@@ -7,7 +7,7 @@ import { buildCharacterContext } from '../src/ai-engine/context';
 import { previewDecision } from '../src/ai-engine/engine';
 import { previewForOwner } from '../src/ai-engine/service';
 import { OpenRouterProvider } from '../src/ai-engine/openrouter';
-import type { TextProvider } from '../src/ai-engine/contracts';
+import { EngineError, type TextProvider } from '../src/ai-engine/contracts';
 
 function fixture() {
   const s = createSeedState(), mar = s.characters.find(c => c.id === 'mar')!;
@@ -77,13 +77,60 @@ test('no hacer nada es válido sin texto y sin programación', async () => {
     { characterId: 'mar', situation: 'post' }, 1);
   assert.equal(preview.decision.action, 'none'); assert.equal(preview.decision.text, null); assert.equal(preview.executed, false);
 });
-test('rechaza JSON inválido, herramientas, tipo incorrecto, longitud y none con texto', async () => {
+test('normaliza none con texto vacío a null, sin convertirlo en una publicación', async () => {
+  const preview = await previewDecision(provider(result('post', { action: 'none', text: '  ' })), fixture(),
+    { characterId: 'mar', situation: 'post' }, 1);
+  assert.equal(preview.decision.action, 'none');
+  assert.equal(preview.decision.text, null);
+  assert.equal(preview.executed, false);
+});
+test('permite borrador de post válido con personaje sin ficha profunda', async () => {
+  const s = fixture();
+  delete s.characters.find(c => c.id === 'mar')!.configuration;
+  const draft = result('post', { contextSections: ['identity', 'recentSocial'], text: 'Un rato tranquilo en Cadaqués.' });
+  const preview = await previewDecision(provider(draft), s, { characterId: 'mar', situation: 'post' }, 1);
+  assert.equal(preview.decision.action, 'draft');
+  assert.equal(preview.decision.text, 'Un rato tranquilo en Cadaqués.');
+  assert.deepEqual(preview.availableContextSections, ['identity', 'recentSocial']);
+});
+test('diagnostica cada inconsistencia semántica sin conservar la salida del modelo', async () => {
   const s = fixture(), input = { characterId: 'mar', situation: 'post' as const };
-  for (const invalid of [result('dm'), result('post', { tool: 'sendMessage' }),
-    result('post', { action: 'publish' }), result('post', { text: 'x'.repeat(601) }),
-    result('post', { action: 'none', text: 'Aun así publica' }), result('post', { suggestedDelayMinutes: -1 }),
-    result('post', { text: 'http://example.com/private' })]) {
-    await assert.rejects(previewDecision(provider(invalid), s, input, 1));
+  const cases: Array<{ value: unknown; diagnostic: string; state?: ReturnType<typeof fixture> }> = [
+    { value: result('dm'), diagnostic: 'SITUATION_MISMATCH' },
+    { value: result('post', { action: 'none', text: 'Aun así publica' }), diagnostic: 'NONE_TEXT_NOT_NULL' },
+    { value: result('post', { text: '   ' }), diagnostic: 'DRAFT_TEXT_EMPTY' },
+    { value: result('post', { text: 'x'.repeat(601) }), diagnostic: 'DRAFT_TEXT_LIMIT_EXCEEDED' },
+    { value: result('post', { contextSections: ['identity', 'voice'] }), diagnostic: 'CONTEXT_SECTION_UNAVAILABLE' },
+    { value: result('post', { contextSections: ['identity', 'identity'] }), diagnostic: 'DUPLICATE_CONTEXT_SECTION' },
+    { value: result('post', { text: 'http://example.com/private' }), diagnostic: 'FORBIDDEN_URL_OR_SECRET_PATTERN' },
+    { value: result('post', { text: '/objects/private-file' }), diagnostic: 'FORBIDDEN_URL_OR_SECRET_PATTERN' },
+    { value: result('post', { reason: 'Credential sk-or-v1-never-log-this' }), diagnostic: 'FORBIDDEN_URL_OR_SECRET_PATTERN' },
+  ];
+  const unconfigured = fixture();
+  delete unconfigured.characters.find(c => c.id === 'mar')!.configuration;
+  cases.push({ value: result('post', { contextSections: ['identity', 'personality'] }),
+    diagnostic: 'CONTEXT_SECTION_UNAVAILABLE', state: unconfigured });
+  for (const item of cases) {
+    const secretLikeOutput = JSON.stringify(item.value);
+    const fake: TextProvider = { name: 'synthetic', complete: async request => {
+      const text = secretLikeOutput;
+      request.validate?.(text);
+      return { text, model: 'synthetic:free' };
+    } };
+    await assert.rejects(previewDecision(fake, item.state ?? s, input, 1), (error: unknown) => {
+      assert.ok(error instanceof EngineError);
+      assert.equal(error.code, 'UNSAFE_OR_INCONSISTENT_DECISION');
+      assert.equal(error.diagnostic, item.diagnostic);
+      assert.equal(JSON.stringify(error).includes('never-log-this'), false);
+      return true;
+    });
+  }
+});
+test('rechaza decisiones JSON estructuralmente inválidas y no ofrece herramientas', async () => {
+  const s = fixture(), input = { characterId: 'mar', situation: 'post' as const };
+  for (const invalid of [result('post', { tool: 'sendMessage' }),
+    result('post', { action: 'publish' }), result('post', { suggestedDelayMinutes: -1 })]) {
+    await assert.rejects(previewDecision(provider(invalid), s, input, 1), /INVALID_MODEL_DECISION/);
   }
   await assert.rejects(previewDecision({ name: 'bad', complete: async () => ({ text: '```json {} ```', model: 'bad:free' }) }, s, input, 1), /INVALID_MODEL_JSON/);
 });

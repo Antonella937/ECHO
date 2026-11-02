@@ -9,14 +9,32 @@ export interface TextProvider {
 }
 
 export interface EngineUsage { promptTokens: number | null; completionTokens: number | null; cost: number | null }
-export interface EngineAttempt { model: string; outcome: 'success' | 'failure' | 'skipped'; code: string | null; usage: EngineUsage }
+export const decisionRejectionDiagnostics = [
+  'SITUATION_MISMATCH',
+  'NONE_TEXT_NOT_NULL',
+  'DRAFT_TEXT_EMPTY',
+  'DRAFT_TEXT_LIMIT_EXCEEDED',
+  'CONTEXT_SECTION_UNAVAILABLE',
+  'DUPLICATE_CONTEXT_SECTION',
+  'FORBIDDEN_URL_OR_SECRET_PATTERN',
+] as const;
+export type DecisionRejectionDiagnostic = typeof decisionRejectionDiagnostics[number];
+
+export interface EngineAttempt {
+  model: string;
+  outcome: 'success' | 'failure' | 'skipped';
+  code: string | null;
+  usage: EngineUsage;
+  /** Fixed safe reason code only; never provider text or prompts. */
+  diagnostic?: DecisionRejectionDiagnostic;
+}
 export const unknownUsage = (): EngineUsage => ({ promptTokens: null, completionTokens: null, cost: null });
 
 export class EngineError extends Error {
   attempts?: EngineAttempt[];
   contextAudit?: CharacterContextAudit;
   retryAfterMs?: number;
-  constructor(public readonly code: string, public readonly status = 400) {
+  constructor(public readonly code: string, public readonly status = 400, public readonly diagnostic?: DecisionRejectionDiagnostic) {
     super(code);
   }
 }

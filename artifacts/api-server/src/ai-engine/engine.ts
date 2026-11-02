@@ -1,6 +1,6 @@
 import { PreviewCharacterDecisionBody, PreviewCharacterDecisionResponse, type CharacterDecisionInput, type SocialState } from '@workspace/api-zod';
 import { buildCharacterContext } from './context';
-import { decisionSchema, EngineError, unknownUsage, type TextProvider } from './contracts';
+import { decisionSchema, EngineError, unknownUsage, type DecisionRejectionDiagnostic, type TextProvider } from './contracts';
 
 const instructions = `You are ECHO's manual character-preview engine. Return ONLY one JSON object matching the supplied schema.
 Nothing will be executed or published. Choose action "none" whenever silence, delay, boundaries, lack of context or routine makes that appropriate. For none, text MUST be null.
@@ -24,16 +24,31 @@ export async function previewDecision(provider: TextProvider, state: SocialState
       if (text.length > 16000) throw new Error();
       raw = JSON.parse(text);
     } catch { throw new EngineError('INVALID_MODEL_JSON', 502); }
+    // Some otherwise-correct no-op responses encode the absence of a draft as
+    // an empty string. Canonicalize only that equivalent representation to null.
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const candidate = raw as Record<string, unknown>;
+      if (candidate.action === 'none' && typeof candidate.text === 'string' && candidate.text.trim() === '') {
+        raw = { ...candidate, text: null };
+      }
+    }
     const validated = PreviewCharacterDecisionResponse.shape.decision.strict().safeParse(raw);
     if (!validated.success) throw new EngineError('INVALID_MODEL_DECISION', 502);
     const decision = validated.data;
     const limit = { post: 600, comment: 1000, dm: 2000 }[input.situation];
-    if (decision.situation !== input.situation ||
-      (decision.action === 'none' ? decision.text !== null : !decision.text?.trim() || decision.text.length > limit) ||
-      decision.contextSections.some(section => !context.availableSections.includes(section)) ||
-      new Set(decision.contextSections).size !== decision.contextSections.length ||
-      /(?:https?:\/\/|\/objects\/|sk-or-v1-)/i.test(`${decision.text ?? ''} ${decision.reason}`))
-      throw new EngineError('UNSAFE_OR_INCONSISTENT_DECISION', 502);
+    const reject = (diagnostic: DecisionRejectionDiagnostic): never => {
+      throw new EngineError('UNSAFE_OR_INCONSISTENT_DECISION', 502, diagnostic);
+    };
+    if (decision.situation !== input.situation) reject('SITUATION_MISMATCH');
+    if (decision.action === 'none' && decision.text !== null) reject('NONE_TEXT_NOT_NULL');
+    if (decision.action === 'draft' && !decision.text?.trim()) reject('DRAFT_TEXT_EMPTY');
+    if (decision.action === 'draft' && decision.text!.length > limit) reject('DRAFT_TEXT_LIMIT_EXCEEDED');
+    if (decision.contextSections.some(section => !context.availableSections.includes(section)))
+      reject('CONTEXT_SECTION_UNAVAILABLE');
+    if (new Set(decision.contextSections).size !== decision.contextSections.length)
+      reject('DUPLICATE_CONTEXT_SECTION');
+    if (/(?:https?:\/\/|\/objects\/|sk-or-v1-)/i.test(`${decision.text ?? ''} ${decision.reason}`))
+      reject('FORBIDDEN_URL_OR_SECRET_PATTERN');
     return decision;
   }
   const contextAudit = { ...context.audit, characterId: input.characterId, sourceRevision, source };

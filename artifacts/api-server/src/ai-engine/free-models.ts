@@ -78,7 +78,8 @@ export class FreeModelProvider implements TextProvider {
       } catch (error) {
         if (error instanceof ProviderFailure) usage = error.usage;
         const safe = error instanceof EngineError ? error : new EngineError('PROVIDER_FAILED', 502);
-        attempts.push({ model: model.id, outcome: 'failure', code: safe.code, usage });
+        attempts.push({ model: model.id, outcome: 'failure', code: safe.code, usage,
+          ...(safe.diagnostic ? { diagnostic: safe.diagnostic } : {}) });
         const retryable = error instanceof ProviderFailure ? error.retryable : invalidOutput.has(safe.code);
         if (!retryable) { safe.attempts = attempts; throw safe; }
         this.cooldown.set(model.id, now() + (error instanceof ProviderFailure && error.retryAfterMs ? error.retryAfterMs : 30000));
