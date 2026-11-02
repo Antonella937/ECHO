@@ -27,12 +27,22 @@ For this stage, Kindroid, visual generation, persistent visual identity, TTS and
 
 **How to apply:** Do not silently replace AI generation with templates or natural-language parsing branded as AI, and do not connect a provider without a new request.
 
-The first AI Engine checkpoint is exclusively manual, technical and text-only.
+Early AI Engine checkpoints are exclusively manual, technical and text-only.
 The user froze the approved appearance during AI work: do not add or redesign
 screens, navigation, themes, styles or visual components for these previews.
 Proposals may include explicit silence; they must not publish, comment, send DMs,
 update memories or schedule future execution.
 
-**Why:** The user explicitly requested only checkpoint 1, repeated “no toques NADA de la apariencia,” and excluded autonomy and multimedia integrations.
+**Why:** The user explicitly limited the AI Engine stages, repeated “no toques NADA de la apariencia,” and excluded autonomy and multimedia integrations.
 
 **How to apply:** Keep previews isolated from social mutation capabilities. State missing character configuration and external-provider failures honestly; test-specific enriched personalities must never be mistaken for the owner's real saved character.
+
+Real-character validation must use an explicitly selected owner's persisted
+universe, never an initial/demo profile substituted for missing or ambiguous
+owner data. Do not invent or save personality fields to make a real-character
+test pass. OpenRouter fallback is allowed only between verified free models,
+while preserving manual preview/no-execution behavior.
+
+**Why:** The user specifically requested the real deep character sheet and real provider decisions after an initial-profile test was insufficient.
+
+**How to apply:** Stop real-character validation if the owner cannot be identified or no developed persisted personality is available. Distinguish this prerequisite from backend tests using isolated synthetic fixtures.

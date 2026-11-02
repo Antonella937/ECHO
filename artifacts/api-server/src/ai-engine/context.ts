@@ -1,4 +1,5 @@
 import type { CharacterDecisionInput, SocialState } from '@workspace/api-zod';
+import { createHash } from 'node:crypto';
 import { EngineError, sections } from './contracts';
 
 /** Builds text-only context from an already owner-scoped persisted snapshot.
@@ -79,7 +80,44 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const serialized = JSON.stringify(context);
   if (serialized.length > 60000) throw new EngineError('CONTEXT_BUDGET_EXCEEDED');
   if (truncated) warnings.push('CONTEXT_TRUNCATED: long fields or arrays were bounded for this preview');
-  return { serialized, availableSections: [...availableSections], warnings };
+  const actual = context as typeof data;
+  const content = {
+    identity: true,
+    personality: !!c && !!(c.personality.description.trim() || c.personality.traits.length || c.personality.values.length || c.personality.boundaries.length),
+    voice: !!c && !!(c.voice.speakingStyle.trim() || c.voice.vocabulary.trim() || c.voice.captionStyle.trim() || c.voice.commentStyle.trim()),
+    relationships: !!actual.relationships?.length,
+    routine: !!actual.routine?.entries.length,
+    social: !!actual.social,
+    memory: !!actual.memory && !!(actual.memory.permanent.length || actual.memory.relationships.length || actual.memory.recent.length || actual.memory.recentSummary.trim()),
+    currentState: !!c && !!(c.currentState.location.trim() || c.currentState.activity.trim() || c.currentState.mood.trim() || c.currentState.companions.length || c.currentState.nextEvent.trim()),
+    recentSocial: Object.values(actual.recentSocial).some(items => items.length > 0),
+  };
+  if (c && !content.personality) warnings.push('PERSONALITY_NOT_CONFIGURED: persisted defaults are not a developed personality');
+  const auditSections = Object.entries(content).map(([name, hasContent]) => {
+    const value = actual[name as keyof typeof data];
+    const recordCount = name === 'memory'
+      ? actual.memory ? actual.memory.permanent.length + actual.memory.relationships.length + actual.memory.recent.length : 0
+      : name === 'routine' ? actual.routine?.entries.length ?? 0
+      : name === 'recentSocial' ? Object.values(actual.recentSocial).reduce((n, items) => n + items.length, 0)
+      : Array.isArray(value) ? value.length : value === null ? 0 : 1;
+    return { name, hasContent, recordCount, fields: fieldPaths(value) };
+  });
+  return {
+    serialized, availableSections: [...availableSections], warnings,
+    audit: {
+      contextHash: createHash('sha256').update(serialized).digest('hex'),
+      sections: auditSections,
+      recentCounts: Object.fromEntries(Object.entries(actual.recentSocial).map(([key, value]) => [key, value.length])),
+      privateDmScope: input.situation === 'dm' ? 'actor_and_recipient_only' as const : 'none' as const,
+    },
+  };
+}
+
+function fieldPaths(value: unknown, prefix = ''): string[] {
+  if (value === null || value === undefined || value === '') return [];
+  if (value instanceof Date || typeof value !== 'object') return prefix ? [prefix] : [];
+  if (Array.isArray(value)) return [...new Set(value.flatMap(v => fieldPaths(v, `${prefix}[]`)))];
+  return Object.entries(value).flatMap(([key, v]) => fieldPaths(v, prefix ? `${prefix}.${key}` : key));
 }
 
 function localTime(now: Date, timezone: string) {

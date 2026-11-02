@@ -37,6 +37,24 @@ export const previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMax = 
 
 export const previewCharacterDecisionResponseDecisionContextSectionsMax = 8;
 
+export const previewCharacterDecisionResponseContextAuditSourceRevisionMin = 0;
+
+export const previewCharacterDecisionResponseContextAuditSectionsItemRecordCountMin = 0;
+
+export const previewCharacterDecisionResponseContextAuditRecentCountsMinOne = 0;
+
+export const previewCharacterDecisionResponseUsagePromptTokensMin = 0;
+
+export const previewCharacterDecisionResponseUsageCompletionTokensMin = 0;
+
+export const previewCharacterDecisionResponseUsageCostMin = 0;
+
+export const previewCharacterDecisionResponseAttemptsItemUsagePromptTokensMin = 0;
+
+export const previewCharacterDecisionResponseAttemptsItemUsageCompletionTokensMin = 0;
+
+export const previewCharacterDecisionResponseAttemptsItemUsageCostMin = 0;
+
 
 
 export const PreviewCharacterDecisionResponse = zod.object({
@@ -55,7 +73,36 @@ export const PreviewCharacterDecisionResponse = zod.object({
   "contextSections": zod.array(zod.enum(['identity', 'personality', 'relationships', 'routine', 'social', 'memory', 'currentState', 'recentSocial'])).max(previewCharacterDecisionResponseDecisionContextSectionsMax)
 }),
   "availableContextSections": zod.array(zod.string()),
-  "warnings": zod.array(zod.string())
+  "warnings": zod.array(zod.string()),
+  "contextAudit": zod.object({
+  "source": zod.enum(['persisted_owner_universe', 'provided_snapshot']),
+  "contextHash": zod.string().describe('SHA-256 of the exact bounded text context'),
+  "characterId": zod.string(),
+  "sourceRevision": zod.number().int().min(previewCharacterDecisionResponseContextAuditSourceRevisionMin),
+  "sections": zod.array(zod.object({
+  "name": zod.string(),
+  "hasContent": zod.boolean().describe('Meaningful content'),
+  "recordCount": zod.number().int().min(previewCharacterDecisionResponseContextAuditSectionsItemRecordCountMin),
+  "fields": zod.array(zod.string()).describe('Included field paths only; never private field values')
+})),
+  "recentCounts": zod.record(zod.string(), zod.number().int().min(previewCharacterDecisionResponseContextAuditRecentCountsMinOne)),
+  "privateDmScope": zod.enum(['none', 'actor_and_recipient_only'])
+}),
+  "usage": zod.object({
+  "promptTokens": zod.number().int().min(previewCharacterDecisionResponseUsagePromptTokensMin).nullable(),
+  "completionTokens": zod.number().int().min(previewCharacterDecisionResponseUsageCompletionTokensMin).nullable(),
+  "cost": zod.number().min(previewCharacterDecisionResponseUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
+}),
+  "attempts": zod.array(zod.object({
+  "model": zod.string(),
+  "outcome": zod.enum(['success', 'failure', 'skipped']),
+  "code": zod.string().nullable(),
+  "usage": zod.object({
+  "promptTokens": zod.number().int().min(previewCharacterDecisionResponseAttemptsItemUsagePromptTokensMin).nullable(),
+  "completionTokens": zod.number().int().min(previewCharacterDecisionResponseAttemptsItemUsageCompletionTokensMin).nullable(),
+  "cost": zod.number().min(previewCharacterDecisionResponseAttemptsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
+})
+}))
 })
 
 

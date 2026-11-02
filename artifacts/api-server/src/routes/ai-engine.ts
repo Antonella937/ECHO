@@ -3,11 +3,11 @@ import { PreviewCharacterDecisionBody } from '@workspace/api-zod';
 import { requireAuth } from '../middlewares/requireAuth';
 import { readUniverse } from '../lib/universeRepository';
 import { previewForOwner } from '../ai-engine/service';
-import { OpenRouterProvider } from '../ai-engine/openrouter';
+import { FreeModelProvider } from '../ai-engine/free-models';
 import { EngineError } from '../ai-engine/contracts';
 
 const router: IRouter = Router();
-const provider = new OpenRouterProvider();
+const provider = new FreeModelProvider();
 const gates = new Map<string, { running: boolean; until: number }>();
 router.post('/ai-engine/preview', requireAuth, async (req, res): Promise<void> => {
   const input = PreviewCharacterDecisionBody.strict().safeParse(req.body);
@@ -27,7 +27,8 @@ router.post('/ai-engine/preview', requireAuth, async (req, res): Promise<void> =
     // No context, generated content, provider error text or secret in logs.
     const safe = error instanceof EngineError ? error : new EngineError('PREVIEW_FAILED', 502);
     req.log.warn({ code: safe.code }, 'Manual character preview failed');
-    res.status(safe.status).json({ error: safe.code, executed: false });
+    if (safe.retryAfterMs) res.setHeader('Retry-After', String(Math.ceil(safe.retryAfterMs / 1000)));
+    res.status(safe.status).json({ error: safe.code, executed: false, attempts: safe.attempts ?? [], contextAudit: safe.contextAudit ?? null });
   } finally {
     gates.set(owner, { running: false, until: Date.now() + 5000 });
   }

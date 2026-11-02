@@ -349,7 +349,7 @@ components:
           items: { type: string, enum: [identity, personality, relationships, routine, social, memory, currentState, recentSocial] }
     CharacterDecisionPreview:
       type: object
-      required: [mode, executed, characterId, sourceRevision, provider, model, decision, availableContextSections, warnings]
+      required: [mode, executed, characterId, sourceRevision, provider, model, decision, availableContextSections, warnings, contextAudit, usage, attempts]
       properties:
         mode: { type: string, enum: [preview] }
         executed: { type: boolean, enum: [false] }
@@ -360,6 +360,45 @@ components:
         decision: { $ref: "#/components/schemas/CharacterDecision" }
         availableContextSections: { type: array, items: { type: string } }
         warnings: { type: array, items: { type: string } }
+        contextAudit: { $ref: "#/components/schemas/CharacterContextAudit" }
+        usage: { $ref: "#/components/schemas/EngineUsage" }
+        attempts: { type: array, items: { $ref: "#/components/schemas/EngineAttempt" } }
+    EngineUsage:
+      type: object
+      required: [promptTokens, completionTokens, cost]
+      properties:
+        promptTokens: { type: [integer, "null"], minimum: 0 }
+        completionTokens: { type: [integer, "null"], minimum: 0 }
+        cost: { type: [number, "null"], minimum: 0, description: Provider-reported USD; null means not reported, not zero }
+    EngineAttempt:
+      type: object
+      required: [model, outcome, code, usage]
+      properties:
+        model: { type: string }
+        outcome: { type: string, enum: [success, failure, skipped] }
+        code: { type: [string, "null"] }
+        usage: { $ref: "#/components/schemas/EngineUsage" }
+    CharacterContextSection:
+      type: object
+      required: [name, hasContent, recordCount, fields]
+      properties:
+        name: { type: string }
+        hasContent: { type: boolean, description: Meaningful content, not merely an empty/default object }
+        recordCount: { type: integer, minimum: 0 }
+        fields: { type: array, items: { type: string }, description: Included field paths only; never private field values }
+    CharacterContextAudit:
+      type: object
+      required: [source, contextHash, characterId, sourceRevision, sections, recentCounts, privateDmScope]
+      properties:
+        source: { type: string, enum: [persisted_owner_universe, provided_snapshot] }
+        contextHash: { type: string, description: SHA-256 of the exact bounded text context, including evaluation time }
+        characterId: { type: string }
+        sourceRevision: { type: integer, minimum: 0 }
+        sections: { type: array, items: { $ref: "#/components/schemas/CharacterContextSection" } }
+        recentCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        privateDmScope: { type: string, enum: [none, actor_and_recipient_only] }
     CharacterConfiguration:
       type: object
       required: [version, basic, personality, voice, relationships, routine, social, memory, currentState, assistance]

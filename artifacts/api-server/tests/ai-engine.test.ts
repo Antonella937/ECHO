@@ -117,7 +117,7 @@ test('adaptador solo permite modelos gratis; errores y respuestas truncadas no s
     const reject = new OpenRouterProvider('openrouter/free', async () => new Response('provider private body', { status: 401 }));
     await assert.rejects(reject.complete({ system: '', context: '', outputSchema: {} }), /OPENROUTER_REJECTED/);
     const truncated = new OpenRouterProvider('openrouter/free', async () => Response.json({ choices: [{ finish_reason: 'length', message: { content: '{}' } }], model: 'test:free' }));
-    await assert.rejects(truncated.complete({ system: '', context: '', outputSchema: {} }), /INCOMPLETE/);
+    await assert.rejects(truncated.complete({ system: '', context: '', outputSchema: {} }), /TRUNCATED/);
   } finally {
     if (original === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = original;
   }

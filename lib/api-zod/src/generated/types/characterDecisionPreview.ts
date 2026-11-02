@@ -5,8 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CharacterContextAudit } from './characterContextAudit';
 import type { CharacterDecision } from './characterDecision';
 import type { CharacterDecisionPreviewMode } from './characterDecisionPreviewMode';
+import type { EngineAttempt } from './engineAttempt';
+import type { EngineUsage } from './engineUsage';
 
 export interface CharacterDecisionPreview {
   mode: CharacterDecisionPreviewMode;
@@ -19,4 +22,7 @@ export interface CharacterDecisionPreview {
   decision: CharacterDecision;
   availableContextSections: string[];
   warnings: string[];
+  contextAudit: CharacterContextAudit;
+  usage: EngineUsage;
+  attempts: EngineAttempt[];
 }

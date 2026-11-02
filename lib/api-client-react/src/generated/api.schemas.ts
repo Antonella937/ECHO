@@ -889,6 +889,82 @@ export const CharacterDecisionPreviewMode = {
   preview: 'preview',
 } as const;
 
+export type CharacterContextAuditSource = typeof CharacterContextAuditSource[keyof typeof CharacterContextAuditSource];
+
+
+export const CharacterContextAuditSource = {
+  persisted_owner_universe: 'persisted_owner_universe',
+  provided_snapshot: 'provided_snapshot',
+} as const;
+
+export interface CharacterContextSection {
+  name: string;
+  /** Meaningful content */
+  hasContent: boolean;
+  /** @minimum 0 */
+  recordCount: number;
+  /** Included field paths only; never private field values */
+  fields: string[];
+}
+
+export type CharacterContextAuditPrivateDmScope = typeof CharacterContextAuditPrivateDmScope[keyof typeof CharacterContextAuditPrivateDmScope];
+
+
+export const CharacterContextAuditPrivateDmScope = {
+  none: 'none',
+  actor_and_recipient_only: 'actor_and_recipient_only',
+} as const;
+
+export type CharacterContextAuditRecentCounts = {[key: string]: number};
+
+export interface CharacterContextAudit {
+  source: CharacterContextAuditSource;
+  /** SHA-256 of the exact bounded text context */
+  contextHash: string;
+  characterId: string;
+  /** @minimum 0 */
+  sourceRevision: number;
+  sections: CharacterContextSection[];
+  recentCounts: CharacterContextAuditRecentCounts;
+  privateDmScope: CharacterContextAuditPrivateDmScope;
+}
+
+export interface EngineUsage {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  promptTokens: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  completionTokens: number | null;
+  /**
+     * Provider-reported USD; null means not reported
+     * @minimum 0
+     * @nullable
+     */
+  cost: number | null;
+}
+
+export type EngineAttemptOutcome = typeof EngineAttemptOutcome[keyof typeof EngineAttemptOutcome];
+
+
+export const EngineAttemptOutcome = {
+  success: 'success',
+  failure: 'failure',
+  skipped: 'skipped',
+} as const;
+
+export interface EngineAttempt {
+  model: string;
+  outcome: EngineAttemptOutcome;
+  /** @nullable */
+  code: string | null;
+  usage: EngineUsage;
+}
+
 export interface CharacterDecisionPreview {
   mode: CharacterDecisionPreviewMode;
   executed: false;
@@ -900,6 +976,9 @@ export interface CharacterDecisionPreview {
   decision: CharacterDecision;
   availableContextSections: string[];
   warnings: string[];
+  contextAudit: CharacterContextAudit;
+  usage: EngineUsage;
+  attempts: EngineAttempt[];
 }
 
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];
