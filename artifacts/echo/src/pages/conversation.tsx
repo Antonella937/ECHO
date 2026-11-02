@@ -29,6 +29,7 @@ export default function ConversationPage() {
   const [pending, setPending] = useState<Pending[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reacting, setReacting] = useState<string | null>(null);
+  const [hiding, setHiding] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(pending); pendingRef.current = pending;
@@ -159,6 +160,9 @@ export default function ConversationPage() {
               onReact={(v) => { try { actions.reactMessage(m.id, v); } catch (e) { setError((e as Error).message); } setReacting(null); }}
               onReply={() => setQuoteId(m.id)}
               onJump={jumpTo}
+              hiding={hiding === m.id}
+              onToggleHiding={() => setHiding(h => h === m.id ? null : m.id)}
+              onHide={() => { try { actions.hideMessage(m.id); if (quoteId === m.id) setQuoteId(null); } catch (e) { setError((e as Error).message); } setHiding(null); }}
             />
           ))}
         </ul>
@@ -250,10 +254,11 @@ function summarize(m: Message): string {
   return 'Mensaje';
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
+  hiding: boolean; onToggleHiding(): void; onHide(): void;
 }) {
   const story = m.storyId ? state.stories.find((s) => s.id === m.storyId) : undefined;
   const post = m.postId ? state.posts.find((p) => p.id === m.postId) : undefined;
@@ -264,7 +269,9 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
-          <span className="text-[11px] text-muted-foreground">{mine ? 'Respondiste a su historia' : 'Respondió a tu historia'}</span>
+          <span className="text-[11px] text-muted-foreground">{story?.reactions?.some(r => r.actorId === m.senderId && r.value === m.text) || REACTIONS.includes(m.text)
+            ? (mine ? 'Reaccionaste a su historia' : 'Reaccionó a tu historia')
+            : (mine ? 'Respondiste a su historia' : 'Respondió a tu historia')}</span>
           {story ? (
             <img src={resolveMedia(story.image)} alt="Historia" className="h-36 w-24 rounded-xl object-cover opacity-90" />
           ) : (
@@ -305,8 +312,16 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
           <button type="button" onClick={onReply} aria-label="Responder" className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label="Reaccionar" aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
+          <button type="button" onClick={onToggleHiding} aria-label="Eliminar para mí" aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
+      {hiding && (
+        <div role="alertdialog" aria-label="Eliminar mensaje para mí" className="mt-1 flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-xs shadow-sm" data-testid={`confirm-hide-${m.id}`}>
+          <span className="text-muted-foreground">Se oculta solo para ti; la otra cuenta lo sigue viendo.</span>
+          <button type="button" onClick={onToggleHiding} className="h-9 rounded-full bg-secondary px-3 font-semibold" data-testid={`button-hide-cancel-${m.id}`}>Cancelar</button>
+          <button type="button" onClick={onHide} className="h-9 rounded-full bg-destructive px-3 font-semibold text-destructive-foreground" data-testid={`button-hide-confirm-${m.id}`}>Eliminar</button>
+        </div>
+      )}
       {reacting && (
         <div role="menu" className="mt-1 flex gap-0.5 rounded-full border border-border bg-card px-1.5 py-1 shadow-sm" data-testid={`menu-reactions-${m.id}`}>
           {REACTIONS.map((r, i) => (

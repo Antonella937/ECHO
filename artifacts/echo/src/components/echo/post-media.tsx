@@ -21,6 +21,15 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   const downLeft = useRef(0);
   const count = media.length;
 
+  if (count <= 1 && media[0]?.type === 'video') {
+    return (
+      <div className="relative w-full overflow-hidden bg-card sm:rounded-[22px]">
+        <video src={resolveMedia(media[0].url)} controls playsInline preload="metadata" aria-label={alt || 'Video'} className="aspect-[4/5] w-full bg-black object-contain" data-testid={`video-post-${postId}`} />
+        {overlay}
+      </div>
+    );
+  }
+
   if (count <= 1) {
     return (
       <button onClick={onTap} className="relative block w-full overflow-hidden bg-card sm:rounded-[22px]" aria-label="Doble toque para indicar que te gusta" data-testid={`button-image-${postId}`}>
@@ -38,7 +47,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   };
 
   return (
-    <div className="relative w-full overflow-hidden bg-card sm:rounded-[22px]" role="region" aria-roledescription="carrusel" aria-label={`Carrusel de ${count} fotos`} data-testid={`carousel-post-${postId}`}>
+    <div className="relative w-full overflow-hidden bg-card sm:rounded-[22px]" role="region" aria-roledescription="carrusel" aria-label={`Carrusel de ${count} elementos`} data-testid={`carousel-post-${postId}`}>
       <div
         ref={scroller}
         onPointerDown={() => (downLeft.current = scroller.current?.scrollLeft ?? 0)}
@@ -63,14 +72,27 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
       >
         {media.map((m, i) => (
           <div key={m.id} className="w-full shrink-0 snap-center snap-always" data-testid={`slide-post-${postId}-${i}`}>
-            <img
-              src={resolveMedia(m.url)}
-              alt={`${alt} · foto ${i + 1} de ${count}`}
-              loading={eager && i === 0 ? 'eager' : 'lazy'}
-              draggable={false}
-              className="aspect-[4/5] w-full object-cover"
-              data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`}
-            />
+            {m.type === 'video' ? (
+              <video
+                src={resolveMedia(m.url)}
+                controls
+                playsInline
+                preload="metadata"
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`${alt} · video ${i + 1} de ${count}`}
+                className="aspect-[4/5] w-full bg-black object-contain"
+                data-testid={`video-post-${postId}-${i}`}
+              />
+            ) : (
+              <img
+                src={resolveMedia(m.url)}
+                alt={`${alt} · foto ${i + 1} de ${count}`}
+                loading={eager && i === 0 ? 'eager' : 'lazy'}
+                draggable={false}
+                className="aspect-[4/5] w-full object-cover"
+                data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`}
+              />
+            )}
           </div>
         ))}
       </div>

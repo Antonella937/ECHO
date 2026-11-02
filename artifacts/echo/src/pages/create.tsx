@@ -1,13 +1,15 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
-import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Plus, RefreshCw, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Music2, Plus, RefreshCw, X } from 'lucide-react';
+import { AccountMultiPicker } from '@/components/echo/account-multi-picker';
+import { MentionSuggestions } from '@/components/echo/mention-suggestions';
 import { MAX_POST_MEDIA, validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { Switch } from '@/components/ui/switch';
-import { compressImage, resolveMedia, uploadPrivateImage } from '@/lib/media';
+import { compressImage, resolveMedia, uploadPrivateFile, uploadPrivateImage } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +26,11 @@ export default function CreatePage() {
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [alsoStory, setAlsoStory] = useState(false);
+  const [tagged, setTagged] = useState<string[]>([]);
+  const [mentioned, setMentioned] = useState<string[]>([]);
+  const [commentsEnabled, setCommentsEnabled] = useState(true);
+  const [musicTitle, setMusicTitle] = useState('');
+  const [musicArtist, setMusicArtist] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -31,7 +38,10 @@ export default function CreatePage() {
   /** null = append, number = replace that index */
   const replaceAt = useRef<number | null>(null);
   const image = items[0]?.url ?? null;
+  const firstIsVideo = items[0]?.type === 'video';
   const tooManyForStory = mode === 'story' && items.length > 1;
+  const storyVideo = mode === 'story' && items.some((m) => m.type === 'video');
+  const musicPartial = mode === 'story' && !!musicTitle.trim() !== !!musicArtist.trim();
 
   const pick = (replace: number | null) => {
     if (busy) return;
@@ -63,9 +73,16 @@ export default function CreatePage() {
       for (let i = 0; i < files.length; i++) {
         setProgress(files.length > 1 ? `Subiendo ${i + 1} de ${files.length}…` : 'Subiendo de forma privada…');
         try {
-          const compressed = await compressImage(files[i], mode === 'story' ? 1280 : 1440);
-          const url = await uploadPrivateImage(compressed);
-          const item: PostMedia = { id: `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`, type: 'image', url };
+          const mid = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+          let item: PostMedia;
+          if (files[i].type.startsWith('video/')) {
+            if (mode === 'story') throw new Error('Las historias admiten solo fotos.');
+            const att = await uploadPrivateFile(files[i]);
+            item = { id: mid, type: 'video', url: att.url, ...(att.mimeType ? { mimeType: att.mimeType } : {}) };
+          } else {
+            const compressed = await compressImage(files[i], mode === 'story' ? 1280 : 1440);
+            item = { id: mid, type: 'image', url: await uploadPrivateImage(compressed) };
+          }
           setItems((cur) => {
             if (replace !== null && cur[replace]) return cur.map((c, j) => (j === replace ? item : c));
             if (mode === 'story') return [item];
@@ -105,14 +122,18 @@ export default function CreatePage() {
           setError('Las historias admiten una sola foto. Quitá fotos hasta dejar una.');
           return;
         }
-        actions.createStory({ image, caption });
+        if (storyVideo) { setError('Las historias admiten solo fotos.'); return; }
+        if (musicPartial) { setError('Completá título y artista de la música, o dejá ambos vacíos.'); return; }
+        actions.createStory({ image, caption, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
+          ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: 'Historia publicada', description: `Como ${me.name}` });
         navigate('/');
         return;
       }
       validatePostMedia(items);
-      const id = actions.createPost({ image, media: items, caption, location });
-      if (alsoStory) actions.createStory({ image, caption: '' });
+      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), commentsEnabled });
+      const cover = items.find((m) => m.type === 'image');
+      if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
       toast({ title: 'Publicado', description: `Como ${me.name}` });
       navigate(`/p/${id}`);
     } catch (err) {
@@ -152,10 +173,14 @@ export default function CreatePage() {
           </Link>
         </div>
 
-        <input ref={fileRef} type="file" accept="image/*" multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
+        <input ref={fileRef} type="file" accept={mode === 'post' ? 'image/*,video/mp4,video/webm' : 'image/*'} multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
         {image ? (
           <div className="relative overflow-hidden rounded-[22px] bg-card py-0">
-            <img src={resolveMedia(image)} alt={items.length > 1 ? `Vista previa, foto 1 de ${items.length}` : 'Vista previa'} className={cn('mx-auto block object-cover', mode === 'story' ? 'aspect-[9/16] h-[min(240px,34dvh)] rounded-[18px]' : 'h-[min(240px,34dvh)] w-full')} data-testid="img-preview" />
+            {firstIsVideo ? (
+              <video src={resolveMedia(image)} controls playsInline preload="metadata" className="mx-auto block h-[min(240px,34dvh)] w-full bg-black object-contain" data-testid="video-preview" />
+            ) : (
+              <img src={resolveMedia(image)} alt={items.length > 1 ? `Vista previa, elemento 1 de ${items.length}` : 'Vista previa'} className={cn('mx-auto block object-cover', mode === 'story' ? 'aspect-[9/16] h-[min(240px,34dvh)] rounded-[18px]' : 'h-[min(240px,34dvh)] w-full')} data-testid="img-preview" />
+            )}
             <button
               type="button"
               disabled={busy}
@@ -177,22 +202,26 @@ export default function CreatePage() {
             <span className="grid h-12 w-12 place-items-center rounded-full bg-accent text-accent-foreground">
               <ImagePlus className="h-6 w-6" strokeWidth={1.5} />
             </span>
-            <span className="font-display text-lg font-light">{busy ? 'Procesando…' : mode === 'post' ? 'Elige fotos' : 'Elige una foto'}</span>
-            <span className="px-4 text-center text-xs text-muted-foreground">{busy ? progress ?? 'Subiendo de forma privada…' : mode === 'post' ? `Solo fotos, hasta ${MAX_POST_MEDIA}. Se guardarán en tu cuenta.` : 'JPG, PNG o HEIC compatible. Se guardará en tu cuenta.'}</span>
+            <span className="font-display text-lg font-light">{busy ? 'Procesando…' : mode === 'post' ? 'Elige fotos o videos' : 'Elige una foto'}</span>
+            <span className="px-4 text-center text-xs text-muted-foreground">{busy ? progress ?? 'Subiendo de forma privada…' : mode === 'post' ? `Fotos o videos, hasta ${MAX_POST_MEDIA}. Se guardan en privado.` : 'JPG, PNG o HEIC compatible. Se guardará en tu cuenta.'}</span>
           </button>
         )}
 
         {items.length > 0 && (mode === 'post' || items.length > 1) && (
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span data-testid="text-media-count">{items.length}/{MAX_POST_MEDIA} fotos · solo fotos</span>
+              <span data-testid="text-media-count">{items.length}/{MAX_POST_MEDIA} · fotos y videos MP4/WebM</span>
               {busy && <span aria-live="polite" data-testid="text-upload-progress">{progress}</span>}
             </div>
             <ol className="no-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Orden de las fotos">
               {items.map((m, i) => (
                 <li key={m.id} data-media-id={m.id} className="w-[132px] shrink-0 rounded-2xl border border-border bg-card p-1.5" data-testid={`item-media-${i}`}>
                   <div className="relative">
-                    <img src={resolveMedia(m.url)} alt={`Foto ${i + 1} de ${items.length}`} className="aspect-[4/5] w-full rounded-xl object-cover" data-testid={`img-media-preview-${i}`} />
+                    {m.type === 'video' ? (
+                      <video src={resolveMedia(m.url)} muted playsInline preload="metadata" aria-label={`Video ${i + 1} de ${items.length}`} className="aspect-[4/5] w-full rounded-xl bg-black object-cover" data-testid={`video-media-preview-${i}`} />
+                    ) : (
+                      <img src={resolveMedia(m.url)} alt={`Foto ${i + 1} de ${items.length}`} className="aspect-[4/5] w-full rounded-xl object-cover" data-testid={`img-media-preview-${i}`} />
+                    )}
                     <span className="absolute left-1.5 top-1.5 rounded-full bg-[hsl(240_8%_3%/0.7)] px-2 py-0.5 text-[11px] font-semibold">{i + 1}</span>
                   </div>
                   <div className="mt-1 flex justify-between">
@@ -227,6 +256,21 @@ export default function CreatePage() {
             data-testid="input-caption"
           />
         </label>
+        <MentionSuggestions text={caption} onPick={(t) => setCaption(t.slice(0, 600))} excludeId={me.id} className="mt-2" />
+
+        {mode === 'story' && (
+          <div className="mt-3 grid gap-3">
+            <AccountMultiPicker value={mentioned} onChange={setMentioned} label="Mencionar cuentas" excludeId={me.id} max={50} testId="picker-story-mentions" />
+            <div className="rounded-2xl border border-input bg-card px-4 py-3">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground"><Music2 className="h-3.5 w-3.5" /> Música · solo metadatos</div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input value={musicTitle} onChange={(e) => setMusicTitle(e.target.value.slice(0, 160))} placeholder="Canción" aria-label="Título de la canción" className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-title" />
+                <input value={musicArtist} onChange={(e) => setMusicArtist(e.target.value.slice(0, 160))} placeholder="Artista" aria-label="Artista" className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-artist" />
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Se muestra como etiqueta. No se reproduce audio ni se conecta ningún servicio de música.</p>
+            </div>
+          </div>
+        )}
 
         {mode === 'post' && (
           <>
@@ -241,10 +285,15 @@ export default function CreatePage() {
                 data-testid="input-location"
               />
             </label>
+            <div className="mt-3"><AccountMultiPicker value={tagged} onChange={setTagged} label="Etiquetar cuentas" excludeId={me.id} testId="picker-post-tags" /></div>
+            <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
+              <span className="block text-sm font-medium">Permitir comentarios</span>
+              <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} data-testid="switch-comments-enabled" />
+            </label>
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
               <span>
                 <span className="block text-sm font-medium">Compartir también en tu historia</span>
-                <span className="text-xs text-muted-foreground">Aparecerá en el círculo de {me.name.split(' ')[0]}{items.length > 1 ? ' · se usa solo la primera foto' : ''}</span>
+                <span className="text-xs text-muted-foreground">Aparecerá en el círculo de {me.name.split(' ')[0]}{items.length > 1 ? ' · se usa solo la primera foto' : ''}{items.length && !items.some((m) => m.type === 'image') ? ' · requiere al menos una foto' : ''}</span>
               </span>
               <Switch checked={alsoStory} onCheckedChange={setAlsoStory} data-testid="switch-also-story" />
             </label>
@@ -259,7 +308,7 @@ export default function CreatePage() {
 
         <button
           type="submit"
-          disabled={!image || busy || tooManyForStory}
+          disabled={!image || busy || tooManyForStory || storyVideo || musicPartial}
           className="tap mt-6 h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground disabled:opacity-40"
           data-testid="button-publish"
         >

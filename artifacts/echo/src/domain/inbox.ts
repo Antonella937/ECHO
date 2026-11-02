@@ -12,7 +12,7 @@ export function hasMessageContent(message: Message): boolean {
 export function selectInbox(state: SocialState, characterId: string): ThreadSummary[] {
   const grouped = new Map<string, Message[]>();
   for (const message of state.messages) {
-    if (!hasMessageContent(message)) continue;
+    if (!hasMessageContent(message) || message.hiddenForIds?.includes(characterId)) continue;
     const other = message.senderId === characterId ? message.recipientId :
       message.recipientId === characterId ? message.senderId : null;
     if (!other || other === characterId || message.threadId !== threadIdFor(characterId, other)) continue;

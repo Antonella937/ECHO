@@ -513,6 +513,8 @@ export const getUniverseResponseStateOneStoriesItemMusicArtistMax = 160;
 
 export const getUniverseResponseStateOneStoriesItemMusicProviderRefMax = 300;
 
+export const getUniverseResponseStateOneMessagesItemHiddenForIdsMax = 2;
+
 
 export const getUniverseResponseStateOneMessagesItemAttachmentsItemDurationSecondsMin = 0;
 
@@ -759,6 +761,7 @@ export const GetUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "hiddenForIds": zod.array(zod.string()).max(getUniverseResponseStateOneMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
   "id": zod.string(),
@@ -991,6 +994,8 @@ export const saveUniverseBodyStateStoriesItemMusicTitleMax = 160;
 export const saveUniverseBodyStateStoriesItemMusicArtistMax = 160;
 
 export const saveUniverseBodyStateStoriesItemMusicProviderRefMax = 300;
+
+export const saveUniverseBodyStateMessagesItemHiddenForIdsMax = 2;
 
 
 export const saveUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin = 0;
@@ -1238,6 +1243,7 @@ export const SaveUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "hiddenForIds": zod.array(zod.string()).max(saveUniverseBodyStateMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
   "id": zod.string(),
@@ -1466,6 +1472,8 @@ export const saveUniverseResponseStateOneStoriesItemMusicTitleMax = 160;
 export const saveUniverseResponseStateOneStoriesItemMusicArtistMax = 160;
 
 export const saveUniverseResponseStateOneStoriesItemMusicProviderRefMax = 300;
+
+export const saveUniverseResponseStateOneMessagesItemHiddenForIdsMax = 2;
 
 
 export const saveUniverseResponseStateOneMessagesItemAttachmentsItemDurationSecondsMin = 0;
@@ -1713,6 +1721,7 @@ export const SaveUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "hiddenForIds": zod.array(zod.string()).max(saveUniverseResponseStateOneMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
   "id": zod.string(),
@@ -1982,6 +1991,8 @@ export const verifyUniverseResponseOneStateOneStoriesItemMusicArtistMax = 160;
 
 export const verifyUniverseResponseOneStateOneStoriesItemMusicProviderRefMax = 300;
 
+export const verifyUniverseResponseOneStateOneMessagesItemHiddenForIdsMax = 2;
+
 
 export const verifyUniverseResponseOneStateOneMessagesItemAttachmentsItemDurationSecondsMin = 0;
 
@@ -2230,6 +2241,7 @@ export const VerifyUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "hiddenForIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
   "id": zod.string(),

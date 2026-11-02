@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Archive, Bookmark, Grid3x3, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
+import { Archive, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -12,6 +12,9 @@ import { toast } from '@/hooks/use-toast';
 import { AccountEditor } from '@/components/echo/account-editor';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { realFollowCounts } from '@/components/echo/account-stats';
+import { HighlightsRow } from '@/components/echo/highlights';
+import { cn } from '@/lib/utils';
+import { isStoryActive } from '@/domain/social-features';
 import { accountTypes, shownCount, formatCount } from '@/domain/accounts';
 
 export default function ProfilePage() {
@@ -22,7 +25,12 @@ export default function ProfilePage() {
   const { openStories } = useStoryViewer();
   const person = character(id);
   const [editing, setEditing] = useState(false);
-  const posts = useMemo(() => state.posts.filter((p) => p.authorId === id).sort(byDateDesc), [state.posts, id]);
+  const [tab, setTab] = useState<'posts' | 'tagged'>('posts');
+  const posts = useMemo(() => {
+    const own = state.posts.filter((p) => p.authorId === id).sort(byDateDesc);
+    return [...own.filter((p) => p.pinned).slice(0, 3), ...own.filter((p) => !own.filter((q) => q.pinned).slice(0, 3).includes(p))];
+  }, [state.posts, id]);
+  const tagged = useMemo(() => state.posts.filter((p) => p.authorId !== id && p.taggedAccountIds?.includes(id)).sort(byDateDesc), [state.posts, id]);
 
   if (!person)
     return (
@@ -33,7 +41,7 @@ export default function ProfilePage() {
     );
 
   const isMe = person.id === me.id;
-  const stories = state.stories.filter((s) => s.authorId === person.id);
+  const stories = state.stories.filter((s) => s.authorId === person.id && isStoryActive(s));
   const unseen = !isMe && stories.some((s) => !s.seenBy.includes(me.id));
   const friends = (state.follows[person.id] ?? []).map(character).filter(Boolean);
   const real = realFollowCounts(state, person.id);
@@ -152,20 +160,30 @@ export default function ProfilePage() {
         )}
       </section>
 
-      <div className="mt-6 flex justify-center border-t border-border/70">
-        <span className="-mt-px flex h-12 items-center gap-2 border-t border-foreground px-6 text-[11px] font-semibold uppercase tracking-[0.18em]">
-          <Grid3x3 className="h-4 w-4" strokeWidth={1.8} /> Fotos
-        </span>
+      <div className="px-5"><HighlightsRow authorId={person.id} isMe={isMe} /></div>
+
+      <div className="mt-6 flex justify-center border-t border-border/70" role="tablist">
+        {([['posts', 'Fotos', Grid3x3], ['tagged', 'Etiquetas', UserSquare2]] as const).map(([k, label, Icon]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            className={cn('-mt-px flex h-12 items-center gap-2 border-t px-6 text-[11px] font-semibold uppercase tracking-[0.18em]', tab === k ? 'border-foreground' : 'border-transparent text-muted-foreground')}
+            data-testid={`tab-profile-${k}`}>
+            <Icon className="h-4 w-4" strokeWidth={1.8} /> {label}
+          </button>
+        ))}
       </div>
 
-      {posts.length === 0 ? (
+      {tab === 'tagged' ? (
+        tagged.length === 0
+          ? <EmptyState title={isMe ? 'Nadie te etiquetó todavía' : 'Sin etiquetas'} body="Las publicaciones donde aparezca esta cuenta se verán aquí." />
+          : <PhotoGrid posts={tagged} />
+      ) : posts.length === 0 ? (
         <EmptyState
           title={isMe ? 'Tu cuadrícula está en blanco' : 'Aún no ha publicado'}
           body={isMe ? 'La primera foto siempre cuesta. Después ya no.' : `${person.name.split(' ')[0]} todavía no ha compartido nada.`}
           action={isMe && <Link href="/create" className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground" data-testid="link-profile-empty-create">Publicar</Link>}
         />
       ) : (
-        <PhotoGrid posts={posts} />
+        <PhotoGrid posts={posts} showPinned />
       )}
       <AccountEditor open={editing} accountId={person.id} onClose={() => setEditing(false)} />
     </div>

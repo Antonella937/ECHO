@@ -12,6 +12,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { SocialStoreProvider } from '@/store/social-store';
 import { StoryViewerProvider } from '@/components/echo/story-viewer';
 import { Shell } from '@/components/echo/shell';
+import { AppearanceSync } from '@/components/echo/appearance-sync';
+import HashtagPage from '@/pages/hashtag';
 import { AppSkeleton } from '@/components/echo/skeletons';
 import HomePage from '@/pages/home';
 import ProfilePage from '@/pages/profile';
@@ -99,6 +101,7 @@ function ProtectedRouter() {
           <Route path="/messages" component={MessagesPage} />
           <Route path="/messages/:id" component={ConversationPage} />
           <Route path="/saved" component={SavedPage} />
+          <Route path="/tags/:tag" component={HashtagPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/characters/new" component={CharacterEditorPage} />
           <Route path="/characters/:id/edit" component={CharacterEditorPage} />
@@ -173,6 +176,7 @@ function AuthenticatedExperience() {
   if (!isSignedIn || !user) return <LandingPage />;
   return (
     <SocialStoreProvider key={user.id} userId={user.id} fallback={<AppSkeleton />}>
+      <AppearanceSync />
       <StoryViewerProvider>
         <ProtectedRouter />
       </StoryViewerProvider>
@@ -251,7 +255,7 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 function App() {
   if (!clerkPubKey) throw new Error('Falta la clave pública de Clerk para iniciar ECHO.');
   useEffect(() => {
-    document.documentElement.classList.add('dark');
+    if (!document.documentElement.classList.contains('theme-light')) document.documentElement.classList.add('dark');
     document.documentElement.lang = 'es';
   }, []);
   return (

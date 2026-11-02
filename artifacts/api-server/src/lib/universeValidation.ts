@@ -4,8 +4,8 @@ import type { SocialState } from '@workspace/api-zod';
 export function universeAccountError(state: SocialState): string | null {
   for (const post of state.posts) {
     if (!post.media) continue;
-    if (!post.media.length || post.media.length > 10) return 'Un carrete debe contener entre 1 y 10 fotos.';
-    if (post.media.some(item => item.type !== 'image')) return 'El video todavía no está habilitado para publicaciones.';
+    if (!post.media.length || post.media.length > 10) return 'Un carrete debe contener entre 1 y 10 fotos o videos.';
+    if (post.media.some(item => !['image', 'video'].includes(item.type))) return 'Formato de publicación inválido.';
     if (new Set(post.media.map(item => item.id)).size !== post.media.length)
       return 'Los elementos de un carrete deben tener identificadores únicos.';
     if (post.media.some(item => !item.id.trim() || !item.url.trim())) return 'Falta un identificador o una foto del carrete.';
@@ -43,6 +43,8 @@ export function universeAccountError(state: SocialState): string | null {
     }
   }
   for (const message of state.messages) {
+    if (message.hiddenForIds?.some(id => ![message.senderId, message.recipientId].includes(id)))
+      return 'Solo los participantes pueden ocultar un mensaje para sí mismos.';
     if (message.quoteMessageId && !state.messages.some(m => m.id === message.quoteMessageId && m.threadId === message.threadId))
       return 'Una cita debe pertenecer a la misma conversación.';
     if (message.reactions?.some(r => ![message.senderId, message.recipientId].includes(r.actorId)) ||

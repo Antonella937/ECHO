@@ -257,3 +257,40 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Light appearance: same layout/type tokens, warm paper neutrals. Accent overrides arrive via inline vars. */
+html.theme-light {
+  color-scheme: light;
+  --button-outline: rgba(30, 20, 25, 0.1);
+  --badge-outline: rgba(30, 20, 25, 0.06);
+  --elevate-1: rgba(30, 20, 25, 0.03);
+  --elevate-2: rgba(30, 20, 25, 0.06);
+  --background: 30 25% 97%;
+  --foreground: 340 12% 11%;
+  --border: 30 12% 87%;
+  --card: 30 30% 99%;
+  --card-foreground: 340 12% 11%;
+  --card-border: 30 12% 88%;
+  --sidebar: 30 22% 95%;
+  --sidebar-foreground: 340 12% 11%;
+  --sidebar-border: 30 12% 87%;
+  --sidebar-accent: 30 15% 91%;
+  --sidebar-accent-foreground: 340 12% 11%;
+  --popover: 30 30% 99%;
+  --popover-foreground: 340 12% 11%;
+  --popover-border: 30 12% 86%;
+  --secondary: 30 16% 92%;
+  --secondary-foreground: 340 12% 14%;
+  --muted: 30 16% 93%;
+  --muted-foreground: 340 5% 42%;
+  --accent: 344 45% 93%;
+  --accent-foreground: 344 40% 32%;
+  --destructive: 356 62% 48%;
+  --destructive-foreground: 30 30% 98%;
+  --input: 30 12% 84%;
+  --shadow-sm: 0 1px 2px hsl(340 20% 20% / 0.06);
+  --shadow: 0 2px 6px hsl(340 20% 20% / 0.08);
+  --shadow-md: 0 6px 18px hsl(340 20% 20% / 0.1);
+  --shadow-lg: 0 14px 40px hsl(340 20% 20% / 0.12);
+  --shadow-xl: 0 24px 60px hsl(340 20% 20% / 0.14);
+}

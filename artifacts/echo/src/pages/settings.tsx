@@ -1,5 +1,8 @@
 import { useClerk, useUser } from '@clerk/react';
-import { Cloud, Info, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Cloud, Info, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
+import type { Appearance } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
@@ -42,6 +45,8 @@ export default function SettingsPage() {
           </p>
           <AccountManager />
         </section>
+
+        <AppearanceSection />
 
         <section className="mt-9" aria-labelledby="about-h">
           <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sobre ECHO</h2>
@@ -105,5 +110,56 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right">{value}</span>
     </div>
+  );
+}
+
+function AppearanceSection() {
+  const { state, actions } = useSocial();
+  const current = state.appearance ?? DEFAULT_APPEARANCE;
+  const [custom, setCustom] = useState(current.accent);
+  const set = (next: Appearance) => {
+    try { actions.setAppearance(next); } catch (e) { toast({ title: 'No se pudo aplicar', description: (e as Error).message }); }
+  };
+  const themes = [['dark', 'Oscuro', Moon], ['light', 'Claro', Sun], ['system', 'Sistema', Monitor]] as const;
+  return (
+    <section className="mt-9" aria-labelledby="appearance-h">
+      <h2 id="appearance-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Apariencia</h2>
+      <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1" role="radiogroup" aria-label="Tema">
+          {themes.map(([k, label, Icon]) => (
+            <button key={k} type="button" role="radio" aria-checked={current.theme === k} onClick={() => set({ ...current, theme: k })}
+              className={cn('flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold', current.theme === k ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+              data-testid={`button-theme-${k}`}>
+              <Icon className="h-4 w-4" strokeWidth={1.8} /> {label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 text-xs text-muted-foreground">Color de acento</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Color de acento">
+          {ACCENT_PRESETS.map((hex) => {
+            const on = current.accent.toLowerCase() === hex;
+            return (
+              <button key={hex} type="button" role="radio" aria-checked={on} aria-label={`Acento ${hex}`} onClick={() => { setCustom(hex); set({ ...current, accent: hex }); }}
+                className={cn('grid h-11 w-11 place-items-center rounded-full ring-offset-2 ring-offset-card', on && 'ring-2 ring-foreground/70')} style={{ backgroundColor: hex }}
+                data-testid={`button-accent-${hex.slice(1)}`}>
+                {on && <Check className="h-4 w-4 text-[#1a1418]" strokeWidth={2.4} />}
+              </button>
+            );
+          })}
+          <label className="flex h-11 items-center gap-2 rounded-full border border-border pl-1.5 pr-3 text-xs" data-testid="label-accent-custom">
+            <input type="color" value={custom} onChange={(e) => setCustom(e.target.value)} onBlur={() => custom !== current.accent && set({ ...current, accent: custom })}
+              aria-label="Acento personalizado" className="h-8 w-8 cursor-pointer rounded-full border-0 bg-transparent p-0" data-testid="input-accent-custom" />
+            Personalizado
+          </label>
+          {custom.toLowerCase() !== current.accent.toLowerCase() && (
+            <button type="button" onClick={() => set({ ...current, accent: custom })} className="h-11 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground" data-testid="button-accent-apply">Aplicar</button>
+          )}
+        </div>
+        <button type="button" onClick={() => { setCustom(DEFAULT_APPEARANCE.accent); set(DEFAULT_APPEARANCE); }} className="mt-4 text-xs font-semibold text-muted-foreground hover:text-foreground" data-testid="button-appearance-reset">
+          Restablecer (oscuro · rosa)
+        </button>
+        <p className="mt-2 text-xs text-muted-foreground">Se sincroniza con tu universo en todos tus dispositivos.</p>
+      </div>
+    </section>
   );
 }

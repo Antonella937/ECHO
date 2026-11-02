@@ -706,6 +706,8 @@ export interface MessageAttachment {
 }
 
 export interface Message {
+  /** @maxItems 2 */
+  hiddenForIds?: string[];
   quoteMessageId?: string;
   /** @maxItems 5 */
   attachments?: MessageAttachment[];

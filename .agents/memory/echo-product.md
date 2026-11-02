@@ -31,7 +31,13 @@ The approved visual direction is black/charcoal dark mode, soft contrast, subtle
 
 **Why:** The user explicitly approved this appearance and asked for comfortable dark screens.
 
-**How to apply:** Preserve dark mode throughout secondary screens, dialogs and creation flows, not just the feed.
+**How to apply:** Dark + muted ECHO pink remains the default. The owner may choose light/system and another accent in Appearance. Change visual tokens only: preserve the approved layout, typography, sizes, borders and personality; no redesign when adding social features.
+
+Music support without a connected service means editable song metadata only, not playable audio.
+
+**Why:** The user explicitly requested prepared music support without inventing an unconnected music service.
+
+**How to apply:** Label song title/artist as information without audio. Uploaded video and voice-note audio are separate, real media features; do not describe metadata as music playback.
 
 ECHO currently uses simulated character activity without API keys. Later phases may connect each character to a Kindroid Kin ID/API and a visual-generation provider with persistent character identity references.
 

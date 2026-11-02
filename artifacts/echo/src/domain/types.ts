@@ -98,6 +98,8 @@ export interface Story {
 }
 
 export interface Message {
+  /** Per-character visibility only. Never removes the other participant's copy. */
+  hiddenForIds?: string[];
   quoteMessageId?: string;
   attachments?: MessageAttachment[];
   reactions?: SocialReaction[];

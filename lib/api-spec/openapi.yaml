@@ -553,6 +553,7 @@ components:
       type: object
       required: [id, threadId, senderId, recipientId, text, createdAt, storyId, postId, readBy, origin]
       properties:
+        hiddenForIds: { type: array, uniqueItems: true, maxItems: 2, items: { type: string } }
         quoteMessageId: { type: string }
         attachments: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/MessageAttachment" } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }

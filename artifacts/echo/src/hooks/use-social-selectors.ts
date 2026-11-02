@@ -1,7 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSocial } from '@/store/social-store';
 import { threadIdFor, type Character, type Message, type Story } from '@/domain/types';
 import { hasMessageContent, selectInbox } from '@/domain/inbox';
+import { isStoryActive } from '@/domain/social-features';
+
+export const hiddenFor = (m: Message, id: string) => !!m.hiddenForIds?.includes(id);
 export type { ThreadSummary } from '@/domain/inbox';
 
 const byDateDesc = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
@@ -12,7 +15,7 @@ export function useUnreadCounts() {
   return useMemo(
     () => ({
       notifications: state.notifications.filter((n) => n.recipientId === me.id && !n.read && n.kind !== 'message' && n.kind !== 'story_reply').length,
-      messages: state.messages.filter((m) => hasMessageContent(m) && m.recipientId === me.id && !m.readBy.includes(me.id)).length,
+      messages: state.messages.filter((m) => hasMessageContent(m) && !hiddenFor(m, me.id) && m.recipientId === me.id && !m.readBy.includes(me.id)).length,
     }),
     [state.notifications, state.messages, me.id],
   );
@@ -32,10 +35,16 @@ export interface StoryGroup {
 /** Story groups ordered: unseen first, then most recent. Includes current character. */
 export function useStoryGroups(): StoryGroup[] {
   const { state, me } = useSocial();
+  const [clock, setClock] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const now = Date.now();
   return useMemo(() => {
     const groups: StoryGroup[] = [];
     for (const c of state.characters) {
-      const stories = state.stories.filter((s) => s.authorId === c.id).sort(byDateAsc);
+      const stories = state.stories.filter((s) => s.authorId === c.id && isStoryActive(s, now)).sort(byDateAsc);
       if (!stories.length) continue;
       const allSeen = c.id === me.id || stories.every((s) => s.seenBy.includes(me.id));
       groups.push({ author: c, stories, allSeen });
@@ -46,7 +55,7 @@ export function useStoryGroups(): StoryGroup[] {
       if (a.allSeen !== b.allSeen) return a.allSeen ? 1 : -1;
       return byDateDesc(a.stories[a.stories.length - 1], b.stories[b.stories.length - 1]);
     });
-  }, [state.stories, state.characters, me.id]);
+  }, [state.stories, state.characters, me.id, clock, now]);
 }
 
 export function useThreads() {
@@ -58,7 +67,7 @@ export function useThreadMessages(otherId: string) {
   const { state, me } = useSocial();
   return useMemo(() => {
     const tid = threadIdFor(me.id, otherId);
-    return state.messages.filter((m) => m.threadId === tid).sort(byDateAsc);
+    return state.messages.filter((m) => m.threadId === tid && !hiddenFor(m, me.id)).sort(byDateAsc);
   }, [state.messages, me.id, otherId]);
 }
 

@@ -19,6 +19,7 @@ export interface SocialActions {
   saveHighlight(highlight: StoryHighlight, expected?: StoryHighlight): void;
   deleteHighlight(id: string): void;
   reactMessage(id: string, value: string): void;
+  hideMessage(id: string): void;
   setAppearance(appearance: Appearance): void;
   createAccount(input: AccountInput): string;
   updateAccount(id: string, input: AccountInput, expected?: AccountInput): void;
@@ -202,11 +203,17 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
           (m.senderId === myId() || m.recipientId === myId()) ? { ...m, reactions: toggleReaction(m.reactions, myId(), value) } : m) }));
       },
+      hideMessage(id) {
+        coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
+          [m.senderId, m.recipientId].includes(myId())
+          ? { ...m, hiddenForIds: [...new Set([...(m.hiddenForIds ?? []), myId()])] } : m) }));
+      },
       reactStory(id, value) {
         const story = cur().stories.find(s => s.id === id);
         if (!story || !isStoryActive(story) || story.authorId === myId()) return;
+        const removing = story.reactions?.some(r => r.actorId === myId() && r.value === value);
         coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, reactions: toggleReaction(st.reactions, myId(), value) } : st) }));
-        send(story.authorId, value, { storyId: id });
+        if (!removing) send(story.authorId, value, { storyId: id });
       },
       saveHighlight(highlight, expected) { coordinator.current?.edit(s => saveHighlight(s, myId(), highlight, expected)); },
       deleteHighlight(id) { coordinator.current?.edit(s => ({ ...s, highlights: s.highlights?.filter(h => h.id !== id || h.authorId !== myId()) })); },

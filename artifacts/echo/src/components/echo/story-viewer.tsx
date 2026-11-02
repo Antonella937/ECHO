@@ -2,7 +2,12 @@ import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Eye, Send, X } from 'lucide-react';
+import { AtSign, ChevronLeft, ChevronRight, Eye, Music2, Send, X } from 'lucide-react';
+import { isStoryActive } from '@/domain/social-features';
+import { SocialText } from './social-text';
+import { MentionSuggestions } from './mention-suggestions';
+
+const STORY_REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
 import { useStoryGroups, type StoryGroup } from '@/hooks/use-social-selectors';
@@ -15,30 +20,41 @@ const DURATION = 5500;
 
 interface ViewerCtx {
   openStories(authorId: string, onlyAuthor?: boolean): void;
+  /** Opens an explicit list (archive / highlight); may include expired stories. */
+  openStoryList(authorId: string, storyIds: string[]): void;
 }
-const Ctx = createContext<ViewerCtx>({ openStories: () => {} });
+const Ctx = createContext<ViewerCtx>({ openStories: () => {}, openStoryList: () => {} });
+type Session = { kind: 'rail'; ids: string[]; index: number } | { kind: 'list'; authorId: string; storyIds: string[] };
 export const useStoryViewer = () => useContext(Ctx);
 
 export function StoryViewerProvider({ children }: { children: ReactNode }) {
   const groups = useStoryGroups();
-  const [session, setSession] = useState<{ ids: string[]; index: number } | null>(null);
+  const { state, character } = useSocial();
+  const [session, setSession] = useState<Session | null>(null);
 
   const openStories = useCallback(
     (authorId: string, onlyAuthor = false) => {
       const ids = onlyAuthor ? [authorId] : groups.map((g) => g.author.id);
       const index = Math.max(0, ids.indexOf(authorId));
-      setSession({ ids, index });
+      setSession({ kind: 'rail', ids, index });
     },
     [groups],
   );
+  const openStoryList = useCallback((authorId: string, storyIds: string[]) => {
+    if (storyIds.length) setSession({ kind: 'list', authorId, storyIds });
+  }, []);
 
-  const sessionGroups = useMemo(
-    () => (session ? session.ids.map((id) => groups.find((g) => g.author.id === id)).filter((g): g is StoryGroup => !!g) : []),
-    [session, groups],
-  );
+  const sessionGroups = useMemo((): StoryGroup[] => {
+    if (!session) return [];
+    if (session.kind === 'rail') return session.ids.map((id) => groups.find((g) => g.author.id === id)).filter((g): g is StoryGroup => !!g);
+    const author = character(session.authorId);
+    const stories = session.storyIds.map((id) => state.stories.find((s) => s.id === id)).filter((s): s is NonNullable<typeof s> => !!s);
+    return author && stories.length ? [{ author, stories, allSeen: true }] : [];
+  }, [session, groups, state.stories, character]);
+  const startIndex = session?.kind === 'rail' ? session.index : 0;
 
   return (
-    <Ctx.Provider value={{ openStories }}>
+    <Ctx.Provider value={{ openStories, openStoryList }}>
       {children}
       {createPortal(
         <AnimatePresence>
@@ -46,7 +62,7 @@ export function StoryViewerProvider({ children }: { children: ReactNode }) {
             <Viewer
               key="viewer"
               groups={sessionGroups}
-              startIndex={Math.min(session.index, sessionGroups.length - 1)}
+              startIndex={Math.min(startIndex, sessionGroups.length - 1)}
               onClose={() => setSession(null)}
             />
           )}
@@ -129,6 +145,15 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   };
 
   const viewers = liveStory.seenBy.map(character).filter(Boolean);
+  const active = isStoryActive(liveStory);
+  const mentioned = (liveStory.mentionedAccountIds ?? []).map(character).filter((c): c is NonNullable<typeof c> => !!c);
+  const myReaction = liveStory.reactions?.find((r) => r.actorId === me.id)?.value;
+  const react = (value: string) => {
+    try {
+      actions.reactStory(story.id, value);
+      if (myReaction !== value) toast({ title: `Reacción enviada a ${group.author.name.split(' ')[0]}`, description: 'También llega como mensaje directo.' });
+    } catch (e) { toast({ title: 'No se pudo reaccionar', description: (e as Error).message }); }
+  };
 
   return (
     <motion.div
@@ -232,11 +257,28 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           />
         </div>
 
-        {story.caption && (
-          <p className="pointer-events-none absolute inset-x-0 bottom-28 z-10 px-6 text-center font-display text-lg font-light leading-snug text-foreground/95">
-            {story.caption}
-          </p>
-        )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex flex-col items-center gap-2 px-6 text-center">
+          {liveStory.music && (
+            <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 py-1.5 text-xs backdrop-blur" title="Solo metadatos: no se reproduce audio" data-testid={`text-story-music-${story.id}`}>
+              <Music2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="truncate"><b className="font-semibold">{liveStory.music.title}</b> · {liveStory.music.artist}</span>
+              <span className="shrink-0 rounded-full bg-foreground/15 px-1.5 text-[10px] uppercase tracking-wider">sin audio</span>
+            </span>
+          )}
+          {story.caption && (
+            <p className="font-display text-lg font-light leading-snug text-foreground/95"><SocialText text={story.caption} /></p>
+          )}
+          {mentioned.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {mentioned.map((c) => (
+                <button key={c.id} type="button" onClick={() => { onClose(); navigate(`/profile/${c.id}`); }} className="pointer-events-auto inline-flex h-8 items-center gap-1 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 text-xs font-semibold backdrop-blur" data-testid={`button-story-mention-${c.id}`}>
+                  <AtSign className="h-3 w-3" />{c.handle}
+                </button>
+              ))}
+            </div>
+          )}
+          {!active && <span className="rounded-full bg-[hsl(240_8%_3%/0.6)] px-2.5 py-1 text-[11px] text-foreground/75" data-testid="status-story-archived">Archivada · ya no aparece en el carrusel</span>}
+        </div>
 
         <div className="relative z-10 px-3 pb-[max(env(safe-area-inset-bottom),14px)] pt-2">
           {isMine ? (
@@ -247,14 +289,15 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 data-testid="button-story-viewers"
               >
                 <Eye className="h-5 w-5" strokeWidth={1.6} />
-                {viewers.length === 0 ? 'Nadie la ha visto todavía' : `Vista por ${viewers.length}`}
+                {viewers.length === 0 ? 'Nadie la ha visto todavía' : `Vista por ${viewers.length}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} reacción(es)` : ''}
               </button>
               {showViewers && viewers.length > 0 && (
                 <div className="mt-1 flex flex-col gap-2 rounded-3xl bg-card/95 p-3 backdrop-blur">
                   {viewers.map((v) =>
                     v ? (
                       <div key={v.id} className="flex items-center gap-2.5 text-sm">
-                        <CharacterAvatar character={v} size={28} /> {v.name}
+                        <CharacterAvatar character={v} size={28} /> <span className="flex-1">{v.name}</span>
+                        {liveStory.reactions?.find((r) => r.actorId === v.id) && <span className="text-base">{liveStory.reactions.find((r) => r.actorId === v.id)!.value}</span>}
                       </div>
                     ) : null,
                   )}
@@ -262,6 +305,17 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
               )}
             </div>
           ) : (
+            <div>
+            {active && (
+              <div className="mb-2 flex justify-center gap-1" role="group" aria-label="Reaccionar a la historia">
+                {STORY_REACTIONS.map((r, i) => (
+                  <button key={r} type="button" onClick={() => react(r)} aria-pressed={myReaction === r}
+                    className={cn('tap grid h-10 w-10 place-items-center rounded-full text-xl', myReaction === r ? 'bg-primary/30' : 'bg-[hsl(240_8%_3%/0.35)]')}
+                    data-testid={`button-story-reaction-${i}`}>{r}</button>
+                ))}
+              </div>
+            )}
+            <MentionSuggestions text={reply} onPick={setReply} excludeId={me.id} className="mb-2" />
             <form onSubmit={submit} className="flex items-center gap-2">
               <input
                 ref={inputRef}
@@ -282,6 +336,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 <Send className="h-6 w-6" strokeWidth={1.6} />
               </button>
             </form>
+            </div>
           )}
         </div>
       </div>

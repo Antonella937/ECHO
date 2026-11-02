@@ -35,16 +35,15 @@ test('contrato conserva orden, ids y metadatos individuales sin inventar anális
   assert.equal(body.state.posts[0].caption, s.posts[0].caption);
 });
 
-test('validación rechaza vacío, exceso, ids repetidos, portada desalineada y video no habilitado', () => {
+test('validación rechaza vacío, exceso, ids repetidos y portada desalineada; admite video', () => {
   assert.throws(() => validatePostMedia([]));
   assert.throws(() => validatePostMedia(Array.from({ length: 11 }, (_, i) => ({ ...photos[0], id: String(i) }))));
   assert.throws(() => validatePostMedia([photos[0], photos[0]]));
   const s = fixture(); s.posts[0].image = photos[1].url;
   assert.match(universeAccountError(SaveUniverseBody.parse({ state: s, expectedRevision: 1 }).state)!, /portada/);
   s.posts[0].image = photos[0].url; s.posts[0].media![1].type = 'video';
-  assert.throws(() => validatePostMedia(s.posts[0].media!), /video/);
-  // The schema prepares video metadata, but the current server explicitly refuses it.
-  assert.match(universeAccountError(SaveUniverseBody.parse({ state: s, expectedRevision: 1 }).state)!, /video/);
+  assert.doesNotThrow(() => validatePostMedia(s.posts[0].media!));
+  assert.equal(universeAccountError(SaveUniverseBody.parse({ state: s, expectedRevision: 1 }).state), null);
   s.posts[0].media = [];
   assert.equal(SaveUniverseBody.safeParse({ state: s, expectedRevision: 1 }).success, false);
 });
