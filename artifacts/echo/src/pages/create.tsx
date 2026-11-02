@@ -5,7 +5,7 @@ import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { Switch } from '@/components/ui/switch';
-import { compressImage } from '@/lib/media';
+import { compressImage, resolveMedia, uploadPrivateImage } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +31,8 @@ export default function CreatePage() {
     setError(null);
     setBusy(true);
     try {
-      setImage(await compressImage(file, mode === 'story' ? 1280 : 1440));
+      const compressed = await compressImage(file, mode === 'story' ? 1280 : 1440);
+      setImage(await uploadPrivateImage(compressed));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -91,7 +92,7 @@ export default function CreatePage() {
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} data-testid="input-file" />
         {image ? (
           <div className="relative overflow-hidden rounded-[22px] bg-card">
-            <img src={image} alt="Vista previa" className={cn('w-full object-cover', mode === 'story' ? 'aspect-[9/16] max-h-[70dvh]' : 'aspect-[4/5]')} data-testid="img-preview" />
+            <img src={resolveMedia(image)} alt="Vista previa" className={cn('w-full object-cover', mode === 'story' ? 'aspect-[9/16] max-h-[70dvh]' : 'aspect-[4/5]')} data-testid="img-preview" />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -112,7 +113,7 @@ export default function CreatePage() {
               <ImagePlus className="h-7 w-7" strokeWidth={1.5} />
             </span>
             <span className="font-display text-lg font-light">{busy ? 'Procesando…' : 'Elige una foto'}</span>
-            <span className="text-xs text-muted-foreground">JPG, PNG o HEIC compatible. Se guarda solo en este dispositivo.</span>
+            <span className="text-xs text-muted-foreground">{busy ? 'Subiendo de forma privada…' : 'JPG, PNG o HEIC compatible. Se guardará en tu cuenta.'}</span>
           </button>
         )}
 

@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: universe
+    description: Private social universe owned by the authenticated user
+  - name: storage
+    description: Private image upload and serving
 paths:
   /healthz:
     get:
@@ -24,6 +28,110 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /universe:
+    get:
+      operationId: getUniverse
+      tags: [universe]
+      summary: Load the authenticated user's universe
+      responses:
+        "200":
+          description: Universe, or null when the account has not been initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniverseEnvelope"
+        "401":
+          description: Authentication required
+    put:
+      operationId: saveUniverse
+      tags: [universe]
+      summary: Save the authenticated user's universe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UniverseInput"
+      responses:
+        "200":
+          description: Saved universe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniverseEnvelope"
+        "400":
+          description: Invalid universe
+        "401":
+          description: Authentication required
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a private image upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlInput"
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResult"
+        "400":
+          description: Invalid image metadata
+        "401":
+          description: Authentication required
+  /storage/uploads/claim:
+    post:
+      operationId: claimUpload
+      tags: [storage]
+      summary: Mark a completed upload as private to its owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadClaimInput"
+      responses:
+        "200":
+          description: Private object path
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadClaimResult"
+        "400":
+          description: Invalid object path
+        "401":
+          description: Authentication required
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getPrivateObject
+      tags: [storage]
+      summary: Serve an image only to its universe owner
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Private image bytes
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Authentication required
+        "403":
+          description: Not the object owner
+        "404":
+          description: Image not found
 components:
   schemas:
     HealthStatus:
@@ -33,4 +141,167 @@ components:
           type: string
       required:
         - status
+    UniverseEnvelope:
+      type: object
+      required: [state]
+      properties:
+        state:
+          oneOf:
+            - $ref: "#/components/schemas/SocialState"
+            - type: "null"
+    UniverseInput:
+      type: object
+      required: [state]
+      properties:
+        state:
+          $ref: "#/components/schemas/SocialState"
+    SocialState:
+      type: object
+      required: [version, currentCharacterId, characters, follows, posts, comments, stories, messages, notifications]
+      properties:
+        version: { type: integer }
+        currentCharacterId: { type: string }
+        characters:
+          type: array
+          items: { $ref: "#/components/schemas/Character" }
+        follows:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+        posts:
+          type: array
+          items: { $ref: "#/components/schemas/Post" }
+        comments:
+          type: array
+          items: { $ref: "#/components/schemas/Comment" }
+        stories:
+          type: array
+          items: { $ref: "#/components/schemas/Story" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+        notifications:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+    Character:
+      type: object
+      required: [id, handle, name, occupation, bio, location, avatar, providerRef, identity]
+      properties:
+        id: { type: string }
+        handle: { type: string }
+        name: { type: string }
+        occupation: { type: string }
+        bio: { type: string }
+        location: { type: string }
+        avatar: { type: string }
+        providerRef:
+          type: object
+          required: [provider, externalId, status, lastSyncAt]
+          properties:
+            provider: { type: string }
+            externalId: { type: [string, "null"] }
+            status: { type: string }
+            lastSyncAt: { type: [string, "null"], format: date-time }
+        identity:
+          type: object
+          required: [provider, referenceImages, seed, appearance, styleNotes, updatedAt]
+          properties:
+            provider: { type: string }
+            referenceImages:
+              type: array
+              items: { type: string }
+            seed: { type: integer }
+            appearance: { type: string }
+            styleNotes: { type: string }
+            updatedAt: { type: string, format: date-time }
+    Post:
+      type: object
+      required: [id, authorId, image, caption, location, createdAt, likes, savedBy, origin, illustrative]
+      properties:
+        id: { type: string }
+        authorId: { type: string }
+        image: { type: string }
+        caption: { type: string }
+        location: { type: string }
+        createdAt: { type: string, format: date-time }
+        likes: { type: array, items: { type: string } }
+        savedBy: { type: array, items: { type: string } }
+        origin: { type: string }
+        illustrative: { type: boolean }
+    Comment:
+      type: object
+      required: [id, postId, authorId, text, createdAt, parentId, replyToAuthorId, likes, origin]
+      properties:
+        id: { type: string }
+        postId: { type: string }
+        authorId: { type: string }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        parentId: { type: [string, "null"] }
+        replyToAuthorId: { type: [string, "null"] }
+        likes: { type: array, items: { type: string } }
+        origin: { type: string }
+    Story:
+      type: object
+      required: [id, authorId, image, caption, createdAt, seenBy, origin]
+      properties:
+        id: { type: string }
+        authorId: { type: string }
+        image: { type: string }
+        caption: { type: string }
+        createdAt: { type: string, format: date-time }
+        seenBy: { type: array, items: { type: string } }
+        origin: { type: string }
+    Message:
+      type: object
+      required: [id, threadId, senderId, recipientId, text, createdAt, storyId, postId, readBy, origin]
+      properties:
+        id: { type: string }
+        threadId: { type: string }
+        senderId: { type: string }
+        recipientId: { type: string }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        storyId: { type: [string, "null"] }
+        postId: { type: [string, "null"] }
+        readBy: { type: array, items: { type: string } }
+        origin: { type: string }
+    Notification:
+      type: object
+      required: [id, recipientId, actorId, kind, postId, commentId, storyId, excerpt, createdAt, read]
+      properties:
+        id: { type: string }
+        recipientId: { type: string }
+        actorId: { type: string }
+        kind: { type: string }
+        postId: { type: [string, "null"] }
+        commentId: { type: [string, "null"] }
+        storyId: { type: [string, "null"] }
+        excerpt: { type: string }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+    UploadUrlInput:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        size: { type: integer, minimum: 1, maximum: 15728640 }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+    UploadUrlResult:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
+    UploadClaimInput:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath: { type: string, minLength: 1 }
+    UploadClaimResult:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath: { type: string }
 

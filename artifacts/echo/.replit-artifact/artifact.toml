@@ -1,7 +1,7 @@
 kind = "web"
 previewPath = "/"
 title = "ECHO"
-description = "A private, mobile-first fictional character social universe for Nela Paez, with stories, a photo feed, profiles and direct messages. Local-first prototype with future character AI adapters."
+description = "A private, mobile-first fictional character social universe for Nela Paez, with secure sign-in, cross-device persistence, stories, profiles and conversations."
 version = "1.0.0"
 id = "artifacts/echo"
 router = "path"

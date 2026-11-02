@@ -1,4 +1,6 @@
 import type { SocialState } from '@/domain/types';
+import type { UniverseInput } from '@workspace/api-client-react';
+import { uploadPrivateImage } from '@/lib/media';
 
 const DB_NAME = 'echo-local';
 const STORE = 'kv';
@@ -32,17 +34,12 @@ function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest):
   );
 }
 
-export type StorageBackend = 'indexeddb' | 'localstorage';
-let backend: StorageBackend = 'indexeddb';
-export const getBackend = () => backend;
-
-export async function loadState(): Promise<SocialState | null> {
+export async function loadLegacyState(): Promise<SocialState | null> {
   // A failed IndexedDB write may leave an older snapshot behind. Once a
   // fallback write succeeds, that localStorage snapshot is authoritative.
   if (localStorage.getItem(BACKEND_KEY) === 'localstorage') {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
-      backend = 'localstorage';
       return JSON.parse(raw) as SocialState;
     }
   }
@@ -50,30 +47,12 @@ export async function loadState(): Promise<SocialState | null> {
     const s = await tx<SocialState | undefined>('readonly', (st) => st.get(KEY));
     return s ?? null;
   } catch {
-    backend = 'localstorage';
     const raw = localStorage.getItem(LS_KEY);
     return raw ? (JSON.parse(raw) as SocialState) : null;
   }
 }
 
-export async function saveState(state: SocialState): Promise<void> {
-  if (backend === 'indexeddb') {
-    try {
-      await tx('readwrite', (st) => st.put(state, KEY));
-      return;
-    } catch {
-      backend = 'localstorage';
-    }
-  }
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-    localStorage.setItem(BACKEND_KEY, 'localstorage');
-  } catch {
-    throw new Error('No queda espacio en este dispositivo. Los últimos cambios no se han guardado.');
-  }
-}
-
-export async function clearState(): Promise<void> {
+export async function clearLegacyState(): Promise<void> {
   try {
     await tx('readwrite', (st) => st.delete(KEY));
   } catch {
@@ -83,12 +62,65 @@ export async function clearState(): Promise<void> {
   localStorage.removeItem(BACKEND_KEY);
 }
 
-export async function estimateUsage(): Promise<string | null> {
+export async function loadUniverse(): Promise<SocialState | null> {
+  const response = await fetch('/api/universe', { credentials: 'same-origin' });
+  if (!response.ok) throw new Error(await responseError(response, 'No se pudo cargar tu universo.'));
+  return ((await response.json()) as { state: SocialState | null }).state;
+}
+
+export async function saveUniverse(state: SocialState): Promise<SocialState> {
+  const data: UniverseInput = { state };
+  const response = await fetch('/api/universe', {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(await responseError(response, 'No se pudo guardar tu universo.'));
+  return ((await response.json()) as { state: SocialState }).state;
+}
+
+export async function moveLocalImagesToPrivateStorage(state: SocialState): Promise<SocialState> {
+  const refs = [
+    ...state.characters.flatMap((character) => [
+      character.avatar,
+      ...character.identity.referenceImages,
+    ]),
+    ...state.posts.map((post) => post.image),
+    ...state.stories.map((story) => story.image),
+  ];
+  if (refs.some((ref) => ref.startsWith('blob:'))) {
+    throw new Error(
+      'Hay una foto local antigua que el navegador ya no puede leer. Tus demás datos siguen intactos; vuelve a seleccionar esa foto antes de sincronizar.',
+    );
+  }
+
+  const localImages = [...new Set(refs.filter((ref) => ref.startsWith('data:')))];
+  const uploads = await Promise.all(
+    localImages.map(async (ref) => [ref, await uploadPrivateImage(ref)] as const),
+  );
+  const replacement = new Map(uploads);
+  const mapRef = (ref: string) => replacement.get(ref) ?? ref;
+  return {
+    ...state,
+    characters: state.characters.map((character) => ({
+      ...character,
+      avatar: mapRef(character.avatar),
+      identity: {
+        ...character.identity,
+        referenceImages: character.identity.referenceImages.map(mapRef),
+      },
+    })),
+    posts: state.posts.map((post) => ({ ...post, image: mapRef(post.image) })),
+    stories: state.stories.map((story) => ({ ...story, image: mapRef(story.image) })),
+  };
+}
+
+async function responseError(response: Response, fallback: string): Promise<string> {
   try {
-    const est = await navigator.storage?.estimate?.();
-    if (!est?.usage) return null;
-    return `${(est.usage / (1024 * 1024)).toFixed(1)} MB`;
+    const payload = (await response.json()) as { error?: string };
+    return payload.error || fallback;
   } catch {
-    return null;
+    return fallback;
   }
 }

@@ -105,7 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <p className="mt-auto px-1 text-[11px] leading-relaxed text-muted-foreground/70">
-          Prototipo local. Personajes y fotos ilustrativas, sin IA en vivo.
+          Universo privado de Nela. Los personajes y sus respuestas todavía son simulados.
         </p>
       </aside>
 

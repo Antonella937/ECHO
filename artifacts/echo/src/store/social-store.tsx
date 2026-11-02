@@ -2,7 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { applyEvent, makeEvent, uid, type EventSource, type SocialEvent, type SocialEventPayload } from '@/domain/events';
 import { SCHEMA_VERSION, threadIdFor, type Character, type CharacterId, type SocialState } from '@/domain/types';
 import type { ActivityAdapter } from '@/domain/providers';
-import { clearState, loadState, saveState } from './persistence';
+import {
+  clearLegacyState,
+  loadLegacyState,
+  loadUniverse,
+  moveLocalImagesToPrivateStorage,
+  saveUniverse,
+} from './persistence';
 import { createSeedState } from './seed';
 import { toast } from '@/hooks/use-toast';
 
@@ -20,6 +26,7 @@ export interface SocialActions {
   markNotificationRead(id: string): void;
   markAllNotificationsRead(): void;
   switchIdentity(id: CharacterId): void;
+  retrySync(): Promise<void>;
   resetAll(): Promise<void>;
 }
 
@@ -28,6 +35,7 @@ interface StoreValue {
   me: Character;
   storageError: string | null;
   lastSavedAt: number | null;
+  syncing: boolean;
   actions: SocialActions;
   dispatch(payload: SocialEventPayload, source?: EventSource): SocialEvent;
   adapter: ActivityAdapter;
@@ -36,37 +44,135 @@ interface StoreValue {
 
 const Ctx = createContext<StoreValue | null>(null);
 
-export function SocialStoreProvider({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
+export function SocialStoreProvider({ children, fallback, userId }: { children: ReactNode; fallback: ReactNode; userId: string }) {
   const [state, setState] = useState<SocialState | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const stateRef = useRef<SocialState | null>(null);
+  const syncInProgressRef = useRef(false);
+  const activeRef = useRef(true);
+  const serverCheckedRef = useRef(false);
+  const serverHasDataRef = useRef(false);
+  const pendingInitialSyncRef = useRef(false);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   stateRef.current = state;
 
-  useEffect(() => {
-    loadState()
-      .then((s) => setState(s && s.version === SCHEMA_VERSION ? s : createSeedState()))
-      .catch(() => {
-        setStorageError('No se pudo leer el almacenamiento local. Empezamos con los datos de ejemplo.');
-        setState(createSeedState());
-      });
+  const initialize = useCallback(async () => {
+    if (syncInProgressRef.current) return;
+    syncInProgressRef.current = true;
+    setStorageError(null);
+    try {
+      const serverState = await loadUniverse();
+      if (!activeRef.current) return;
+      serverCheckedRef.current = true;
+      if (serverState) {
+        serverHasDataRef.current = true;
+        stateRef.current = serverState;
+        setState(serverState);
+        setLastSavedAt(Date.now());
+        return;
+      }
+
+      const legacyState = await loadLegacyState();
+      if (!activeRef.current) return;
+      const initialState = legacyState ?? createSeedState();
+      if (initialState.version !== SCHEMA_VERSION) {
+        throw new Error('La versión de los datos locales no es compatible. No se ha borrado ni reemplazado.');
+      }
+      serverHasDataRef.current = false;
+      pendingInitialSyncRef.current = true;
+      stateRef.current = initialState;
+
+      const stateWithPrivateImages = await moveLocalImagesToPrivateStorage(initialState);
+      const savedState = await saveUniverse(stateWithPrivateImages);
+      await clearLegacyState();
+      if (!activeRef.current) return;
+      stateRef.current = savedState;
+      setState(savedState);
+      serverHasDataRef.current = true;
+      pendingInitialSyncRef.current = false;
+      setLastSavedAt(Date.now());
+    } catch (error) {
+      if (activeRef.current) {
+        if (stateRef.current) setState(stateRef.current);
+        setStorageError((error as Error).message || 'No se pudo sincronizar tu universo.');
+      }
+    } finally {
+      syncInProgressRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
-    if (!state) return;
+    activeRef.current = true;
+    void initialize();
+    return () => {
+      activeRef.current = false;
+    };
+  }, [initialize, userId]);
+
+  useEffect(() => {
+    if (!state || pendingInitialSyncRef.current) return;
     const t = setTimeout(() => {
-      saveState(state)
-        .then(() => {
+      const snapshot = state;
+      saveQueueRef.current = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (!activeRef.current) return;
+          await saveUniverse(snapshot);
+          if (!activeRef.current) return;
           setStorageError(null);
           setLastSavedAt(Date.now());
         })
         .catch((e: Error) => {
+          if (!activeRef.current) return;
           setStorageError(e.message);
           toast({ title: 'No se ha podido guardar', description: e.message, variant: 'destructive' });
         });
     }, 250);
     return () => clearTimeout(t);
   }, [state]);
+
+  const retrySync = useCallback(async () => {
+    if (!serverCheckedRef.current) {
+      await initialize();
+      return;
+    }
+    if (syncInProgressRef.current) return;
+    syncInProgressRef.current = true;
+    setSyncing(true);
+    setStorageError(null);
+    try {
+      if (!serverHasDataRef.current) {
+        const serverState = await loadUniverse();
+        if (serverState) {
+          stateRef.current = serverState;
+          setState(serverState);
+          serverHasDataRef.current = true;
+          pendingInitialSyncRef.current = false;
+          setLastSavedAt(Date.now());
+          return;
+        }
+      }
+      const currentState = stateRef.current ?? createSeedState();
+      const stateWithPrivateImages = await moveLocalImagesToPrivateStorage(currentState);
+      if (!activeRef.current) return;
+      const savedState = await saveUniverse(stateWithPrivateImages);
+      await clearLegacyState();
+      stateRef.current = savedState;
+      setState(savedState);
+      serverHasDataRef.current = true;
+      pendingInitialSyncRef.current = false;
+      setStorageError(null);
+      setLastSavedAt(Date.now());
+    } catch (error) {
+      setStorageError((error as Error).message || 'No se pudo sincronizar tu universo.');
+      throw error;
+    } finally {
+      syncInProgressRef.current = false;
+      setSyncing(false);
+    }
+  }, [initialize]);
 
   const dispatch = useCallback((payload: SocialEventPayload, source: EventSource = 'user') => {
     const ev = makeEvent(payload, source);
@@ -177,14 +283,25 @@ export function SocialStoreProvider({ children, fallback }: { children: ReactNod
         dispatch({ type: 'notifications.readAll', recipientId: myId() });
       },
       switchIdentity(id) {
-        dispatch({ type: 'identity.switched', characterId: id });
+        if (cur().characters.some((character) => character.id === id)) {
+          dispatch({ type: 'identity.switched', characterId: id });
+        }
       },
+      retrySync,
       async resetAll() {
-        await clearState();
-        dispatch({ type: 'state.replaced', state: createSeedState() }, 'system');
+        const seed = createSeedState();
+        stateRef.current = seed;
+        setState(seed);
+        await saveQueueRef.current.catch(() => undefined);
+        if (!activeRef.current) return;
+        const savedState = await saveUniverse(seed);
+        await clearLegacyState();
+        stateRef.current = savedState;
+        setState(savedState);
+        setLastSavedAt(Date.now());
       },
     };
-  }, [dispatch]);
+  }, [dispatch, retrySync]);
 
   const value = useMemo<StoreValue | null>(() => {
     if (!state || !meId) return null;
@@ -194,15 +311,44 @@ export function SocialStoreProvider({ children, fallback }: { children: ReactNod
       me,
       storageError,
       lastSavedAt,
+      syncing,
       actions,
       dispatch,
       adapter,
       character: (id) => state.characters.find((c) => c.id === id),
     };
-  }, [state, meId, storageError, lastSavedAt, actions, dispatch, adapter]);
+  }, [state, meId, storageError, lastSavedAt, syncing, actions, dispatch, adapter]);
 
-  if (!value) return <>{fallback}</>;
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  if (!value) {
+    if (!storageError) return <>{fallback}</>;
+    return (
+      <main className="grid min-h-[100dvh] place-items-center bg-background px-6 text-foreground">
+        <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6">
+          <h1 className="font-display text-xl">No se pudo abrir tu universo</h1>
+          <p role="alert" className="mt-3 text-sm leading-relaxed text-muted-foreground">{storageError}</p>
+          <button
+            type="button"
+            onClick={() => void initialize()}
+            className="mt-5 h-11 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground"
+          >
+            Reintentar
+          </button>
+        </div>
+      </main>
+    );
+  }
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      {syncing && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-background/70 px-6 backdrop-blur-sm" role="status">
+          <div className="rounded-2xl border border-border bg-card px-5 py-4 text-sm font-medium shadow-xl">
+            Sincronizando tu universo…
+          </div>
+        </div>
+      )}
+    </Ctx.Provider>
+  );
 }
 
 export function useSocial(): StoreValue {

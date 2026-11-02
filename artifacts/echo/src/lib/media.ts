@@ -34,10 +34,11 @@ const MEDIA: Record<string, string> = {
 
 export function resolveMedia(ref: string): string {
   if (ref.startsWith('asset:')) return MEDIA[ref.slice(6)] ?? '';
+  if (ref.startsWith('/objects/')) return `/api/storage${ref}`;
   return ref;
 }
 
-/** Downscale and re-encode an uploaded image so it fits comfortably in local storage. */
+/** Downscale and re-encode an image before moving it to private object storage. */
 export async function compressImage(file: File, maxEdge = 1440, quality = 0.84): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('El archivo no es una imagen.');
   const url = URL.createObjectURL(file);
@@ -58,6 +59,53 @@ export async function compressImage(file: File, maxEdge = 1440, quality = 0.84):
     return canvas.toDataURL('image/jpeg', quality);
   } finally {
     URL.revokeObjectURL(url);
+  }
+}
+
+export async function uploadPrivateImage(dataUrl: string): Promise<string> {
+  const image = await fetch(dataUrl).then((response) => response.blob());
+  const contentType = image.type || 'image/jpeg';
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+    throw new Error('El formato de esta imagen no se puede guardar de forma segura.');
+  }
+  const request = await fetch('/api/storage/uploads/request-url', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'echo-image',
+      size: image.size,
+      contentType,
+    }),
+  });
+  if (!request.ok) throw new Error(await responseError(request, 'No se pudo preparar la subida.'));
+  const { uploadURL, objectPath } = (await request.json()) as {
+    uploadURL: string;
+    objectPath: string;
+  };
+  const upload = await fetch(uploadURL, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: image,
+  });
+  if (!upload.ok) throw new Error('No se pudo subir la imagen al almacenamiento privado.');
+
+  const claim = await fetch('/api/storage/uploads/claim', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objectPath }),
+  });
+  if (!claim.ok) throw new Error(await responseError(claim, 'No se pudo proteger la imagen.'));
+  return ((await claim.json()) as { objectPath: string }).objectPath;
+}
+
+async function responseError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as { error?: string };
+    return payload.error || fallback;
+  } catch {
+    return fallback;
   }
 }
 

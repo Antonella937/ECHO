@@ -1,28 +1,43 @@
-import { useEffect, useState } from 'react';
-import { Check, HardDrive, Info, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { useClerk, useUser } from '@clerk/react';
+import { Check, Cloud, Info, LogOut, RotateCcw } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { Sheet } from '@/components/echo/sheet';
 import { characterProvider, imageProvider } from '@/domain/providers';
-import { estimateUsage, getBackend } from '@/store/persistence';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 export default function SettingsPage() {
   const { state, me, actions, storageError, lastSavedAt } = useSocial();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const back = useBack();
-  const [usage, setUsage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-
-  useEffect(() => {
-    estimateUsage().then(setUsage);
-  }, [lastSavedAt]);
 
   return (
     <div>
       <TopBar title="Ajustes" onBack={back} />
       <div className="px-4 pb-12 pt-5">
+        <section aria-labelledby="account-h">
+          <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tu cuenta</h2>
+          <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
+            <div className="text-sm font-semibold">{user?.fullName || 'Cuenta ECHO'}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || 'Sesión protegida'}</div>
+            <button
+              type="button"
+              onClick={() => void signOut({ redirectUrl: basePath || '/' })}
+              className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              data-testid="button-sign-out"
+            >
+              <LogOut className="h-4 w-4" /> Cerrar sesión
+            </button>
+          </div>
+        </section>
+
         <section aria-labelledby="identity-h">
           <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Identidad activa</h2>
           <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
@@ -62,13 +77,13 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-9" aria-labelledby="about-h">
-          <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sobre este prototipo</h2>
+          <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sobre ECHO</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
             <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
-              <span>Los datos se guardan solo en este dispositivo. Si borras los datos del navegador, se pierden.</span></p>
+              <span>Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.</span></p>
             <p className="mt-2.5 pl-[26px]">Los personajes y su actividad son simulados: no hay IA conectada ni respuestas en vivo.</p>
             <p className="mt-2.5 pl-[26px]">Las fotos de ejemplo son ilustrativas y no muestran a personas reales.</p>
-            <p className="mt-2.5 pl-[26px]">Todavía no existe un inicio de sesión seguro. Cualquiera con acceso a este navegador puede cambiar de identidad.</p>
+            <p className="mt-2.5 pl-[26px]">Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.</p>
           </div>
         </section>
 
@@ -76,16 +91,27 @@ export default function SettingsPage() {
           <h2 id="storage-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Almacenamiento</h2>
           <div className="mt-3 rounded-2xl border border-border p-4 text-[13px]">
             <div className="flex items-center gap-2.5">
-              <HardDrive className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} />
-              <span className="flex-1">{getBackend() === 'indexeddb' ? 'IndexedDB' : 'localStorage'}{usage ? ` · ${usage} usados` : ''}</span>
+              <Cloud className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} />
+              <span className="flex-1">Nube privada ECHO</span>
               <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-semibold', storageError ? 'bg-destructive/15 text-destructive' : 'bg-secondary text-muted-foreground')} data-testid="status-storage">
-                {storageError ? 'Error' : 'Guardado'}
+                {storageError ? 'Pendiente' : 'Sincronizado'}
               </span>
             </div>
             {storageError && <p role="alert" className="mt-3 text-destructive">{storageError}</p>}
             <p className="mt-3 text-muted-foreground">
-              {state.posts.length} publicaciones · {state.stories.length} historias · {state.messages.length} mensajes
+              {state.posts.length} publicaciones · {state.comments.length} comentarios · {state.messages.length} mensajes
             </p>
+            {lastSavedAt && <p className="mt-1.5 text-xs text-muted-foreground">Última sincronización: {new Date(lastSavedAt).toLocaleString('es-ES')}</p>}
+            {storageError && (
+              <button
+                type="button"
+                onClick={() => void actions.retrySync().then(() => toast({ title: 'Universo sincronizado' })).catch(() => undefined)}
+                className="mt-3 h-10 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground"
+                data-testid="button-retry-sync"
+              >
+                Reintentar sincronización
+              </button>
+            )}
           </div>
         </section>
 
@@ -110,14 +136,18 @@ export default function SettingsPage() {
       </div>
 
       <Sheet open={confirmReset} onClose={() => setConfirmReset(false)} title="¿Restaurar ECHO?">
-        <p className="text-sm text-muted-foreground">Se borrarán tus publicaciones, mensajes y cambios en este dispositivo, y volverás a ser Nela.</p>
+        <p className="text-sm text-muted-foreground">Se borrarán tus publicaciones, mensajes y cambios guardados en tu cuenta, y volverás a ser Nela.</p>
         <div className="mt-5 flex gap-2 pb-2">
           <button onClick={() => setConfirmReset(false)} className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-medium" data-testid="button-cancel-reset">Cancelar</button>
           <button
             onClick={async () => {
-              await actions.resetAll();
-              setConfirmReset(false);
-              toast({ title: 'Datos restaurados' });
+              try {
+                await actions.resetAll();
+                setConfirmReset(false);
+                toast({ title: 'Datos restaurados' });
+              } catch {
+                toast({ title: 'No se pudo sincronizar el restablecimiento', variant: 'destructive' });
+              }
             }}
             className="h-12 flex-1 rounded-2xl bg-destructive text-sm font-semibold text-destructive-foreground"
             data-testid="button-confirm-reset"
