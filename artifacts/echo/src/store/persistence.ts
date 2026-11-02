@@ -1,6 +1,5 @@
 import type { SocialState } from '@/domain/types';
 import type { UniverseInput } from '@workspace/api-client-react';
-import { uploadPrivateImage } from '@/lib/media';
 
 const DB_NAME = 'echo-local';
 const STORE = 'kv';
@@ -52,35 +51,95 @@ export async function loadLegacyState(): Promise<SocialState | null> {
   }
 }
 
-export async function clearLegacyState(): Promise<void> {
-  try {
-    await tx('readwrite', (st) => st.delete(KEY));
-  } catch {
-    /* ignore */
-  }
-  localStorage.removeItem(LS_KEY);
-  localStorage.removeItem(BACKEND_KEY);
-}
-
-export async function loadUniverse(): Promise<SocialState | null> {
-  const response = await fetch('/api/universe', { credentials: 'same-origin' });
+export interface UniverseEnvelope { state: SocialState | null; revision: number }
+export async function loadUniverse(): Promise<UniverseEnvelope> {
+  const response = await fetch('/api/universe', { credentials: 'same-origin', cache: 'no-store' });
   if (!response.ok) throw new Error(await responseError(response, 'No se pudo cargar tu universo.'));
-  return ((await response.json()) as { state: SocialState | null }).state;
+  return response.json();
 }
 
-export async function saveUniverse(state: SocialState): Promise<SocialState> {
-  const data: UniverseInput = { state };
+export class RevisionConflict extends Error {}
+
+export async function saveUniverse(state: SocialState, expectedRevision: number): Promise<UniverseEnvelope> {
+  const data: UniverseInput = { state, expectedRevision };
   const response = await fetch('/api/universe', {
     method: 'PUT',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
+  if (response.status === 409) throw new RevisionConflict('Otro dispositivo guardó cambios. Se volverán a combinar.');
   if (!response.ok) throw new Error(await responseError(response, 'No se pudo guardar tu universo.'));
-  return ((await response.json()) as { state: SocialState }).state;
+  return response.json();
+}
+
+// Owner-scoped recovery never overwrites or removes the original legacy copy.
+export interface Recovery {
+  base: SocialState | null;
+  state: SocialState;
+}
+export async function loadRecovery(owner: string): Promise<Recovery | null> {
+  return await tx<Recovery | undefined>('readonly', st => st.get(`recovery:${owner}`)) ?? null;
+}
+export async function saveRecovery(owner: string, recovery: Recovery): Promise<void> {
+  await tx('readwrite', st => st.put(recovery, `recovery:${owner}`));
+}
+export async function fingerprint(state: SocialState): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(state));
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+export async function importedBy(owner: string, hash: string): Promise<boolean> {
+  return !!await tx('readonly', st => st.get(`import:${owner}:${hash}`));
+}
+export async function markImported(owner: string, hash: string): Promise<void> {
+  await tx('readwrite', st => st.put({ verifiedAt: new Date().toISOString() }, `import:${owner}:${hash}`));
+}
+export async function legacyOwner(hash: string): Promise<string | null> {
+  return await tx<string | undefined>('readonly', st => st.get(`legacy-owner:${hash}`)) ?? null;
+}
+/** Read + claim in one IDB transaction, so two signed-in tabs cannot claim it. */
+export async function claimLegacy(owner: string, hash: string): Promise<void> {
+  const db = await openDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE, 'readwrite');
+      const store = transaction.objectStore(STORE);
+      const request = store.get(`legacy-owner:${hash}`);
+      request.onsuccess = () => {
+        if (request.result && request.result !== owner) transaction.abort();
+        else store.put(owner, `legacy-owner:${hash}`);
+      };
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(new Error('Estos datos locales ya están vinculados a otro propietario.'));
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } finally { db.close(); }
+}
+export async function cachedMigration(owner: string, hash: string): Promise<SocialState | null> {
+  return await tx<SocialState | undefined>('readonly', st => st.get(`migration:${owner}:${hash}`)) ?? null;
+}
+export async function cacheMigration(owner: string, hash: string, state: SocialState): Promise<void> {
+  await tx('readwrite', st => st.put(state, `migration:${owner}:${hash}`));
+}
+export async function verifySavedUniverse(expected: SocialState): Promise<void> {
+  // A separate HTTP read, followed by a full server-side read of private files.
+  const response = await fetch('/api/universe/verify', { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) throw new Error(await responseError(response, 'No se pudo verificar el universo y sus fotos.'));
+  const actual = await response.json() as UniverseEnvelope;
+  if (JSON.stringify(actual.state) !== JSON.stringify(expected)) {
+    // PostgreSQL jsonb reorders object properties; compare canonical data.
+    const canonical = (v: unknown): string => JSON.stringify(v, (_key, value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+        : value);
+    if (canonical(actual.state) !== canonical(expected))
+      throw new Error('El servidor cambió durante la verificación. La copia local sigue intacta; reintenta la importación.');
+  }
 }
 
 export async function moveLocalImagesToPrivateStorage(state: SocialState): Promise<SocialState> {
+  const { uploadPrivateImage } = await import('@/lib/media');
   const refs = [
     ...state.characters.flatMap((character) => [
       character.avatar,

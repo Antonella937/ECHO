@@ -53,6 +53,8 @@ paths:
             schema:
               $ref: "#/components/schemas/UniverseInput"
       responses:
+        "409":
+          description: Stale revision; reload and safely merge before retrying
         "200":
           description: Saved universe
           content:
@@ -107,6 +109,22 @@ paths:
           description: Invalid object path
         "401":
           description: Authentication required
+  /universe/verify:
+    get:
+      operationId: verifyUniverse
+      tags: [universe]
+      summary: Re-read the saved universe and verify every private image is readable
+      responses:
+        "200":
+          description: Verified universe and private images
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniverseVerification"
+        "401":
+          description: Authentication required
+        "422":
+          description: A saved file could not be verified
   /storage/objects/{objectPath}:
     get:
       operationId: getPrivateObject
@@ -143,18 +161,27 @@ components:
         - status
     UniverseEnvelope:
       type: object
-      required: [state]
+      required: [state, revision]
       properties:
+        revision: { type: integer, minimum: 0 }
         state:
           oneOf:
             - $ref: "#/components/schemas/SocialState"
             - type: "null"
     UniverseInput:
       type: object
-      required: [state]
+      required: [state, expectedRevision]
       properties:
+        expectedRevision: { type: integer, minimum: 0 }
         state:
           $ref: "#/components/schemas/SocialState"
+    UniverseVerification:
+      allOf:
+        - $ref: "#/components/schemas/UniverseEnvelope"
+        - type: object
+          required: [verifiedFiles]
+          properties:
+            verifiedFiles: { type: integer, minimum: 0 }
     SocialState:
       type: object
       required: [version, currentCharacterId, characters, follows, posts, comments, stories, messages, notifications]

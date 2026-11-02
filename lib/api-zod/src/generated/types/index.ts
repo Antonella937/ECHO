@@ -19,6 +19,7 @@ export * from './socialStateFollows';
 export * from './story';
 export * from './universeEnvelope';
 export * from './universeInput';
+export * from './universeVerification';
 export * from './uploadClaimInput';
 export * from './uploadClaimResult';
 export * from './uploadUrlInput';

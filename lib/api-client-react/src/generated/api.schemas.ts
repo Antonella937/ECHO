@@ -122,12 +122,21 @@ export interface SocialState {
 }
 
 export interface UniverseEnvelope {
+  /** @minimum 0 */
+  revision: number;
   state: SocialState | null;
 }
 
 export interface UniverseInput {
+  /** @minimum 0 */
+  expectedRevision: number;
   state: SocialState;
 }
+
+export type UniverseVerification = UniverseEnvelope & {
+  /** @minimum 0 */
+  verifiedFiles: number;
+};
 
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];
 

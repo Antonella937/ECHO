@@ -23,6 +23,7 @@ import type {
   HealthStatus,
   UniverseEnvelope,
   UniverseInput,
+  UniverseVerification,
   UploadClaimInput,
   UploadClaimResult,
   UploadUrlInput,
@@ -474,6 +475,83 @@ export const useClaimUpload = <TError = ErrorType<void>,
       > => {
       return useMutation(getClaimUploadMutationOptions(options));
     }
+
+export const getVerifyUniverseUrl = () => {
+
+
+
+
+  return `/api/universe/verify`
+}
+
+/**
+ * @summary Re-read the saved universe and verify every private image is readable
+ */
+export const verifyUniverse = async ( options?: Parameters<typeof customFetch>[1]): Promise<UniverseVerification> => {
+
+  return customFetch<UniverseVerification>(getVerifyUniverseUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyUniverseQueryKey = () => {
+    return [
+    `/api/universe/verify`
+    ] as const;
+    }
+
+
+export const getVerifyUniverseQueryOptions = <TData = Awaited<ReturnType<typeof verifyUniverse>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyUniverseQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyUniverse>>> = ({ signal }) => verifyUniverse({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyUniverseQueryResult = NonNullable<Awaited<ReturnType<typeof verifyUniverse>>>
+export type VerifyUniverseQueryError = ErrorType<void>
+
+
+/**
+ * @summary Re-read the saved universe and verify every private image is readable
+ */
+
+export function useVerifyUniverse<TData = Awaited<ReturnType<typeof verifyUniverse>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyUniverseQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetPrivateObjectUrl = (objectPath: string,) => {
 

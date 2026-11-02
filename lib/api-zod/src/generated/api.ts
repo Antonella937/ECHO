@@ -20,7 +20,12 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Load the authenticated user's universe
  */
+export const getUniverseResponseRevisionMin = 0;
+
+
+
 export const GetUniverseResponse = zod.object({
+  "revision": zod.number().int().min(getUniverseResponseRevisionMin),
   "state": zod.union([zod.object({
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -111,7 +116,12 @@ export const GetUniverseResponse = zod.object({
 /**
  * @summary Save the authenticated user's universe
  */
+export const saveUniverseBodyExpectedRevisionMin = 0;
+
+
+
 export const SaveUniverseBody = zod.object({
+  "expectedRevision": zod.number().int().min(saveUniverseBodyExpectedRevisionMin),
   "state": zod.object({
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -198,7 +208,12 @@ export const SaveUniverseBody = zod.object({
 })
 })
 
+export const saveUniverseResponseRevisionMin = 0;
+
+
+
 export const SaveUniverseResponse = zod.object({
+  "revision": zod.number().int().min(saveUniverseResponseRevisionMin),
   "state": zod.union([zod.object({
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -320,6 +335,106 @@ export const ClaimUploadBody = zod.object({
 export const ClaimUploadResponse = zod.object({
   "objectPath": zod.string()
 })
+
+
+/**
+ * @summary Re-read the saved universe and verify every private image is readable
+ */
+export const verifyUniverseResponseOneRevisionMin = 0;
+
+export const verifyUniverseResponseTwoVerifiedFilesMin = 0;
+
+
+
+export const VerifyUniverseResponse = zod.object({
+  "revision": zod.number().int().min(verifyUniverseResponseOneRevisionMin),
+  "state": zod.union([zod.object({
+  "version": zod.number().int(),
+  "currentCharacterId": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string(),
+  "handle": zod.string(),
+  "name": zod.string(),
+  "occupation": zod.string(),
+  "bio": zod.string(),
+  "location": zod.string(),
+  "avatar": zod.string(),
+  "providerRef": zod.object({
+  "provider": zod.string(),
+  "externalId": zod.string().nullable(),
+  "status": zod.string(),
+  "lastSyncAt": zod.coerce.date().nullable()
+}),
+  "identity": zod.object({
+  "provider": zod.string(),
+  "referenceImages": zod.array(zod.string()),
+  "seed": zod.number().int(),
+  "appearance": zod.string(),
+  "styleNotes": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+})),
+  "follows": zod.record(zod.string(), zod.array(zod.string())),
+  "posts": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "image": zod.string(),
+  "caption": zod.string(),
+  "location": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "likes": zod.array(zod.string()),
+  "savedBy": zod.array(zod.string()),
+  "origin": zod.string(),
+  "illustrative": zod.boolean()
+})),
+  "comments": zod.array(zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "authorId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "parentId": zod.string().nullable(),
+  "replyToAuthorId": zod.string().nullable(),
+  "likes": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "stories": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "image": zod.string(),
+  "caption": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "seenBy": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "threadId": zod.string(),
+  "senderId": zod.string(),
+  "recipientId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "storyId": zod.string().nullable(),
+  "postId": zod.string().nullable(),
+  "readBy": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "notifications": zod.array(zod.object({
+  "id": zod.string(),
+  "recipientId": zod.string(),
+  "actorId": zod.string(),
+  "kind": zod.string(),
+  "postId": zod.string().nullable(),
+  "commentId": zod.string().nullable(),
+  "storyId": zod.string().nullable(),
+  "excerpt": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "read": zod.boolean()
+}))
+}),zod.null()])
+}).and(zod.object({
+  "verifiedFiles": zod.number().int().min(verifyUniverseResponseTwoVerifiedFilesMin)
+}))
 
 
 /**

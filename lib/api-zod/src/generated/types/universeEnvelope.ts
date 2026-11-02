@@ -8,5 +8,7 @@
 import type { SocialState } from './socialState';
 
 export interface UniverseEnvelope {
+  /** @minimum 0 */
+  revision: number;
   state: SocialState | null;
 }
