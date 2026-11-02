@@ -531,6 +531,35 @@ export interface Character {
   identity: CharacterIdentity;
 }
 
+export type PostMediaType = typeof PostMediaType[keyof typeof PostMediaType];
+
+
+export const PostMediaType = {
+  image: 'image',
+  video: 'video',
+} as const;
+
+/**
+ * Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.
+ */
+export interface PostMedia {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  id: string;
+  type: PostMediaType;
+  /** @minLength 1 */
+  url: string;
+  mimeType?: string;
+  /** @minimum 1 */
+  width?: number;
+  /** @minimum 1 */
+  height?: number;
+  /** @minimum 0 */
+  durationSeconds?: number;
+}
+
 export type PostDisplayMetrics = {
   /**
      * @minimum 0
@@ -557,6 +586,12 @@ export interface Post {
   id: string;
   authorId: string;
   image: string;
+  /**
+     * Optional additive carousel; array order is display order. image remains its first item's URL for legacy covers.
+     * @minItems 1
+     * @maxItems 10
+     */
+  media?: PostMedia[];
   caption: string;
   location: string;
   createdAt: string;

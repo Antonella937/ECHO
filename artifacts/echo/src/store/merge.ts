@@ -39,6 +39,9 @@ export function mergeUniverse(
     if (b === undefined && l === undefined) return r;
     if (b === undefined && r === undefined) return l;
     if (Array.isArray(l) && Array.isArray(r)) {
+      // Carousel order is content, not set membership. Never silently reorder
+      // conflicting versions of the same post during import/synchronization.
+      if (/^posts\.[^.]+\.media$/.test(path)) return conflict(b, l, r, path);
       if ([...l, ...r].every(v => typeof v === 'string')) {
         const bs = new Set(Array.isArray(b) ? b : []);
         const ls = new Set(l), rs = new Set(r);

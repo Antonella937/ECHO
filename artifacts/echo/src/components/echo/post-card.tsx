@@ -7,8 +7,10 @@ import { VerifiedBadge } from './verified-badge';
 import { PostMetricsEditor } from './post-metrics-editor';
 import { shownCount, formatCount } from '@/domain/accounts';
 import { CommentsSheet, LikersSheet, OptionsSheet, ShareSheet } from './post-sheets';
-import { resolveMedia, timeAgo } from '@/lib/media';
+import { timeAgo } from '@/lib/media';
 import { cn } from '@/lib/utils';
+import { PostMediaView } from './post-media';
+import { postMedia } from '@/domain/post-media';
 import type { Post } from '@/domain/types';
 
 interface Props {
@@ -59,26 +61,18 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
       </header>
 
       <div className="relative px-0 sm:px-3">
-        <button
-          onClick={onImageTap}
-          className="relative block w-full overflow-hidden bg-card sm:rounded-[22px]"
-          aria-label="Doble toque para indicar que te gusta"
-          data-testid={`button-image-${post.id}`}
-        >
-          <img
-            src={resolveMedia(post.image)}
-            alt={post.caption || `Foto de ${author.name}`}
-            loading={eager ? 'eager' : 'lazy'}
-            draggable={false}
-            className="aspect-[4/5] w-full object-cover"
-            data-testid={`img-post-${post.id}`}
-          />
-          {burst > 0 && (
+        <PostMediaView
+          postId={post.id}
+          media={postMedia(post)}
+          alt={post.caption || `Foto de ${author.name}`}
+          eager={eager}
+          onTap={onImageTap}
+          overlay={burst > 0 && (
             <span key={burst} className="heart-pop pointer-events-none absolute inset-0 grid place-items-center">
               <Heart className="h-24 w-24 fill-primary text-primary drop-shadow-lg" strokeWidth={1} />
             </span>
           )}
-        </button>
+        />
       </div>
 
       <div className="flex items-center px-2.5 pt-2">

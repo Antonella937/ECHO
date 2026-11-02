@@ -48,6 +48,8 @@ export * from './message';
 export * from './notification';
 export * from './post';
 export * from './postDisplayMetrics';
+export * from './postMedia';
+export * from './postMediaType';
 export * from './routineEntry';
 export * from './routineEntryActivity';
 export * from './routineEntryFlexibility';

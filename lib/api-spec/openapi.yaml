@@ -440,6 +440,18 @@ components:
         kind: { type: string, enum: [manual, interaction, post, conversation, event] }
         sourceId: { type: [string, "null"] }
         promotedTo: { type: [string, "null"] }
+    PostMedia:
+      type: object
+      description: Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.
+      required: [id, type, url]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 120 }
+        type: { type: string, enum: [image, video] }
+        url: { type: string, minLength: 1 }
+        mimeType: { type: string }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        durationSeconds: { type: number, minimum: 0 }
     Post:
       type: object
       required: [id, authorId, image, caption, location, createdAt, likes, savedBy, origin, illustrative]
@@ -453,6 +465,12 @@ components:
         id: { type: string }
         authorId: { type: string }
         image: { type: string }
+        media:
+          type: array
+          minItems: 1
+          maxItems: 10
+          description: Optional additive carousel; array order is display order. image remains its first item's URL for legacy covers.
+          items: { $ref: "#/components/schemas/PostMedia" }
         caption: { type: string }
         location: { type: string }
         createdAt: { type: string, format: date-time }

@@ -7,6 +7,8 @@ import { UniverseSync, type SyncView } from './synchronization';
 import { SyncNotices } from './sync-notices';
 import { archiveAccount, editAccount, editPostMetrics, validateAccount, type AccountInput, type PostMetrics } from '@/domain/accounts';
 import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core';
+import { validatePostMedia } from '@/domain/post-media';
+import type { PostMedia } from '@/domain/types';
 
 export interface SocialActions {
   createAccount(input: AccountInput): string;
@@ -19,7 +21,7 @@ export interface SocialActions {
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
-  createPost(input: { image: string; caption: string; location: string }): string;
+  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string }): string;
   createStory(input: { image: string; caption: string }): string;
   deletePost(postId: string): void;
   seeStory(storyId: string): void;
@@ -171,14 +173,16 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const c = cur().comments.find((x) => x.id === commentId);
         if (c) dispatch({ type: 'comment.liked', commentId, actorId: myId(), liked: !c.likes.includes(myId()) });
       },
-      createPost({ image, caption, location }) {
+      createPost({ image, media, caption, location }) {
+        if (media) validatePostMedia(media);
         const id = uid('p');
         dispatch({
           type: 'post.created',
           post: {
             id,
             authorId: myId(),
-            image,
+            image: media?.[0].url ?? image,
+            ...(media ? { media: structuredClone(media) } : {}),
             caption: caption.trim(),
             location: location.trim(),
             createdAt: new Date().toISOString(),

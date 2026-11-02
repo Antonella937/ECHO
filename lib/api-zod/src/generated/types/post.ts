@@ -6,12 +6,19 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PostDisplayMetrics } from './postDisplayMetrics';
+import type { PostMedia } from './postMedia';
 
 export interface Post {
   displayMetrics?: PostDisplayMetrics;
   id: string;
   authorId: string;
   image: string;
+  /**
+     * Optional additive carousel; array order is display order. image remains its first item's URL for legacy covers.
+     * @minItems 1
+     * @maxItems 10
+     */
+  media?: PostMedia[];
   caption: string;
   location: string;
   createdAt: Date;

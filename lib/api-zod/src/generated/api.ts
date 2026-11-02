@@ -485,6 +485,15 @@ export const getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax = 100
 export const getUniverseResponseStateOnePostsItemDisplayMetricsViewsMin = 0;
 export const getUniverseResponseStateOnePostsItemDisplayMetricsViewsMax = 1000000000000;
 
+export const getUniverseResponseStateOnePostsItemMediaItemIdMax = 120;
+
+
+
+
+export const getUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin = 0;
+
+export const getUniverseResponseStateOnePostsItemMediaMax = 10;
+
 
 
 export const GetUniverseResponse = zod.object({
@@ -661,6 +670,15 @@ export const GetUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
+  "media": zod.array(zod.object({
+  "id": zod.string().min(1).max(getUniverseResponseStateOnePostsItemMediaItemIdMax),
+  "type": zod.enum(['image', 'video']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "width": zod.number().int().min(1).optional(),
+  "height": zod.number().int().min(1).optional(),
+  "durationSeconds": zod.number().min(getUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin).optional()
+}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(getUniverseResponseStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -882,6 +900,15 @@ export const saveUniverseBodyStatePostsItemDisplayMetricsCommentsMax = 100000000
 export const saveUniverseBodyStatePostsItemDisplayMetricsViewsMin = 0;
 export const saveUniverseBodyStatePostsItemDisplayMetricsViewsMax = 1000000000000;
 
+export const saveUniverseBodyStatePostsItemMediaItemIdMax = 120;
+
+
+
+
+export const saveUniverseBodyStatePostsItemMediaItemDurationSecondsMin = 0;
+
+export const saveUniverseBodyStatePostsItemMediaMax = 10;
+
 
 
 export const SaveUniverseBody = zod.object({
@@ -1058,6 +1085,15 @@ export const SaveUniverseBody = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
+  "media": zod.array(zod.object({
+  "id": zod.string().min(1).max(saveUniverseBodyStatePostsItemMediaItemIdMax),
+  "type": zod.enum(['image', 'video']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "width": zod.number().int().min(1).optional(),
+  "height": zod.number().int().min(1).optional(),
+  "durationSeconds": zod.number().min(saveUniverseBodyStatePostsItemMediaItemDurationSecondsMin).optional()
+}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(saveUniverseBodyStatePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -1275,6 +1311,15 @@ export const saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax = 10
 export const saveUniverseResponseStateOnePostsItemDisplayMetricsViewsMin = 0;
 export const saveUniverseResponseStateOnePostsItemDisplayMetricsViewsMax = 1000000000000;
 
+export const saveUniverseResponseStateOnePostsItemMediaItemIdMax = 120;
+
+
+
+
+export const saveUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin = 0;
+
+export const saveUniverseResponseStateOnePostsItemMediaMax = 10;
+
 
 
 export const SaveUniverseResponse = zod.object({
@@ -1451,6 +1496,15 @@ export const SaveUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
+  "media": zod.array(zod.object({
+  "id": zod.string().min(1).max(saveUniverseResponseStateOnePostsItemMediaItemIdMax),
+  "type": zod.enum(['image', 'video']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "width": zod.number().int().min(1).optional(),
+  "height": zod.number().int().min(1).optional(),
+  "durationSeconds": zod.number().min(saveUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin).optional()
+}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(saveUniverseResponseStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -1708,6 +1762,15 @@ export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMax
 export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsViewsMin = 0;
 export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsViewsMax = 1000000000000;
 
+export const verifyUniverseResponseOneStateOnePostsItemMediaItemIdMax = 120;
+
+
+
+
+export const verifyUniverseResponseOneStateOnePostsItemMediaItemDurationSecondsMin = 0;
+
+export const verifyUniverseResponseOneStateOnePostsItemMediaMax = 10;
+
 export const verifyUniverseResponseTwoVerifiedFilesMin = 0;
 
 
@@ -1886,6 +1949,15 @@ export const VerifyUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
+  "media": zod.array(zod.object({
+  "id": zod.string().min(1).max(verifyUniverseResponseOneStateOnePostsItemMediaItemIdMax),
+  "type": zod.enum(['image', 'video']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "width": zod.number().int().min(1).optional(),
+  "height": zod.number().int().min(1).optional(),
+  "durationSeconds": zod.number().min(verifyUniverseResponseOneStateOnePostsItemMediaItemDurationSecondsMin).optional()
+}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(verifyUniverseResponseOneStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),

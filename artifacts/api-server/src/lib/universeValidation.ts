@@ -2,6 +2,15 @@ import type { SocialState } from '@workspace/api-zod';
 
 /** Owner-private account rules, independent of whichever character is active. */
 export function universeAccountError(state: SocialState): string | null {
+  for (const post of state.posts) {
+    if (!post.media) continue;
+    if (!post.media.length || post.media.length > 10) return 'Un carrete debe contener entre 1 y 10 fotos.';
+    if (post.media.some(item => item.type !== 'image')) return 'El video todavía no está habilitado para publicaciones.';
+    if (new Set(post.media.map(item => item.id)).size !== post.media.length)
+      return 'Los elementos de un carrete deben tener identificadores únicos.';
+    if (post.media.some(item => !item.id.trim() || !item.url.trim())) return 'Falta un identificador o una foto del carrete.';
+    if (post.image !== post.media[0].url) return 'La portada debe coincidir con la primera foto del carrete.';
+  }
   const ids = new Set<string>(), handles = new Set<string>();
   for (const account of state.characters) {
     const handle = account.handle.toLowerCase().replace(/^@/, '');

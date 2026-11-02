@@ -46,10 +46,14 @@ export interface Character {
   displayMetrics?: { followers?: number | null; following?: number | null };
 }
 
+export type PostMedia = import('@workspace/api-client-react').PostMedia;
+
 export interface Post {
   id: string;
   authorId: CharacterId;
   image: MediaRef;
+  /** Optional ordered carousel. image stays the first item for legacy cover consumers. */
+  media?: PostMedia[];
   caption: string;
   location: string;
   createdAt: ISODate;

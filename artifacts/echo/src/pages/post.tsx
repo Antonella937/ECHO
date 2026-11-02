@@ -23,8 +23,8 @@ export default function PostPage() {
       <div>
         <TopBar title="Publicación" onBack={back} />
         <EmptyState
-          title="Esta foto ya no está"
-          body="Puede que se haya eliminado, o que el enlace venga de otro dispositivo. ECHO todavía guarda todo solo aquí."
+          title="Esta publicación ya no está"
+          body="Puede que se haya eliminado o que todavía no se haya sincronizado. Volvé a intentarlo cuando tengas conexión."
           action={<Link href="/" className="inline-flex h-11 items-center rounded-full bg-secondary px-6 text-sm font-semibold" data-testid="link-post-missing-home">Volver al inicio</Link>}
         />
       </div>
