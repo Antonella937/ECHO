@@ -1,4 +1,5 @@
 import type { SocialState } from '../domain/types';
+import { deletionBlockReason } from '../domain/character-core';
 
 export interface MergeConflict {
   path: string;
@@ -57,6 +58,9 @@ export function mergeUniverse(
       const result: Record<string, unknown> = {};
       for (const key of new Set([...Object.keys(l), ...Object.keys(r), ...Object.keys(b ?? {})])) {
         const p = path ? `${path}.${key}` : key;
+        if (p.endsWith('.configuration.currentState.lastActivityAt') && typeof l[key] === 'string' && typeof r[key] === 'string') {
+          result[key] = [l[key] as string, r[key] as string].sort().at(-1); continue;
+        }
         // Same stable id denotes the same entity. Keep the earliest creation
         // timestamp and latest metadata update when importing, not a fake clash.
         if (!base && (key === 'createdAt' || key === 'updatedAt') &&
@@ -89,6 +93,22 @@ export function mergeUniverse(
       conflicts.push({ path, local: localPost, remote: remotePost });
     }
   }
+  // An unused account may be deleted locally just before another device uses it.
+  // Preserve the new history and turn that stale deletion into reversible archive.
+  const candidates = new Map([...(base?.characters ?? []), ...local.characters, ...remote.characters].map(c => [c.id, c]));
+  for (const [id, character] of candidates) {
+    if (state.characters.some(c => c.id === id)) continue;
+    const probe = { ...state, characters: [...state.characters, character] };
+    if (deletionBlockReason(probe, id)) state.characters.push({ ...character, archived: id !== 'nela' });
+  }
   if (!state.characters.some(c => c.id === state.currentCharacterId && !c.archived)) state.currentCharacterId = 'nela';
+  // Only this explicitly rotating context index is bounded; source social history
+  // and permanent/relationship memories are never trimmed.
+  state.characters = state.characters.map(character => {
+    const config = character.configuration;
+    if (!config || config.memory.recent.length <= config.memory.recentLimit) return character;
+    return { ...character, configuration: { ...config, memory: { ...config.memory,
+      recent: [...config.memory.recent].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)).slice(-config.memory.recentLimit) } } };
+  });
   return { state, conflicts };
 }

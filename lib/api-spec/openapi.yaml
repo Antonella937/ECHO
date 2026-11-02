@@ -15,6 +15,33 @@ tags:
   - name: storage
     description: Private image upload and serving
 paths:
+  /characters/assistance:
+    get:
+      operationId: getCharacterAssistance
+      summary: Owner-private character proposal provider availability
+      responses:
+        "200":
+          description: Assistance status, without credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CharacterAssistanceStatus" }
+        "401": { description: Authentication required }
+    post:
+      operationId: proposeCharacter
+      summary: Propose an editable character without creating or activating it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CharacterProposalInput" }
+      responses:
+        "200":
+          description: Reviewable proposal; saving requires explicit owner confirmation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CharacterProposal" }
+        "401": { description: Authentication required }
+        "503": { description: No assistance provider configured; no generation performed }
   /healthz:
     get:
       operationId: healthCheck
@@ -216,6 +243,7 @@ components:
       type: object
       required: [id, handle, name, occupation, bio, location, avatar, providerRef, identity]
       properties:
+        configuration: { $ref: "#/components/schemas/CharacterConfiguration" }
         accountType: { type: string, enum: [personal, band, venue, organization] }
         verified: { type: boolean }
         archived: { type: boolean }
@@ -251,6 +279,167 @@ components:
             appearance: { type: string }
             styleNotes: { type: string }
             updatedAt: { type: string, format: date-time }
+    CharacterAssistanceStatus:
+      type: object
+      required: [available, reason]
+      properties:
+        available: { type: boolean }
+        reason: { type: string }
+    CharacterProposalInput:
+      type: object
+      required: [description]
+      properties:
+        description: { type: string, minLength: 10, maxLength: 8000 }
+    CharacterProposal:
+      type: object
+      required: [name, handle, bio, occupation, location, configuration]
+      properties:
+        name: { type: string }
+        handle: { type: string }
+        bio: { type: string }
+        occupation: { type: string }
+        location: { type: string }
+        configuration: { $ref: "#/components/schemas/CharacterConfiguration" }
+    CharacterConfiguration:
+      type: object
+      required: [version, basic, personality, voice, relationships, routine, social, memory, currentState, assistance]
+      properties:
+        version: { type: integer, enum: [1] }
+        basic:
+          type: object
+          required: [name, age, pronouns, interests, likes, dislikes, notes]
+          properties:
+            name: { type: string, maxLength: 100 }
+            age: { type: [integer, "null"], minimum: 0, maximum: 150 }
+            pronouns: { type: string, maxLength: 100 }
+            interests: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            likes: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            dislikes: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            notes: { type: string, maxLength: 8000 }
+        personality:
+          type: object
+          required: [description, traits, temperament, values, humor, sociability, expressiveness, emotionalStyle, commonTopics, boundaries]
+          properties:
+            description: { type: string, maxLength: 24000 }
+            traits: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            temperament: { type: string, maxLength: 2000 }
+            values: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            humor: { type: string, maxLength: 2000 }
+            sociability: { type: string, enum: [low, medium, high] }
+            expressiveness: { type: string, maxLength: 2000 }
+            emotionalStyle: { type: string, maxLength: 4000 }
+            commonTopics: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            boundaries: { type: array, maxItems: 50, items: { type: string, maxLength: 1000 } }
+        voice:
+          type: object
+          required: [speakingStyle, messageLength, vocabulary, emojiStyle, captionStyle, commentStyle, disclosure, postsAbout, avoidsPosting]
+          properties:
+            speakingStyle: { type: string, maxLength: 4000 }
+            messageLength: { type: string, enum: [short, balanced, long] }
+            vocabulary: { type: string, maxLength: 4000 }
+            emojiStyle: { type: string, maxLength: 2000 }
+            captionStyle: { type: string, maxLength: 4000 }
+            commentStyle: { type: string, maxLength: 4000 }
+            disclosure: { type: string, enum: [private, balanced, open] }
+            postsAbout: { type: array, maxItems: 50, items: { type: string, maxLength: 200 } }
+            avoidsPosting: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+        relationships:
+          type: array
+          maxItems: 300
+          items: { $ref: "#/components/schemas/CharacterRelationship" }
+        routine:
+          type: object
+          required: [timezone, flexibilityNotes, entries]
+          properties:
+            timezone: { type: string, maxLength: 100 }
+            flexibilityNotes: { type: string, maxLength: 4000 }
+            entries: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/RoutineEntry" } }
+        social:
+          type: object
+          required: [activity, postsFrequency, storiesFrequency, likesFrequency, commentsFrequency, initiatesDMs, replySpeed, sociability, spontaneity, allowSilence, silenceNotes, postsPerWeek, storiesPerWeek, minReplyMinutes, maxReplyMinutes]
+          properties:
+            activity: { type: string, enum: [low, medium, high] }
+            postsFrequency: { type: string, enum: [rare, normal, frequent] }
+            storiesFrequency: { type: string, enum: [rare, normal, frequent] }
+            likesFrequency: { type: string, enum: [rare, normal, frequent] }
+            commentsFrequency: { type: string, enum: [rare, normal, frequent] }
+            initiatesDMs: { type: string, enum: [rare, normal, frequent] }
+            replySpeed: { type: string, enum: [slow, normal, quick] }
+            sociability: { type: string, enum: [low, medium, high] }
+            spontaneity: { type: string, enum: [low, medium, high] }
+            allowSilence: { type: boolean }
+            silenceNotes: { type: string, maxLength: 4000 }
+            postsPerWeek: { type: [integer, "null"], minimum: 0, maximum: 100 }
+            storiesPerWeek: { type: [integer, "null"], minimum: 0, maximum: 300 }
+            minReplyMinutes: { type: [integer, "null"], minimum: 0, maximum: 10080 }
+            maxReplyMinutes: { type: [integer, "null"], minimum: 0, maximum: 10080 }
+        memory:
+          type: object
+          required: [permanent, relationships, recent, recentLimit, recentSummary]
+          properties:
+            permanent: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/CharacterMemory" } }
+            relationships: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/CharacterMemory" } }
+            recent: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/CharacterMemory" } }
+            recentLimit: { type: integer, minimum: 10, maximum: 200 }
+            recentSummary: { type: string, maxLength: 8000 }
+        currentState:
+          type: object
+          required: [location, activity, mood, companions, lastActivityAt, nextEvent, source, updatedAt]
+          properties:
+            location: { type: string, maxLength: 500 }
+            activity: { type: string, maxLength: 1000 }
+            mood: { type: string, maxLength: 500 }
+            companions: { type: array, maxItems: 50, items: { type: string } }
+            lastActivityAt: { type: [string, "null"], format: date-time }
+            nextEvent: { type: string, maxLength: 1000 }
+            source: { type: string, enum: [manual, routine] }
+            updatedAt: { type: string, format: date-time }
+        assistance:
+          type: object
+          required: [description, status, provider]
+          properties:
+            description: { type: string, maxLength: 8000 }
+            status: { type: string, enum: [manual, unavailable, proposed, accepted] }
+            provider: { type: [string, "null"] }
+    CharacterRelationship:
+      type: object
+      required: [id, targetId, preset, customLabel, description, closeness, trust, attraction, tension]
+      properties:
+        id: { type: string }
+        targetId: { type: string, description: "'owner' denotes the universe owner, never a login credential" }
+        preset: { type: string, enum: [stranger, acquaintance, friend, close_friend, family, crush, romantic_tension, partner, ex, rival, custom] }
+        customLabel: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 8000 }
+        closeness: { type: integer, minimum: 0, maximum: 100 }
+        trust: { type: integer, minimum: 0, maximum: 100 }
+        attraction: { type: [integer, "null"], minimum: 0, maximum: 100 }
+        tension: { type: [integer, "null"], minimum: 0, maximum: 100 }
+    RoutineEntry:
+      type: object
+      required: [id, title, activity, weekdays, start, end, location, recurrence, date, flexibility]
+      properties:
+        id: { type: string }
+        title: { type: string, maxLength: 200 }
+        activity: { type: string, enum: [sleep, work, study, meal, exercise, rehearsal, social, leisure, custom] }
+        weekdays: { type: array, maxItems: 7, items: { type: integer, minimum: 1, maximum: 7 } }
+        start: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        end: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        location: { type: string, maxLength: 500 }
+        recurrence: { type: string, enum: [weekly, once] }
+        date: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        flexibility: { type: string, enum: [low, medium, high] }
+    CharacterMemory:
+      type: object
+      required: [id, text, targetId, createdAt, updatedAt, kind, sourceId, promotedTo]
+      properties:
+        id: { type: string }
+        text: { type: string, minLength: 1, maxLength: 8000 }
+        targetId: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        kind: { type: string, enum: [manual, interaction, post, conversation, event] }
+        sourceId: { type: [string, "null"] }
+        promotedTo: { type: [string, "null"] }
     Post:
       type: object
       required: [id, authorId, image, caption, location, createdAt, likes, savedBy, origin, illustrative]

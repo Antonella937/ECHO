@@ -1,7 +1,8 @@
 import type { Character, Post, SocialState } from './types';
+import { characterConfig, sameCharacterValue, validateCharacterConfig } from './character-core';
 
 export type AccountInput = Pick<Character, 'name' | 'handle' | 'bio' | 'avatar'> &
-  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics'>>;
+  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration'>>;
 export const accountTypes = { personal: 'Personal', band: 'Banda', venue: 'Lugar', organization: 'Organización' } as const;
 const catalog = [
   ['pretty-violence', 'Pretty Violence', 'prettyviolence', 'band'],
@@ -41,6 +42,7 @@ export function validateAccount(input: AccountInput, state: SocialState, id?: st
     throw Error('Ese @username ya existe en tu universo, incluso entre las cuentas archivadas.');
   if (input.accountType && !Object.hasOwn(accountTypes, input.accountType)) throw Error('Tipo de cuenta inválido.');
   validateMetrics(input.displayMetrics);
+  if (input.configuration) validateCharacterConfig(input.configuration, state, id);
   return { ...input, name, handle };
 }
 export function validateMetrics(metrics?: Record<string, number | null | undefined>) {
@@ -53,6 +55,7 @@ export function formatCount(value: number) {
 }
 export function accountFormValues(c: AccountInput): AccountInput {
   return { name: c.name, handle: c.handle, bio: c.bio, avatar: c.avatar,
+    occupation: c.occupation ?? '', location: c.location ?? '', configuration: c.configuration,
     accountType: c.accountType ?? 'personal', verified: c.verified ?? false,
     displayMetrics: { followers: c.displayMetrics?.followers ?? null, following: c.displayMetrics?.following ?? null } };
 }
@@ -61,6 +64,17 @@ function formField<T>(current: T, input: T, original: T): T {
   if (!Object.is(current, original) && !Object.is(current, input))
     throw Error('Este campo cambió desde que abriste el editor. No sobrescribimos nada: vuelve a abrir el perfil para revisar la versión más reciente.');
   return input;
+}
+/** Three-way leaf merge for rich forms, preserving unchanged and concurrent sections. */
+function configField(current: unknown, input: unknown, original: unknown): unknown {
+  const same = sameCharacterValue;
+  if (same(input, original)) return current;
+  if (same(current, original) || same(current, input)) return input;
+  if (current && input && original && !Array.isArray(input) && typeof input === 'object' && typeof current === 'object' && typeof original === 'object') {
+    const c = current as Record<string, unknown>, i = input as Record<string, unknown>, o = original as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(i).map(key => [key, configField(c[key], i[key], o[key])]));
+  }
+  throw Error('Esta sección cambió en otro dispositivo. Tu borrador sigue abierto: revisá la versión más reciente antes de guardar.');
 }
 export function editAccount(state: SocialState, id: string, input: AccountInput, expected?: AccountInput): SocialState {
   const current = state.characters.find(c => c.id === id);
@@ -75,6 +89,11 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       avatar: formField(now.avatar, wanted.avatar, before.avatar),
       accountType: formField(now.accountType, wanted.accountType, before.accountType),
       verified: formField(now.verified, wanted.verified, before.verified),
+      occupation: formField(now.occupation, input.occupation ?? now.occupation, expected.occupation ?? now.occupation),
+      location: formField(now.location, input.location ?? now.location, expected.location ?? now.location),
+      configuration: input.configuration
+        ? configField(characterConfig(current), input.configuration, expected.configuration ?? characterConfig({ ...current, configuration: undefined })) as Character['configuration']
+        : current.configuration,
       displayMetrics: {
         followers: formField(now.displayMetrics?.followers, wanted.displayMetrics?.followers, before.displayMetrics?.followers),
         following: formField(now.displayMetrics?.following, wanted.displayMetrics?.following, before.displayMetrics?.following),

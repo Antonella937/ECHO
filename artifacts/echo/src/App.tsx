@@ -23,6 +23,7 @@ import ConversationPage from '@/pages/conversation';
 import SavedPage from '@/pages/saved';
 import SettingsPage from '@/pages/settings';
 import NotFound from '@/pages/not-found';
+import CharacterEditorPage from '@/pages/character-editor';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -99,6 +100,8 @@ function ProtectedRouter() {
           <Route path="/messages/:id" component={ConversationPage} />
           <Route path="/saved" component={SavedPage} />
           <Route path="/settings" component={SettingsPage} />
+          <Route path="/characters/new" component={CharacterEditorPage} />
+          <Route path="/characters/:id/edit" component={CharacterEditorPage} />
           <Route component={NotFound} />
         </Switch>
       </RoutedErrorBoundary>

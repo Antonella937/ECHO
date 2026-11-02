@@ -8,6 +8,7 @@ import {
   type SocialState,
   type Story,
 } from './types';
+import { rememberActivity } from './character-memory';
 
 /**
  * Every mutation in ECHO is a typed event. User actions and future autonomous
@@ -59,6 +60,13 @@ const clip = (s: string, n = 90) => (s.length > n ? `${s.slice(0, n - 1)}…` : 
 
 /** Pure reducer: (state, event) -> state. */
 export function applyEvent(state: SocialState, ev: SocialEvent): SocialState {
+  if ((ev.type === 'post.created' && state.posts.some(p => p.id === ev.post.id)) ||
+      (ev.type === 'story.created' && state.stories.some(s => s.id === ev.story.id)) ||
+      (ev.type === 'comment.created' && state.comments.some(c => c.id === ev.comment.id)) ||
+      (ev.type === 'message.sent' && state.messages.some(m => m.id === ev.message.id))) return state;
+  return rememberActivity(state, reduceEvent(state, ev), ev);
+}
+function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
   switch (ev.type) {
     case 'post.created':
       return { ...state, posts: [ev.post, ...state.posts] };

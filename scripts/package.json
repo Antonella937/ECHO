@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:echo-character-browser": "ECHO_CHARACTERS_ONLY=1 tsx tests/echo-accounts-browser.ts",
+    "test:echo-characters": "tsx --test ../artifacts/echo/tests/character-core.test.ts",
     "test:echo-ux": "ECHO_UX_ONLY=1 tsx tests/echo-accounts-browser.ts",
     "test:echo-inbox": "tsx --test ../artifacts/echo/tests/inbox.test.ts",
     "test:echo-browser": "tsx tests/echo-accounts-browser.ts",

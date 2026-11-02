@@ -1,2 +1,4 @@
 - [ECHO product direction](echo-product.md) — Nela-first character social app; approved dark mobile style and future AI scope.
 - [Data preservation](data-preservation.md) — retain original legacy backups, verify imports by re-reading files, and never silently overwrite concurrent edits.
+- [Character principles](character-principles.md) — progressive, manually editable people; honest AI dependency, contextual routines and bounded memory without losing history.
+- [Calendar semantics](calendar-semantics.md) — local routine dates must remain strings; generated date coercion is appropriate for timestamps, not calendar days.

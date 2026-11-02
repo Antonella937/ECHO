@@ -18,5 +18,28 @@ export function universeAccountError(state: SocialState): string | null {
   const actors = [...state.posts.map(p => p.authorId), ...state.stories.map(s => s.authorId),
     ...state.comments.map(c => c.authorId), ...state.messages.flatMap(m => [m.senderId, m.recipientId])];
   if (actors.some(id => !ids.has(id))) return 'Falta una cuenta referenciada por el historial. Archiva las cuentas en lugar de eliminarlas.';
+  const validTarget = (id: string, self: string) => id === 'owner' || (ids.has(id) && id !== self);
+  for (const account of state.characters) {
+    const config = account.configuration;
+    if (!config) continue; // Compatible with original profiles without rewriting them.
+    try { new Intl.DateTimeFormat('es', { timeZone: config.routine.timezone }); } catch { return 'Zona horaria inválida.'; }
+    if (config.relationships.some(r => !validTarget(r.targetId, account.id)) ||
+        new Set(config.relationships.map(r => r.targetId)).size !== config.relationships.length)
+      return 'Una relación apunta a una cuenta inexistente, a sí misma o está duplicada.';
+    if (config.currentState.companions.some(id => !validTarget(id, account.id))) return 'Compañía inválida.';
+    if ([...config.memory.permanent, ...config.memory.relationships, ...config.memory.recent].some(m => m.targetId && !validTarget(m.targetId, account.id)) ||
+        config.memory.relationships.some(m => !m.targetId)) return 'Un recuerdo apunta a un vínculo inválido.';
+    for (const entry of config.routine.entries) {
+      if (!entry.title.trim() || (entry.recurrence === 'weekly' && !entry.weekdays.length)) return 'Actividad sin nombre o días.';
+      if (entry.recurrence === 'once' && (!entry.date || Number.isNaN(Date.parse(`${entry.date}T00:00:00Z`)) ||
+          new Date(`${entry.date}T00:00:00Z`).toISOString().slice(0, 10) !== entry.date)) return 'Fecha puntual inválida.';
+    }
+    if (config.social.minReplyMinutes != null && config.social.maxReplyMinutes != null &&
+        config.social.minReplyMinutes > config.social.maxReplyMinutes) return 'La demora mínima supera a la máxima.';
+    if (config.memory.recent.length > config.memory.recentLimit) return 'La memoria reciente supera el límite configurado.';
+    for (const items of [config.relationships, config.routine.entries, config.memory.permanent, config.memory.relationships, config.memory.recent]) {
+      if (new Set(items.map(item => item.id)).size !== items.length) return 'Identificadores duplicados en la ficha.';
+    }
+  }
   return null;
 }

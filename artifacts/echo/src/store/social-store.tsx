@@ -6,11 +6,14 @@ import { createSeedState } from './seed';
 import { UniverseSync, type SyncView } from './synchronization';
 import { SyncNotices } from './sync-notices';
 import { archiveAccount, editAccount, editPostMetrics, validateAccount, type AccountInput, type PostMetrics } from '@/domain/accounts';
+import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core';
 
 export interface SocialActions {
   createAccount(input: AccountInput): string;
   updateAccount(id: string, input: AccountInput, expected?: AccountInput): void;
   archiveAccount(id: string, archived: boolean): void;
+  duplicateAccount(id: string): string;
+  deleteAccount(id: string): void;
   updatePostMetrics(id: string, metrics: PostMetrics, expected?: PostMetrics): void;
   toggleLike(postId: string): void;
   toggleSave(postId: string): void;
@@ -110,7 +113,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const data = validateAccount(input, cur());
         const id = uid('account');
         const account: Character = {
-          ...data, id, occupation: '', location: '', accountType: data.accountType ?? 'personal',
+          ...data, id, occupation: data.occupation ?? '', location: data.location ?? '', accountType: data.accountType ?? 'personal',
           verified: data.verified ?? false, archived: false,
           providerRef: { provider: 'mock', externalId: null, status: 'not_connected', lastSyncAt: null },
           identity: { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date().toISOString() },
@@ -120,6 +123,16 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       updateAccount(id, input, expected) {
         const next = editAccount(cur(), id, input, expected);
+        coordinator.current?.edit(() => next);
+      },
+      duplicateAccount(id) {
+        const newId = uid('account');
+        const copy = duplicateCharacter(cur(), id, newId);
+        coordinator.current?.edit(s => ({ ...s, characters: [...s.characters, copy] }));
+        return newId;
+      },
+      deleteAccount(id) {
+        const next = deleteUnusedAccount(cur(), id);
         coordinator.current?.edit(() => next);
       },
       archiveAccount(id, archived) {

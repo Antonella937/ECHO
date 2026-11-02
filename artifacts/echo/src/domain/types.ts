@@ -29,6 +29,7 @@ export interface IdentityReference {
 }
 
 export interface Character {
+  configuration?: import('@workspace/api-client-react').CharacterConfiguration;
   id: CharacterId;
   handle: string;
   name: string;

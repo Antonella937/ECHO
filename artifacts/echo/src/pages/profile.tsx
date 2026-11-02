@@ -102,6 +102,9 @@ export default function ProfilePage() {
             <Link href="/settings" className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-identity">
               <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Cambiar identidad
             </Link>
+            <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character-me">
+              Ficha de personaje
+            </Link>
           </div>
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-2">
@@ -126,6 +129,9 @@ export default function ProfilePage() {
             <button onClick={() => setEditing(true)} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="button-profile-edit">
               <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Editar perfil
             </button>
+            <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character">
+              Ficha de personaje
+            </Link>
           </div>
         )}
 

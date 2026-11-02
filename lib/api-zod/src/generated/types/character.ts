@@ -6,11 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CharacterAccountType } from './characterAccountType';
+import type { CharacterConfiguration } from './characterConfiguration';
 import type { CharacterDisplayMetrics } from './characterDisplayMetrics';
 import type { CharacterIdentity } from './characterIdentity';
 import type { CharacterProviderRef } from './characterProviderRef';
 
 export interface Character {
+  configuration?: CharacterConfiguration;
   accountType?: CharacterAccountType;
   verified?: boolean;
   archived?: boolean;

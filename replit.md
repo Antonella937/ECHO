@@ -50,6 +50,21 @@ Account removal is reversible archive, not deletion. Nela cannot be archived. Ar
 
 Manual audience figures are fictional **bases added to real activity**, not fabricated relationship or interaction records. Blank bases mean no fictional addition. Editors show the real counts separately. New optional JSON fields preserve compatibility with Stage 1 snapshots. Profile/metric forms apply only fields changed since opening and reject incompatible intervening edits, even when polling has already advanced the client's sync base.
 
+## Character studio (ECHO Base)
+
+`/characters/new` offers quick, advanced and assisted creation; `/characters/:id/edit` edits every account, including Nela and official profiles. Settings > Crear personaje and profile > Ficha de personaje are the entry points. The existing simple account editor remains available for account type, verification and fictional audience bases.
+
+The optional, versioned `Character.configuration` is specified in OpenAPI and validated with the same generated Zod contract on client and server. Existing profiles use lazy defaults, not a destructive rewrite. Rich forms retain an opening snapshot and merge unchanged fields before saving. All configuration remains inside the owner-private, revision-controlled universe.
+
+Relations distinguish the universe owner (`owner`) from social identities. Routine entries use character timezones and **date-only strings** for one-off calendar events; they are contextual previews, not schedules that run activity. Current state is manually correctable. Recent memory indexes real post/story/comment/message events with a bounded limit; trimming this index never deletes social history or permanent/relationship memories.
+
+Duplication copies the designed ficha and durable memories, not social history/recent memory/audience/verification/external connections. Only unused accounts may be permanently deleted, with typed username confirmation; Nela is protected. If another device creates history while an unused account is being deleted, synchronization retains that account as archived rather than orphaning content.
+
+No text-model provider is configured. The private `/api/characters/assistance` availability endpoint reports this explicitly and POST returns 503 without generation or mutations. The assisted UI can retain an owner-written brief and continue manually; it does not pretend to generate. No Kindroid, visual generation, TTS or autonomous activity was introduced.
+
+- `pnpm --filter @workspace/scripts run test:echo-characters`: character defaults, schema round-trip, deep edits/conflicts, relationships, dates/timezones/overnight/DST context, memory bounds, duplication and safe deletion.
+- `pnpm --filter @workspace/scripts run test:echo-character-browser`: disposable real-auth browser flow through all seven sections, manual-assisted fallback, memory promotion, two fresh browser contexts, lifecycle and 320/390/430px safe-area geometry.
+
 ## Mobile layout and conversations
 
 Keep mobile navigation clearance and its safe-area inset coordinated through the shared CSS variables. All regular pages reserve bottom clearance; conversation pages hide navigation and reserve space for their own composer. Sheets overlay navigation and have their own safe-area padding. Browser checks assert actual computed padding/control bounds rather than only checking class names.

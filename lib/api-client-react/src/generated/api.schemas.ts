@@ -9,6 +9,468 @@ export interface HealthStatus {
   status: string;
 }
 
+export type CharacterConfigurationVersion = typeof CharacterConfigurationVersion[keyof typeof CharacterConfigurationVersion];
+
+
+export const CharacterConfigurationVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type CharacterConfigurationPersonalitySociability = typeof CharacterConfigurationPersonalitySociability[keyof typeof CharacterConfigurationPersonalitySociability];
+
+
+export const CharacterConfigurationPersonalitySociability = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type CharacterConfigurationVoiceMessageLength = typeof CharacterConfigurationVoiceMessageLength[keyof typeof CharacterConfigurationVoiceMessageLength];
+
+
+export const CharacterConfigurationVoiceMessageLength = {
+  short: 'short',
+  balanced: 'balanced',
+  long: 'long',
+} as const;
+
+export type CharacterConfigurationVoiceDisclosure = typeof CharacterConfigurationVoiceDisclosure[keyof typeof CharacterConfigurationVoiceDisclosure];
+
+
+export const CharacterConfigurationVoiceDisclosure = {
+  private: 'private',
+  balanced: 'balanced',
+  open: 'open',
+} as const;
+
+export type CharacterRelationshipPreset = typeof CharacterRelationshipPreset[keyof typeof CharacterRelationshipPreset];
+
+
+export const CharacterRelationshipPreset = {
+  stranger: 'stranger',
+  acquaintance: 'acquaintance',
+  friend: 'friend',
+  close_friend: 'close_friend',
+  family: 'family',
+  crush: 'crush',
+  romantic_tension: 'romantic_tension',
+  partner: 'partner',
+  ex: 'ex',
+  rival: 'rival',
+  custom: 'custom',
+} as const;
+
+export interface CharacterRelationship {
+  id: string;
+  /** 'owner' denotes the universe owner, never a login credential */
+  targetId: string;
+  preset: CharacterRelationshipPreset;
+  /** @maxLength 200 */
+  customLabel: string;
+  /** @maxLength 8000 */
+  description: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  closeness: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  trust: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  attraction: number | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  tension: number | null;
+}
+
+export type RoutineEntryActivity = typeof RoutineEntryActivity[keyof typeof RoutineEntryActivity];
+
+
+export const RoutineEntryActivity = {
+  sleep: 'sleep',
+  work: 'work',
+  study: 'study',
+  meal: 'meal',
+  exercise: 'exercise',
+  rehearsal: 'rehearsal',
+  social: 'social',
+  leisure: 'leisure',
+  custom: 'custom',
+} as const;
+
+export type RoutineEntryRecurrence = typeof RoutineEntryRecurrence[keyof typeof RoutineEntryRecurrence];
+
+
+export const RoutineEntryRecurrence = {
+  weekly: 'weekly',
+  once: 'once',
+} as const;
+
+export type RoutineEntryFlexibility = typeof RoutineEntryFlexibility[keyof typeof RoutineEntryFlexibility];
+
+
+export const RoutineEntryFlexibility = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export interface RoutineEntry {
+  id: string;
+  /** @maxLength 200 */
+  title: string;
+  activity: RoutineEntryActivity;
+  /**
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  weekdays: number[];
+  /** @pattern ^([01][0-9]|2[0-3]):[0-5][0-9]$ */
+  start: string;
+  /** @pattern ^([01][0-9]|2[0-3]):[0-5][0-9]$ */
+  end: string;
+  /** @maxLength 500 */
+  location: string;
+  recurrence: RoutineEntryRecurrence;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  date: string | null;
+  flexibility: RoutineEntryFlexibility;
+}
+
+export type CharacterConfigurationSocialActivity = typeof CharacterConfigurationSocialActivity[keyof typeof CharacterConfigurationSocialActivity];
+
+
+export const CharacterConfigurationSocialActivity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type CharacterConfigurationSocialPostsFrequency = typeof CharacterConfigurationSocialPostsFrequency[keyof typeof CharacterConfigurationSocialPostsFrequency];
+
+
+export const CharacterConfigurationSocialPostsFrequency = {
+  rare: 'rare',
+  normal: 'normal',
+  frequent: 'frequent',
+} as const;
+
+export type CharacterConfigurationSocialStoriesFrequency = typeof CharacterConfigurationSocialStoriesFrequency[keyof typeof CharacterConfigurationSocialStoriesFrequency];
+
+
+export const CharacterConfigurationSocialStoriesFrequency = {
+  rare: 'rare',
+  normal: 'normal',
+  frequent: 'frequent',
+} as const;
+
+export type CharacterConfigurationSocialLikesFrequency = typeof CharacterConfigurationSocialLikesFrequency[keyof typeof CharacterConfigurationSocialLikesFrequency];
+
+
+export const CharacterConfigurationSocialLikesFrequency = {
+  rare: 'rare',
+  normal: 'normal',
+  frequent: 'frequent',
+} as const;
+
+export type CharacterConfigurationSocialCommentsFrequency = typeof CharacterConfigurationSocialCommentsFrequency[keyof typeof CharacterConfigurationSocialCommentsFrequency];
+
+
+export const CharacterConfigurationSocialCommentsFrequency = {
+  rare: 'rare',
+  normal: 'normal',
+  frequent: 'frequent',
+} as const;
+
+export type CharacterConfigurationSocialInitiatesDMs = typeof CharacterConfigurationSocialInitiatesDMs[keyof typeof CharacterConfigurationSocialInitiatesDMs];
+
+
+export const CharacterConfigurationSocialInitiatesDMs = {
+  rare: 'rare',
+  normal: 'normal',
+  frequent: 'frequent',
+} as const;
+
+export type CharacterConfigurationSocialReplySpeed = typeof CharacterConfigurationSocialReplySpeed[keyof typeof CharacterConfigurationSocialReplySpeed];
+
+
+export const CharacterConfigurationSocialReplySpeed = {
+  slow: 'slow',
+  normal: 'normal',
+  quick: 'quick',
+} as const;
+
+export type CharacterConfigurationSocialSociability = typeof CharacterConfigurationSocialSociability[keyof typeof CharacterConfigurationSocialSociability];
+
+
+export const CharacterConfigurationSocialSociability = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type CharacterConfigurationSocialSpontaneity = typeof CharacterConfigurationSocialSpontaneity[keyof typeof CharacterConfigurationSocialSpontaneity];
+
+
+export const CharacterConfigurationSocialSpontaneity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type CharacterMemoryKind = typeof CharacterMemoryKind[keyof typeof CharacterMemoryKind];
+
+
+export const CharacterMemoryKind = {
+  manual: 'manual',
+  interaction: 'interaction',
+  post: 'post',
+  conversation: 'conversation',
+  event: 'event',
+} as const;
+
+export interface CharacterMemory {
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 8000
+     */
+  text: string;
+  /** @nullable */
+  targetId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  kind: CharacterMemoryKind;
+  /** @nullable */
+  sourceId: string | null;
+  /** @nullable */
+  promotedTo: string | null;
+}
+
+export type CharacterConfigurationCurrentStateSource = typeof CharacterConfigurationCurrentStateSource[keyof typeof CharacterConfigurationCurrentStateSource];
+
+
+export const CharacterConfigurationCurrentStateSource = {
+  manual: 'manual',
+  routine: 'routine',
+} as const;
+
+export type CharacterConfigurationAssistanceStatus = typeof CharacterConfigurationAssistanceStatus[keyof typeof CharacterConfigurationAssistanceStatus];
+
+
+export const CharacterConfigurationAssistanceStatus = {
+  manual: 'manual',
+  unavailable: 'unavailable',
+  proposed: 'proposed',
+  accepted: 'accepted',
+} as const;
+
+export type CharacterConfigurationBasic = {
+  /** @maxLength 100 */
+  name: string;
+  /**
+     * @minimum 0
+     * @maximum 150
+     * @nullable
+     */
+  age: number | null;
+  /** @maxLength 100 */
+  pronouns: string;
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  interests: string[];
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  likes: string[];
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  dislikes: string[];
+  /** @maxLength 8000 */
+  notes: string;
+};
+
+export type CharacterConfigurationPersonality = {
+  /** @maxLength 24000 */
+  description: string;
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  traits: string[];
+  /** @maxLength 2000 */
+  temperament: string;
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  values: string[];
+  /** @maxLength 2000 */
+  humor: string;
+  sociability: CharacterConfigurationPersonalitySociability;
+  /** @maxLength 2000 */
+  expressiveness: string;
+  /** @maxLength 4000 */
+  emotionalStyle: string;
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  commonTopics: string[];
+  /**
+     * @maxItems 50
+     * @items.maxLength 1000
+     */
+  boundaries: string[];
+};
+
+export type CharacterConfigurationVoice = {
+  /** @maxLength 4000 */
+  speakingStyle: string;
+  messageLength: CharacterConfigurationVoiceMessageLength;
+  /** @maxLength 4000 */
+  vocabulary: string;
+  /** @maxLength 2000 */
+  emojiStyle: string;
+  /** @maxLength 4000 */
+  captionStyle: string;
+  /** @maxLength 4000 */
+  commentStyle: string;
+  disclosure: CharacterConfigurationVoiceDisclosure;
+  /**
+     * @maxItems 50
+     * @items.maxLength 200
+     */
+  postsAbout: string[];
+  /**
+     * @maxItems 50
+     * @items.maxLength 500
+     */
+  avoidsPosting: string[];
+};
+
+export type CharacterConfigurationRoutine = {
+  /** @maxLength 100 */
+  timezone: string;
+  /** @maxLength 4000 */
+  flexibilityNotes: string;
+  /** @maxItems 100 */
+  entries: RoutineEntry[];
+};
+
+export type CharacterConfigurationSocial = {
+  activity: CharacterConfigurationSocialActivity;
+  postsFrequency: CharacterConfigurationSocialPostsFrequency;
+  storiesFrequency: CharacterConfigurationSocialStoriesFrequency;
+  likesFrequency: CharacterConfigurationSocialLikesFrequency;
+  commentsFrequency: CharacterConfigurationSocialCommentsFrequency;
+  initiatesDMs: CharacterConfigurationSocialInitiatesDMs;
+  replySpeed: CharacterConfigurationSocialReplySpeed;
+  sociability: CharacterConfigurationSocialSociability;
+  spontaneity: CharacterConfigurationSocialSpontaneity;
+  allowSilence: boolean;
+  /** @maxLength 4000 */
+  silenceNotes: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  postsPerWeek: number | null;
+  /**
+     * @minimum 0
+     * @maximum 300
+     * @nullable
+     */
+  storiesPerWeek: number | null;
+  /**
+     * @minimum 0
+     * @maximum 10080
+     * @nullable
+     */
+  minReplyMinutes: number | null;
+  /**
+     * @minimum 0
+     * @maximum 10080
+     * @nullable
+     */
+  maxReplyMinutes: number | null;
+};
+
+export type CharacterConfigurationMemory = {
+  /** @maxItems 200 */
+  permanent: CharacterMemory[];
+  /** @maxItems 200 */
+  relationships: CharacterMemory[];
+  /** @maxItems 200 */
+  recent: CharacterMemory[];
+  /**
+     * @minimum 10
+     * @maximum 200
+     */
+  recentLimit: number;
+  /** @maxLength 8000 */
+  recentSummary: string;
+};
+
+export type CharacterConfigurationCurrentState = {
+  /** @maxLength 500 */
+  location: string;
+  /** @maxLength 1000 */
+  activity: string;
+  /** @maxLength 500 */
+  mood: string;
+  /** @maxItems 50 */
+  companions: string[];
+  /** @nullable */
+  lastActivityAt: string | null;
+  /** @maxLength 1000 */
+  nextEvent: string;
+  source: CharacterConfigurationCurrentStateSource;
+  updatedAt: string;
+};
+
+export type CharacterConfigurationAssistance = {
+  /** @maxLength 8000 */
+  description: string;
+  status: CharacterConfigurationAssistanceStatus;
+  /** @nullable */
+  provider: string | null;
+};
+
+export interface CharacterConfiguration {
+  version: CharacterConfigurationVersion;
+  basic: CharacterConfigurationBasic;
+  personality: CharacterConfigurationPersonality;
+  voice: CharacterConfigurationVoice;
+  /** @maxItems 300 */
+  relationships: CharacterRelationship[];
+  routine: CharacterConfigurationRoutine;
+  social: CharacterConfigurationSocial;
+  memory: CharacterConfigurationMemory;
+  currentState: CharacterConfigurationCurrentState;
+  assistance: CharacterConfigurationAssistance;
+}
+
 export type CharacterAccountType = typeof CharacterAccountType[keyof typeof CharacterAccountType];
 
 
@@ -53,6 +515,7 @@ export type CharacterIdentity = {
 };
 
 export interface Character {
+  configuration?: CharacterConfiguration;
   accountType?: CharacterAccountType;
   verified?: boolean;
   archived?: boolean;
@@ -190,6 +653,28 @@ export type UniverseVerification = UniverseEnvelope & {
   /** @minimum 0 */
   verifiedFiles: number;
 };
+
+export interface CharacterAssistanceStatus {
+  available: boolean;
+  reason: string;
+}
+
+export interface CharacterProposalInput {
+  /**
+     * @minLength 10
+     * @maxLength 8000
+     */
+  description: string;
+}
+
+export interface CharacterProposal {
+  name: string;
+  handle: string;
+  bio: string;
+  occupation: string;
+  location: string;
+  configuration: CharacterConfiguration;
+}
 
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];
 

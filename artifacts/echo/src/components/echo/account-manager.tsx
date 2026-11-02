@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Check, Pencil, Plus } from 'lucide-react';
+import { Link } from 'wouter';
+import { Check, Pencil, Plus, SlidersHorizontal } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { VerifiedBadge } from './verified-badge';
@@ -28,10 +29,13 @@ export function AccountManager() {
             </button>
           ))}
         </div>
-        <button onClick={() => setEditing(null)} className="flex h-12 items-center gap-1.5 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground" data-testid="button-create-account">
-          <Plus className="h-4 w-4" strokeWidth={2.4} /> Crear
+        <button onClick={() => setEditing(null)} className="flex h-12 items-center gap-1.5 rounded-2xl border border-border px-3 text-xs font-semibold" data-testid="button-create-account">
+          <Plus className="h-4 w-4" strokeWidth={2.4} /> Cuenta
         </button>
       </div>
+      <Link href="/characters/new" className="mt-3 flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground" data-testid="button-create-character">
+        <Plus className="h-4 w-4" /> Crear personaje
+      </Link>
 
       <div className="mt-3 flex flex-col gap-2" role={tab === 'active' ? 'radiogroup' : undefined} aria-label="Identidad activa">
         {list.length === 0 && (
@@ -66,6 +70,9 @@ export function AccountManager() {
                   </span>
                 )}
               </button>
+              <Link href={`/characters/${c.id}/edit`} aria-label={`Ficha de personaje de ${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`link-character-edit-${c.id}`}>
+                <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
+              </Link>
               <button onClick={() => setEditing(c.id)} aria-label={`Editar ${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`button-edit-account-${c.id}`}>
                 <Pencil className="h-4 w-4" strokeWidth={1.8} />
               </button>

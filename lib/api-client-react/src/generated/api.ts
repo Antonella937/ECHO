@@ -20,6 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CharacterAssistanceStatus,
+  CharacterProposal,
+  CharacterProposalInput,
   HealthStatus,
   UniverseEnvelope,
   UniverseInput,
@@ -56,6 +59,171 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetCharacterAssistanceUrl = () => {
+
+
+
+
+  return `/api/characters/assistance`
+}
+
+/**
+ * @summary Owner-private character proposal provider availability
+ */
+export const getCharacterAssistance = async ( options?: Parameters<typeof customFetch>[1]): Promise<CharacterAssistanceStatus> => {
+
+  return customFetch<CharacterAssistanceStatus>(getGetCharacterAssistanceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCharacterAssistanceQueryKey = () => {
+    return [
+    `/api/characters/assistance`
+    ] as const;
+    }
+
+
+export const getGetCharacterAssistanceQueryOptions = <TData = Awaited<ReturnType<typeof getCharacterAssistance>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCharacterAssistance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCharacterAssistanceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCharacterAssistance>>> = ({ signal }) => getCharacterAssistance({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCharacterAssistance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCharacterAssistanceQueryResult = NonNullable<Awaited<ReturnType<typeof getCharacterAssistance>>>
+export type GetCharacterAssistanceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Owner-private character proposal provider availability
+ */
+
+export function useGetCharacterAssistance<TData = Awaited<ReturnType<typeof getCharacterAssistance>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCharacterAssistance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCharacterAssistanceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getProposeCharacterUrl = () => {
+
+
+
+
+  return `/api/characters/assistance`
+}
+
+/**
+ * @summary Propose an editable character without creating or activating it
+ */
+export const proposeCharacter = async (characterProposalInput: CharacterProposalInput, options?: Parameters<typeof customFetch>[1]): Promise<CharacterProposal> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CharacterProposal>(getProposeCharacterUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(characterProposalInput)
+  }
+);}
+
+
+
+
+
+export const getProposeCharacterMutationKey = () => ['proposeCharacter'] as const;
+
+export const getProposeCharacterMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof proposeCharacter>>, TError,ProposeCharacterMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof proposeCharacter>>, TError,ProposeCharacterMutationVariables, TContext> => {
+
+const mutationKey = getProposeCharacterMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof proposeCharacter>>, ProposeCharacterMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  proposeCharacter(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ProposeCharacterMutationResult = NonNullable<Awaited<ReturnType<typeof proposeCharacter>>>
+    export type ProposeCharacterMutationBody = BodyType<CharacterProposalInput>
+    export type ProposeCharacterMutationError = ErrorType<void>
+    export type ProposeCharacterMutationVariables = {data: BodyType<CharacterProposalInput>}
+
+    /**
+ * @summary Propose an editable character without creating or activating it
+ */
+export const useProposeCharacter = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof proposeCharacter>>, TError,ProposeCharacterMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof proposeCharacter>>,
+        TError,
+        ProposeCharacterMutationVariables,
+        TContext
+      > => {
+      return useMutation(getProposeCharacterMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { mkdir, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { runUxChecks } from './echo-ux-checks';
+import { runCharacterChecks } from './echo-character-checks';
 
 const serverRequire = createRequire(new URL('../../artifacts/api-server/package.json', import.meta.url));
 const { clerkClient } = serverRequire('@clerk/express');
@@ -53,7 +54,9 @@ try {
   const owner = await createUser(), page = await signedIn(owner);
   const initial = await state(page);
   assert.equal(initial.currentCharacterId, 'nela');
-  if (process.env.ECHO_UX_ONLY === '1') {
+  if (process.env.ECHO_CHARACTERS_ONLY === '1') {
+    await runCharacterChecks(page, state, base, out);
+  } else if (process.env.ECHO_UX_ONLY === '1') {
     await runUxChecks(page, state, base, out);
   } else if (process.env.ECHO_VISUAL_ONLY === '1') {
     await page.goto(`${base}/profile/official-pretty-violence`);
