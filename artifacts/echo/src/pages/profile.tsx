@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Archive, Bookmark, Grid3x3, MapPin, MessageCircle, Pencil, Repeat2, Settings } from 'lucide-react';
+import { Archive, Bookmark, Grid3x3, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -43,7 +43,7 @@ export default function ProfilePage() {
   return (
     <div>
       <TopBar
-        title={person.handle}
+        title={`@${person.handle}`}
         onBack={isMe ? undefined : back}
         right={
           isMe && (
@@ -60,25 +60,25 @@ export default function ProfilePage() {
       />
 
       <section className="px-5 pt-6">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-5">
           <button
             onClick={() => (stories.length ? openStories(person.id, true) : undefined)}
-            className="tap rounded-full"
+            className="tap shrink-0 rounded-full"
             aria-label={stories.length ? `Ver historias de ${person.name}` : person.name}
             disabled={!stories.length}
             data-testid="button-profile-avatar"
           >
-            <CharacterAvatar character={person} size={92} ring={stories.length ? (unseen ? 'unseen' : 'seen') : 'none'} />
+            <CharacterAvatar character={person} size={88} ring={stories.length ? (unseen ? 'unseen' : 'seen') : 'none'} />
           </button>
           <dl className="grid flex-1 grid-cols-3 text-center">
-            <Stat value={posts.length} label="posts" testId="text-count-posts" />
+            <Stat value={posts.length} label={posts.length === 1 ? "publicación" : "publicaciones"} testId="text-count-posts" />
             <Stat value={followers} label="seguidores" testId="text-count-followers" />
             <Stat value={following} label="seguidos" testId="text-count-following" />
           </dl>
         </div>
 
         <div className="mt-4">
-          <h2 className="font-display text-[19px] font-medium tracking-wide" data-testid="text-profile-name"><span className="inline-flex items-center gap-1.5">{person.name}<VerifiedBadge account={person} className="h-[18px] w-[18px]" /></span></h2>
+          <h2 className="font-display text-[19px] font-medium tracking-wide" data-testid="text-profile-name"><span className="inline-flex min-w-0 items-center gap-1.5"><span className="truncate">{person.name}</span><VerifiedBadge account={person} className="h-[18px] w-[18px] shrink-0" /></span></h2>
           <p className="text-sm text-muted-foreground">@{person.handle} · {person.occupation || accountTypes[person.accountType ?? 'personal']}</p>
           {person.archived && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground" data-testid="status-profile-archived">
@@ -91,42 +91,43 @@ export default function ProfilePage() {
           </p>}
         </div>
 
-        <div className="mt-5 flex gap-2">
-          <button onClick={() => setEditing(true)} aria-label="Editar perfil" className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-secondary px-3 text-sm font-semibold" data-testid="button-profile-edit">
-            <Pencil className="h-4 w-4" strokeWidth={1.8} /><span className={isMe ? '' : 'sr-only'}>Editar</span>
-          </button>
-          {isMe ? (
-            <>
-              <Link href="/create" className="grid h-10 flex-1 place-items-center rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-create">
-                Nueva publicación
-              </Link>
-              <Link href="/settings" className="grid h-10 flex-1 place-items-center rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-identity">
-                Cambiar identidad
-              </Link>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => navigate(`/messages/${person.id}`)}
-                className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
-                data-testid="button-profile-message"
-              >
-                <MessageCircle className="h-4 w-4" strokeWidth={2} /> Mensaje
-              </button>
-              <button
-                disabled={person.archived}
-                onClick={() => {
-                  actions.switchIdentity(person.id);
-                  toast({ title: `Ahora publicas como ${person.name}` });
-                }}
-                className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50"
-                data-testid="button-profile-become"
-              >
-                <Repeat2 className="h-4 w-4" strokeWidth={1.8} /> {person.archived ? 'Restaura para usar' : 'Usar este perfil'}
-              </button>
-            </>
-          )}
-        </div>
+        {isMe ? (
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <Link href="/create" className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground" data-testid="link-profile-create">
+              <PlusSquare className="h-4 w-4" strokeWidth={2} /> Nueva publicación
+            </Link>
+            <button onClick={() => setEditing(true)} className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold" data-testid="button-profile-edit">
+              <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Editar perfil
+            </button>
+            <Link href="/settings" className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-identity">
+              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Cambiar identidad
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => navigate(`/messages/${person.id}`)}
+              className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
+              data-testid="button-profile-message"
+            >
+              <MessageCircle className="h-4 w-4 shrink-0" strokeWidth={2} /> Mensaje
+            </button>
+            <button
+              disabled={person.archived}
+              onClick={() => {
+                actions.switchIdentity(person.id);
+                toast({ title: `Ahora publicas como ${person.name}` });
+              }}
+              className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50"
+              data-testid="button-profile-become"
+            >
+              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {person.archived ? 'Restaura para usar' : 'Usar este perfil'}
+            </button>
+            <button onClick={() => setEditing(true)} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="button-profile-edit">
+              <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Editar perfil
+            </button>
+          </div>
+        )}
 
         {friends.length > 0 && (
           <div className="mt-6 flex items-center gap-3">

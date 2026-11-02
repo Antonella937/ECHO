@@ -64,6 +64,14 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+:root {
+  --echo-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --echo-keyboard-inset: 0px;
+  --nav-height: 60px;
+  --nav-gap: 0.25rem;
+  --nav-clearance: calc(var(--nav-height) + var(--nav-gap) + max(var(--echo-safe-bottom), 0.5rem) + 1.25rem);
+}
+
 :root,
 .dark {
   --button-outline: rgba(255, 255, 255, 0.08);
@@ -165,8 +173,15 @@
   .no-scrollbar {
     scrollbar-width: none;
   }
+  .pb-nav {
+    padding-bottom: var(--nav-clearance);
+    scroll-padding-bottom: var(--nav-clearance);
+  }
+  html {
+    scroll-padding-bottom: var(--nav-clearance);
+  }
   .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+    padding-bottom: max(var(--echo-safe-bottom), 0.5rem);
   }
   .pt-safe {
     padding-top: env(safe-area-inset-top);

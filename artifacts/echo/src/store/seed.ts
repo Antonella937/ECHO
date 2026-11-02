@@ -1,14 +1,12 @@
 import {
   SCHEMA_VERSION,
-  threadIdFor,
   type Character,
   type Comment,
-  type Message,
   type Notification,
   type Post,
   type SocialState,
   type Story,
-} from '@/domain/types';
+} from '../domain/types';
 
 const NELA = 'nela';
 const MAR = 'mar';
@@ -152,36 +150,6 @@ export function createSeedState(): SocialState {
     { id: 's-nela-1', authorId: NELA, image: 'asset:nela-2', caption: 'Revelando lo de este verano', createdAt: ago(2 * H), seenBy: [MAR], origin: 'seed' },
   ];
 
-  const msg = (from: string, to: string, text: string, minutesAgo: number, read: boolean, extra: Partial<Message> = {}): Message => ({
-    id: `m-${from}-${minutesAgo}`,
-    threadId: threadIdFor(from, to),
-    senderId: from,
-    recipientId: to,
-    text,
-    createdAt: ago(minutesAgo),
-    storyId: null,
-    postId: null,
-    readBy: read ? [from, to] : [from],
-    origin: 'seed',
-    ...extra,
-  });
-
-  const messages: Message[] = [
-    msg(MAR, NELA, '¿Sigues queriendo venir en octubre? Te guardo la habitación de arriba.', 2 * D + 3 * H, true),
-    msg(NELA, MAR, 'Sí. Necesito mar y silencio, en ese orden.', 2 * D + 2 * H, true),
-    msg(MAR, NELA, 'Aquí hay mucho de los dos. Trae la cámara buena.', 2 * D + 1 * H, true),
-    msg(NELA, MAR, 'Traigo las dos. Nunca sé cuál es la buena.', 1 * D + 5 * H, true),
-    msg(MAR, NELA, 'Te he hecho una taza. No preguntes de qué color.', 5 * H, false),
-    msg(NOAH, NELA, 'Ya está la maqueta. ¿Te la paso o prefieres esperar a oírla en directo?', 3 * D + 2 * H, true),
-    msg(NELA, NOAH, 'Pásamela. Y luego también en directo.', 3 * D + 1 * H, true),
-    msg(NOAH, NELA, 'Trato. Aviso: hay una melodía tuya dentro.', 2 * D + 8 * H, true),
-    msg(NELA, NOAH, 'Ya lo he visto en tu post. Ladrón.', 2 * D + 7 * H, true),
-    msg(NOAH, NELA, 'Te debo un café. O dos.', 20 * H, false),
-    msg(NOAH, MAR, '¿Me haces unas tazas para el bar? Te pago en entradas.', 6 * D, true),
-    msg(MAR, NOAH, 'Te las hago si tocas en la inauguración del taller.', 5 * D + 22 * H, true),
-    msg(NOAH, MAR, 'Hecho. Llevo a la gata.', 5 * D + 20 * H, false),
-  ];
-
   const n = (
     id: string,
     recipientId: string,
@@ -195,8 +163,6 @@ export function createSeedState(): SocialState {
   ): Notification => ({ id, recipientId, actorId, kind, postId, commentId, storyId: null, excerpt, createdAt: ago(minutesAgo), read });
 
   const notifications: Notification[] = [
-    n('n1', NELA, NOAH, 'message', 20 * H, false, 'Te debo un café. O dos.'),
-    n('n2', NELA, MAR, 'message', 5 * H, false, 'Te he hecho una taza. No preguntes de qué color.'),
     n('n3', NELA, MAR, 'like', 2 * H + 50, false, 'Llueve en Malasaña y el café se enfría…', 'p-nela-1'),
     n('n4', NELA, MAR, 'comment', 2 * H + 40, false, 'Esa luz es tuya, no de Madrid.', 'p-nela-1', 'c1'),
     n('n5', NELA, NOAH, 'comment', 2 * H, false, 'Guárdame un café para el jueves.', 'p-nela-1', 'c2'),
@@ -218,7 +184,8 @@ export function createSeedState(): SocialState {
     posts,
     comments,
     stories,
-    messages,
+    // New universes start empty. Existing remote/local history is never reset.
+    messages: [],
     notifications,
   };
 }

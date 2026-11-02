@@ -6,6 +6,7 @@ import { chromium, expect, type Page } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { mkdir, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { runUxChecks } from './echo-ux-checks';
 
 const serverRequire = createRequire(new URL('../../artifacts/api-server/package.json', import.meta.url));
 const { clerkClient } = serverRequire('@clerk/express');
@@ -52,7 +53,9 @@ try {
   const owner = await createUser(), page = await signedIn(owner);
   const initial = await state(page);
   assert.equal(initial.currentCharacterId, 'nela');
-  if (process.env.ECHO_VISUAL_ONLY === '1') {
+  if (process.env.ECHO_UX_ONLY === '1') {
+    await runUxChecks(page, state, base, out);
+  } else if (process.env.ECHO_VISUAL_ONLY === '1') {
     await page.goto(`${base}/profile/official-pretty-violence`);
     await expect(page.getByTestId('text-profile-name')).toContainText('Pretty Violence', { timeout: 30000 });
     await page.screenshot({ path: `${out}profile-mobile.jpg` });

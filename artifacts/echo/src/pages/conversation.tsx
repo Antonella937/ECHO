@@ -29,6 +29,25 @@ export default function ConversationPage() {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
 
+  // Keep the composer above the on-screen keyboard where visualViewport is available.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      root.style.setProperty('--echo-keyboard-inset', `${Math.round(inset)}px`);
+      if (inset > 0) endRef.current?.scrollIntoView({ block: 'end' });
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      root.style.removeProperty('--echo-keyboard-inset');
+    };
+  }, []);
+
   if (!other || other.id === me.id)
     return <EmptyState title="Conversación no disponible" body="No puedes escribirte a ti mismo, aunque a veces apetezca." />;
 
@@ -49,20 +68,20 @@ export default function ConversationPage() {
           <Link href={`/profile/${other.id}`} className="flex min-w-0 items-center gap-3" data-testid="link-conversation-profile">
             <CharacterAvatar character={other} size={38} />
             <div className="min-w-0 leading-tight">
-              <div className="flex items-center gap-1 truncate text-[15px] font-semibold">{other.name}<VerifiedBadge account={other} className="h-3.5 w-3.5" /></div>
+              <div className="flex min-w-0 items-center gap-1 text-[15px] font-semibold"><span className="truncate">{other.name}</span><VerifiedBadge account={other} className="h-3.5 w-3.5 shrink-0" /></div>
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
         </div>
       </header>
 
-      <div className="flex-1 px-4 pb-4 pt-6">
+      <div className="flex-1 px-4 pb-4 pt-6" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
           <div className="text-xs text-muted-foreground">{other.occupation} · {other.location}</div>
         </div>
-        {messages.length === 0 && <p className="text-center text-sm text-muted-foreground">Todavía no os habéis escrito.</p>}
+        {messages.length === 0 && <p className="text-center text-sm text-muted-foreground" data-testid="text-conversation-empty">Todavía no os habéis escrito. Envía el primer mensaje para empezar.</p>}
         <ul className="flex flex-col gap-1.5">
           {messages.map((m, i) => (
             <Bubble key={m.id} m={m} mine={m.senderId === me.id} showTime={i === 0 || new Date(m.createdAt).getTime() - new Date(messages[i - 1].createdAt).getTime() > 3 * 3600_000} state={state} />
@@ -71,7 +90,7 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="sticky bottom-0 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl">
+      <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset)] z-20 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         <div className="flex items-center gap-2 pb-1">
           <CharacterAvatar character={me} size={32} />
           <input
@@ -79,10 +98,10 @@ export default function ConversationPage() {
             onChange={(e) => setText(e.target.value)}
             placeholder={`Escribir como ${me.name.split(' ')[0]}…`}
             className="h-12 min-w-0 flex-1 rounded-full border border-input bg-card px-5 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
-            aria-label="Mensaje"
+            aria-label={`Mensaje para ${other.name}`}
             data-testid="input-message"
           />
-          <button type="submit" disabled={!text.trim()} aria-label="Enviar" className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-send-message">
+          <button type="submit" disabled={!text.trim()} aria-label="Enviar mensaje" className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-send-message">
             <Send className="h-5 w-5" strokeWidth={1.8} />
           </button>
         </div>

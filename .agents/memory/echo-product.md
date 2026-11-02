@@ -9,6 +9,12 @@ ECHO is a private fictional-character social universe experienced as Nela Paez's
 
 **How to apply:** Keep primary navigation focused on feed, stories, profiles and conversations. Put character control in secondary settings.
 
+New inboxes must start empty. An available character is a contact, not a conversation; selecting one without sending anything must not add an empty thread.
+
+**Why:** The user explicitly requested that DMs appear from interaction, not automatically list every character. She also required existing and migrated conversations to remain intact.
+
+**How to apply:** Seed no messages for new universes. Derive inbox rows from persisted message history, including already-stored illustrative/seed messages and archived participants; do not purge that history to produce a visually empty inbox. Keep a clear searchable way to start a new conversation.
+
 Every social account, including Nela/the user's own profile, must be manually editable. Personal characters and official bands/places are equally usable posting identities within each owner's isolated universe.
 
 **Why:** The user explicitly said “ALL accounts, including Nela/user’s own account, must be manually editable” and wants to switch to any character or official account, act manually, then switch back.

@@ -42,7 +42,7 @@ export function Sheet({ open, onClose, title, children, footer, testId }: Props)
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="relative flex max-h-[86dvh] w-full max-w-[520px] flex-col rounded-t-[28px] border border-card-border bg-card shadow-xl md:rounded-[28px]"
+            className="relative flex max-h-[calc(92dvh-env(safe-area-inset-top))] w-full max-w-[520px] flex-col rounded-t-[28px] border border-card-border bg-card shadow-xl md:rounded-[28px]"
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
@@ -64,7 +64,7 @@ export function Sheet({ open, onClose, title, children, footer, testId }: Props)
                 <X className="h-5 w-5" strokeWidth={1.6} />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4" onPointerDownCapture={(e) => e.stopPropagation()}>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4" style={footer ? undefined : { paddingBottom: 'max(var(--echo-safe-bottom), 1rem)' }} onPointerDownCapture={(e) => e.stopPropagation()}>
               {children}
             </div>
             {footer && <div className="border-t border-border px-4 pb-safe pt-3">{footer}</div>}

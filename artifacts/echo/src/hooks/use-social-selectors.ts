@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useSocial } from '@/store/social-store';
 import { threadIdFor, type Character, type Message, type Story } from '@/domain/types';
+import { hasMessageContent, selectInbox } from '@/domain/inbox';
+export type { ThreadSummary } from '@/domain/inbox';
 
 const byDateDesc = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
 const byDateAsc = <T extends { createdAt: string }>(a: T, b: T) => a.createdAt.localeCompare(b.createdAt);
@@ -10,7 +12,7 @@ export function useUnreadCounts() {
   return useMemo(
     () => ({
       notifications: state.notifications.filter((n) => n.recipientId === me.id && !n.read && n.kind !== 'message' && n.kind !== 'story_reply').length,
-      messages: state.messages.filter((m) => m.recipientId === me.id && !m.readBy.includes(me.id)).length,
+      messages: state.messages.filter((m) => hasMessageContent(m) && m.recipientId === me.id && !m.readBy.includes(me.id)).length,
     }),
     [state.notifications, state.messages, me.id],
   );
@@ -47,29 +49,9 @@ export function useStoryGroups(): StoryGroup[] {
   }, [state.stories, state.characters, me.id]);
 }
 
-export interface ThreadSummary {
-  other: Character;
-  last: Message | null;
-  unread: number;
-}
-
-export function useThreads(): ThreadSummary[] {
+export function useThreads() {
   const { state, me } = useSocial();
-  return useMemo(() => {
-    return state.characters
-      .filter((c) => c.id !== me.id)
-      .map((other) => {
-        const tid = threadIdFor(me.id, other.id);
-        const msgs = state.messages.filter((m) => m.threadId === tid).sort(byDateAsc);
-        return {
-          other,
-          last: msgs[msgs.length - 1] ?? null,
-          unread: msgs.filter((m) => m.recipientId === me.id && !m.readBy.includes(me.id)).length,
-        };
-      })
-      .filter((t) => !t.other.archived || t.last !== null)
-      .sort((a, b) => (b.last?.createdAt ?? '').localeCompare(a.last?.createdAt ?? ''));
-  }, [state.messages, state.characters, me.id]);
+  return useMemo(() => selectInbox(state, me.id), [state.messages, state.characters, me.id]);
 }
 
 export function useThreadMessages(otherId: string) {

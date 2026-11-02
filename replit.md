@@ -20,6 +20,8 @@ A mobile-first fictional-character social network, experienced as Nela Paez's ow
 - Authentication and App Storage are configured; Kindroid and visual AI are not connected.
 - `pnpm --filter @workspace/scripts run test:echo-privacy` runs synchronization, migration, database concurrency and real private image storage tests.
 - `pnpm --filter @workspace/scripts run test:echo-accounts` checks additive account upgrades, edit validation, reversible archive, fictional metrics and stale-open form safety.
+- `pnpm --filter @workspace/scripts run test:echo-inbox` checks empty new inboxes and preserves existing/migrated message history.
+- `pnpm --filter @workspace/scripts run test:echo-ux` uses disposable authenticated sessions to check conversation search/start/send/history and mobile layout at 320/390/430px, including simulated bottom safe area and a shortened conversation viewport.
 - `pnpm --filter @workspace/scripts run test:echo-browser` exercises the real signed-in UI in disposable Clerk development accounts, including uploads, manual posting, a second session and cross-owner isolation. It deletes only its own test users/universes/files; never run it against production.
 - `pnpm run typecheck` is the canonical check; it builds shared declarations before checking apps.
 
@@ -40,8 +42,6 @@ Pending changes have an owner-scoped IndexedDB recovery snapshot. Network failur
 
 The manifest enables standalone phone use on compatible browsers. The production service worker caches the shell and visited static assets; it does not cache APIs or third-party requests. Offline use requires an initial online visit.
 
-## Future integration constraints
-
 ## Account editing and audience figures
 
 All social profiles, including Nela, are editable by their authenticated universe owner. Personal, band, venue and organization accounts share the same interaction capabilities. Additive catalog initialization supplies editable official Pretty Violence, False Halo, Saint Vulture, Stray Kids, The Hollow and Dead Static accounts once; it never replaces existing accounts, resets the universe or revives archived accounts.
@@ -49,5 +49,13 @@ All social profiles, including Nela, are editable by their authenticated univers
 Account removal is reversible archive, not deletion. Nela cannot be archived. Archive keeps posts, messages, comments and historical relationships, hides the account from identity selection and returns an archived active identity to Nela. Settings has no destructive demo-reset control.
 
 Manual audience figures are fictional **bases added to real activity**, not fabricated relationship or interaction records. Blank bases mean no fictional addition. Editors show the real counts separately. New optional JSON fields preserve compatibility with Stage 1 snapshots. Profile/metric forms apply only fields changed since opening and reject incompatible intervening edits, even when polling has already advanced the client's sync base.
+
+## Mobile layout and conversations
+
+Keep mobile navigation clearance and its safe-area inset coordinated through the shared CSS variables. All regular pages reserve bottom clearance; conversation pages hide navigation and reserve space for their own composer. Sheets overlay navigation and have their own safe-area padding. Browser checks assert actual computed padding/control bounds rather than only checking class names.
+
+New universes contain no seeded DMs or message notifications. The inbox is derived from actual persisted messages, not every available account. Existing messages of any origin, including old sample and migrated history, are never removed by this UI change. Choosing a recipient only opens a draft conversation; sending the first message makes it appear in the inbox. Search lists exclude archived accounts, while existing archived-account history remains visible.
+
+## Future integration constraints
 
 Keep external character and image providers behind the domain contracts. Autonomous activity must enter through typed social events rather than mutate views directly. The character switcher must never alter authenticated ownership.

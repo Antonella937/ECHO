@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:echo-ux": "ECHO_UX_ONLY=1 tsx tests/echo-accounts-browser.ts",
+    "test:echo-inbox": "tsx --test ../artifacts/echo/tests/inbox.test.ts",
     "test:echo-browser": "tsx tests/echo-accounts-browser.ts",
     "test:echo-accounts": "tsx --test ../artifacts/echo/tests/accounts.test.ts ../artifacts/api-server/tests/accounts-validation.test.ts",
     "test:echo-privacy": "tsx --test ../artifacts/echo/tests/privacy-sync.test.ts ../artifacts/api-server/tests/universe-repository.test.ts",
