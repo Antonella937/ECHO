@@ -10,6 +10,7 @@ import { Readable } from "node:stream";
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectPermission } from "../lib/objectAcl";
+import { mediaLimits, validMediaHeader } from "../lib/mediaSafety";
 import {
   ObjectNotFoundError,
   ObjectStorageService,
@@ -23,7 +24,7 @@ router.post(
   requireAuth,
   async (req, res): Promise<void> => {
     const parsed = RequestUploadUrlBody.safeParse(req.body);
-    if (!parsed.success) {
+    if (!parsed.success || parsed.data.size > mediaLimits[parsed.data.contentType] * 1024 * 1024) {
       res.status(400).json({ error: "Invalid image metadata" });
       return;
     }
@@ -75,6 +76,18 @@ router.post(
     }
 
     try {
+      const file = await storage.getObjectEntityFile(media.objectPath);
+      const [metadata] = await file.getMetadata();
+      const mime = (metadata.contentType ?? '').split(';')[0].trim().toLowerCase();
+      if (!mediaLimits[mime] || Number(metadata.size) < 1 || Number(metadata.size) > mediaLimits[mime] * 1024 * 1024) {
+        res.status(400).json({ error: 'Formato o tamaño no permitido. Fotos/audio: 15 MB; video: 50 MB.' });
+        return;
+      }
+      const [header] = await file.download({ start: 0, end: 63, validation: false });
+      if (!validMediaHeader(header, mime)) {
+        res.status(400).json({ error: 'El contenido del archivo no coincide con su formato.' });
+        return;
+      }
       const objectPath = await storage.trySetObjectEntityAclPolicy(
         media.objectPath,
         { owner: req.userId!, visibility: "private" },
@@ -124,12 +137,15 @@ router.get(
         res.status(404).json({ error: "Image not found" });
         return;
       }
-      const response = await storage.downloadObject(file);
+      const response = await storage.downloadObject(file, 0, req.headers.range);
       response.headers.forEach((value, key) => res.setHeader(key, value));
       res.setHeader("Cache-Control", "private, no-store");
       res.status(response.status);
       if (response.body) {
-        Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res);
+        const stream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+        stream.on('error', error => { req.log.warn({ err: error }, 'Private media stream interrupted'); res.destroy(); });
+        res.on('close', () => stream.destroy());
+        stream.pipe(res);
       } else {
         res.end();
       }

@@ -9,6 +9,36 @@ export interface HealthStatus {
   status: string;
 }
 
+export type AppearanceTheme = typeof AppearanceTheme[keyof typeof AppearanceTheme];
+
+
+export const AppearanceTheme = {
+  dark: 'dark',
+  light: 'light',
+  system: 'system',
+} as const;
+
+export interface Appearance {
+  theme: AppearanceTheme;
+  /** @pattern ^#[0-9a-fA-F]{6}$ */
+  accent: string;
+}
+
+export interface StoryHighlight {
+  id: string;
+  authorId: string;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  title: string;
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  storyIds: string[];
+}
+
 export type CharacterConfigurationVersion = typeof CharacterConfigurationVersion[keyof typeof CharacterConfigurationVersion];
 
 
@@ -582,6 +612,11 @@ export type PostDisplayMetrics = {
 };
 
 export interface Post {
+  /** @maxItems 50 */
+  taggedAccountIds?: string[];
+  commentsEnabled?: boolean;
+  pinned?: boolean;
+  editedAt?: string;
   displayMetrics?: PostDisplayMetrics;
   id: string;
   authorId: string;
@@ -615,7 +650,33 @@ export interface Comment {
   origin: string;
 }
 
+export interface SocialReaction {
+  id: string;
+  actorId: string;
+  /**
+     * @minLength 1
+     * @maxLength 32
+     */
+  value: string;
+}
+
+/**
+ * Metadata only; no music provider, audio stream or playback is connected.
+ */
+export interface StoryMusic {
+  /** @maxLength 160 */
+  title: string;
+  /** @maxLength 160 */
+  artist: string;
+  /** @maxLength 300 */
+  providerRef?: string;
+}
+
 export interface Story {
+  /** @maxItems 50 */
+  mentionedAccountIds?: string[];
+  reactions?: SocialReaction[];
+  music?: StoryMusic;
   id: string;
   authorId: string;
   image: string;
@@ -625,7 +686,30 @@ export interface Story {
   origin: string;
 }
 
+export type MessageAttachmentType = typeof MessageAttachmentType[keyof typeof MessageAttachmentType];
+
+
+export const MessageAttachmentType = {
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export interface MessageAttachment {
+  id: string;
+  type: MessageAttachmentType;
+  /** @minLength 1 */
+  url: string;
+  mimeType?: string;
+  /** @minimum 0 */
+  durationSeconds?: number;
+}
+
 export interface Message {
+  quoteMessageId?: string;
+  /** @maxItems 5 */
+  attachments?: MessageAttachment[];
+  reactions?: SocialReaction[];
   id: string;
   threadId: string;
   senderId: string;
@@ -659,6 +743,9 @@ export interface Notification {
 export type SocialStateFollows = {[key: string]: string[]};
 
 export interface SocialState {
+  appearance?: Appearance;
+  /** @maxItems 200 */
+  highlights?: StoryHighlight[];
   /** @minimum 0 */
   accountCatalogVersion?: number;
   version: number;
@@ -718,6 +805,13 @@ export const UploadUrlInputContentType = {
   'image/jpeg': 'image/jpeg',
   'image/png': 'image/png',
   'image/webp': 'image/webp',
+  'video/mp4': 'video/mp4',
+  'video/webm': 'video/webm',
+  'audio/webm': 'audio/webm',
+  'audio/ogg': 'audio/ogg',
+  'audio/mp4': 'audio/mp4',
+  'audio/mpeg': 'audio/mpeg',
+  'audio/wav': 'audio/wav',
 } as const;
 
 export interface UploadUrlInput {
@@ -728,7 +822,7 @@ export interface UploadUrlInput {
   name: string;
   /**
      * @minimum 1
-     * @maximum 15728640
+     * @maximum 52428800
      */
   size: number;
   contentType: UploadUrlInputContentType;

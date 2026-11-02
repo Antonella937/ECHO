@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Check, Copy, Link2, Share, Trash2, User } from 'lucide-react';
+import { Check, Copy, Link2, MessageCircleOff, MessageCircle, Pencil, Pin, PinOff, Share, Trash2, User } from 'lucide-react';
+import { EditPostSheet } from './edit-post-sheet';
 import { useSocial } from '@/store/social-store';
 import { Sheet } from './sheet';
 import { CharacterAvatar } from './avatar';
@@ -137,6 +138,7 @@ export function OptionsSheet({ post, open, onClose }: { post: Post; open: boolea
   const { me, actions, character } = useSocial();
   const [, navigate] = useLocation();
   const [confirm, setConfirm] = useState(false);
+  const [editing, setEditing] = useState(false);
   const author = character(post.authorId);
   const mine = post.authorId === me.id;
 
@@ -145,7 +147,13 @@ export function OptionsSheet({ post, open, onClose }: { post: Post; open: boolea
     onClose();
   };
 
+  const run = (fn: () => void, ok: string) => {
+    try { fn(); toast({ title: ok }); close(); } catch (e) { toast({ title: 'No se pudo completar', description: (e as Error).message }); }
+  };
+
   return (
+    <>
+    <EditPostSheet post={post} open={editing} onClose={() => setEditing(false)} />
     <Sheet open={open} onClose={close} title={confirm ? '¿Eliminar publicación?' : 'Opciones'} testId="sheet-options">
       {confirm ? (
         <div className="pb-2">
@@ -187,6 +195,19 @@ export function OptionsSheet({ post, open, onClose }: { post: Post; open: boolea
             <Copy className="h-5 w-5" strokeWidth={1.6} /> Copiar enlace
           </button>
           {mine && (
+            <>
+              <button onClick={() => { close(); setEditing(true); }} className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-option-edit">
+                <Pencil className="h-5 w-5" strokeWidth={1.6} /> Editar publicación
+              </button>
+              <button onClick={() => run(() => actions.pinPost(post.id, !post.pinned), post.pinned ? 'Publicación desfijada' : 'Publicación fijada')} className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-option-pin">
+                {post.pinned ? <PinOff className="h-5 w-5" strokeWidth={1.6} /> : <Pin className="h-5 w-5" strokeWidth={1.6} />} {post.pinned ? 'Desfijar del perfil' : 'Fijar en el perfil'}
+              </button>
+              <button onClick={() => { const on = post.commentsEnabled === false; run(() => actions.editPost(post.id, { commentsEnabled: on }, { commentsEnabled: post.commentsEnabled }), on ? 'Comentarios activados' : 'Comentarios desactivados'); }} className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-option-comments">
+                {post.commentsEnabled === false ? <MessageCircle className="h-5 w-5" strokeWidth={1.6} /> : <MessageCircleOff className="h-5 w-5" strokeWidth={1.6} />} {post.commentsEnabled === false ? 'Activar comentarios' : 'Desactivar comentarios'}
+              </button>
+            </>
+          )}
+          {mine && (
             <button onClick={() => setConfirm(true)} className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium text-destructive" data-testid="button-option-delete">
               <Trash2 className="h-5 w-5" strokeWidth={1.6} /> Eliminar publicación
             </button>
@@ -194,5 +215,6 @@ export function OptionsSheet({ post, open, onClose }: { post: Post; open: boolea
         </div>
       )}
     </Sheet>
+    </>
   );
 }

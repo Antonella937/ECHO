@@ -27,6 +27,34 @@ export function universeAccountError(state: SocialState): string | null {
   const actors = [...state.posts.map(p => p.authorId), ...state.stories.map(s => s.authorId),
     ...state.comments.map(c => c.authorId), ...state.messages.flatMap(m => [m.senderId, m.recipientId])];
   if (actors.some(id => !ids.has(id))) return 'Falta una cuenta referenciada por el historial. Archiva las cuentas en lugar de eliminarlas.';
+  for (const accountId of ids) {
+    if (state.posts.filter(p => p.authorId === accountId && p.pinned).length > 3) return 'Solo se pueden fijar 3 publicaciones por perfil.';
+  }
+  if (state.posts.some(p => p.taggedAccountIds?.some(id => !ids.has(id))) ||
+    state.stories.some(s => s.mentionedAccountIds?.some(id => !ids.has(id)))) return 'Una etiqueta referencia una cuenta inexistente.';
+  const comments = new Map(state.comments.map(c => [c.id, c]));
+  for (const comment of state.comments) {
+    const visited = new Set([comment.id]);
+    let parent = comment.parentId;
+    while (parent) {
+      const target = comments.get(parent);
+      if (!target || target.postId !== comment.postId || visited.has(parent)) return 'El hilo de comentarios contiene referencias inválidas.';
+      visited.add(parent); parent = target.parentId;
+    }
+  }
+  for (const message of state.messages) {
+    if (message.quoteMessageId && !state.messages.some(m => m.id === message.quoteMessageId && m.threadId === message.threadId))
+      return 'Una cita debe pertenecer a la misma conversación.';
+    if (message.reactions?.some(r => ![message.senderId, message.recipientId].includes(r.actorId)) ||
+      new Set(message.reactions?.map(r => r.actorId)).size !== (message.reactions?.length ?? 0)) return 'Reacción de mensaje inválida.';
+  }
+  for (const story of state.stories) {
+    if (story.reactions?.some(r => !ids.has(r.actorId)) ||
+      new Set(story.reactions?.map(r => r.actorId)).size !== (story.reactions?.length ?? 0)) return 'Reacción de historia inválida.';
+  }
+  if (new Set(state.highlights?.map(h => h.id)).size !== (state.highlights?.length ?? 0) ||
+    state.highlights?.some(h => !ids.has(h.authorId) || h.storyIds.some(id => !state.stories.some(s => s.id === id && s.authorId === h.authorId))))
+    return 'La destacada debe contener historias de su propia cuenta.';
   const validTarget = (id: string, self: string) => id === 'owner' || (ids.has(id) && id !== self);
   for (const account of state.characters) {
     const config = account.configuration;

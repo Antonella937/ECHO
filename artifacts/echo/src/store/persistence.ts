@@ -147,6 +147,7 @@ export async function moveLocalImagesToPrivateStorage(state: SocialState): Promi
     ]),
     ...state.posts.flatMap((post) => [post.image, ...(post.media ?? []).map(item => item.url)]),
     ...state.stories.map((story) => story.image),
+    ...state.messages.flatMap(message => (message.attachments ?? []).map(item => item.url)),
   ];
   if (refs.some((ref) => ref.startsWith('blob:'))) {
     throw new Error(
@@ -175,6 +176,8 @@ export async function moveLocalImagesToPrivateStorage(state: SocialState): Promi
       ...(post.media ? { media: post.media.map(item => ({ ...item, url: mapRef(item.url) })) } : {}),
     })),
     stories: state.stories.map((story) => ({ ...story, image: mapRef(story.image) })),
+    messages: state.messages.map(message => ({ ...message,
+      ...(message.attachments ? { attachments: message.attachments.map(item => ({ ...item, url: mapRef(item.url) })) } : {}) })),
   };
 }
 

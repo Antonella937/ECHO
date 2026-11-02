@@ -213,6 +213,8 @@ components:
       type: object
       required: [version, currentCharacterId, characters, follows, posts, comments, stories, messages, notifications]
       properties:
+        appearance: { $ref: "#/components/schemas/Appearance" }
+        highlights: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/StoryHighlight" } }
         accountCatalogVersion: { type: integer, minimum: 0 }
         version: { type: integer }
         currentCharacterId: { type: string }
@@ -440,6 +442,44 @@ components:
         kind: { type: string, enum: [manual, interaction, post, conversation, event] }
         sourceId: { type: [string, "null"] }
         promotedTo: { type: [string, "null"] }
+    Appearance:
+      type: object
+      required: [theme, accent]
+      properties:
+        theme: { type: string, enum: [dark, light, system] }
+        accent: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+    SocialReaction:
+      type: object
+      required: [id, actorId, value]
+      properties:
+        id: { type: string }
+        actorId: { type: string }
+        value: { type: string, minLength: 1, maxLength: 32 }
+    MessageAttachment:
+      type: object
+      required: [id, type, url]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [image, video, audio] }
+        url: { type: string, minLength: 1 }
+        mimeType: { type: string }
+        durationSeconds: { type: number, minimum: 0 }
+    StoryHighlight:
+      type: object
+      required: [id, authorId, title, storyIds]
+      properties:
+        id: { type: string }
+        authorId: { type: string }
+        title: { type: string, minLength: 1, maxLength: 40 }
+        storyIds: { type: array, minItems: 1, maxItems: 100, items: { type: string } }
+    StoryMusic:
+      type: object
+      description: Metadata only; no music provider, audio stream or playback is connected.
+      required: [title, artist]
+      properties:
+        title: { type: string, maxLength: 160 }
+        artist: { type: string, maxLength: 160 }
+        providerRef: { type: string, maxLength: 300 }
     PostMedia:
       type: object
       description: Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.
@@ -456,6 +496,10 @@ components:
       type: object
       required: [id, authorId, image, caption, location, createdAt, likes, savedBy, origin, illustrative]
       properties:
+        taggedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
+        commentsEnabled: { type: boolean }
+        pinned: { type: boolean }
+        editedAt: { type: string, format: date-time }
         displayMetrics:
           type: object
           properties:
@@ -495,6 +539,9 @@ components:
       type: object
       required: [id, authorId, image, caption, createdAt, seenBy, origin]
       properties:
+        mentionedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
+        reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
+        music: { $ref: "#/components/schemas/StoryMusic" }
         id: { type: string }
         authorId: { type: string }
         image: { type: string }
@@ -506,6 +553,9 @@ components:
       type: object
       required: [id, threadId, senderId, recipientId, text, createdAt, storyId, postId, readBy, origin]
       properties:
+        quoteMessageId: { type: string }
+        attachments: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/MessageAttachment" } }
+        reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         id: { type: string }
         threadId: { type: string }
         senderId: { type: string }
@@ -535,8 +585,8 @@ components:
       required: [name, size, contentType]
       properties:
         name: { type: string, minLength: 1, maxLength: 200 }
-        size: { type: integer, minimum: 1, maximum: 15728640 }
-        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        size: { type: integer, minimum: 1, maximum: 52428800 }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp, video/mp4, video/webm, audio/webm, audio/ogg, audio/mp4, audio/mpeg, audio/wav] }
     UploadUrlResult:
       type: object
       required: [uploadURL, objectPath]

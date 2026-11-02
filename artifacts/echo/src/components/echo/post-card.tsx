@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
-import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
+import { Bookmark, Heart, MessageCircle, MoreHorizontal, Pin, Send, UserRound } from 'lucide-react';
+import { SocialText } from './social-text';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { VerifiedBadge } from './verified-badge';
@@ -32,6 +33,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const saved = post.savedBy.includes(me.id);
   const commentCount = state.comments.filter((c) => c.postId === post.id).length;
   const likers = post.likes.map(character).filter(Boolean);
+  const tagged = (post.taggedAccountIds ?? []).map(character).filter(Boolean);
   const firstLiker = likers.find((c) => c && c.id !== me.id) ?? likers[0];
 
   const onImageTap = () => {
@@ -53,8 +55,9 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </Link>
         <div className="min-w-0 flex-1 leading-tight">
           <Link href={`/profile/${author.id}`} className="inline-flex items-center gap-1 text-[14.5px] font-semibold">{author.handle}<VerifiedBadge account={author} /></Link>
-          {post.location && <div className="truncate text-xs text-muted-foreground">{post.location}</div>}
+          {post.location && <Link href={`/search?location=${encodeURIComponent(post.location)}`} className="block truncate text-xs text-muted-foreground" data-testid={`link-post-location-${post.id}`}>{post.location}</Link>}
         </div>
+        {post.pinned && <Pin className="h-4 w-4 text-primary" strokeWidth={1.8} aria-label="Fijada" data-testid={`status-post-pinned-${post.id}`} />}
         <button onClick={() => setSheet('options')} aria-label="Opciones" className="tap -mr-2 grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:text-foreground" data-testid={`button-options-${post.id}`}>
           <MoreHorizontal className="h-5 w-5" strokeWidth={1.6} />
         </button>
@@ -113,7 +116,15 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         {post.caption && (
           <p className="mt-1.5 text-[14.5px] leading-relaxed text-foreground/90" data-testid={`text-caption-${post.id}`}>
             <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold text-foreground">{author.handle}</Link>
-            {post.caption}
+            <SocialText text={post.caption} />
+          </p>
+        )}
+        {tagged.length > 0 && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted-foreground" data-testid={`text-tagged-${post.id}`}>
+            <UserRound className="h-3.5 w-3.5" strokeWidth={1.8} /> Con
+            {tagged.map((c, i) => c && (
+              <Link key={c.id} href={`/profile/${c.id}`} className="font-semibold text-foreground" data-testid={`link-tagged-${post.id}-${c.id}`}>@{c.handle}{i < tagged.length - 1 ? ',' : ''}</Link>
+            ))}
           </p>
         )}
         {commentCount > 0 && (
@@ -122,8 +133,9 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           </button>
         )}
         <Link href={`/p/${post.id}`} className="mt-1 block text-[11.5px] uppercase tracking-[0.08em] text-muted-foreground/80" data-testid={`link-post-time-${post.id}`}>
-          {timeAgo(post.createdAt)}
+          {timeAgo(post.createdAt)}{post.editedAt ? ' · editada' : ''}
         </Link>
+        {post.commentsEnabled === false && <p className="mt-1 text-[12px] text-muted-foreground" data-testid={`status-comments-off-${post.id}`}>Comentarios desactivados</p>}
       </div>
 
       <CommentsSheet post={post} open={sheet === 'comments'} onClose={() => setSheet(null)} />

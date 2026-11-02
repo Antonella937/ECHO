@@ -9,6 +9,11 @@ import type { PostDisplayMetrics } from './postDisplayMetrics';
 import type { PostMedia } from './postMedia';
 
 export interface Post {
+  /** @maxItems 50 */
+  taggedAccountIds?: string[];
+  commentsEnabled?: boolean;
+  pinned?: boolean;
+  editedAt?: Date;
   displayMetrics?: PostDisplayMetrics;
   id: string;
   authorId: string;

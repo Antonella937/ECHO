@@ -123,6 +123,31 @@ async function responseError(response: Response, fallback: string): Promise<stri
   }
 }
 
+/** Private binary attachments. Video/audio bytes are never re-encoded or muted. */
+export async function uploadPrivateFile(file: Blob): Promise<import('@/domain/types').MessageAttachment> {
+  const mimeType = file.type.split(';')[0].toLowerCase();
+  const type = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : 'audio';
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm',
+    'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'];
+  if (!allowed.includes(mimeType)) throw new Error('Formato no compatible. Usá JPG/PNG/WebP, MP4/WebM o audio WebM/Ogg/MP4/MP3/WAV.');
+  if (!file.size || file.size > (type === 'video' ? 50 : 15) * 1024 * 1024) throw new Error(`El archivo debe pesar menos de ${type === 'video' ? 50 : 15} MB.`);
+  const id = `attachment-${crypto.randomUUID()}`;
+  if (type === 'image') {
+    const imageFile = file instanceof File ? file : new File([file], 'foto', { type: mimeType });
+    return { id, type, url: await uploadPrivateImage(await compressImage(imageFile)), mimeType: 'image/jpeg' };
+  }
+  const request = await fetch('/api/storage/uploads/request-url', { method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'echo-attachment', size: file.size, contentType: mimeType }) });
+  if (!request.ok) throw new Error(await responseError(request, 'No se pudo preparar el adjunto.'));
+  const { uploadURL, objectPath } = await request.json();
+  const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': mimeType }, body: file });
+  if (!upload.ok) throw new Error('No se pudo subir el adjunto.');
+  const claim = await fetch('/api/storage/uploads/claim', { method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objectPath }) });
+  if (!claim.ok) throw new Error(await responseError(claim, 'No se pudo proteger el adjunto.'));
+  return { id, type, url: (await claim.json()).objectPath, mimeType };
+}
+
 export function timeAgo(iso: string): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const m = Math.floor(diff / 60000);

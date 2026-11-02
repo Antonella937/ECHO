@@ -7,7 +7,7 @@ export interface ThreadSummary {
 }
 /** Existing persisted seed/migrated messages ARE history, not empty contacts. */
 export function hasMessageContent(message: Message): boolean {
-  return Boolean(message.text.trim() || message.postId || message.storyId);
+  return Boolean(message.text.trim() || message.postId || message.storyId || message.attachments?.length);
 }
 export function selectInbox(state: SocialState, characterId: string): ThreadSummary[] {
   const grouped = new Map<string, Message[]>();

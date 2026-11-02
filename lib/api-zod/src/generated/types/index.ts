@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './appearance';
+export * from './appearanceTheme';
 export * from './character';
 export * from './characterAccountType';
 export * from './characterAssistanceStatus';
@@ -45,6 +47,8 @@ export * from './characterRelationshipPreset';
 export * from './comment';
 export * from './healthStatus';
 export * from './message';
+export * from './messageAttachment';
+export * from './messageAttachmentType';
 export * from './notification';
 export * from './post';
 export * from './postDisplayMetrics';
@@ -54,9 +58,12 @@ export * from './routineEntry';
 export * from './routineEntryActivity';
 export * from './routineEntryFlexibility';
 export * from './routineEntryRecurrence';
+export * from './socialReaction';
 export * from './socialState';
 export * from './socialStateFollows';
 export * from './story';
+export * from './storyHighlight';
+export * from './storyMusic';
 export * from './universeEnvelope';
 export * from './universeInput';
 export * from './universeVerification';

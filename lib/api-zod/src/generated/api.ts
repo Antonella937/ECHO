@@ -325,6 +325,13 @@ export const HealthCheckResponse = zod.object({
  */
 export const getUniverseResponseRevisionMin = 0;
 
+export const getUniverseResponseStateOneAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getUniverseResponseStateOneHighlightsItemTitleMax = 40;
+
+export const getUniverseResponseStateOneHighlightsItemStoryIdsMax = 100;
+
+export const getUniverseResponseStateOneHighlightsMax = 200;
+
 export const getUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
 export const getUniverseResponseStateOneCharactersItemConfigurationBasicNameMax = 100;
@@ -476,6 +483,8 @@ export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMax
 export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMin = 0;
 export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax = 1000000000000;
 
+export const getUniverseResponseStateOnePostsItemTaggedAccountIdsMax = 50;
+
 export const getUniverseResponseStateOnePostsItemDisplayMetricsLikesMin = 0;
 export const getUniverseResponseStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -494,11 +503,38 @@ export const getUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin = 0
 
 export const getUniverseResponseStateOnePostsItemMediaMax = 10;
 
+export const getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax = 50;
+
+export const getUniverseResponseStateOneStoriesItemReactionsItemValueMax = 32;
+
+export const getUniverseResponseStateOneStoriesItemMusicTitleMax = 160;
+
+export const getUniverseResponseStateOneStoriesItemMusicArtistMax = 160;
+
+export const getUniverseResponseStateOneStoriesItemMusicProviderRefMax = 300;
+
+
+export const getUniverseResponseStateOneMessagesItemAttachmentsItemDurationSecondsMin = 0;
+
+export const getUniverseResponseStateOneMessagesItemAttachmentsMax = 5;
+
+export const getUniverseResponseStateOneMessagesItemReactionsItemValueMax = 32;
+
 
 
 export const GetUniverseResponse = zod.object({
   "revision": zod.number().int().min(getUniverseResponseRevisionMin),
   "state": zod.union([zod.object({
+  "appearance": zod.object({
+  "theme": zod.enum(['dark', 'light', 'system']),
+  "accent": zod.string().regex(getUniverseResponseStateOneAppearanceAccentRegExp)
+}).optional(),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "title": zod.string().min(1).max(getUniverseResponseStateOneHighlightsItemTitleMax),
+  "storyIds": zod.array(zod.string()).min(1).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax)
+})).max(getUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(getUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -662,6 +698,10 @@ export const GetUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "taggedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOnePostsItemTaggedAccountIdsMax).optional(),
+  "commentsEnabled": zod.boolean().optional(),
+  "pinned": zod.boolean().optional(),
+  "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(getUniverseResponseStateOnePostsItemDisplayMetricsLikesMin).max(getUniverseResponseStateOnePostsItemDisplayMetricsLikesMax).nullish(),
   "comments": zod.number().int().min(getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMin).max(getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax).nullish(),
@@ -699,6 +739,17 @@ export const GetUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "mentionedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(getUniverseResponseStateOneStoriesItemReactionsItemValueMax)
+})).optional(),
+  "music": zod.object({
+  "title": zod.string().max(getUniverseResponseStateOneStoriesItemMusicTitleMax),
+  "artist": zod.string().max(getUniverseResponseStateOneStoriesItemMusicArtistMax),
+  "providerRef": zod.string().max(getUniverseResponseStateOneStoriesItemMusicProviderRefMax).optional()
+}).optional().describe('Metadata only; no music provider, audio stream or playback is connected.'),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -708,6 +759,19 @@ export const GetUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "quoteMessageId": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['image', 'video', 'audio']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "durationSeconds": zod.number().min(getUniverseResponseStateOneMessagesItemAttachmentsItemDurationSecondsMin).optional()
+})).max(getUniverseResponseStateOneMessagesItemAttachmentsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(getUniverseResponseStateOneMessagesItemReactionsItemValueMax)
+})).optional(),
   "id": zod.string(),
   "threadId": zod.string(),
   "senderId": zod.string(),
@@ -739,6 +803,13 @@ export const GetUniverseResponse = zod.object({
  * @summary Save the authenticated user's universe
  */
 export const saveUniverseBodyExpectedRevisionMin = 0;
+
+export const saveUniverseBodyStateAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const saveUniverseBodyStateHighlightsItemTitleMax = 40;
+
+export const saveUniverseBodyStateHighlightsItemStoryIdsMax = 100;
+
+export const saveUniverseBodyStateHighlightsMax = 200;
 
 export const saveUniverseBodyStateAccountCatalogVersionMin = 0;
 
@@ -891,6 +962,8 @@ export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowersMax = 100
 export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMin = 0;
 export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMax = 1000000000000;
 
+export const saveUniverseBodyStatePostsItemTaggedAccountIdsMax = 50;
+
 export const saveUniverseBodyStatePostsItemDisplayMetricsLikesMin = 0;
 export const saveUniverseBodyStatePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -909,11 +982,38 @@ export const saveUniverseBodyStatePostsItemMediaItemDurationSecondsMin = 0;
 
 export const saveUniverseBodyStatePostsItemMediaMax = 10;
 
+export const saveUniverseBodyStateStoriesItemMentionedAccountIdsMax = 50;
+
+export const saveUniverseBodyStateStoriesItemReactionsItemValueMax = 32;
+
+export const saveUniverseBodyStateStoriesItemMusicTitleMax = 160;
+
+export const saveUniverseBodyStateStoriesItemMusicArtistMax = 160;
+
+export const saveUniverseBodyStateStoriesItemMusicProviderRefMax = 300;
+
+
+export const saveUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin = 0;
+
+export const saveUniverseBodyStateMessagesItemAttachmentsMax = 5;
+
+export const saveUniverseBodyStateMessagesItemReactionsItemValueMax = 32;
+
 
 
 export const SaveUniverseBody = zod.object({
   "expectedRevision": zod.number().int().min(saveUniverseBodyExpectedRevisionMin),
   "state": zod.object({
+  "appearance": zod.object({
+  "theme": zod.enum(['dark', 'light', 'system']),
+  "accent": zod.string().regex(saveUniverseBodyStateAppearanceAccentRegExp)
+}).optional(),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "title": zod.string().min(1).max(saveUniverseBodyStateHighlightsItemTitleMax),
+  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseBodyStateHighlightsItemStoryIdsMax)
+})).max(saveUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseBodyStateAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -1077,6 +1177,10 @@ export const SaveUniverseBody = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "taggedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStatePostsItemTaggedAccountIdsMax).optional(),
+  "commentsEnabled": zod.boolean().optional(),
+  "pinned": zod.boolean().optional(),
+  "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(saveUniverseBodyStatePostsItemDisplayMetricsLikesMin).max(saveUniverseBodyStatePostsItemDisplayMetricsLikesMax).nullish(),
   "comments": zod.number().int().min(saveUniverseBodyStatePostsItemDisplayMetricsCommentsMin).max(saveUniverseBodyStatePostsItemDisplayMetricsCommentsMax).nullish(),
@@ -1114,6 +1218,17 @@ export const SaveUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(saveUniverseBodyStateStoriesItemReactionsItemValueMax)
+})).optional(),
+  "music": zod.object({
+  "title": zod.string().max(saveUniverseBodyStateStoriesItemMusicTitleMax),
+  "artist": zod.string().max(saveUniverseBodyStateStoriesItemMusicArtistMax),
+  "providerRef": zod.string().max(saveUniverseBodyStateStoriesItemMusicProviderRefMax).optional()
+}).optional().describe('Metadata only; no music provider, audio stream or playback is connected.'),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -1123,6 +1238,19 @@ export const SaveUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "quoteMessageId": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['image', 'video', 'audio']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "durationSeconds": zod.number().min(saveUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin).optional()
+})).max(saveUniverseBodyStateMessagesItemAttachmentsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(saveUniverseBodyStateMessagesItemReactionsItemValueMax)
+})).optional(),
   "id": zod.string(),
   "threadId": zod.string(),
   "senderId": zod.string(),
@@ -1150,6 +1278,13 @@ export const SaveUniverseBody = zod.object({
 })
 
 export const saveUniverseResponseRevisionMin = 0;
+
+export const saveUniverseResponseStateOneAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const saveUniverseResponseStateOneHighlightsItemTitleMax = 40;
+
+export const saveUniverseResponseStateOneHighlightsItemStoryIdsMax = 100;
+
+export const saveUniverseResponseStateOneHighlightsMax = 200;
 
 export const saveUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
@@ -1302,6 +1437,8 @@ export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMa
 export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMin = 0;
 export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax = 1000000000000;
 
+export const saveUniverseResponseStateOnePostsItemTaggedAccountIdsMax = 50;
+
 export const saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMin = 0;
 export const saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -1320,11 +1457,38 @@ export const saveUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin = 
 
 export const saveUniverseResponseStateOnePostsItemMediaMax = 10;
 
+export const saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax = 50;
+
+export const saveUniverseResponseStateOneStoriesItemReactionsItemValueMax = 32;
+
+export const saveUniverseResponseStateOneStoriesItemMusicTitleMax = 160;
+
+export const saveUniverseResponseStateOneStoriesItemMusicArtistMax = 160;
+
+export const saveUniverseResponseStateOneStoriesItemMusicProviderRefMax = 300;
+
+
+export const saveUniverseResponseStateOneMessagesItemAttachmentsItemDurationSecondsMin = 0;
+
+export const saveUniverseResponseStateOneMessagesItemAttachmentsMax = 5;
+
+export const saveUniverseResponseStateOneMessagesItemReactionsItemValueMax = 32;
+
 
 
 export const SaveUniverseResponse = zod.object({
   "revision": zod.number().int().min(saveUniverseResponseRevisionMin),
   "state": zod.union([zod.object({
+  "appearance": zod.object({
+  "theme": zod.enum(['dark', 'light', 'system']),
+  "accent": zod.string().regex(saveUniverseResponseStateOneAppearanceAccentRegExp)
+}).optional(),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "title": zod.string().min(1).max(saveUniverseResponseStateOneHighlightsItemTitleMax),
+  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax)
+})).max(saveUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -1488,6 +1652,10 @@ export const SaveUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "taggedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOnePostsItemTaggedAccountIdsMax).optional(),
+  "commentsEnabled": zod.boolean().optional(),
+  "pinned": zod.boolean().optional(),
+  "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMin).max(saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMax).nullish(),
   "comments": zod.number().int().min(saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMin).max(saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax).nullish(),
@@ -1525,6 +1693,17 @@ export const SaveUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(saveUniverseResponseStateOneStoriesItemReactionsItemValueMax)
+})).optional(),
+  "music": zod.object({
+  "title": zod.string().max(saveUniverseResponseStateOneStoriesItemMusicTitleMax),
+  "artist": zod.string().max(saveUniverseResponseStateOneStoriesItemMusicArtistMax),
+  "providerRef": zod.string().max(saveUniverseResponseStateOneStoriesItemMusicProviderRefMax).optional()
+}).optional().describe('Metadata only; no music provider, audio stream or playback is connected.'),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -1534,6 +1713,19 @@ export const SaveUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "quoteMessageId": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['image', 'video', 'audio']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "durationSeconds": zod.number().min(saveUniverseResponseStateOneMessagesItemAttachmentsItemDurationSecondsMin).optional()
+})).max(saveUniverseResponseStateOneMessagesItemAttachmentsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(saveUniverseResponseStateOneMessagesItemReactionsItemValueMax)
+})).optional(),
   "id": zod.string(),
   "threadId": zod.string(),
   "senderId": zod.string(),
@@ -1566,14 +1758,14 @@ export const SaveUniverseResponse = zod.object({
  */
 export const requestUploadUrlBodyNameMax = 200;
 
-export const requestUploadUrlBodySizeMax = 15728640;
+export const requestUploadUrlBodySizeMax = 52428800;
 
 
 
 export const RequestUploadUrlBody = zod.object({
   "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
   "size": zod.number().int().min(1).max(requestUploadUrlBodySizeMax),
-  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'])
 })
 
 export const RequestUploadUrlResponse = zod.object({
@@ -1601,6 +1793,13 @@ export const ClaimUploadResponse = zod.object({
  * @summary Re-read the saved universe and verify every private image is readable
  */
 export const verifyUniverseResponseOneRevisionMin = 0;
+
+export const verifyUniverseResponseOneStateOneAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const verifyUniverseResponseOneStateOneHighlightsItemTitleMax = 40;
+
+export const verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax = 100;
+
+export const verifyUniverseResponseOneStateOneHighlightsMax = 200;
 
 export const verifyUniverseResponseOneStateOneAccountCatalogVersionMin = 0;
 
@@ -1753,6 +1952,8 @@ export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollow
 export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowingMin = 0;
 export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowingMax = 1000000000000;
 
+export const verifyUniverseResponseOneStateOnePostsItemTaggedAccountIdsMax = 50;
+
 export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMin = 0;
 export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -1771,6 +1972,23 @@ export const verifyUniverseResponseOneStateOnePostsItemMediaItemDurationSecondsM
 
 export const verifyUniverseResponseOneStateOnePostsItemMediaMax = 10;
 
+export const verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax = 50;
+
+export const verifyUniverseResponseOneStateOneStoriesItemReactionsItemValueMax = 32;
+
+export const verifyUniverseResponseOneStateOneStoriesItemMusicTitleMax = 160;
+
+export const verifyUniverseResponseOneStateOneStoriesItemMusicArtistMax = 160;
+
+export const verifyUniverseResponseOneStateOneStoriesItemMusicProviderRefMax = 300;
+
+
+export const verifyUniverseResponseOneStateOneMessagesItemAttachmentsItemDurationSecondsMin = 0;
+
+export const verifyUniverseResponseOneStateOneMessagesItemAttachmentsMax = 5;
+
+export const verifyUniverseResponseOneStateOneMessagesItemReactionsItemValueMax = 32;
+
 export const verifyUniverseResponseTwoVerifiedFilesMin = 0;
 
 
@@ -1778,6 +1996,16 @@ export const verifyUniverseResponseTwoVerifiedFilesMin = 0;
 export const VerifyUniverseResponse = zod.object({
   "revision": zod.number().int().min(verifyUniverseResponseOneRevisionMin),
   "state": zod.union([zod.object({
+  "appearance": zod.object({
+  "theme": zod.enum(['dark', 'light', 'system']),
+  "accent": zod.string().regex(verifyUniverseResponseOneStateOneAppearanceAccentRegExp)
+}).optional(),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "title": zod.string().min(1).max(verifyUniverseResponseOneStateOneHighlightsItemTitleMax),
+  "storyIds": zod.array(zod.string()).min(1).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax)
+})).max(verifyUniverseResponseOneStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(verifyUniverseResponseOneStateOneAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
@@ -1941,6 +2169,10 @@ export const VerifyUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "taggedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOnePostsItemTaggedAccountIdsMax).optional(),
+  "commentsEnabled": zod.boolean().optional(),
+  "pinned": zod.boolean().optional(),
+  "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMin).max(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMax).nullish(),
   "comments": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMin).max(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMax).nullish(),
@@ -1978,6 +2210,17 @@ export const VerifyUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "mentionedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(verifyUniverseResponseOneStateOneStoriesItemReactionsItemValueMax)
+})).optional(),
+  "music": zod.object({
+  "title": zod.string().max(verifyUniverseResponseOneStateOneStoriesItemMusicTitleMax),
+  "artist": zod.string().max(verifyUniverseResponseOneStateOneStoriesItemMusicArtistMax),
+  "providerRef": zod.string().max(verifyUniverseResponseOneStateOneStoriesItemMusicProviderRefMax).optional()
+}).optional().describe('Metadata only; no music provider, audio stream or playback is connected.'),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -1987,6 +2230,19 @@ export const VerifyUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "quoteMessageId": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['image', 'video', 'audio']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "durationSeconds": zod.number().min(verifyUniverseResponseOneStateOneMessagesItemAttachmentsItemDurationSecondsMin).optional()
+})).max(verifyUniverseResponseOneStateOneMessagesItemAttachmentsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(verifyUniverseResponseOneStateOneMessagesItemReactionsItemValueMax)
+})).optional(),
   "id": zod.string(),
   "threadId": zod.string(),
   "senderId": zod.string(),

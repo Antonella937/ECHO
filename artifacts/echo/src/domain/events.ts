@@ -126,6 +126,7 @@ function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
 
     case 'comment.created': {
       const c = ev.comment;
+      if (state.posts.find(p => p.id === c.postId)?.commentsEnabled === false) return state;
       const post = state.posts.find((p) => p.id === c.postId);
       if (!post) return state;
       let notifications = notify(state.notifications, {

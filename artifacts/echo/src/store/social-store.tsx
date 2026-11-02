@@ -9,8 +9,17 @@ import { archiveAccount, editAccount, editPostMetrics, validateAccount, type Acc
 import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core';
 import { validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
+import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/types';
+import { editSocialPost, setPinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, type PostEdit } from '@/domain/social-features';
 
 export interface SocialActions {
+  editPost(id: string, patch: Partial<PostEdit>, expected?: Partial<PostEdit>): void;
+  pinPost(id: string, pinned: boolean): void;
+  reactStory(id: string, value: string): void;
+  saveHighlight(highlight: StoryHighlight, expected?: StoryHighlight): void;
+  deleteHighlight(id: string): void;
+  reactMessage(id: string, value: string): void;
+  setAppearance(appearance: Appearance): void;
   createAccount(input: AccountInput): string;
   updateAccount(id: string, input: AccountInput, expected?: AccountInput): void;
   archiveAccount(id: string, archived: boolean): void;
@@ -21,11 +30,11 @@ export interface SocialActions {
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
-  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string }): string;
-  createStory(input: { image: string; caption: string }): string;
+  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; commentsEnabled?: boolean }): string;
+  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic }): string;
   deletePost(postId: string): void;
   seeStory(storyId: string): void;
-  sendMessage(to: CharacterId, text: string, extra?: { storyId?: string; postId?: string }): void;
+  sendMessage(to: CharacterId, text: string, extra?: { storyId?: string; postId?: string; quoteMessageId?: string; attachments?: MessageAttachment[] }): void;
   markThreadRead(otherId: CharacterId): void;
   markNotificationRead(id: string): void;
   markAllNotificationsRead(): void;
@@ -110,6 +119,16 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
   const actions = useMemo<SocialActions>(() => {
     const cur = () => stateRef.current!;
     const myId = () => cur().currentCharacterId;
+    const send: SocialActions['sendMessage'] = (to, text, extra) => {
+      if (!cur().characters.some(c => c.id === to && !c.archived) || to === myId()) throw new Error('Elegí una cuenta disponible.');
+      if (!text.trim() && !extra?.attachments?.length && !extra?.postId && !extra?.storyId) return;
+      if (extra?.quoteMessageId && !cur().messages.some(m => m.id === extra.quoteMessageId && m.threadId === threadIdFor(myId(), to)))
+        throw new Error('La cita debe pertenecer a esta conversación.');
+      dispatch({ type: 'message.sent', message: { id: uid('m'), threadId: threadIdFor(myId(), to), senderId: myId(), recipientId: to,
+        text: text.trim(), createdAt: new Date().toISOString(), storyId: extra?.storyId ?? null, postId: extra?.postId ?? null,
+        readBy: [myId()], origin: 'user', ...(extra?.quoteMessageId ? { quoteMessageId: extra.quoteMessageId } : {}),
+        ...(extra?.attachments?.length ? { attachments: extra.attachments } : {}) } });
+    };
     return {
       createAccount(input) {
         const data = validateAccount(input, cur());
@@ -154,6 +173,10 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (p) dispatch({ type: 'post.saved', postId, actorId: myId(), saved: !p.savedBy.includes(myId()) });
       },
       addComment(postId, text, parentId = null, replyToAuthorId = null) {
+        const post = cur().posts.find(p => p.id === postId);
+        if (!post || post.commentsEnabled === false) throw new Error('Los comentarios de esta publicación están desactivados.');
+        if (!text.trim()) return;
+        if (parentId && !cur().comments.some(c => c.id === parentId && c.postId === postId)) throw new Error('El comentario original ya no está disponible.');
         dispatch({
           type: 'comment.created',
           comment: {
@@ -173,7 +196,25 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const c = cur().comments.find((x) => x.id === commentId);
         if (c) dispatch({ type: 'comment.liked', commentId, actorId: myId(), liked: !c.likes.includes(myId()) });
       },
-      createPost({ image, media, caption, location }) {
+      editPost(id, patch, expected) { coordinator.current?.edit(s => editSocialPost(s, id, myId(), patch, expected)); },
+      pinPost(id, pinned) { coordinator.current?.edit(s => setPinnedPost(s, id, myId(), pinned)); },
+      reactMessage(id, value) {
+        coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
+          (m.senderId === myId() || m.recipientId === myId()) ? { ...m, reactions: toggleReaction(m.reactions, myId(), value) } : m) }));
+      },
+      reactStory(id, value) {
+        const story = cur().stories.find(s => s.id === id);
+        if (!story || !isStoryActive(story) || story.authorId === myId()) return;
+        coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, reactions: toggleReaction(st.reactions, myId(), value) } : st) }));
+        send(story.authorId, value, { storyId: id });
+      },
+      saveHighlight(highlight, expected) { coordinator.current?.edit(s => saveHighlight(s, myId(), highlight, expected)); },
+      deleteHighlight(id) { coordinator.current?.edit(s => ({ ...s, highlights: s.highlights?.filter(h => h.id !== id || h.authorId !== myId()) })); },
+      setAppearance(appearance) {
+        if (!['dark', 'light', 'system'].includes(appearance.theme) || !/^#[a-f0-9]{6}$/i.test(appearance.accent)) throw new Error('Apariencia inválida.');
+        coordinator.current?.edit(s => ({ ...s, appearance }));
+      },
+      createPost({ image, media, caption, location, taggedAccountIds, commentsEnabled }) {
         if (media) validatePostMedia(media);
         const id = uid('p');
         dispatch({
@@ -190,16 +231,21 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
             savedBy: [],
             origin: 'user',
             illustrative: false,
+            ...(taggedAccountIds ? { taggedAccountIds } : {}),
+            ...(commentsEnabled !== undefined ? { commentsEnabled } : {}),
           },
         });
+        coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { postId: id }, taggedAccountIds));
         return id;
       },
-      createStory({ image, caption }) {
+      createStory({ image, caption, mentionedAccountIds, music }) {
         const id = uid('s');
         dispatch({
           type: 'story.created',
-          story: { id, authorId: myId(), image, caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user' },
+          story: { id, authorId: myId(), image, caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
+            ...(mentionedAccountIds ? { mentionedAccountIds } : {}), ...(music ? { music } : {}) },
         });
+        coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { storyId: id }, mentionedAccountIds));
         return id;
       },
       deletePost(postId) {
@@ -211,21 +257,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           dispatch({ type: 'story.seen', storyId, actorId: myId() });
       },
       sendMessage(to, text, extra) {
-        dispatch({
-          type: 'message.sent',
-          message: {
-            id: uid('m'),
-            threadId: threadIdFor(myId(), to),
-            senderId: myId(),
-            recipientId: to,
-            text: text.trim(),
-            createdAt: new Date().toISOString(),
-            storyId: extra?.storyId ?? null,
-            postId: extra?.postId ?? null,
-            readBy: [myId()],
-            origin: 'user',
-          },
-        });
+        send(to, text, extra);
       },
       markThreadRead(otherId) {
         const tid = threadIdFor(myId(), otherId);

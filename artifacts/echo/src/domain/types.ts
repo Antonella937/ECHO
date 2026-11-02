@@ -49,6 +49,10 @@ export interface Character {
 export type PostMedia = import('@workspace/api-client-react').PostMedia;
 
 export interface Post {
+  taggedAccountIds?: string[];
+  commentsEnabled?: boolean;
+  pinned?: boolean;
+  editedAt?: ISODate;
   id: string;
   authorId: CharacterId;
   image: MediaRef;
@@ -81,6 +85,9 @@ export interface Comment {
 }
 
 export interface Story {
+  mentionedAccountIds?: string[];
+  reactions?: SocialReaction[];
+  music?: import('@workspace/api-client-react').StoryMusic;
   id: string;
   authorId: CharacterId;
   image: MediaRef;
@@ -91,6 +98,9 @@ export interface Story {
 }
 
 export interface Message {
+  quoteMessageId?: string;
+  attachments?: MessageAttachment[];
+  reactions?: SocialReaction[];
   id: string;
   threadId: string;
   senderId: CharacterId;
@@ -127,6 +137,8 @@ export interface Notification {
 }
 
 export interface SocialState {
+  appearance?: Appearance;
+  highlights?: StoryHighlight[];
   version: number;
   currentCharacterId: CharacterId;
   characters: Character[];
@@ -141,6 +153,10 @@ export interface SocialState {
 }
 
 export const SCHEMA_VERSION = 1;
+export type Appearance = import('@workspace/api-client-react').Appearance;
+export type SocialReaction = import('@workspace/api-client-react').SocialReaction;
+export type MessageAttachment = import('@workspace/api-client-react').MessageAttachment;
+export type StoryHighlight = import('@workspace/api-client-react').StoryHighlight;
 
 export function threadIdFor(a: CharacterId, b: CharacterId): string {
   return [a, b].sort().join('__');

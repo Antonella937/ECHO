@@ -64,7 +64,7 @@ export default function MessagesPage() {
                   </div>
                   <div className={cn('truncate text-[13.5px]', unread ? 'text-foreground' : 'text-muted-foreground')}>
                     {last
-                      ? `${last.senderId === me.id ? 'Tú: ' : ''}${last.storyId ? 'Respondió a una historia · ' : last.postId ? 'Compartió una foto · ' : ''}${last.text}`
+                      ? `${last.senderId === me.id ? 'Tú: ' : ''}${last.storyId ? 'Respondió a una historia · ' : last.postId ? 'Compartió una foto · ' : ''}${last.text || (last.attachments?.length ? (last.attachments[0].type === 'image' ? 'Foto' : last.attachments[0].type === 'video' ? 'Video' : 'Nota de voz') : '')}`
                       : `@${other.handle}`}
                     {last && <span className="text-muted-foreground"> · {timeAgo(last.createdAt)}</span>}
                   </div>

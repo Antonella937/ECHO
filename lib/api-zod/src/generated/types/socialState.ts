@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Appearance } from './appearance';
 import type { Character } from './character';
 import type { Comment } from './comment';
 import type { Message } from './message';
@@ -12,8 +13,12 @@ import type { Notification } from './notification';
 import type { Post } from './post';
 import type { SocialStateFollows } from './socialStateFollows';
 import type { Story } from './story';
+import type { StoryHighlight } from './storyHighlight';
 
 export interface SocialState {
+  appearance?: Appearance;
+  /** @maxItems 200 */
+  highlights?: StoryHighlight[];
   /** @minimum 0 */
   accountCatalogVersion?: number;
   version: number;

@@ -5,8 +5,14 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SocialReaction } from './socialReaction';
+import type { StoryMusic } from './storyMusic';
 
 export interface Story {
+  /** @maxItems 50 */
+  mentionedAccountIds?: string[];
+  reactions?: SocialReaction[];
+  music?: StoryMusic;
   id: string;
   authorId: string;
   image: string;

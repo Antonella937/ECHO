@@ -5,8 +5,14 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MessageAttachment } from './messageAttachment';
+import type { SocialReaction } from './socialReaction';
 
 export interface Message {
+  quoteMessageId?: string;
+  /** @maxItems 5 */
+  attachments?: MessageAttachment[];
+  reactions?: SocialReaction[];
   id: string;
   threadId: string;
   senderId: string;

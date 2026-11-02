@@ -91,24 +91,34 @@ export class ObjectStorageService {
   async downloadObject(
     file: File,
     cacheTtlSec: number = 3600,
+    rangeHeader?: string,
   ): Promise<Response> {
     const [metadata] = await file.getMetadata();
     const aclPolicy = await getObjectAclPolicy(file);
     const isPublic = aclPolicy?.visibility === 'public';
 
-    const nodeStream = file.createReadStream();
+    const { byteRange } = await import('./mediaSafety');
+    const range = byteRange(rangeHeader, Number(metadata.size ?? 0));
+    if (range === 'invalid') return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${metadata.size}`, 'Accept-Ranges': 'bytes' } });
+    const nodeStream = file.createReadStream(range ? { start: range.start, end: range.end, validation: false } : {});
     const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
     const headers: Record<string, string> = {
       'Content-Type':
         (metadata.contentType as string) || 'application/octet-stream',
+      'Accept-Ranges': 'bytes',
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': `${isPublic ? 'public' : 'private'}, max-age=${cacheTtlSec}`,
     };
     if (metadata.size) {
       headers['Content-Length'] = String(metadata.size);
     }
 
-    return new Response(webStream, { headers });
+    if (range) {
+      headers['Content-Range'] = `bytes ${range.start}-${range.end}/${metadata.size}`;
+      headers['Content-Length'] = String(range.end - range.start + 1);
+    }
+    return new Response(webStream, { headers, status: range ? 206 : 200 });
   }
 
   async getObjectEntityUploadURL(): Promise<string> {
