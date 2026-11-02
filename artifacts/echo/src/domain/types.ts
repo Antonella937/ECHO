@@ -38,6 +38,11 @@ export interface Character {
   avatar: MediaRef;
   providerRef: CharacterProviderRef;
   identity: IdentityReference;
+  accountType?: 'personal' | 'band' | 'venue' | 'organization';
+  verified?: boolean;
+  archived?: boolean;
+  /** Fictional base audience; actual relationships remain in follows. */
+  displayMetrics?: { followers?: number | null; following?: number | null };
 }
 
 export interface Post {
@@ -52,6 +57,8 @@ export interface Post {
   origin: ContentOrigin;
   /** True for sample/AI imagery that does not depict real people. */
   illustrative: boolean;
+  /** Fictional base counts, never synthetic interaction records. */
+  displayMetrics?: { likes?: number | null; comments?: number | null; views?: number | null };
 }
 
 export interface Comment {
@@ -125,6 +132,7 @@ export interface SocialState {
   stories: Story[];
   messages: Message[];
   notifications: Notification[];
+  accountCatalogVersion?: number;
 }
 
 export const SCHEMA_VERSION = 1;

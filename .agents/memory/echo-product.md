@@ -9,6 +9,12 @@ ECHO is a private fictional-character social universe experienced as Nela Paez's
 
 **How to apply:** Keep primary navigation focused on feed, stories, profiles and conversations. Put character control in secondary settings.
 
+Every social account, including Nela/the user's own profile, must be manually editable. Personal characters and official bands/places are equally usable posting identities within each owner's isolated universe.
+
+**Why:** The user explicitly said “ALL accounts, including Nela/user’s own account, must be manually editable” and wants to switch to any character or official account, act manually, then switch back.
+
+**How to apply:** Do not give account management privileges based on the active character. Owner controls belong to the signed-in universe owner; changing a fictional profile must not change their authentication account.
+
 Each person's universe belongs to their signed-in account. Posts, conversations and private images must stay owner-scoped on the server. Read legacy browser data only to migrate it, and retain it until the cloud copy succeeds.
 
 **Why:** The user asked for a private network with secure sign-in and access to the same universe across devices, without losing existing content.

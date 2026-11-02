@@ -1,3 +1,4 @@
+import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -196,7 +197,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             data-testid="link-story-author"
           >
             <CharacterAvatar character={group.author} size={34} />
-            <span className="truncate text-sm font-semibold">{group.author.handle}</span>
+            <span className="truncate text-sm font-semibold">{group.author.handle}</span><VerifiedBadge account={group.author} className="h-3.5 w-3.5" />
             <span className="text-sm text-foreground/60">{timeAgo(story.createdAt)}</span>
           </button>
           <button

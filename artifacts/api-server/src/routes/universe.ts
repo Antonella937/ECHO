@@ -10,6 +10,7 @@ import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { universeAccountError } from "../lib/universeValidation";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,8 @@ router.put("/universe", async (req, res): Promise<void> => {
   }
 
   const { state, expectedRevision } = parsed.data;
+  const accountError = universeAccountError(state);
+  if (accountError) { res.status(400).json({ error: accountError }); return; }
   const characterIds = new Set(state.characters.map((character) => character.id));
   if (!characterIds.has("nela") || !characterIds.has(state.currentCharacterId)) {
     res.status(400).json({ error: "Nela and the active character are required" });
@@ -55,7 +58,7 @@ router.put("/universe", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(SaveUniverseResponse.parse({ state: saved.state }));
+  res.json(SaveUniverseResponse.parse(saved));
 });
 
 // Verification is read-only: proves every referenced private file exists and

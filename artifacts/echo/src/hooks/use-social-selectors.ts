@@ -67,6 +67,7 @@ export function useThreads(): ThreadSummary[] {
           unread: msgs.filter((m) => m.recipientId === me.id && !m.readBy.includes(me.id)).length,
         };
       })
+      .filter((t) => !t.other.archived || t.last !== null)
       .sort((a, b) => (b.last?.createdAt ?? '').localeCompare(a.last?.createdAt ?? ''));
   }, [state.messages, state.characters, me.id]);
 }

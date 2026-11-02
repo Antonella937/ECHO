@@ -59,7 +59,7 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
   const url = postUrl(post.id);
   const author = character(post.authorId);
   const canNativeShare = typeof navigator !== 'undefined' && 'share' in navigator;
-  const friends = state.characters.filter((c) => c.id !== me.id);
+  const friends = state.characters.filter((c) => c.id !== me.id && !c.archived);
 
   const nativeShare = async () => {
     try {

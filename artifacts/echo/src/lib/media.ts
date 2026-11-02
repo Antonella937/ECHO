@@ -13,6 +13,13 @@ import noah1 from '@/assets/media/noah-1.jpg';
 import noah2 from '@/assets/media/noah-2.jpg';
 import noah3 from '@/assets/media/noah-3.jpg';
 import noah4 from '@/assets/media/noah-4.jpg';
+import a0 from '@/assets/media/official-pretty-violence.svg';
+import a1 from '@/assets/media/official-false-halo.svg';
+import a2 from '@/assets/media/official-saint-vulture.svg';
+import a3 from '@/assets/media/official-stray-kids.svg';
+import a4 from '@/assets/media/official-the-hollow.svg';
+import a5 from '@/assets/media/official-dead-static.svg';
+import a6 from '@/assets/media/account-default.svg';
 
 const MEDIA: Record<string, string> = {
   'nela-avatar': nelaAvatar,
@@ -30,6 +37,13 @@ const MEDIA: Record<string, string> = {
   'noah-2': noah2,
   'noah-3': noah3,
   'noah-4': noah4,
+  'official-pretty-violence': a0,
+  'official-false-halo': a1,
+  'official-saint-vulture': a2,
+  'official-stray-kids': a3,
+  'official-the-hollow': a4,
+  'official-dead-static': a5,
+  'account-default': a6,
 };
 
 export function resolveMedia(ref: string): string {

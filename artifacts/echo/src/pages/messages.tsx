@@ -1,3 +1,4 @@
+import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { Link } from 'wouter';
 import { useSocial } from '@/store/social-store';
 import { useThreads } from '@/hooks/use-social-selectors';
@@ -18,7 +19,7 @@ export default function MessagesPage() {
             <Link href={`/messages/${other.id}`} className="flex items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
               <CharacterAvatar character={other} size={54} />
               <div className="min-w-0 flex-1">
-                <div className={cn('truncate text-[15px]', unread ? 'font-semibold' : 'font-medium')}>{other.name}</div>
+                <div className={cn('truncate text-[15px]', unread ? 'font-semibold' : 'font-medium')}><span className="inline-flex items-center gap-1">{other.name}<VerifiedBadge account={other} className="h-3.5 w-3.5" /></span></div>
                 <div className={cn('truncate text-[13.5px]', unread ? 'text-foreground' : 'text-muted-foreground')}>
                   {last
                     ? `${last.senderId === me.id ? 'Tú: ' : ''}${last.storyId ? 'Respondió a una historia · ' : last.postId ? 'Compartió una foto · ' : ''}${last.text}`

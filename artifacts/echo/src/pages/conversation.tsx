@@ -1,3 +1,4 @@
+import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
 import { ChevronLeft, Send } from 'lucide-react';
@@ -48,7 +49,7 @@ export default function ConversationPage() {
           <Link href={`/profile/${other.id}`} className="flex min-w-0 items-center gap-3" data-testid="link-conversation-profile">
             <CharacterAvatar character={other} size={38} />
             <div className="min-w-0 leading-tight">
-              <div className="truncate text-[15px] font-semibold">{other.name}</div>
+              <div className="flex items-center gap-1 truncate text-[15px] font-semibold">{other.name}<VerifiedBadge account={other} className="h-3.5 w-3.5" /></div>
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
@@ -58,7 +59,7 @@ export default function ConversationPage() {
       <div className="flex-1 px-4 pb-4 pt-6">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
-          <div className="mt-3 font-display text-lg">{other.name}</div>
+          <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
           <div className="text-xs text-muted-foreground">{other.occupation} · {other.location}</div>
         </div>
         {messages.length === 0 && <p className="text-center text-sm text-muted-foreground">Todavía no os habéis escrito.</p>}

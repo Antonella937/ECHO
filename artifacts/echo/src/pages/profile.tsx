@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Bookmark, Grid3x3, MapPin, MessageCircle, Repeat2, Settings } from 'lucide-react';
+import { Archive, Bookmark, Grid3x3, MapPin, MessageCircle, Pencil, Repeat2, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -9,6 +9,10 @@ import { EmptyState } from '@/components/echo/skeletons';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { byDateDesc } from '@/hooks/use-social-selectors';
 import { toast } from '@/hooks/use-toast';
+import { AccountEditor } from '@/components/echo/account-editor';
+import { VerifiedBadge } from '@/components/echo/verified-badge';
+import { realFollowCounts } from '@/components/echo/account-stats';
+import { accountTypes, shownCount, formatCount } from '@/domain/accounts';
 
 export default function ProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -17,13 +21,14 @@ export default function ProfilePage() {
   const back = useBack();
   const { openStories } = useStoryViewer();
   const person = character(id);
+  const [editing, setEditing] = useState(false);
   const posts = useMemo(() => state.posts.filter((p) => p.authorId === id).sort(byDateDesc), [state.posts, id]);
 
   if (!person)
     return (
       <div>
         <TopBar title="Perfil" onBack={back} />
-        <EmptyState title="Este perfil no existe" body="En ECHO solo viven tres personajes por ahora." />
+        <EmptyState title="Este perfil no existe" body="Puede que la cuenta ya no exista en tu universo." />
       </div>
     );
 
@@ -31,6 +36,9 @@ export default function ProfilePage() {
   const stories = state.stories.filter((s) => s.authorId === person.id);
   const unseen = !isMe && stories.some((s) => !s.seenBy.includes(me.id));
   const friends = (state.follows[person.id] ?? []).map(character).filter(Boolean);
+  const real = realFollowCounts(state, person.id);
+  const followers = shownCount(person.displayMetrics?.followers, real.followers);
+  const following = shownCount(person.displayMetrics?.following, real.following);
 
   return (
     <div>
@@ -63,22 +71,30 @@ export default function ProfilePage() {
             <CharacterAvatar character={person} size={92} ring={stories.length ? (unseen ? 'unseen' : 'seen') : 'none'} />
           </button>
           <dl className="grid flex-1 grid-cols-3 text-center">
-            <Stat value={posts.length} label="publicaciones" testId="text-count-posts" />
-            <Stat value={friends.length} label="amistades" testId="text-count-friends" />
-            <Stat value={stories.length} label="historias" testId="text-count-stories" />
+            <Stat value={posts.length} label="posts" testId="text-count-posts" />
+            <Stat value={followers} label="seguidores" testId="text-count-followers" />
+            <Stat value={following} label="seguidos" testId="text-count-following" />
           </dl>
         </div>
 
         <div className="mt-4">
-          <h2 className="font-display text-[19px] font-medium tracking-wide" data-testid="text-profile-name">{person.name}</h2>
-          <p className="text-sm text-muted-foreground">{person.occupation}</p>
+          <h2 className="font-display text-[19px] font-medium tracking-wide" data-testid="text-profile-name"><span className="inline-flex items-center gap-1.5">{person.name}<VerifiedBadge account={person} className="h-[18px] w-[18px]" /></span></h2>
+          <p className="text-sm text-muted-foreground">@{person.handle} · {person.occupation || accountTypes[person.accountType ?? 'personal']}</p>
+          {person.archived && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground" data-testid="status-profile-archived">
+              <Archive className="h-3.5 w-3.5" /> Cuenta archivada · historial conservado
+            </p>
+          )}
           <p className="mt-2 max-w-[440px] text-[14.5px] leading-relaxed text-foreground/90" data-testid="text-profile-bio">{person.bio}</p>
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {person.location && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" strokeWidth={1.6} /> {person.location}
-          </p>
+          </p>}
         </div>
 
         <div className="mt-5 flex gap-2">
+          <button onClick={() => setEditing(true)} aria-label="Editar perfil" className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-secondary px-3 text-sm font-semibold" data-testid="button-profile-edit">
+            <Pencil className="h-4 w-4" strokeWidth={1.8} /><span className={isMe ? '' : 'sr-only'}>Editar</span>
+          </button>
           {isMe ? (
             <>
               <Link href="/create" className="grid h-10 flex-1 place-items-center rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-create">
@@ -98,14 +114,15 @@ export default function ProfilePage() {
                 <MessageCircle className="h-4 w-4" strokeWidth={2} /> Mensaje
               </button>
               <button
+                disabled={person.archived}
                 onClick={() => {
                   actions.switchIdentity(person.id);
                   toast({ title: `Ahora publicas como ${person.name}` });
                 }}
-                className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold"
+                className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50"
                 data-testid="button-profile-become"
               >
-                <Repeat2 className="h-4 w-4" strokeWidth={1.8} /> Usar este perfil
+                <Repeat2 className="h-4 w-4" strokeWidth={1.8} /> {person.archived ? 'Restaura para usar' : 'Usar este perfil'}
               </button>
             </>
           )}
@@ -143,14 +160,16 @@ export default function ProfilePage() {
       ) : (
         <PhotoGrid posts={posts} />
       )}
+      <AccountEditor open={editing} accountId={person.id} onClose={() => setEditing(false)} />
     </div>
   );
 }
 
 function Stat({ value, label, testId }: { value: number; label: string; testId: string }) {
+  const shown = formatCount(value);
   return (
     <div>
-      <dd className="font-display text-lg font-medium" data-testid={testId}>{value}</dd>
+      <dd className="font-display text-lg font-medium" data-testid={testId}>{shown}</dd>
       <dt className="text-[11.5px] text-muted-foreground">{label}</dt>
     </div>
   );

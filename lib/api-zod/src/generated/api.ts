@@ -22,14 +22,39 @@ export const HealthCheckResponse = zod.object({
  */
 export const getUniverseResponseRevisionMin = 0;
 
+export const getUniverseResponseStateOneAccountCatalogVersionMin = 0;
+
+export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMin = 0;
+export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMax = 1000000000000;
+
+export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMin = 0;
+export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax = 1000000000000;
+
+export const getUniverseResponseStateOnePostsItemDisplayMetricsLikesMin = 0;
+export const getUniverseResponseStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
+
+export const getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMin = 0;
+export const getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax = 1000000000000;
+
+export const getUniverseResponseStateOnePostsItemDisplayMetricsViewsMin = 0;
+export const getUniverseResponseStateOnePostsItemDisplayMetricsViewsMax = 1000000000000;
+
 
 
 export const GetUniverseResponse = zod.object({
   "revision": zod.number().int().min(getUniverseResponseRevisionMin),
   "state": zod.union([zod.object({
+  "accountCatalogVersion": zod.number().int().min(getUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
+  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "verified": zod.boolean().optional(),
+  "archived": zod.boolean().optional(),
+  "displayMetrics": zod.object({
+  "followers": zod.number().int().min(getUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMin).max(getUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMax).nullish(),
+  "following": zod.number().int().min(getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMin).max(getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax).nullish()
+}).optional(),
   "id": zod.string(),
   "handle": zod.string(),
   "name": zod.string(),
@@ -54,6 +79,11 @@ export const GetUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "likes": zod.number().int().min(getUniverseResponseStateOnePostsItemDisplayMetricsLikesMin).max(getUniverseResponseStateOnePostsItemDisplayMetricsLikesMax).nullish(),
+  "comments": zod.number().int().min(getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMin).max(getUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax).nullish(),
+  "views": zod.number().int().min(getUniverseResponseStateOnePostsItemDisplayMetricsViewsMin).max(getUniverseResponseStateOnePostsItemDisplayMetricsViewsMax).nullish()
+}).optional(),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -118,14 +148,39 @@ export const GetUniverseResponse = zod.object({
  */
 export const saveUniverseBodyExpectedRevisionMin = 0;
 
+export const saveUniverseBodyStateAccountCatalogVersionMin = 0;
+
+export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowersMin = 0;
+export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowersMax = 1000000000000;
+
+export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMin = 0;
+export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMax = 1000000000000;
+
+export const saveUniverseBodyStatePostsItemDisplayMetricsLikesMin = 0;
+export const saveUniverseBodyStatePostsItemDisplayMetricsLikesMax = 1000000000000;
+
+export const saveUniverseBodyStatePostsItemDisplayMetricsCommentsMin = 0;
+export const saveUniverseBodyStatePostsItemDisplayMetricsCommentsMax = 1000000000000;
+
+export const saveUniverseBodyStatePostsItemDisplayMetricsViewsMin = 0;
+export const saveUniverseBodyStatePostsItemDisplayMetricsViewsMax = 1000000000000;
+
 
 
 export const SaveUniverseBody = zod.object({
   "expectedRevision": zod.number().int().min(saveUniverseBodyExpectedRevisionMin),
   "state": zod.object({
+  "accountCatalogVersion": zod.number().int().min(saveUniverseBodyStateAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
+  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "verified": zod.boolean().optional(),
+  "archived": zod.boolean().optional(),
+  "displayMetrics": zod.object({
+  "followers": zod.number().int().min(saveUniverseBodyStateCharactersItemDisplayMetricsFollowersMin).max(saveUniverseBodyStateCharactersItemDisplayMetricsFollowersMax).nullish(),
+  "following": zod.number().int().min(saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMin).max(saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMax).nullish()
+}).optional(),
   "id": zod.string(),
   "handle": zod.string(),
   "name": zod.string(),
@@ -150,6 +205,11 @@ export const SaveUniverseBody = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "likes": zod.number().int().min(saveUniverseBodyStatePostsItemDisplayMetricsLikesMin).max(saveUniverseBodyStatePostsItemDisplayMetricsLikesMax).nullish(),
+  "comments": zod.number().int().min(saveUniverseBodyStatePostsItemDisplayMetricsCommentsMin).max(saveUniverseBodyStatePostsItemDisplayMetricsCommentsMax).nullish(),
+  "views": zod.number().int().min(saveUniverseBodyStatePostsItemDisplayMetricsViewsMin).max(saveUniverseBodyStatePostsItemDisplayMetricsViewsMax).nullish()
+}).optional(),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -210,14 +270,39 @@ export const SaveUniverseBody = zod.object({
 
 export const saveUniverseResponseRevisionMin = 0;
 
+export const saveUniverseResponseStateOneAccountCatalogVersionMin = 0;
+
+export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMin = 0;
+export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMax = 1000000000000;
+
+export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMin = 0;
+export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax = 1000000000000;
+
+export const saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMin = 0;
+export const saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
+
+export const saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMin = 0;
+export const saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax = 1000000000000;
+
+export const saveUniverseResponseStateOnePostsItemDisplayMetricsViewsMin = 0;
+export const saveUniverseResponseStateOnePostsItemDisplayMetricsViewsMax = 1000000000000;
+
 
 
 export const SaveUniverseResponse = zod.object({
   "revision": zod.number().int().min(saveUniverseResponseRevisionMin),
   "state": zod.union([zod.object({
+  "accountCatalogVersion": zod.number().int().min(saveUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
+  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "verified": zod.boolean().optional(),
+  "archived": zod.boolean().optional(),
+  "displayMetrics": zod.object({
+  "followers": zod.number().int().min(saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMin).max(saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowersMax).nullish(),
+  "following": zod.number().int().min(saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMin).max(saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax).nullish()
+}).optional(),
   "id": zod.string(),
   "handle": zod.string(),
   "name": zod.string(),
@@ -242,6 +327,11 @@ export const SaveUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "likes": zod.number().int().min(saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMin).max(saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMax).nullish(),
+  "comments": zod.number().int().min(saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMin).max(saveUniverseResponseStateOnePostsItemDisplayMetricsCommentsMax).nullish(),
+  "views": zod.number().int().min(saveUniverseResponseStateOnePostsItemDisplayMetricsViewsMin).max(saveUniverseResponseStateOnePostsItemDisplayMetricsViewsMax).nullish()
+}).optional(),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),
@@ -342,6 +432,23 @@ export const ClaimUploadResponse = zod.object({
  */
 export const verifyUniverseResponseOneRevisionMin = 0;
 
+export const verifyUniverseResponseOneStateOneAccountCatalogVersionMin = 0;
+
+export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowersMin = 0;
+export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowersMax = 1000000000000;
+
+export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowingMin = 0;
+export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowingMax = 1000000000000;
+
+export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMin = 0;
+export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
+
+export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMin = 0;
+export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMax = 1000000000000;
+
+export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsViewsMin = 0;
+export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsViewsMax = 1000000000000;
+
 export const verifyUniverseResponseTwoVerifiedFilesMin = 0;
 
 
@@ -349,9 +456,17 @@ export const verifyUniverseResponseTwoVerifiedFilesMin = 0;
 export const VerifyUniverseResponse = zod.object({
   "revision": zod.number().int().min(verifyUniverseResponseOneRevisionMin),
   "state": zod.union([zod.object({
+  "accountCatalogVersion": zod.number().int().min(verifyUniverseResponseOneStateOneAccountCatalogVersionMin).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
+  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "verified": zod.boolean().optional(),
+  "archived": zod.boolean().optional(),
+  "displayMetrics": zod.object({
+  "followers": zod.number().int().min(verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowersMin).max(verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowersMax).nullish(),
+  "following": zod.number().int().min(verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowingMin).max(verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollowingMax).nullish()
+}).optional(),
   "id": zod.string(),
   "handle": zod.string(),
   "name": zod.string(),
@@ -376,6 +491,11 @@ export const VerifyUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "likes": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMin).max(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMax).nullish(),
+  "comments": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMin).max(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsCommentsMax).nullish(),
+  "views": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsViewsMin).max(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsViewsMax).nullish()
+}).optional(),
   "id": zod.string(),
   "authorId": zod.string(),
   "image": zod.string(),

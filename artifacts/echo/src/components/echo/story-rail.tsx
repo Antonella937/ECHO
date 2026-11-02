@@ -1,3 +1,4 @@
+import { VerifiedBadge } from './verified-badge';
 import { Plus } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
@@ -46,7 +47,7 @@ export function StoryRail() {
         >
           <CharacterAvatar character={g.author} size={66} ring={g.allSeen ? 'seen' : 'unseen'} />
           <span className={`w-full truncate text-center text-[11.5px] ${g.allSeen ? 'text-muted-foreground' : 'text-foreground'}`}>
-            {g.author.name.split(' ')[0].toLowerCase()}
+            {g.author.name.split(' ')[0].toLowerCase()}<VerifiedBadge account={g.author} className="ml-0.5 h-3 w-3 align-[-1px]" />
           </span>
         </button>
       ))}

@@ -89,6 +89,6 @@ export function mergeUniverse(
       conflicts.push({ path, local: localPost, remote: remotePost });
     }
   }
-  if (!state.characters.some(c => c.id === state.currentCharacterId)) state.currentCharacterId = 'nela';
+  if (!state.characters.some(c => c.id === state.currentCharacterId && !c.archived)) state.currentCharacterId = 'nela';
   return { state, conflicts };
 }

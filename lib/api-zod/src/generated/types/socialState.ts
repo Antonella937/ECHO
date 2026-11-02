@@ -14,6 +14,8 @@ import type { SocialStateFollows } from './socialStateFollows';
 import type { Story } from './story';
 
 export interface SocialState {
+  /** @minimum 0 */
+  accountCatalogVersion?: number;
   version: number;
   currentCharacterId: string;
   characters: Character[];

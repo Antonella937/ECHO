@@ -3,6 +3,9 @@ import { Link } from 'wouter';
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
+import { VerifiedBadge } from './verified-badge';
+import { PostMetricsEditor } from './post-metrics-editor';
+import { shownCount, formatCount } from '@/domain/accounts';
 import { CommentsSheet, LikersSheet, OptionsSheet, ShareSheet } from './post-sheets';
 import { resolveMedia, timeAgo } from '@/lib/media';
 import { cn } from '@/lib/utils';
@@ -47,7 +50,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           <CharacterAvatar character={author} size={38} />
         </Link>
         <div className="min-w-0 flex-1 leading-tight">
-          <Link href={`/profile/${author.id}`} className="text-[14.5px] font-semibold">{author.handle}</Link>
+          <Link href={`/profile/${author.id}`} className="inline-flex items-center gap-1 text-[14.5px] font-semibold">{author.handle}<VerifiedBadge account={author} /></Link>
           {post.location && <div className="truncate text-xs text-muted-foreground">{post.location}</div>}
         </div>
         <button onClick={() => setSheet('options')} aria-label="Opciones" className="tap -mr-2 grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:text-foreground" data-testid={`button-options-${post.id}`}>
@@ -107,6 +110,12 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         ) : (
           <p className="text-[14px] text-muted-foreground">Sé la primera persona en darle me gusta</p>
         )}
+        <div className="mt-1 flex items-center gap-3 text-[13px] text-muted-foreground">
+          <span data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> me gusta</span>
+          <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.comments, commentCount))}</span> comentarios</span>
+          <span className="flex-1" />
+          <PostMetricsEditor post={post} actualComments={commentCount} />
+        </div>
         {post.caption && (
           <p className="mt-1.5 text-[14.5px] leading-relaxed text-foreground/90" data-testid={`text-caption-${post.id}`}>
             <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold text-foreground">{author.handle}</Link>

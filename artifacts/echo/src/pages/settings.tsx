@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { useClerk, useUser } from '@clerk/react';
-import { Check, Cloud, Info, LogOut, RotateCcw } from 'lucide-react';
+import { Cloud, Info, LogOut } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
-import { CharacterAvatar } from '@/components/echo/avatar';
-import { Sheet } from '@/components/echo/sheet';
+import { AccountManager } from '@/components/echo/account-manager';
 import { characterProvider, imageProvider } from '@/domain/providers';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -16,7 +14,6 @@ export default function SettingsPage() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const back = useBack();
-  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <div>
@@ -38,42 +35,12 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section aria-labelledby="identity-h">
-          <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Identidad activa</h2>
+        <section className="mt-9" aria-labelledby="identity-h">
+          <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cuentas e identidad activa</h2>
           <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
             Todo lo que publiques, comentes o envíes saldrá con este perfil.
           </p>
-          <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label="Identidad activa">
-            {state.characters.map((c) => {
-              const active = c.id === me.id;
-              return (
-                <button
-                  key={c.id}
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => {
-                    if (active) return;
-                    actions.switchIdentity(c.id);
-                    toast({ title: `Ahora publicas como ${c.name}` });
-                  }}
-                  className={cn(
-                    'flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors',
-                    active ? 'border-primary/50 bg-accent/40' : 'border-border hover:bg-secondary/60',
-                  )}
-                  data-testid={`radio-identity-${c.id}`}
-                >
-                  <CharacterAvatar character={c} size={46} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold">{c.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">@{c.handle} · {c.occupation}</div>
-                  </div>
-                  <span className={cn('grid h-6 w-6 place-items-center rounded-full border', active ? 'border-primary bg-primary text-primary-foreground' : 'border-[hsl(240_4%_26%)]')}>
-                    {active && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <AccountManager />
         </section>
 
         <section className="mt-9" aria-labelledby="about-h">
@@ -120,42 +87,14 @@ export default function SettingsPage() {
           <div className="mt-3 divide-y divide-border rounded-2xl border border-border text-[13px]">
             <Row label="Motor de personajes" value={characterProvider.label} />
             <Row label="Generación de imágenes" value={imageProvider.label} />
-            {state.characters.map((c) => (
+            {state.characters.filter((c) => !c.archived).map((c) => (
               <Row key={c.id} label={`Kin ID de ${c.name.split(' ')[0]}`} value={c.providerRef.externalId ?? 'Sin vincular'} />
             ))}
           </div>
         </section>
 
-        <button
-          onClick={() => setConfirmReset(true)}
-          className="mt-9 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground"
-          data-testid="button-reset"
-        >
-          <RotateCcw className="h-4 w-4" strokeWidth={1.8} /> Restaurar datos de ejemplo
-        </button>
       </div>
 
-      <Sheet open={confirmReset} onClose={() => setConfirmReset(false)} title="¿Restaurar ECHO?">
-        <p className="text-sm text-muted-foreground">Se borrarán tus publicaciones, mensajes y cambios guardados en tu cuenta, y volverás a ser Nela.</p>
-        <div className="mt-5 flex gap-2 pb-2">
-          <button onClick={() => setConfirmReset(false)} className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-medium" data-testid="button-cancel-reset">Cancelar</button>
-          <button
-            onClick={async () => {
-              try {
-                await actions.resetAll();
-                setConfirmReset(false);
-                toast({ title: 'Datos restaurados' });
-              } catch {
-                toast({ title: 'No se pudo sincronizar el restablecimiento', variant: 'destructive' });
-              }
-            }}
-            className="h-12 flex-1 rounded-2xl bg-destructive text-sm font-semibold text-destructive-foreground"
-            data-testid="button-confirm-reset"
-          >
-            Restaurar
-          </button>
-        </div>
-      </Sheet>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
@@ -47,7 +48,7 @@ export default function NotificationsPage() {
             <CharacterAvatar character={actor} size={44} />
           </span>
           <span className="min-w-0 flex-1 text-[14px] leading-snug">
-            <span className="font-semibold">{actor.handle}</span> <span className="text-foreground/85">{VERB[n.kind]}</span>
+            <span className="font-semibold">{actor.handle}</span><VerifiedBadge account={actor} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" /> <span className="text-foreground/85">{VERB[n.kind]}</span>
             {n.excerpt && <span className="text-muted-foreground">: {n.excerpt}</span>}
             <span className="ml-1.5 text-xs text-muted-foreground/80">{timeAgo(n.createdAt)}</span>
           </span>

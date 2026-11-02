@@ -224,7 +224,7 @@ export function applyEvent(state: SocialState, ev: SocialEvent): SocialState {
       };
 
     case 'identity.switched':
-      if (!state.characters.some((c) => c.id === ev.characterId)) return state;
+      if (!state.characters.some((c) => c.id === ev.characterId && !c.archived)) return state;
       return { ...state, currentCharacterId: ev.characterId };
 
     case 'state.replaced':

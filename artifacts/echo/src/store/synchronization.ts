@@ -1,4 +1,5 @@
 import { SCHEMA_VERSION, type SocialState } from '../domain/types';
+import { upgradeAccounts } from '../domain/accounts';
 import { mergeUniverse, same, type MergeConflict, type Resolutions } from './merge';
 import {
   loadUniverse, saveUniverse, RevisionConflict, loadRecovery, saveRecovery,
@@ -70,6 +71,7 @@ export class UniverseSync {
       this.base = recovery && !same(recovery.base, recovery.state) ? recovery.base : remote.state;
       this.view.state = recovery && !same(recovery.base, recovery.state)
         ? recovery.state : remote.state ?? this.seed();
+      this.view.state = upgradeAccounts(this.view.state);
       await this.backup();
     } catch (e) { this.view.error = (e as Error).message; }
     finally { this.view.busy = false; this.emit(); }
@@ -166,7 +168,8 @@ export class UniverseSync {
         const next = this.generation === generation
           ? { state: saved.state, conflicts: [] }
           : mergeUniverse(draft, this.view.state!, saved.state);
-        const active = this.view.state!.currentCharacterId;
+        const activeId = this.view.state!.currentCharacterId;
+        const active = next.state.characters.some(c => c.id === activeId && !c.archived) ? activeId : 'nela';
         this.base = structuredClone(saved.state);
         this.base.currentCharacterId = active;
         next.state = structuredClone(next.state);

@@ -5,8 +5,13 @@ import type { ActivityAdapter } from '@/domain/providers';
 import { createSeedState } from './seed';
 import { UniverseSync, type SyncView } from './synchronization';
 import { SyncNotices } from './sync-notices';
+import { archiveAccount, editAccount, editPostMetrics, validateAccount, type AccountInput, type PostMetrics } from '@/domain/accounts';
 
 export interface SocialActions {
+  createAccount(input: AccountInput): string;
+  updateAccount(id: string, input: AccountInput, expected?: AccountInput): void;
+  archiveAccount(id: string, archived: boolean): void;
+  updatePostMetrics(id: string, metrics: PostMetrics, expected?: PostMetrics): void;
   toggleLike(postId: string): void;
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
@@ -101,6 +106,30 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     const cur = () => stateRef.current!;
     const myId = () => cur().currentCharacterId;
     return {
+      createAccount(input) {
+        const data = validateAccount(input, cur());
+        const id = uid('account');
+        const account: Character = {
+          ...data, id, occupation: '', location: '', accountType: data.accountType ?? 'personal',
+          verified: data.verified ?? false, archived: false,
+          providerRef: { provider: 'mock', externalId: null, status: 'not_connected', lastSyncAt: null },
+          identity: { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date().toISOString() },
+        };
+        coordinator.current?.edit(s => ({ ...s, characters: [...s.characters, account] }));
+        return id;
+      },
+      updateAccount(id, input, expected) {
+        const next = editAccount(cur(), id, input, expected);
+        coordinator.current?.edit(() => next);
+      },
+      archiveAccount(id, archived) {
+        const next = archiveAccount(cur(), id, archived);
+        coordinator.current?.edit(() => next);
+      },
+      updatePostMetrics(id, metrics, expected) {
+        const next = editPostMetrics(cur(), id, metrics, expected);
+        coordinator.current?.edit(() => next);
+      },
       toggleLike(postId) {
         const p = cur().posts.find((x) => x.id === postId);
         if (p) dispatch({ type: 'post.liked', postId, actorId: myId(), liked: !p.likes.includes(myId()) });
@@ -193,7 +222,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         dispatch({ type: 'notifications.readAll', recipientId: myId() });
       },
       switchIdentity(id) {
-        if (cur().characters.some((character) => character.id === id)) {
+        if (cur().characters.some((character) => character.id === id && !character.archived)) {
           dispatch({ type: 'identity.switched', characterId: id });
         }
       },

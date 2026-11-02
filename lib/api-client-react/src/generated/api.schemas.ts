@@ -9,6 +9,31 @@ export interface HealthStatus {
   status: string;
 }
 
+export type CharacterAccountType = typeof CharacterAccountType[keyof typeof CharacterAccountType];
+
+
+export const CharacterAccountType = {
+  personal: 'personal',
+  band: 'band',
+  venue: 'venue',
+  organization: 'organization',
+} as const;
+
+export type CharacterDisplayMetrics = {
+  /**
+     * @minimum 0
+     * @maximum 1000000000000
+     * @nullable
+     */
+  followers?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 1000000000000
+     * @nullable
+     */
+  following?: number | null;
+};
+
 export type CharacterProviderRef = {
   provider: string;
   /** @nullable */
@@ -28,6 +53,10 @@ export type CharacterIdentity = {
 };
 
 export interface Character {
+  accountType?: CharacterAccountType;
+  verified?: boolean;
+  archived?: boolean;
+  displayMetrics?: CharacterDisplayMetrics;
   id: string;
   handle: string;
   name: string;
@@ -39,7 +68,29 @@ export interface Character {
   identity: CharacterIdentity;
 }
 
+export type PostDisplayMetrics = {
+  /**
+     * @minimum 0
+     * @maximum 1000000000000
+     * @nullable
+     */
+  likes?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 1000000000000
+     * @nullable
+     */
+  comments?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 1000000000000
+     * @nullable
+     */
+  views?: number | null;
+};
+
 export interface Post {
+  displayMetrics?: PostDisplayMetrics;
   id: string;
   authorId: string;
   image: string;
@@ -110,6 +161,8 @@ export interface Notification {
 export type SocialStateFollows = {[key: string]: string[]};
 
 export interface SocialState {
+  /** @minimum 0 */
+  accountCatalogVersion?: number;
   version: number;
   currentCharacterId: string;
   characters: Character[];

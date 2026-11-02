@@ -186,6 +186,7 @@ components:
       type: object
       required: [version, currentCharacterId, characters, follows, posts, comments, stories, messages, notifications]
       properties:
+        accountCatalogVersion: { type: integer, minimum: 0 }
         version: { type: integer }
         currentCharacterId: { type: string }
         characters:
@@ -215,6 +216,14 @@ components:
       type: object
       required: [id, handle, name, occupation, bio, location, avatar, providerRef, identity]
       properties:
+        accountType: { type: string, enum: [personal, band, venue, organization] }
+        verified: { type: boolean }
+        archived: { type: boolean }
+        displayMetrics:
+          type: object
+          properties:
+            followers: { type: [integer, "null"], minimum: 0, maximum: 1000000000000 }
+            following: { type: [integer, "null"], minimum: 0, maximum: 1000000000000 }
         id: { type: string }
         handle: { type: string }
         name: { type: string }
@@ -246,6 +255,12 @@ components:
       type: object
       required: [id, authorId, image, caption, location, createdAt, likes, savedBy, origin, illustrative]
       properties:
+        displayMetrics:
+          type: object
+          properties:
+            likes: { type: [integer, "null"], minimum: 0, maximum: 1000000000000 }
+            comments: { type: [integer, "null"], minimum: 0, maximum: 1000000000000 }
+            views: { type: [integer, "null"], minimum: 0, maximum: 1000000000000 }
         id: { type: string }
         authorId: { type: string }
         image: { type: string }

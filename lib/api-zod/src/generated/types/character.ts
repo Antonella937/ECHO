@@ -5,10 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CharacterAccountType } from './characterAccountType';
+import type { CharacterDisplayMetrics } from './characterDisplayMetrics';
 import type { CharacterIdentity } from './characterIdentity';
 import type { CharacterProviderRef } from './characterProviderRef';
 
 export interface Character {
+  accountType?: CharacterAccountType;
+  verified?: boolean;
+  archived?: boolean;
+  displayMetrics?: CharacterDisplayMetrics;
   id: string;
   handle: string;
   name: string;

@@ -1,3 +1,4 @@
+import { VerifiedBadge } from './verified-badge';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
 import { Heart, X } from 'lucide-react';
@@ -57,7 +58,7 @@ function CommentRow({ comment, onReply, small, highlight }: { comment: Comment; 
       </Link>
       <div className="min-w-0 flex-1">
         <p className="text-[14px] leading-snug">
-          <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold">{author.handle}</Link>
+          <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold">{author.handle}<VerifiedBadge account={author} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" /></Link>
           {replyTo && <span className="mr-1 text-primary">@{replyTo.handle}</span>}
           <span className="text-foreground/90">{comment.text}</span>
         </p>

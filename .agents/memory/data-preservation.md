@@ -14,3 +14,9 @@ Concurrent devices must not silently replace each other's recent work. Preserve 
 **Why:** The previous whole-universe save could lose work from a second device; the user required this fixed before further social features.
 
 **How to apply:** Keep atomic server-side stale-write rejection in every save path, including initialization, migration, retries and reset. A local character switch never changes authenticated ownership.
+
+Open forms need their own original-value snapshot in addition to universe revision checks. Apply only intentionally edited fields; reject incompatible changes since the form opened.
+
+**Why:** Background synchronization can advance the universe's merge base while an editor still contains old values. Saving the entire old form would then look like a valid new edit and silently undo another device's work.
+
+**How to apply:** Use this rule for account fields, audience figures and future editing forms. Keep independent remote edits even if the user leaves their corresponding form inputs untouched.

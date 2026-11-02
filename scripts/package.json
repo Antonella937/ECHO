@@ -4,11 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:echo-browser": "tsx tests/echo-accounts-browser.ts",
+    "test:echo-accounts": "tsx --test ../artifacts/echo/tests/accounts.test.ts ../artifacts/api-server/tests/accounts-validation.test.ts",
     "test:echo-privacy": "tsx --test ../artifacts/echo/tests/privacy-sync.test.ts ../artifacts/api-server/tests/universe-repository.test.ts",
     "hello": "tsx ./src/hello.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "catalog:",
     "tsx": "catalog:"
   }

@@ -5,8 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PostDisplayMetrics } from './postDisplayMetrics';
 
 export interface Post {
+  displayMetrics?: PostDisplayMetrics;
   id: string;
   authorId: string;
   image: string;

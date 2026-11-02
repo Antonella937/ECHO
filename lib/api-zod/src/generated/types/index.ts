@@ -7,6 +7,8 @@
  */
 
 export * from './character';
+export * from './characterAccountType';
+export * from './characterDisplayMetrics';
 export * from './characterIdentity';
 export * from './characterProviderRef';
 export * from './comment';
@@ -14,6 +16,7 @@ export * from './healthStatus';
 export * from './message';
 export * from './notification';
 export * from './post';
+export * from './postDisplayMetrics';
 export * from './socialState';
 export * from './socialStateFollows';
 export * from './story';
