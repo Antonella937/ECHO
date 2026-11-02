@@ -259,6 +259,22 @@
 }
 
 /* Light appearance: same layout/type tokens, warm paper neutrals. Accent overrides arrive via inline vars. */
+/* Media overlays and the approved dark navigation retain their own contrast,
+   independently of the surrounding page theme. No geometry is changed. */
+.echo-dark-surface {
+  color-scheme: dark;
+  --background: 240 5% 4.5%;
+  --foreground: 30 12% 93%;
+  --muted-foreground: 240 4% 68%;
+  --card: 240 4% 8%;
+  --card-foreground: 30 12% 93%;
+  --secondary: 240 4% 12%;
+  --secondary-foreground: 30 12% 92%;
+  --border: 240 4% 14%;
+  --primary: var(--dark-surface-primary, 344 42% 76%);
+  --primary-foreground: 240 6% 7%;
+}
+
 html.theme-light {
   color-scheme: light;
   --button-outline: rgba(30, 20, 25, 0.1);

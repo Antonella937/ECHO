@@ -61,6 +61,7 @@ export function AppearanceSync() {
     const primary = `${h} ${s}% ${pl}%`;
     const fg = luminance(h, s, pl) > 0.179 ? '240 6% 7%' : '30 30% 98%';
     const vars: Record<string, string> = {
+      '--dark-surface-primary': `${h} ${s}% ${Math.max(l, 76)}%`,
       '--primary': primary, '--ring': primary, '--sidebar-primary': primary, '--sidebar-ring': primary, '--chart-1': primary,
       '--primary-foreground': fg, '--sidebar-primary-foreground': fg,
       '--accent': dark ? `${h} ${Math.min(s, 30)}% 16%` : `${h} ${Math.min(s, 55)}% 93%`,

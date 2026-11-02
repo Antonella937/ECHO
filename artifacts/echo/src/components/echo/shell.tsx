@@ -111,7 +111,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       {!inConversation && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-safe lg:hidden" aria-label="Navegación principal" data-testid="nav-mobile">
+        <nav className="echo-dark-surface fixed inset-x-0 bottom-0 z-40 px-3 pb-safe lg:hidden" aria-label="Navegación principal" data-testid="nav-mobile">
           <div className="mx-auto mb-1 flex h-[var(--nav-height)] max-w-[440px] items-center justify-around rounded-[26px] border border-border/80 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
             {items.map((it) => {
               const active = it.match(location);

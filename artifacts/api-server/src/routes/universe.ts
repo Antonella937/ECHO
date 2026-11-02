@@ -87,8 +87,9 @@ router.get("/universe/verify", async (req, res): Promise<void> => {
     }
     // Consume a full authenticated storage read, rather than only trust metadata.
     const response = await storage.downloadObject(file);
-    if (!response.ok) { res.status(422).json({ error: "No se pudo verificar una foto" }); return; }
-    await response.arrayBuffer();
+    if (response.status !== 200 || !response.body) { res.status(422).json({ error: "No se pudo verificar una foto" }); return; }
+    // Consume fully, retaining SDK integrity validation without a second adapter.
+    for await (const _chunk of response.body) { /* verify every stored byte */ }
   }
   res.json({ ...envelope, verifiedFiles: objects.length });
 });

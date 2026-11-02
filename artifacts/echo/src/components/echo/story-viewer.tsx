@@ -157,7 +157,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
   return (
     <motion.div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(240_8%_3%)]"
+      className="echo-dark-surface fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(240_8%_3%)] text-foreground"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
@@ -266,7 +266,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             </span>
           )}
           {story.caption && (
-            <p className="font-display text-lg font-light leading-snug text-foreground/95"><SocialText text={story.caption} /></p>
+            <p className="font-display text-lg font-light leading-snug text-foreground/95"><SocialText text={story.caption} onNavigate={onClose} /></p>
           )}
           {mentioned.length > 0 && (
             <div className="flex flex-wrap justify-center gap-1.5">

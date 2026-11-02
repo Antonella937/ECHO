@@ -6,7 +6,7 @@ import {
 } from "@workspace/api-zod";
 import { db, echoMediaTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { Readable } from "node:stream";
+import { pipeMedia } from "../lib/pipeMedia";
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectPermission } from "../lib/objectAcl";
@@ -142,10 +142,7 @@ router.get(
       res.setHeader("Cache-Control", "private, no-store");
       res.status(response.status);
       if (response.body) {
-        const stream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-        stream.on('error', error => { req.log.warn({ err: error }, 'Private media stream interrupted'); res.destroy(); });
-        res.on('close', () => stream.destroy());
-        stream.pipe(res);
+        pipeMedia(response.body, res, error => req.log.warn({ err: error }, 'Private media stream interrupted'));
       } else {
         res.end();
       }

@@ -42,8 +42,16 @@ test('almacenamiento real: una foto conserva sus bytes y solo su propietario pue
     await storage.trySetObjectEntityAclPolicy(path, { owner: owners[0], visibility: 'private' });
     assert.equal(await storage.canAccessObjectEntity({ userId: owners[0], objectFile: file, requestedPermission: ObjectPermission.READ }), true);
     assert.equal(await storage.canAccessObjectEntity({ userId: owners[1], objectFile: file, requestedPermission: ObjectPermission.READ }), false);
+    const [header] = await file.download({ start: 0, end: 63, validation: false });
+    assert.deepEqual(header, bytes.subarray(0, 64));
+    const ranged = await storage.downloadObject(file, 0, 'bytes=0-31');
+    const chunks: Buffer[] = [];
+    for await (const chunk of ranged.body!) chunks.push(Buffer.from(chunk));
+    assert.deepEqual(Buffer.concat(chunks), bytes.subarray(0, 32));
     const downloaded = await storage.downloadObject(file);
-    assert.ok(downloaded.ok);
-    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes);
+    assert.equal(downloaded.status, 200);
+    const full: Buffer[] = [];
+    for await (const chunk of downloaded.body!) full.push(Buffer.from(chunk));
+    assert.deepEqual(Buffer.concat(full), bytes);
   } finally { await file.delete(); }
 });

@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { Readable } from 'stream';
 import { File, Storage } from '@google-cloud/storage';
 
 import {
@@ -92,16 +91,15 @@ export class ObjectStorageService {
     file: File,
     cacheTtlSec: number = 3600,
     rangeHeader?: string,
-  ): Promise<Response> {
+  ): Promise<{ status: number; headers: Headers; body: NodeJS.ReadableStream | null }> {
     const [metadata] = await file.getMetadata();
     const aclPolicy = await getObjectAclPolicy(file);
     const isPublic = aclPolicy?.visibility === 'public';
 
     const { byteRange } = await import('./mediaSafety');
     const range = byteRange(rangeHeader, Number(metadata.size ?? 0));
-    if (range === 'invalid') return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${metadata.size}`, 'Accept-Ranges': 'bytes' } });
+    if (range === 'invalid') return { body: null, status: 416, headers: new Headers({ 'Content-Range': `bytes */${metadata.size}`, 'Accept-Ranges': 'bytes' }) };
     const nodeStream = file.createReadStream(range ? { start: range.start, end: range.end, validation: false } : {});
-    const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
     const headers: Record<string, string> = {
       'Content-Type':
@@ -118,7 +116,9 @@ export class ObjectStorageService {
       headers['Content-Range'] = `bytes ${range.start}-${range.end}/${metadata.size}`;
       headers['Content-Length'] = String(range.end - range.start + 1);
     }
-    return new Response(webStream, { headers, status: range ? 206 : 200 });
+    // Keep the SDK stream native. Node → Web → Node adapters each attach
+    // lifecycle listeners and are unnecessary for Express or verification.
+    return { body: nodeStream, headers: new Headers(headers), status: range ? 206 : 200 };
   }
 
   async getObjectEntityUploadURL(): Promise<string> {

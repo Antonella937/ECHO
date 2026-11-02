@@ -5,7 +5,7 @@ import { useSocial } from '@/store/social-store';
 const TOKEN = /(@[a-zA-Z0-9_][a-zA-Z0-9_.]{0,29}|#[\p{L}\p{N}_]{1,80})/gu;
 
 /** Renders text with clickable @mentions (existing accounts only) and #hashtags. */
-export function SocialText({ text, className }: { text: string; className?: string }) {
+export function SocialText({ text, className, onNavigate }: { text: string; className?: string; onNavigate?: () => void }) {
   const { state } = useSocial();
   const parts = text.split(TOKEN);
   return (
@@ -21,7 +21,7 @@ export function SocialText({ text, className }: { text: string; className?: stri
               const rest = part.slice(1 + handle.length);
               return (
                 <Fragment key={i}>
-                  <Link href={`/profile/${acc.id}`} onClick={(e) => e.stopPropagation()} className="pointer-events-auto font-semibold text-primary hover:underline" data-testid={`link-mention-${acc.id}`}>@{handle}</Link>{rest}
+                  <Link href={`/profile/${acc.id}`} onClick={(e) => { e.stopPropagation(); onNavigate?.(); }} className="pointer-events-auto font-semibold text-primary hover:underline" data-testid={`link-mention-${acc.id}`}>@{handle}</Link>{rest}
                 </Fragment>
               );
             }
@@ -29,7 +29,7 @@ export function SocialText({ text, className }: { text: string; className?: stri
           if (boundary && part.startsWith('#')) {
             const tag = part.slice(1).toLocaleLowerCase();
             return (
-              <Link key={i} href={`/tags/${encodeURIComponent(tag)}`} onClick={(e) => e.stopPropagation()} className="pointer-events-auto font-medium text-primary hover:underline" data-testid={`link-hashtag-${tag}`}>{part}</Link>
+              <Link key={i} href={`/tags/${encodeURIComponent(tag)}`} onClick={(e) => { e.stopPropagation(); onNavigate?.(); }} className="pointer-events-auto font-medium text-primary hover:underline" data-testid={`link-hashtag-${tag}`}>{part}</Link>
             );
           }
         }
