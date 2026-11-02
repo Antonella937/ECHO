@@ -9,6 +9,57 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Manual text-only character decision; never executes or persists social actions
+ */
+export const previewCharacterDecisionBodyCharacterIdMax = 120;
+
+export const previewCharacterDecisionBodyPostIdMax = 120;
+
+export const previewCharacterDecisionBodyRecipientIdMax = 120;
+
+
+
+export const PreviewCharacterDecisionBody = zod.object({
+  "characterId": zod.string().min(1).max(previewCharacterDecisionBodyCharacterIdMax),
+  "situation": zod.enum(['post', 'comment', 'dm']),
+  "postId": zod.string().min(1).max(previewCharacterDecisionBodyPostIdMax).optional(),
+  "recipientId": zod.string().min(1).max(previewCharacterDecisionBodyRecipientIdMax).optional()
+})
+
+export const previewCharacterDecisionResponseSourceRevisionMin = 0;
+
+export const previewCharacterDecisionResponseDecisionTextMax = 2000;
+
+export const previewCharacterDecisionResponseDecisionReasonMax = 400;
+
+export const previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMin = 0;
+export const previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMax = 10080;
+
+export const previewCharacterDecisionResponseDecisionContextSectionsMax = 8;
+
+
+
+export const PreviewCharacterDecisionResponse = zod.object({
+  "mode": zod.enum(['preview']),
+  "executed": zod.literal(false),
+  "characterId": zod.string(),
+  "sourceRevision": zod.number().int().min(previewCharacterDecisionResponseSourceRevisionMin),
+  "provider": zod.string(),
+  "model": zod.string(),
+  "decision": zod.object({
+  "action": zod.enum(['none', 'draft']),
+  "situation": zod.enum(['post', 'comment', 'dm']),
+  "text": zod.string().max(previewCharacterDecisionResponseDecisionTextMax).nullable(),
+  "reason": zod.string().min(1).max(previewCharacterDecisionResponseDecisionReasonMax).describe('Brief explanation'),
+  "suggestedDelayMinutes": zod.number().int().min(previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMin).max(previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMax),
+  "contextSections": zod.array(zod.enum(['identity', 'personality', 'relationships', 'routine', 'social', 'memory', 'currentState', 'recentSocial'])).max(previewCharacterDecisionResponseDecisionContextSectionsMax)
+}),
+  "availableContextSections": zod.array(zod.string()),
+  "warnings": zod.array(zod.string())
+})
+
+
+/**
  * @summary Owner-private character proposal provider availability
  */
 export const GetCharacterAssistanceResponse = zod.object({

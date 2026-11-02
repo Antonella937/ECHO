@@ -15,6 +15,27 @@ tags:
   - name: storage
     description: Private image upload and serving
 paths:
+  /ai-engine/preview:
+    post:
+      operationId: previewCharacterDecision
+      summary: Manual text-only character decision; never executes or persists social actions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CharacterDecisionInput" }
+      responses:
+        "200":
+          description: Validated dry-run proposal from owner-scoped persisted character data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CharacterDecisionPreview" }
+        "400": { description: Invalid input or unavailable target }
+        "401": { description: Authentication required }
+        "404": { description: Character or universe not found for this owner }
+        "429": { description: Another preview is running or cooldown active }
+        "502": { description: Provider failure or invalid model output; no action executed }
+        "503": { description: Provider is not configured }
   /characters/assistance:
     get:
       operationId: getCharacterAssistance
@@ -302,6 +323,43 @@ components:
         occupation: { type: string }
         location: { type: string }
         configuration: { $ref: "#/components/schemas/CharacterConfiguration" }
+    CharacterDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [characterId, situation]
+      properties:
+        characterId: { type: string, minLength: 1, maxLength: 120 }
+        situation: { type: string, enum: [post, comment, dm] }
+        postId: { type: string, minLength: 1, maxLength: 120 }
+        recipientId: { type: string, minLength: 1, maxLength: 120 }
+    CharacterDecision:
+      type: object
+      additionalProperties: false
+      required: [action, situation, text, reason, suggestedDelayMinutes, contextSections]
+      properties:
+        action: { type: string, enum: [none, draft] }
+        situation: { type: string, enum: [post, comment, dm] }
+        text: { type: [string, "null"], maxLength: 2000 }
+        reason: { type: string, minLength: 1, maxLength: 400, description: Brief explanation, not hidden reasoning }
+        suggestedDelayMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        contextSections:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items: { type: string, enum: [identity, personality, relationships, routine, social, memory, currentState, recentSocial] }
+    CharacterDecisionPreview:
+      type: object
+      required: [mode, executed, characterId, sourceRevision, provider, model, decision, availableContextSections, warnings]
+      properties:
+        mode: { type: string, enum: [preview] }
+        executed: { type: boolean, enum: [false] }
+        characterId: { type: string }
+        sourceRevision: { type: integer, minimum: 0 }
+        provider: { type: string }
+        model: { type: string }
+        decision: { $ref: "#/components/schemas/CharacterDecision" }
+        availableContextSections: { type: array, items: { type: string } }
+        warnings: { type: array, items: { type: string } }
     CharacterConfiguration:
       type: object
       required: [version, basic, personality, voice, relationships, routine, social, memory, currentState, assistance]

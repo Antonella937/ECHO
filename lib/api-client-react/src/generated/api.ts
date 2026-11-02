@@ -21,6 +21,8 @@ import type {
 
 import type {
   CharacterAssistanceStatus,
+  CharacterDecisionInput,
+  CharacterDecisionPreview,
   CharacterProposal,
   CharacterProposalInput,
   HealthStatus,
@@ -59,6 +61,94 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getPreviewCharacterDecisionUrl = () => {
+
+
+
+
+  return `/api/ai-engine/preview`
+}
+
+/**
+ * @summary Manual text-only character decision; never executes or persists social actions
+ */
+export const previewCharacterDecision = async (characterDecisionInput: CharacterDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<CharacterDecisionPreview> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CharacterDecisionPreview>(getPreviewCharacterDecisionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(characterDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewCharacterDecisionMutationKey = () => ['previewCharacterDecision'] as const;
+
+export const getPreviewCharacterDecisionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCharacterDecision>>, TError,PreviewCharacterDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewCharacterDecision>>, TError,PreviewCharacterDecisionMutationVariables, TContext> => {
+
+const mutationKey = getPreviewCharacterDecisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewCharacterDecision>>, PreviewCharacterDecisionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewCharacterDecision(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewCharacterDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof previewCharacterDecision>>>
+    export type PreviewCharacterDecisionMutationBody = BodyType<CharacterDecisionInput>
+    export type PreviewCharacterDecisionMutationError = ErrorType<void>
+    export type PreviewCharacterDecisionMutationVariables = {data: BodyType<CharacterDecisionInput>}
+
+    /**
+ * @summary Manual text-only character decision; never executes or persists social actions
+ */
+export const usePreviewCharacterDecision = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCharacterDecision>>, TError,PreviewCharacterDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewCharacterDecision>>,
+        TError,
+        PreviewCharacterDecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPreviewCharacterDecisionMutationOptions(options));
+    }
 
 export const getGetCharacterAssistanceUrl = () => {
 

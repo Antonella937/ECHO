@@ -800,6 +800,108 @@ export interface CharacterProposal {
   configuration: CharacterConfiguration;
 }
 
+export type CharacterDecisionInputSituation = typeof CharacterDecisionInputSituation[keyof typeof CharacterDecisionInputSituation];
+
+
+export const CharacterDecisionInputSituation = {
+  post: 'post',
+  comment: 'comment',
+  dm: 'dm',
+} as const;
+
+export interface CharacterDecisionInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  characterId: string;
+  situation: CharacterDecisionInputSituation;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  postId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  recipientId?: string;
+}
+
+export type CharacterDecisionAction = typeof CharacterDecisionAction[keyof typeof CharacterDecisionAction];
+
+
+export const CharacterDecisionAction = {
+  none: 'none',
+  draft: 'draft',
+} as const;
+
+export type CharacterDecisionSituation = typeof CharacterDecisionSituation[keyof typeof CharacterDecisionSituation];
+
+
+export const CharacterDecisionSituation = {
+  post: 'post',
+  comment: 'comment',
+  dm: 'dm',
+} as const;
+
+export type CharacterDecisionContextSectionsItem = typeof CharacterDecisionContextSectionsItem[keyof typeof CharacterDecisionContextSectionsItem];
+
+
+export const CharacterDecisionContextSectionsItem = {
+  identity: 'identity',
+  personality: 'personality',
+  relationships: 'relationships',
+  routine: 'routine',
+  social: 'social',
+  memory: 'memory',
+  currentState: 'currentState',
+  recentSocial: 'recentSocial',
+} as const;
+
+export interface CharacterDecision {
+  action: CharacterDecisionAction;
+  situation: CharacterDecisionSituation;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  text: string | null;
+  /**
+     * Brief explanation
+     * @minLength 1
+     * @maxLength 400
+     */
+  reason: string;
+  /**
+     * @minimum 0
+     * @maximum 10080
+     */
+  suggestedDelayMinutes: number;
+  /** @maxItems 8 */
+  contextSections: CharacterDecisionContextSectionsItem[];
+}
+
+export type CharacterDecisionPreviewMode = typeof CharacterDecisionPreviewMode[keyof typeof CharacterDecisionPreviewMode];
+
+
+export const CharacterDecisionPreviewMode = {
+  preview: 'preview',
+} as const;
+
+export interface CharacterDecisionPreview {
+  mode: CharacterDecisionPreviewMode;
+  executed: false;
+  characterId: string;
+  /** @minimum 0 */
+  sourceRevision: number;
+  provider: string;
+  model: string;
+  decision: CharacterDecision;
+  availableContextSections: string[];
+  warnings: string[];
+}
+
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];
 
 
