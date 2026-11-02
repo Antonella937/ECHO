@@ -1,0 +1,22 @@
+---
+name: ECHO product direction
+description: User-approved product identity, accessibility preference, and boundaries for the first prototype.
+---
+
+ECHO is a private fictional-character social universe experienced as Nela Paez's own social account, not an administration dashboard. Mar Mulligan and Noah Hayes are distinct characters. Manual character switching must remain unobtrusive.
+
+**Why:** The user said she wants to control Nela as herself, posting and participating from her profile.
+
+**How to apply:** Keep primary navigation focused on feed, stories, profiles and conversations. Put character control in secondary settings.
+
+The approved visual direction is black/charcoal dark mode, soft contrast, subtle muted pink, harmonious rounded controls and friendly icons, with an iPhone-first layout. The user stated that bright screens hurt her eyes.
+
+**Why:** The user explicitly approved this appearance and asked for comfortable dark screens.
+
+**How to apply:** Preserve dark mode throughout secondary screens, dialogs and creation flows, not just the feed.
+
+The first prototype uses local/mock AI activity without API keys. Later phases may connect each character to a Kindroid Kin ID/API and a visual-generation provider with persistent character identity references.
+
+**Why:** The user requested a usable first prototype without requiring credentials, while preserving a path to autonomous social activity.
+
+**How to apply:** Keep provider contracts separate from UI, distinguish simulated activity from live AI, and do not imply local-only storage provides authenticated private access.

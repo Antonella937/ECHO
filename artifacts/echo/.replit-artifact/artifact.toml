@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ECHO"
+description = "A private, mobile-first fictional character social universe for Nela Paez, with stories, a photo feed, profiles and direct messages. Local-first prototype with future character AI adapters."
+version = "1.0.0"
+id = "artifacts/echo"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23641
+
+[services.development]
+run = "pnpm --filter @workspace/echo run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/echo", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/echo/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23641"
+BASE_PATH = "/"

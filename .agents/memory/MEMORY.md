@@ -1,0 +1,1 @@
+- [ECHO product direction](echo-product.md) — Nela-first character social app; approved dark mobile style and future AI scope.

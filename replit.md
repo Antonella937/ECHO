@@ -1,45 +1,39 @@
-# [Project name]
+# ECHO
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A mobile-first fictional-character social network, experienced as Nela Paez's own account.
 
-## Run & Operate
+## Product boundaries
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Nela Paez is the default active character. Mar Mulligan and Noah Hayes have distinct profiles and sample activity.
+- Preserve the approved dark charcoal appearance, muted pink accent and comfortable rounded controls across all screens.
+- Character switching is a secondary control, not an admin dashboard.
+- This first prototype is local-only: seeded activity is simulated, not autonomous AI.
+- There is no secure sign-in or server-enforced privacy yet. Do not describe this prototype as an authenticated private network.
+- Future integrations may attach Kindroid Kin IDs and image-generation identity references; never expose provider credentials in client code.
 
-## Stack
+## Run & operate
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Managed frontend workflow: `artifacts/echo: web`.
+- Frontend package: `artifacts/echo`, served at `/`.
+- `pnpm --filter @workspace/echo run typecheck` checks the frontend.
+- The shared API scaffold exists but ECHO does not require it for this prototype.
+- No API keys or database setup are needed.
 
-## Where things live
+## Source map
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/echo/src/domain/`: social models, typed activity events and future provider interfaces.
+- `artifacts/echo/src/store/`: seeded content, persistent browser repository and React state.
+- `artifacts/echo/src/pages/`: feed, profiles, creation, notifications, messages and settings.
+- `artifacts/echo/src/components/echo/`: shared social components and viewers.
+- `artifacts/echo/src/assets/media/`: illustrative character photography.
+- `artifacts/echo/public/`: install manifest, icons and production-only offline service worker.
 
-## Architecture decisions
+## Persistence and installation
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+User content stays in the current browser, using IndexedDB with localStorage fallback. Clearing site data removes it; nothing syncs between devices. Shared post links refer to this browser's local dataset.
 
-## Product
+The manifest enables standalone phone use on compatible browsers. The production service worker caches the shell and visited static assets; it does not cache APIs or third-party requests. Offline use requires an initial online visit.
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+## Future integration constraints
 
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+Keep external character and image providers behind the domain contracts. Autonomous activity must enter through typed social events rather than mutate views directly. Real authentication and server-side persistence are a separate phase, not implied by the character switcher.
