@@ -91,24 +91,20 @@ async function ownedImage(ownerId: string, item: MediaItem): Promise<{ bytes: Bu
   if (!allowed) throw new VisionError("VISION_MEDIA_ACCESS_DENIED", 403);
 
   let metadata: Record<string, unknown>;
-  let bytes: Buffer;
   try {
     const [rawMetadata] = await file.getMetadata();
     metadata = rawMetadata as Record<string, unknown>;
-    const mimeType = String(metadata.contentType ?? "").split(";")[0].trim().toLowerCase();
-    const size = Number(metadata.size ?? 0);
-    if (!IMAGE_MIMES.has(mimeType) || size < 1 || size > MAX_IMAGE_BYTES)
-      throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
+  } catch { throw new VisionError("VISION_MEDIA_READ_FAILED", 502); }
+  const mimeType = String(metadata.contentType ?? "").split(";")[0].trim().toLowerCase();
+  const size = Number(metadata.size ?? 0);
+  if (!IMAGE_MIMES.has(mimeType) || size < 1 || size > MAX_IMAGE_BYTES)
+    throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
+  let bytes: Buffer;
+  try {
     const [downloaded] = await file.download({ validation: false });
     bytes = downloaded;
-  } catch {
-    // Keep storage/provider details and private object metadata out of responses.
-    throw new VisionError("VISION_MEDIA_READ_FAILED", 502);
-  }
-  const mimeType = String(metadata.contentType ?? "").split(";")[0].trim().toLowerCase();
-  const size = Number(metadata.size ?? bytes.length);
-  if (!IMAGE_MIMES.has(mimeType) || size < 1 || size > MAX_IMAGE_BYTES || bytes.length > MAX_IMAGE_BYTES)
-    throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
+  } catch { throw new VisionError("VISION_MEDIA_READ_FAILED", 502); }
+  if (bytes.length > MAX_IMAGE_BYTES) throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
   if (!validMediaHeader(bytes, mimeType)) throw new VisionError("VISION_IMAGE_HEADER_INVALID", 415);
   return { bytes, mimeType, contentHash: hashImage(mimeType, bytes) };
 }

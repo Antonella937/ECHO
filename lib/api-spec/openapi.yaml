@@ -36,6 +36,38 @@ paths:
         "429": { description: Another preview is running or cooldown active }
         "502": { description: Provider failure or invalid model output; no action executed }
         "503": { description: Provider is not configured }
+  /ai-engine/vision/analyze:
+    post:
+      operationId: analyzeOwnerImageMedia
+      summary: Analyze persisted owner-uploaded post/story images; videos and audio are excluded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [postId]
+                  additionalProperties: false
+                  properties: { postId: { type: string, minLength: 1, maxLength: 120 } }
+                - type: object
+                  required: [storyId]
+                  additionalProperties: false
+                  properties: { storyId: { type: string, minLength: 1, maxLength: 120 } }
+      responses:
+        "200":
+          description: Persisted per-image results and ordered post summary; repeat requests reuse completed analyses
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VisionAnalysisResponse" }
+        "401": { description: Authentication required }
+        "404": { description: Owner universe, post, story, or owned media not found }
+        "409": { description: The same image is currently being analyzed }
+        "413": { description: Image exceeds the analysis size limit }
+        "415": { description: Unsupported media type; only PNG, JPEG, and WebP images are analyzed }
+        "422": { description: Invalid media reference or structured model result }
+        "502": { description: Storage or provider failure; no social action is executed }
+        "503": { description: No free image-capable model is available }
   /autonomy/settings:
     get:
       operationId: getAutonomySettings
