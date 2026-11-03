@@ -10,7 +10,8 @@ import {
   echoUniversesTable,
 } from "@workspace/db";
 import type { TextProvider } from "../src/ai-engine/contracts";
-import { MeteredTextProvider } from "../src/lib/metered-ai";
+import type { VisionProvider } from "../src/vision/contracts";
+import { MeteredTextProvider, withMeteredVision } from "../src/lib/metered-ai";
 import {
   AiBudgetExceededError,
   configureAiBudget,
@@ -62,6 +63,88 @@ async function seedCharge(
     reservedUnits: 0,
     attemptCount: 1,
   });
+}
+
+async function assertCategoryBlockedBeforeProvider(
+  owner: string,
+  category: "vision" | "memory_context" | "images",
+) {
+  let externalCalls = 0;
+  const rejection = (error: unknown) =>
+    error instanceof Error && error.message === "AUTONOMY_BUDGET_RESERVED";
+
+  if (category === "vision") {
+    const provider = {
+      name: "synthetic-vision-provider",
+      analyze: async () => {
+        externalCalls += 1;
+        return {} as Awaited<ReturnType<VisionProvider["analyze"]>>;
+      },
+    } as unknown as VisionProvider;
+    await assert.rejects(
+      withMeteredVision(owner, {
+        image: { mimeType: "image/png", base64: "synthetic" },
+        prompt: "synthetic test",
+        validate: () => ({}) as Awaited<ReturnType<VisionProvider["analyze"]>>["analysis"],
+      }, provider),
+      rejection,
+    );
+  } else if (category === "memory_context") {
+    const provider = new MeteredTextProvider(owner, category, {
+      name: "synthetic-memory-provider",
+      complete: async () => {
+        externalCalls += 1;
+        return { text: "must not be called" };
+      },
+    } as unknown as TextProvider);
+    await assert.rejects(
+      provider.complete({} as Parameters<TextProvider["complete"]>[0]),
+      rejection,
+    );
+  } else {
+    // Images has no production provider wrapper in this stage. Exercise the
+    // existing reservation-first contract with a synthetic downstream call.
+    await assert.rejects((async () => {
+      const reservation = await reserveAiUsage(owner, "images", "synthetic_image_generation");
+      externalCalls += 1;
+      await settleAiUsage(reservation, { attempted: true, succeeded: true });
+    })(), rejection);
+  }
+
+  assert.equal(externalCalls, 0, `${category} rejection must precede provider invocation`);
+}
+
+async function assertAutonomyReserveAndOwnCap() {
+  const reserveOwner = ownerId();
+  await configure(reserveOwner, 100, 20, weights({ autonomy: 10, brain_text: 10 }));
+  await seedCharge(reserveOwner, "brain_text", 80);
+
+  const firstReservedUnit = await reserveAiUsage(reserveOwner, "autonomy", "synthetic_reserved_autonomy_1");
+  const secondReservedUnit = await reserveAiUsage(reserveOwner, "autonomy", "synthetic_reserved_autonomy_2");
+  await settleAiUsage(firstReservedUnit, { attempted: true, succeeded: true });
+  await settleAiUsage(secondReservedUnit, { attempted: true, succeeded: true });
+  assert.equal((await creatorUsageSummary(reserveOwner)).totalUnits, 100);
+  await assert.rejects(
+    reserveAiUsage(reserveOwner, "autonomy", "synthetic_over_total_after_reserve"),
+    (error: unknown) => error instanceof AiBudgetExceededError && error.code === "AI_MONTHLY_HARD_CEILING",
+  );
+
+  const cappedOwner = ownerId();
+  await configure(cappedOwner, 100, 20, weights({ autonomy: 10 }));
+  await seedCharge(cappedOwner, "autonomy", 80);
+  let externalCalls = 0;
+  const provider = new MeteredTextProvider(cappedOwner, "autonomy", {
+    name: "synthetic-autonomy-cap-provider",
+    complete: async () => {
+      externalCalls += 1;
+      return { text: "must not be called" };
+    },
+  } as unknown as TextProvider);
+  await assert.rejects(
+    provider.complete({} as Parameters<TextProvider["complete"]>[0]),
+    (error: unknown) => error instanceof Error && error.message === "AUTONOMY_BUDGET_PROTECTED",
+  );
+  assert.equal(externalCalls, 0);
 }
 
 after(async () => {
@@ -230,6 +313,30 @@ test("Autonomy's individual cap leaves room for other categories, and budget blo
     (error: unknown) => error instanceof Error && error.message === "AI_MONTHLY_HARD_CEILING",
   );
   assert.equal(otherExternalCalls, 0);
+});
+
+test("Vision cannot consume Autonomy's reserved 20% and Autonomy retains its bounded share", async () => {
+  const owner = ownerId();
+  await configure(owner, 100, 20, weights({ autonomy: 10, brain_text: 10, vision: 10 }));
+  await seedCharge(owner, "brain_text", 80);
+  await assertCategoryBlockedBeforeProvider(owner, "vision");
+  await assertAutonomyReserveAndOwnCap();
+});
+
+test("memory/context cannot consume Autonomy's reserved 20% and Autonomy retains its bounded share", async () => {
+  const owner = ownerId();
+  await configure(owner, 100, 20, weights({ autonomy: 10, brain_text: 10, memory_context: 10 }));
+  await seedCharge(owner, "brain_text", 80);
+  await assertCategoryBlockedBeforeProvider(owner, "memory_context");
+  await assertAutonomyReserveAndOwnCap();
+});
+
+test("Images budget category cannot consume Autonomy's reserved 20% and Autonomy retains its bounded share", async () => {
+  const owner = ownerId();
+  await configure(owner, 100, 20, weights({ autonomy: 10, brain_text: 10, images: 10 }));
+  await seedCharge(owner, "brain_text", 80);
+  await assertCategoryBlockedBeforeProvider(owner, "images");
+  await assertAutonomyReserveAndOwnCap();
 });
 
 test("blocks all categories after the hard ceiling is exhausted", async () => {
