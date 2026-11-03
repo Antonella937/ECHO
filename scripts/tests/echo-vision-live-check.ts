@@ -84,6 +84,7 @@ const runId = randomUUID();
 const nonce = Date.now().toString(36);
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 let cleanupSucceeded = false;
+const cleanupErrors: string[] = [];
 let report: Record<string, unknown> = {};
 
 async function createDisposableOwner(autonomyPreview = false): Promise<string> {
@@ -244,6 +245,7 @@ try {
 
   const firstResponse = await ownerPage.context().request.post(`${base}/api/ai-engine/vision/analyze`, {
     data: { postId },
+    timeout: 240_000,
   });
   assert.equal(firstResponse.status(), 200, "authenticated owner Vision route must analyze the fixture");
   const firstResult = await firstResponse.json();
@@ -275,6 +277,7 @@ try {
   // Same post and image bytes: response must be cache-only, with no provider attempt.
   const secondResponse = await ownerPage.context().request.post(`${base}/api/ai-engine/vision/analyze`, {
     data: { postId },
+    timeout: 60_000,
   });
   assert.equal(secondResponse.status(), 200);
   const secondResult = await secondResponse.json();
@@ -290,6 +293,7 @@ try {
   // Authenticated Brain preview should read the saved analysis rather than infer Vision again.
   const brainResponse = await ownerPage.context().request.post(`${base}/api/ai-engine/preview`, {
     data: { characterId: "mar", situation: "comment", postId },
+    timeout: 120_000,
   });
   assert.equal(brainResponse.status(), 200, "Brain route must consume the persisted Vision context");
   const brain = await brainResponse.json();
@@ -309,6 +313,7 @@ try {
   assert.equal(settings.characters.find((item: any) => item.characterId === "mar")?.enabled, false);
   const autonomyResponse = await ownerPage.context().request.post(`${base}/api/autonomy/test-preview`, {
     data: { characterId: "mar", idempotencyKey: randomUUID(), situation: "like_post", targetId: postId },
+    timeout: 120_000,
   });
   assert.equal(autonomyResponse.status(), 200, "autonomy preview must run through its authenticated dry-run route");
   const autonomy = await autonomyResponse.json();
@@ -366,38 +371,52 @@ try {
   }
   try { await browser?.close(); } catch {}
   for (const ownerId of createdOwners) {
-    try {
-      await db.delete(echoVisionMediaRefsTable).where(eq(echoVisionMediaRefsTable.ownerId, ownerId));
-      await db.delete(echoVisionPostSummariesTable).where(eq(echoVisionPostSummariesTable.ownerId, ownerId));
-      await db.delete(echoVisionAnalysesTable).where(eq(echoVisionAnalysesTable.ownerId, ownerId));
-      await db.delete(echoAutonomyRunsTable).where(eq(echoAutonomyRunsTable.ownerId, ownerId));
-      await db.delete(echoAutonomyCharactersTable).where(eq(echoAutonomyCharactersTable.ownerId, ownerId));
-      await db.delete(echoAutonomyOwnersTable).where(eq(echoAutonomyOwnersTable.ownerId, ownerId));
-      const files = await db.select().from(echoMediaTable).where(eq(echoMediaTable.ownerId, ownerId));
-      const storage = new ObjectStorageService();
-      for (const file of files) {
+    const cleanStep = async (label: string, action: () => Promise<unknown>) => {
+      try { await action(); } catch { cleanupErrors.push(label); }
+    };
+    await cleanStep("vision_media_refs", () => db.delete(echoVisionMediaRefsTable).where(eq(echoVisionMediaRefsTable.ownerId, ownerId)));
+    await cleanStep("vision_post_summaries", () => db.delete(echoVisionPostSummariesTable).where(eq(echoVisionPostSummariesTable.ownerId, ownerId)));
+    await cleanStep("vision_analyses", () => db.delete(echoVisionAnalysesTable).where(eq(echoVisionAnalysesTable.ownerId, ownerId)));
+    await cleanStep("autonomy_runs", () => db.delete(echoAutonomyRunsTable).where(eq(echoAutonomyRunsTable.ownerId, ownerId)));
+    await cleanStep("autonomy_characters", () => db.delete(echoAutonomyCharactersTable).where(eq(echoAutonomyCharactersTable.ownerId, ownerId)));
+    await cleanStep("autonomy_owner", () => db.delete(echoAutonomyOwnersTable).where(eq(echoAutonomyOwnersTable.ownerId, ownerId)));
+    const files = await db.select().from(echoMediaTable).where(eq(echoMediaTable.ownerId, ownerId)).catch(() => {
+      cleanupErrors.push("media_list"); return [];
+    });
+    const storage = new ObjectStorageService();
+    for (const file of files) {
+      await cleanStep("storage_object", async () => {
         await (await storage.getObjectEntityFile(file.objectPath)).delete({ ignoreNotFound: true });
-      }
-      await db.delete(echoMediaTable).where(eq(echoMediaTable.ownerId, ownerId));
-      await db.delete(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
-      await clerkClient.users.deleteUser(ownerId);
-      const remainingAnalysis = await db.select({ id: echoVisionAnalysesTable.id })
-        .from(echoVisionAnalysesTable).where(eq(echoVisionAnalysesTable.ownerId, ownerId));
-      const remainingRefs = await db.select({ ownerId: echoVisionMediaRefsTable.ownerId })
-        .from(echoVisionMediaRefsTable).where(eq(echoVisionMediaRefsTable.ownerId, ownerId));
-      const remainingSummaries = await db.select({ ownerId: echoVisionPostSummariesTable.ownerId })
-        .from(echoVisionPostSummariesTable).where(eq(echoVisionPostSummariesTable.ownerId, ownerId));
-      const remainingMedia = await db.select({ ownerId: echoMediaTable.ownerId })
-        .from(echoMediaTable).where(eq(echoMediaTable.ownerId, ownerId));
-      const remainingUniverse = await db.select({ ownerId: echoUniversesTable.ownerId })
-        .from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
-      if (remainingAnalysis.length || remainingRefs.length || remainingSummaries.length
-        || remainingMedia.length || remainingUniverse.length) cleanupSucceeded = false;
-    } catch {
-      cleanupSucceeded = false;
-      continue;
+      });
     }
+    await cleanStep("media_rows", () => db.delete(echoMediaTable).where(eq(echoMediaTable.ownerId, ownerId)));
+    await cleanStep("universe", () => db.delete(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId)));
+    await cleanStep("clerk_user", () => clerkClient.users.deleteUser(ownerId));
+    const verify = async (label: string, query: Promise<unknown[]>) => {
+      const rows = await query.catch(() => { cleanupErrors.push(`${label}_verify`); return [{}]; });
+      if (rows.length) cleanupErrors.push(`${label}_remaining`);
+    };
+    await verify("vision_analysis", db.select({ id: echoVisionAnalysesTable.id }).from(echoVisionAnalysesTable)
+      .where(eq(echoVisionAnalysesTable.ownerId, ownerId)));
+    await verify("vision_refs", db.select({ ownerId: echoVisionMediaRefsTable.ownerId }).from(echoVisionMediaRefsTable)
+      .where(eq(echoVisionMediaRefsTable.ownerId, ownerId)));
+    await verify("vision_summaries", db.select({ ownerId: echoVisionPostSummariesTable.ownerId }).from(echoVisionPostSummariesTable)
+      .where(eq(echoVisionPostSummariesTable.ownerId, ownerId)));
+    await verify("media", db.select({ ownerId: echoMediaTable.ownerId }).from(echoMediaTable)
+      .where(eq(echoMediaTable.ownerId, ownerId)));
+    await verify("universe", db.select({ ownerId: echoUniversesTable.ownerId }).from(echoUniversesTable)
+      .where(eq(echoUniversesTable.ownerId, ownerId)));
+    await cleanStep("clerk_user_verify", async () => {
+      try { await clerkClient.users.getUser(ownerId); throw new Error("TEST_USER_REMAINS"); }
+      catch (error) {
+        if ((error as { status?: number }).status === 404) return;
+        if ((error as { errors?: Array<{ code?: string }> }).errors?.some(item => item.code === "resource_not_found")) return;
+        throw error;
+      }
+    });
   }
+  cleanupSucceeded = cleanupErrors.length === 0;
+  report.cleanupErrors = cleanupErrors;
   report.cleanupSucceeded = cleanupSucceeded;
   console.log(JSON.stringify(report, null, 2));
   await pool.end();
