@@ -1,5 +1,8 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
+import express, { type RequestHandler } from "express";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { inArray } from "drizzle-orm";
 import {
   db,
@@ -15,6 +18,7 @@ import { createSeedState } from "../../echo/src/store/seed";
 import { defaultCharacterConfig } from "../../echo/src/domain/character-core";
 import { previewForOwner } from "../src/ai-engine/service";
 import { readUniverse } from "../src/lib/universeRepository";
+import { createBrainPreviewRouter } from "../src/routes/brain-preview";
 import type { TextProvider } from "../src/ai-engine/contracts";
 
 const repositoryOwners = [
@@ -189,6 +193,99 @@ test("Brain preview usa el universo solicitado para personalidad, memoria y cont
     universeId: "studio",
   }, { read: readUniverse, provider: noCallProvider }), /UNIVERSE_NOT_FOUND/);
   assert.equal(providerCalls, 0, "an absent universe under this owner must fail before provider use");
+});
+
+test("la ruta HTTP autenticada propaga universo, memoria y aislamiento de propietario", async () => {
+  const routeContexts: string[] = [];
+  let providerCalls = 0;
+  const routeProvider: TextProvider = {
+    ...provider,
+    complete: async (input) => {
+      providerCalls += 1;
+      routeContexts.push(input.context);
+      return provider.complete(input);
+    },
+  };
+
+  async function postPreview(ownerId: string, body: Record<string, unknown>) {
+    const app = express();
+    app.use(express.json());
+    const authenticate: RequestHandler = (req, _res, next) => {
+      req.userId = ownerId;
+      next();
+    };
+    app.use(createBrainPreviewRouter({
+      authenticate,
+      read: readUniverse,
+      providerForOwner: () => routeProvider,
+      visionForOwner: async () => ({ analyses: {}, postSummaries: {} }),
+    }));
+    const server = createServer(app);
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      const address = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${address.port}/ai-engine/preview`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { status: response.status, body: await response.json() as Record<string, unknown> };
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  }
+
+  const selected = await postPreview(previewOwners[0]!, {
+    characterId: "mar",
+    situation: "post",
+    universeId: "studio",
+  });
+  assert.equal(selected.status, 200);
+  assert.equal(selected.body.sourceRevision, 8);
+  const selectedContext = JSON.parse(routeContexts.at(-1)!) as {
+    memory: { permanent: Array<{ text: string }> };
+    recentSocial: { posts: Array<{ caption: string }> };
+  };
+  assert.equal(selectedContext.memory.permanent[0]?.text, "PERMANENT_MEMORY_OWNER_A_STUDIO");
+  assert.equal(selectedContext.recentSocial.posts[0]?.caption, "SOCIAL_CONTEXT_OWNER_A_STUDIO");
+
+  const fallback = await postPreview(previewOwners[0]!, {
+    characterId: "mar",
+    situation: "post",
+  });
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.body.sourceRevision, 3);
+  const fallbackContext = JSON.parse(routeContexts.at(-1)!) as {
+    memory: { permanent: Array<{ text: string }> };
+  };
+  assert.equal(fallbackContext.memory.permanent[0]?.text, "PERMANENT_MEMORY_OWNER_A_PRIMARY");
+
+  const otherOwner = await postPreview(previewOwners[1]!, {
+    characterId: "mar",
+    situation: "post",
+    universeId: "primary",
+  });
+  assert.equal(otherOwner.status, 200);
+  const otherOwnerContext = JSON.parse(routeContexts.at(-1)!) as {
+    memory: { permanent: Array<{ text: string }> };
+  };
+  assert.equal(otherOwnerContext.memory.permanent[0]?.text, "PERMANENT_MEMORY_OWNER_B_PRIMARY");
+  assert.equal(routeContexts.at(-1)!.includes("OWNER_A_STUDIO"), false);
+
+  const callsBeforeForeignUniverse = providerCalls;
+  const foreignUniverse = await postPreview(previewOwners[1]!, {
+    characterId: "mar",
+    situation: "post",
+    universeId: "studio",
+  });
+  assert.equal(foreignUniverse.status, 404);
+  assert.equal(foreignUniverse.body.error, "UNIVERSE_NOT_FOUND");
+  assert.equal(providerCalls, callsBeforeForeignUniverse);
 });
 
 test("el contrato de Brain permite universeId opcional sin aceptar campos no relacionados", () => {
