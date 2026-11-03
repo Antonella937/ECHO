@@ -727,11 +727,15 @@ components:
         - type: object
           required: [postId]
           additionalProperties: false
-          properties: { postId: { type: string, minLength: 1, maxLength: 120 } }
+          properties:
+            postId: { type: string, minLength: 1, maxLength: 120 }
+            universeId: { type: string, minLength: 1, maxLength: 120, default: primary }
         - type: object
           required: [storyId]
           additionalProperties: false
-          properties: { storyId: { type: string, minLength: 1, maxLength: 120 } }
+          properties:
+            storyId: { type: string, minLength: 1, maxLength: 120 }
+            universeId: { type: string, minLength: 1, maxLength: 120, default: primary }
     VisionAnalyzedMediaItem:
       type: object
       required: [mediaId, position, analysisId, analysis, provider, model, cacheHit, attempts, usage]

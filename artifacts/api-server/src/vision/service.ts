@@ -111,12 +111,16 @@ async function ownedImage(ownerId: string, item: MediaItem): Promise<{ bytes: Bu
   return { bytes, mimeType, contentHash: hashImage(mimeType, bytes) };
 }
 
-async function claimAnalysis(ownerId: string, input: {
+async function claimAnalysis(ownerId: string, universeId: string, input: {
   contentHash: string; mimeType: string; byteSize: number;
 }): Promise<{ id: string; cache: VisionAnalysis | null; provider: string; model: string }> {
   const read = async () => {
     const [row] = await db.select().from(echoVisionAnalysesTable)
-      .where(and(eq(echoVisionAnalysesTable.ownerId, ownerId), eq(echoVisionAnalysesTable.contentHash, input.contentHash)))
+      .where(and(
+        eq(echoVisionAnalysesTable.ownerId, ownerId),
+        eq(echoVisionAnalysesTable.universeId, universeId),
+        eq(echoVisionAnalysesTable.contentHash, input.contentHash),
+      ))
       .limit(1);
     return row;
   };
@@ -127,7 +131,11 @@ async function claimAnalysis(ownerId: string, input: {
     // A malformed stored result is not trusted or silently returned.
     await db.update(echoVisionAnalysesTable)
       .set({ status: "failed", errorCode: "STORED_ANALYSIS_INVALID", updatedAt: new Date() })
-      .where(and(eq(echoVisionAnalysesTable.id, row.id), eq(echoVisionAnalysesTable.ownerId, ownerId)));
+      .where(and(
+        eq(echoVisionAnalysesTable.id, row.id),
+        eq(echoVisionAnalysesTable.ownerId, ownerId),
+        eq(echoVisionAnalysesTable.universeId, universeId),
+      ));
     row = await read();
   }
   if (row?.status === "pending") throw new VisionError("VISION_ANALYSIS_IN_PROGRESS", 409);
@@ -135,7 +143,12 @@ async function claimAnalysis(ownerId: string, input: {
   if (row?.status === "failed") {
     const claimed = await db.update(echoVisionAnalysesTable)
       .set({ status: "pending", errorCode: null, provider: null, model: null, analysis: null, updatedAt: new Date() })
-      .where(and(eq(echoVisionAnalysesTable.id, row.id), eq(echoVisionAnalysesTable.ownerId, ownerId), eq(echoVisionAnalysesTable.status, "failed")))
+      .where(and(
+        eq(echoVisionAnalysesTable.id, row.id),
+        eq(echoVisionAnalysesTable.ownerId, ownerId),
+        eq(echoVisionAnalysesTable.universeId, universeId),
+        eq(echoVisionAnalysesTable.status, "failed"),
+      ))
       .returning({ id: echoVisionAnalysesTable.id });
     if (claimed[0]) return { id: row.id, cache: null, provider: "", model: "" };
     row = await read();
@@ -148,7 +161,7 @@ async function claimAnalysis(ownerId: string, input: {
 
   const id = randomUUID();
   const inserted = await db.insert(echoVisionAnalysesTable).values({
-    id, ownerId, contentHash: input.contentHash, mimeType: input.mimeType, byteSize: input.byteSize,
+    id, ownerId, universeId, contentHash: input.contentHash, mimeType: input.mimeType, byteSize: input.byteSize,
     status: "pending", updatedAt: new Date(),
   }).onConflictDoNothing().returning({ id: echoVisionAnalysesTable.id });
   if (inserted[0]) return { id, cache: null, provider: "", model: "" };
@@ -160,27 +173,42 @@ async function claimAnalysis(ownerId: string, input: {
   throw new VisionError(row?.status === "pending" ? "VISION_ANALYSIS_IN_PROGRESS" : "VISION_ANALYSIS_CLAIM_CONFLICT", 409);
 }
 
-async function persistReference(ownerId: string, entityType: VisionEntityType, entityId: string, item: MediaItem, contentHash: string): Promise<void> {
+async function persistReference(
+  ownerId: string,
+  universeId: string,
+  entityType: VisionEntityType,
+  entityId: string,
+  item: MediaItem,
+  contentHash: string,
+): Promise<void> {
   await db.insert(echoVisionMediaRefsTable).values({
-    ownerId, entityType, entityId, mediaId: item.id, position: item.position, contentHash, sourcePath: item.url,
+    ownerId, universeId, entityType, entityId, mediaId: item.id,
+    position: item.position, contentHash, sourcePath: item.url,
   }).onConflictDoUpdate({
-    target: [echoVisionMediaRefsTable.ownerId, echoVisionMediaRefsTable.entityType, echoVisionMediaRefsTable.entityId, echoVisionMediaRefsTable.mediaId],
+    target: [
+      echoVisionMediaRefsTable.ownerId,
+      echoVisionMediaRefsTable.universeId,
+      echoVisionMediaRefsTable.entityType,
+      echoVisionMediaRefsTable.entityId,
+      echoVisionMediaRefsTable.mediaId,
+    ],
     set: { position: item.position, contentHash, sourcePath: item.url },
   });
 }
 
 async function analyzeOne(
   ownerId: string,
+  universeId: string,
   entityType: VisionEntityType,
   entityId: string,
   item: MediaItem,
   provider: VisionProvider,
 ): Promise<AnalysisResult> {
   const image = await ownedImage(ownerId, item);
-  const claim = await claimAnalysis(ownerId, {
+  const claim = await claimAnalysis(ownerId, universeId, {
     contentHash: image.contentHash, mimeType: image.mimeType, byteSize: image.bytes.length,
   });
-  await persistReference(ownerId, entityType, entityId, item, image.contentHash);
+  await persistReference(ownerId, universeId, entityType, entityId, item, image.contentHash);
   if (claim.cache) {
     return {
       mediaId: item.id, position: item.position, analysisId: claim.id, analysis: claim.cache,
@@ -203,7 +231,12 @@ async function analyzeOne(
     await db.update(echoVisionAnalysesTable).set({
       status: "complete", provider: outcome.provider, model: outcome.model, analysis: outcome.analysis,
       errorCode: null, updatedAt: new Date(),
-    }).where(and(eq(echoVisionAnalysesTable.id, claim.id), eq(echoVisionAnalysesTable.ownerId, ownerId), eq(echoVisionAnalysesTable.status, "pending")));
+    }).where(and(
+      eq(echoVisionAnalysesTable.id, claim.id),
+      eq(echoVisionAnalysesTable.ownerId, ownerId),
+      eq(echoVisionAnalysesTable.universeId, universeId),
+      eq(echoVisionAnalysesTable.status, "pending"),
+    ));
     return {
       mediaId: item.id, position: item.position, analysisId: claim.id, analysis: outcome.analysis,
       provider: outcome.provider, model: outcome.model, cacheHit: false, attempts: outcome.attempts, usage: outcome.usage,
@@ -213,13 +246,23 @@ async function analyzeOne(
       const visionError = new VisionError(error.code, error.status);
       await db.update(echoVisionAnalysesTable)
         .set({ status: "failed", errorCode: error.code, updatedAt: new Date() })
-        .where(and(eq(echoVisionAnalysesTable.id, claim.id), eq(echoVisionAnalysesTable.ownerId, ownerId), eq(echoVisionAnalysesTable.status, "pending")));
+        .where(and(
+          eq(echoVisionAnalysesTable.id, claim.id),
+          eq(echoVisionAnalysesTable.ownerId, ownerId),
+          eq(echoVisionAnalysesTable.universeId, universeId),
+          eq(echoVisionAnalysesTable.status, "pending"),
+        ));
       throw visionError;
     }
     const code = error instanceof VisionError ? error.code : "VISION_ANALYSIS_FAILED";
     await db.update(echoVisionAnalysesTable)
       .set({ status: "failed", errorCode: code, updatedAt: new Date() })
-      .where(and(eq(echoVisionAnalysesTable.id, claim.id), eq(echoVisionAnalysesTable.ownerId, ownerId), eq(echoVisionAnalysesTable.status, "pending")));
+      .where(and(
+        eq(echoVisionAnalysesTable.id, claim.id),
+        eq(echoVisionAnalysesTable.ownerId, ownerId),
+        eq(echoVisionAnalysesTable.universeId, universeId),
+        eq(echoVisionAnalysesTable.status, "pending"),
+      ));
     if (error instanceof VisionError) throw error;
     throw new VisionError("VISION_ANALYSIS_FAILED", 502);
   }
@@ -264,7 +307,7 @@ export function buildVisionPostSummary(postId: string, caption: string,
 export class VisionService {
   constructor(private readonly provider: VisionProvider = visionProvider) {}
 
-  async analyzePost(ownerId: string, state: SocialState, postId: string) {
+  async analyzePost(ownerId: string, state: SocialState, postId: string, universeId = "primary") {
     if (!ownerId) throw new VisionError("AUTHENTICATION_REQUIRED", 401);
     const post = state.posts.find((item) => item.id === postId);
     if (!post) throw new VisionError("POST_NOT_FOUND", 404);
@@ -276,17 +319,22 @@ export class VisionService {
     if (!imageItems.length) throw new VisionError("POST_HAS_NO_IMAGE_MEDIA", 415);
 
     const results: AnalysisResult[] = [];
-    for (const item of imageItems) results.push(await analyzeOne(ownerId, "post", post.id, item, this.provider));
+    for (const item of imageItems) results.push(await analyzeOne(ownerId, universeId, "post", post.id, item, this.provider));
 
     const overallHash = hashPost(items.map((item) => ({ id: item.id, type: item.type, path: item.url })),
       post.caption ?? "", post.location ?? "");
     const summary = buildVisionPostSummary(post.id, post.caption ?? "", results,
       allImageItems.length - imageItems.length, videoItems.length);
     await db.insert(echoVisionPostSummariesTable).values({
-      ownerId, postId: post.id, contentHash: overallHash,
+      ownerId, universeId, postId: post.id, contentHash: overallHash,
       summary: summary as unknown as Record<string, unknown>, updatedAt: new Date(),
     }).onConflictDoUpdate({
-      target: [echoVisionPostSummariesTable.ownerId, echoVisionPostSummariesTable.postId, echoVisionPostSummariesTable.contentHash],
+      target: [
+        echoVisionPostSummariesTable.ownerId,
+        echoVisionPostSummariesTable.universeId,
+        echoVisionPostSummariesTable.postId,
+        echoVisionPostSummariesTable.contentHash,
+      ],
       set: { summary: summary as unknown as Record<string, unknown>, updatedAt: new Date() },
     });
 
@@ -300,12 +348,12 @@ export class VisionService {
     };
   }
 
-  async analyzeStory(ownerId: string, state: SocialState, storyId: string) {
+  async analyzeStory(ownerId: string, state: SocialState, storyId: string, universeId = "primary") {
     if (!ownerId) throw new VisionError("AUTHENTICATION_REQUIRED", 401);
     const story = state.stories.find((item) => item.id === storyId);
     if (!story) throw new VisionError("STORY_NOT_FOUND", 404);
     const item: MediaItem = { id: `story:${story.id}`, type: "image", url: story.image, position: 0 };
-    const result = await analyzeOne(ownerId, "story", story.id, item, this.provider);
+    const result = await analyzeOne(ownerId, universeId, "story", story.id, item, this.provider);
     return {
       entityType: "story" as const,
       entityId: story.id,
@@ -316,8 +364,9 @@ export class VisionService {
   }
 
   async ensureForDecision(ownerId: string, state: SocialState, input: CharacterDecisionInput): Promise<VisionContext> {
+    const universeId = input.universeId ?? "primary";
     if (input.postId) {
-      try { await this.analyzePost(ownerId, state, input.postId); }
+      try { await this.analyzePost(ownerId, state, input.postId, universeId); }
       catch (error) {
         // Existing posts using bundled/legacy media remain usable by the Brain;
         // only persisted private uploads are eligible for first-time Vision analysis.
@@ -325,15 +374,20 @@ export class VisionService {
       }
     }
     if (input.storyId) {
-      try { await this.analyzeStory(ownerId, state, input.storyId); }
+      try { await this.analyzeStory(ownerId, state, input.storyId, universeId); }
       catch (error) {
         if (!(error instanceof VisionError) || error.code !== "VISION_MEDIA_NOT_PRIVATE_UPLOAD") throw error;
       }
     }
-    return this.loadContext(ownerId, state, input);
+    return this.loadContext(ownerId, state, input, universeId);
   }
 
-  async loadContext(ownerId: string, state: SocialState, input: CharacterDecisionInput): Promise<VisionContext> {
+  async loadContext(
+    ownerId: string,
+    state: SocialState,
+    input: CharacterDecisionInput,
+    universeId = input.universeId ?? "primary",
+  ): Promise<VisionContext> {
     const relevantPosts = state.posts.filter((post) =>
       post.authorId === input.characterId || post.taggedAccountIds?.includes(input.characterId) || post.id === input.postId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 6);
@@ -348,13 +402,16 @@ export class VisionService {
     ];
     const refs = entityFilters.length
       ? await db.select().from(echoVisionMediaRefsTable).where(and(
-        eq(echoVisionMediaRefsTable.ownerId, ownerId), or(...entityFilters)!,
+        eq(echoVisionMediaRefsTable.ownerId, ownerId),
+        eq(echoVisionMediaRefsTable.universeId, universeId),
+        or(...entityFilters)!,
       ))
       : [];
     const hashes = [...new Set(refs.map((ref) => ref.contentHash))];
     const analysisRows = hashes.length
       ? await db.select().from(echoVisionAnalysesTable).where(and(
         eq(echoVisionAnalysesTable.ownerId, ownerId),
+        eq(echoVisionAnalysesTable.universeId, universeId),
         inArray(echoVisionAnalysesTable.contentHash, hashes),
         eq(echoVisionAnalysesTable.status, "complete"),
       ))
@@ -377,6 +434,7 @@ export class VisionService {
     const summaries = postIds.length
       ? await db.select().from(echoVisionPostSummariesTable).where(and(
         eq(echoVisionPostSummariesTable.ownerId, ownerId),
+        eq(echoVisionPostSummariesTable.universeId, universeId),
         inArray(echoVisionPostSummariesTable.postId, postIds),
       ))
       : [];

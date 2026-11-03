@@ -133,14 +133,22 @@ export const PreviewCharacterDecisionResponse = zod.object({
  */
 export const analyzeOwnerImageMediaBodyOnePostIdMax = 120;
 
+export const analyzeOwnerImageMediaBodyOneUniverseIdDefault = `primary`;
+export const analyzeOwnerImageMediaBodyOneUniverseIdMax = 120;
+
 export const analyzeOwnerImageMediaBodyTwoStoryIdMax = 120;
+
+export const analyzeOwnerImageMediaBodyTwoUniverseIdDefault = `primary`;
+export const analyzeOwnerImageMediaBodyTwoUniverseIdMax = 120;
 
 
 
 export const AnalyzeOwnerImageMediaBody = zod.union([zod.object({
-  "postId": zod.string().min(1).max(analyzeOwnerImageMediaBodyOnePostIdMax)
+  "postId": zod.string().min(1).max(analyzeOwnerImageMediaBodyOnePostIdMax),
+  "universeId": zod.string().min(1).max(analyzeOwnerImageMediaBodyOneUniverseIdMax).default(analyzeOwnerImageMediaBodyOneUniverseIdDefault)
 }),zod.object({
-  "storyId": zod.string().min(1).max(analyzeOwnerImageMediaBodyTwoStoryIdMax)
+  "storyId": zod.string().min(1).max(analyzeOwnerImageMediaBodyTwoStoryIdMax),
+  "universeId": zod.string().min(1).max(analyzeOwnerImageMediaBodyTwoUniverseIdMax).default(analyzeOwnerImageMediaBodyTwoUniverseIdDefault)
 })])
 
 export const analyzeOwnerImageMediaResponseSummaryOneCaptionMax = 500;

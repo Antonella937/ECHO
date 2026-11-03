@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:autonomy-tests": "tsc -p tsconfig.autonomy-tests.json",
-    "typecheck:brain-tests": "tsc -p tsconfig.brain-tests.json"
+    "typecheck:brain-tests": "tsc -p tsconfig.brain-tests.json",
+    "typecheck:vision-tests": "tsc -p tsconfig.vision-tests.json"
   },
   "dependencies": {
     "@clerk/express": "^2.1.86",

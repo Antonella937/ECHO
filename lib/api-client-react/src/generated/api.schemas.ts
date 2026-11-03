@@ -1465,12 +1465,22 @@ export type VisionAnalyzeInput = {
      * @maxLength 120
      */
   postId: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 } | {
   /**
      * @minLength 1
      * @maxLength 120
      */
   storyId: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 };
 
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];
