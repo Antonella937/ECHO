@@ -192,6 +192,7 @@ async function analyzeOne(
       image: { mimeType: image.mimeType, base64: image.bytes.toString("base64") },
       prompt: [
         "Analiza esta foto para contexto social, sin identificar personas.",
+        "Responde en español. Describe con precisión el color dominante y las formas u objetos claramente visibles; no adivines si hay duda.",
         "Devuelve exactamente este JSON: {\"sceneDescription\":\"descripción observable\",\"setting\":\"lugar o contexto visible\",\"objects\":[{\"label\":\"elemento\",\"category\":\"object|person|animal|text|setting|other\",\"attributes\":[\"rasgo visible\"],\"position\":\"foreground|center|background|left|right|top|bottom|unknown\",\"confidence\":0.0}],\"people\":{\"count\":0,\"nonIdentifyingDetails\":[\"acción o ubicación visible, sin identidad ni rasgos sensibles\"]},\"activities\":[],\"dominantColors\":[],\"visibleText\":[],\"notableDetails\":[],\"uncertainty\":[]}.",
         "No inventes eventos fuera de la imagen; conserva nombres de elementos concretos y expresa dudas en uncertainty.",
       ].join("\n"),
