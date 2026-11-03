@@ -3,7 +3,7 @@ import { after, afterEach, before, beforeEach, test } from "node:test";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
 import express, { type RequestHandler } from "express";
-import { inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import {
   db,
   echoCharacterFollowRequestsTable,
@@ -84,8 +84,9 @@ async function seedUniverse(
   ownerId: string,
   universeId: string,
   state: Record<string, unknown>,
+  sharingEnabled = false,
 ): Promise<void> {
-  await db.insert(echoUniversesTable).values({ ownerId, universeId, revision: 1, state });
+  await db.insert(echoUniversesTable).values({ ownerId, universeId, revision: 1, state, sharingEnabled });
 }
 
 async function seedFixture(): Promise<void> {
@@ -140,7 +141,7 @@ async function seedFixture(): Promise<void> {
   ], {
     highlights: [{ id: "highlight-secret", authorId: characterId, title: "Saved", storyIds: ["highlighted-story"] }],
     ownerPrivateField: "OWNER_ONLY_SECRET",
-  }));
+  }), true);
 
   await seedUniverse(targetOwner, "studio", seedState({
     id: characterId, handle: "public-character", name: "Public Character",
@@ -162,7 +163,7 @@ async function seedFixture(): Promise<void> {
   ], [{
     id: "public-story", authorId: characterId, image: "/objects/public-story",
     caption: "PUBLIC_STUDIO_STORY", createdAt: new Date(NOW - 60_000).toISOString(),
-  }]));
+  }]), true);
 
   await seedUniverse(otherOwner, "primary", seedState({
     id: characterId, handle: "other-owner-character", name: "Other Owner",
@@ -171,14 +172,14 @@ async function seedFixture(): Promise<void> {
   }, [{
     id: postId, authorId: characterId, caption: "OTHER_OWNER_PUBLIC_POST",
     location: "", image: "/objects/other-post", createdAt: new Date(NOW - 180_000).toISOString(),
-  }]));
+  }]), true);
   await seedUniverse(otherOwner, "sparse", seedState(
     { id: "sparse-character" },
     [{
       id: "sparse-post", authorId: "sparse-character", caption: "SPARSE_AUTHOR_POST",
       location: "", image: "", createdAt: new Date(NOW - 240_000).toISOString(),
     }],
-  ));
+  ), true);
 
   await seedUniverse(viewerOwner, "primary", {
     version: 1,
@@ -276,6 +277,11 @@ test("profile read enforces public/private visibility and returns only an explic
   assert.equal((await get(viewerOwner, targetPath(targetOwner, "primary") + viewerQuery("rejected-viewer"))).status, 404);
   assert.equal((await get(viewerOwner, targetPath(targetOwner, "primary") + viewerQuery("cancelled-viewer"))).status, 404);
   assert.equal((await get(otherOwner, targetPath(targetOwner, "primary"))).status, 404);
+  assert.equal(
+    (await get(targetOwner, targetPath(targetOwner, "studio") + viewerQuery(characterId, "primary"))).status,
+    404,
+    "a same-owner viewer in primary cannot read a character from studio as part of that universe",
+  );
 });
 
 test("profile routes reject anonymous, malformed, foreign and client-asserted owner identities", async () => {
@@ -481,4 +487,61 @@ test("feed pagination and mediaOnly filtering avoid duplicate or unauthorized pa
   assert.equal((await get(viewerOwner, "/social/feed?viewerUniverseId=primary&viewerCharacterId=missing")).status, 404);
   assert.equal((await get(viewerOwner, "/social/feed?viewerUniverseId=primary&viewerCharacterId=accepted-viewer&ownerId=other")).status, 400);
   assert.equal((await get(null, route)).status, 401);
+});
+
+test("sharing disabled hides cross-owner public and followed-private reads before pagination", async () => {
+  await db.update(echoUniversesTable).set({ sharingEnabled: false }).where(and(
+    eq(echoUniversesTable.ownerId, targetOwner),
+    inArray(echoUniversesTable.universeId, ["primary", "studio"]),
+  ));
+  await db.update(echoUniversesTable).set({ sharingEnabled: false }).where(and(
+    eq(echoUniversesTable.ownerId, otherOwner),
+    inArray(echoUniversesTable.universeId, ["primary", "sparse"]),
+  ));
+
+  // An accepted follow cannot bypass the universe-level denial for private content.
+  assert.equal(
+    (await get(viewerOwner, targetPath(targetOwner, "primary") + viewerQuery())).status,
+    404,
+  );
+  // Public characters and direct IDs are also hidden while their universe is off.
+  assert.equal(
+    (await get(viewerOwner, targetPath(targetOwner, "studio"))).status,
+    404,
+  );
+  assert.equal(
+    (await get(viewerOwner, targetPath(targetOwner, "studio", characterId, "/posts"))).status,
+    404,
+  );
+  assert.equal(
+    (await get(viewerOwner, targetPath(targetOwner, "studio", characterId, `/posts/${postId}`))).status,
+    404,
+  );
+  assert.equal(
+    (await get(viewerOwner, targetPath(targetOwner, "studio", characterId, "/stories"))).status,
+    404,
+  );
+  assert.equal(
+    (await get(viewerOwner, targetPath(targetOwner, "studio", characterId, "/stories/public-story"))).status,
+    404,
+  );
+
+  // The creator still reads their own same-universe content with sharing off.
+  assert.equal((await get(targetOwner, targetPath(targetOwner, "primary"))).status, 200);
+  assert.equal((await get(targetOwner, targetPath(targetOwner, "primary", characterId, "/posts"))).status, 200);
+
+  const response = await get(
+    viewerOwner,
+    `/social/feed?viewerUniverseId=primary&viewerCharacterId=accepted-viewer&limit=1`,
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json() as {
+    items: Array<{ identity: CharacterIdentity; post: Record<string, unknown> }>;
+    nextCursor: string | null;
+  };
+  assert.deepEqual(body.items.map((item) => item.post.caption), ["VIEWER_OWN_POST"]);
+  assert.equal(body.items.some((item) =>
+    item.identity.ownerId === targetOwner || item.identity.ownerId === otherOwner,
+  ), false);
+  assert.equal(body.nextCursor, null, "denied posts must be filtered before page boundaries are computed");
 });

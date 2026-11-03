@@ -17,6 +17,11 @@ export type SocialContentViewer = {
   characterId: string;
 };
 
+type CharacterReadOptions = {
+  /** Media is intentionally deferred to privacy step 2B. */
+  requireUniverseSharing?: boolean;
+};
+
 type PlainRecord = Record<string, unknown>;
 
 function record(value: unknown): PlainRecord | null {
@@ -133,9 +138,13 @@ export async function canReadSocialCharacter(
   authenticatedOwnerId: string,
   target: CharacterIdentity,
   viewer?: SocialContentViewer,
+  options: CharacterReadOptions = {},
 ): Promise<boolean> {
   if (!authenticatedOwnerId) return false;
-  const [targetUniverse] = await db.select({ state: echoUniversesTable.state })
+  const [targetUniverse] = await db.select({
+    state: echoUniversesTable.state,
+    sharingEnabled: echoUniversesTable.sharingEnabled,
+  })
     .from(echoUniversesTable)
     .where(and(
       eq(echoUniversesTable.ownerId, target.ownerId),
@@ -146,7 +155,12 @@ export async function canReadSocialCharacter(
     ? stateCharacters(targetUniverse.state).find((character) => character.id === target.characterId)
     : undefined;
   if (!targetCharacter) return false;
-  if (authenticatedOwnerId === target.ownerId) return true;
+  if (authenticatedOwnerId === target.ownerId) {
+    // A direct owner read remains available, but a request made in another
+    // selected universe must not cross this universe boundary.
+    return !viewer || viewer.universeId === target.universeId;
+  }
+  if (options.requireUniverseSharing !== false && !targetUniverse.sharingEnabled) return false;
   if (targetCharacter.archived === true) return false;
 
   const [privacy] = await db.select({ visibility: echoCharacterPrivacyTable.visibility })
@@ -266,6 +280,7 @@ export async function canReadSocialMedia(
         authenticatedOwnerId,
         { ownerId: mediaOwnerId, universeId: universe.universeId, characterId },
         viewer,
+        { requireUniverseSharing: false },
       )) return true;
     }
   }
