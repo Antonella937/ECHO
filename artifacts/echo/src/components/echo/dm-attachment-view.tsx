@@ -1,10 +1,11 @@
 import type { MessageAttachment } from '@/domain/types';
-import { resolveMedia } from '@/lib/media';
+import { useMediaResolver } from '@/lib/media';
 import { formatDuration } from '@/lib/dm-attachments';
 import { cn } from '@/lib/utils';
 
-export function AttachmentView({ a, mine }: { a: MessageAttachment; mine: boolean }) {
-  const src = resolveMedia(a.url);
+export function AttachmentView({ a, mine, messageId }: { a: MessageAttachment; mine: boolean; messageId?: string }) {
+  const resolveMedia = useMediaResolver();
+  const src = resolveMedia(a.url, messageId ? { sourceType: 'message', sourceContentId: messageId } : undefined);
   if (a.type === 'image')
     return <img src={src} alt="Foto adjunta" loading="lazy" className="max-h-72 w-56 rounded-2xl border border-border object-cover" data-testid={`img-attachment-${a.id}`} />;
   if (a.type === 'video')

@@ -12,6 +12,7 @@ import type { PostMedia } from '@/domain/types';
 import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/types';
 import { editSocialPost, setPinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, type PostEdit } from '@/domain/social-features';
 import { getActiveUniverseId } from './persistence';
+import { MediaScopeContext } from '@/lib/media';
 
 export interface SocialActions {
   editPost(id: string, patch: Partial<PostEdit>, expected?: Partial<PostEdit>): void;
@@ -60,6 +61,7 @@ interface StoreValue {
 const Ctx = createContext<StoreValue | null>(null);
 
 export function SocialStoreProvider({ children, fallback, userId }: { children: ReactNode; fallback: ReactNode; userId: string }) {
+  const [mediaUniverseId] = useState(() => getActiveUniverseId(userId));
   const [view, setView] = useState<SyncView>({
     state: null, error: null, busy: false, lastSavedAt: null,
     conflicts: [], legacyAvailable: false, importVerified: false, importing: false,
@@ -73,7 +75,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     const engine = new UniverseSync(userId, createSeedState, next => {
       stateRef.current = next.state;
       setView(next);
-    }, undefined, getActiveUniverseId(userId));
+    }, undefined, mediaUniverseId);
     coordinator.current = engine;
     void engine.initialize();
     const refresh = () => { if (document.visibilityState !== 'hidden') void engine.sync(); };
@@ -327,8 +329,10 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
   }
   return (
     <Ctx.Provider value={value}>
+      <MediaScopeContext.Provider value={{ universeId: mediaUniverseId, state: value.state }}>
       {children}
       <SyncNotices view={view} engine={coordinator.current} />
+      </MediaScopeContext.Provider>
     </Ctx.Provider>
   );
 }

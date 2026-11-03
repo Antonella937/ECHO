@@ -11,7 +11,7 @@ const STORY_REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
 import { useStoryGroups, type StoryGroup } from '@/hooks/use-social-selectors';
-import { resolveMedia, timeAgo } from '@/lib/media';
+import { useMediaResolver, timeAgo } from '@/lib/media';
 import { CharacterAvatar } from './avatar';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -74,6 +74,7 @@ export function StoryViewerProvider({ children }: { children: ReactNode }) {
 }
 
 function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIndex: number; onClose(): void }) {
+  const resolveMedia = useMediaResolver();
   const { me, actions, state, character } = useSocial();
   const [, navigate] = useLocation();
   const [gi, setGi] = useState(startIndex);
@@ -186,7 +187,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
         <img
           key={story.id}
-          src={resolveMedia(story.image)}
+          src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })}
           alt={story.caption || `Historia de ${group.author.name}`}
           className="fade-up absolute inset-0 h-full w-full object-cover"
           draggable={false}

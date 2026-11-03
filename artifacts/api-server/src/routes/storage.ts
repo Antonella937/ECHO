@@ -37,7 +37,7 @@ const viewerQuerySchema = z.object({
   viewerCharacterId: z.string().trim().min(1).max(120).optional(),
   sourceUniverseId: z.string().trim().min(1).max(120).optional(),
   sourceCharacterId: z.string().trim().min(1).max(120).optional(),
-  sourceType: z.enum(["post", "story", "avatar"]).optional(),
+  sourceType: z.enum(["post", "story", "avatar", "message"]).optional(),
   sourceContentId: z.string().trim().min(1).max(160).optional(),
 }).strict().refine((value) =>
   Boolean(value.viewerUniverseId) === Boolean(value.viewerCharacterId),

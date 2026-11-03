@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { resolveMedia } from '@/lib/media';
+import { useMediaResolver } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import type { PostMedia } from '@/domain/types';
 
@@ -16,6 +16,8 @@ interface Props {
 
 /** Single photo renders exactly like legacy posts; 2+ becomes a native scroll-snap carousel. */
 export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Props) {
+  const resolveScopedMedia = useMediaResolver();
+  const resolveMedia = (ref: string) => resolveScopedMedia(ref, { sourceType: 'post', sourceContentId: postId });
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const downLeft = useRef(0);

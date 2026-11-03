@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Archive, Check, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { uid } from '@/domain/events';
-import { resolveMedia, timeAgo } from '@/lib/media';
+import { useMediaResolver, timeAgo } from '@/lib/media';
 import { isStoryActive } from '@/domain/social-features';
 import { Sheet } from './sheet';
 import { useStoryViewer } from './story-viewer';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import type { StoryHighlight } from '@/domain/types';
 
 export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: boolean }) {
+  const resolveMedia = useMediaResolver();
   const { state } = useSocial();
   const { openStoryList } = useStoryViewer();
   const [editing, setEditing] = useState<StoryHighlight | 'new' | null>(null);
@@ -25,7 +26,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
         return (
           <div key={h.id} className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
             <button onClick={() => openStoryList(authorId, h.storyIds)} className="tap h-16 w-16 overflow-hidden rounded-full border border-border bg-card p-[3px]" aria-label={`Ver destacada ${h.title}`} data-testid={`button-highlight-${h.id}`}>
-              {cover && <img src={resolveMedia(cover.image)} alt="" className="h-full w-full rounded-full object-cover" />}
+              {cover && <img src={resolveMedia(cover.image, { sourceType: 'story', sourceContentId: cover.id })} alt="" className="h-full w-full rounded-full object-cover" />}
             </button>
             <span className="w-full truncate text-center text-[11.5px]">{h.title}</span>
             {isMe && <button onClick={() => setEditing(h)} className="-mt-2 grid h-11 w-11 place-items-center text-muted-foreground" aria-label={`Editar ${h.title}`} data-testid={`button-highlight-edit-${h.id}`}><Pencil className="h-3.5 w-3.5" /></button>}
@@ -50,6 +51,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
 }
 
 function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null; onClose(): void }) {
+  const resolveMedia = useMediaResolver();
   const { state, me, actions } = useSocial();
   const [title, setTitle] = useState(initial?.title ?? '');
   const [ids, setIds] = useState<string[]>(initial?.storyIds ?? []);
@@ -89,7 +91,7 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
               return (
                 <button key={s.id} type="button" aria-pressed={on} onClick={() => setIds(on ? ids.filter((i) => i !== s.id) : [...ids, s.id])}
                   className={cn('relative overflow-hidden rounded-xl border-2', on ? 'border-primary' : 'border-transparent')} data-testid={`button-highlight-story-${s.id}`}>
-                  <img src={resolveMedia(s.image)} alt={s.caption || 'Historia'} className="aspect-[9/16] w-full object-cover" />
+                  <img src={resolveMedia(s.image, { sourceType: 'story', sourceContentId: s.id })} alt={s.caption || 'Historia'} className="aspect-[9/16] w-full object-cover" />
                   <span className="absolute inset-x-0 bottom-0 bg-[hsl(240_8%_3%/0.65)] px-1.5 py-1 text-[10.5px]">{isStoryActive(s) ? 'Activa' : 'Vencida'} · {timeAgo(s.createdAt)}</span>
                   {on && <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></span>}
                 </button>

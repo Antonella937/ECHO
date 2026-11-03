@@ -5,7 +5,7 @@ import { useSocial } from '@/store/social-store';
 import { TopBar } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { EmptyState } from '@/components/echo/skeletons';
-import { resolveMedia, timeAgo } from '@/lib/media';
+import { useMediaResolver, timeAgo } from '@/lib/media';
 import { postMedia } from '@/domain/post-media';
 import { cn } from '@/lib/utils';
 import type { Notification } from '@/domain/types';
@@ -26,6 +26,7 @@ const VERB: Record<Notification['kind'], string> = {
 };
 
 export default function NotificationsPage() {
+  const resolveMedia = useMediaResolver();
   const { state, me, character, actions } = useSocial();
   const { openStoryList } = useStoryViewer();
   const [, navigate] = useLocation();
@@ -64,7 +65,7 @@ export default function NotificationsPage() {
             {n.excerpt && <span className="text-muted-foreground">: {n.excerpt}</span>}
             <span className="ml-1.5 text-xs text-muted-foreground/80">{timeAgo(n.createdAt)}</span>
           </span>
-          {post && postMedia(post).length > 0 && post.media?.[0]?.type !== 'video' && <img src={resolveMedia(post.image)} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />}
+          {post && postMedia(post).length > 0 && post.media?.[0]?.type !== 'video' && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />}
           <span className={cn('h-2 w-2 shrink-0 rounded-full', n.read ? 'bg-transparent' : 'bg-primary')} aria-label={n.read ? undefined : 'Sin leer'} />
         </button>
       </li>

@@ -20,7 +20,7 @@ export type SocialContentViewer = {
 export type SocialMediaSource = {
   universeId: string;
   characterId: string;
-  contentType: "post" | "story" | "avatar";
+  contentType: "post" | "story" | "avatar" | "message";
   contentId: string;
 };
 
@@ -248,6 +248,12 @@ export function storyIsStillVisible(state: PlainRecord, story: PlainRecord, nowM
   });
 }
 
+function referencesObjectPath(value: unknown, objectPath: string): boolean {
+  if (typeof value !== "string") return false;
+  const path = value.split(/[?#]/, 1)[0].replace(/^\/api\/storage(?=\/objects\/)/, "");
+  return path === objectPath;
+}
+
 function matchesMediaSource(
   stateValue: unknown,
   objectPath: string,
@@ -259,16 +265,25 @@ function matchesMediaSource(
   const character = stateCharacters(state).find((item) => item.id === source.characterId);
   if (!character || (!ownerRead && character.archived === true)) return false;
 
+  if (source.contentType === "message") {
+    if (!ownerRead) return false;
+    const messages = Array.isArray(state.messages) ? state.messages : [];
+    const message = messages.map(record).find(item =>
+      item?.id === source.contentId && item.senderId === source.characterId);
+    return Boolean(message && Array.isArray(message.attachments) &&
+      message.attachments.some(item => referencesObjectPath(record(item)?.url, objectPath)));
+  }
+
   if (source.contentType === "avatar") {
-    return source.contentId === source.characterId && character.avatar === objectPath;
+    return source.contentId === source.characterId && referencesObjectPath(character.avatar, objectPath);
   }
   if (source.contentType === "post") {
     const posts = Array.isArray(state.posts) ? state.posts : [];
     const post = posts.map(record).find((item) =>
       item?.id === source.contentId && item.authorId === source.characterId);
     return Boolean(post && (
-      post.image === objectPath ||
-      (Array.isArray(post.media) && post.media.some((item) => record(item)?.url === objectPath))
+      referencesObjectPath(post.image, objectPath) ||
+      (Array.isArray(post.media) && post.media.some((item) => referencesObjectPath(record(item)?.url, objectPath)))
     ));
   }
   const stories = Array.isArray(state.stories) ? state.stories : [];
@@ -276,7 +291,7 @@ function matchesMediaSource(
     item?.id === source.contentId && item.authorId === source.characterId);
   return Boolean(
     story &&
-    story.image === objectPath &&
+    referencesObjectPath(story.image, objectPath) &&
     (ownerRead || storyIsStillVisible(state, story, Date.now())),
   );
 }
@@ -328,7 +343,7 @@ export async function canReadSocialMedia(
 
 /** Include attachments nested in messages/configuration, not only feed media. */
 function containsObjectPath(value: unknown, objectPath: string): boolean {
-  if (typeof value === "string") return value === objectPath;
+  if (typeof value === "string") return referencesObjectPath(value, objectPath);
   if (Array.isArray(value)) return value.some(item => containsObjectPath(item, objectPath));
   const object = record(value);
   return object ? Object.values(object).some(item => containsObjectPath(item, objectPath)) : false;

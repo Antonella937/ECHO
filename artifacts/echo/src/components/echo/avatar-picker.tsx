@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
-import { compressImage, resolveMedia, uploadPrivateImage } from '@/lib/media';
+import { compressImage, useMediaResolver, uploadPrivateImage } from '@/lib/media';
 import { cn } from '@/lib/utils';
 
 const PRESETS = [
@@ -9,6 +9,7 @@ const PRESETS = [
 ];
 
 export function AvatarPicker({ value, onChange, onBusy }: { value: string; onChange(v: string): void; onBusy(b: boolean): void }) {
+  const resolveMedia = useMediaResolver();
   const input = useRef<HTMLInputElement>(null);
   const token = useRef(0);
   const [busy, setBusy] = useState(false);

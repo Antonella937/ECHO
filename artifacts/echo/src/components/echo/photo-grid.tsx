@@ -2,10 +2,11 @@ import { Link } from 'wouter';
 import { Copy, Heart, MessageCircle, Pin, Play } from 'lucide-react';
 import { postMedia } from '@/domain/post-media';
 import { useSocial } from '@/store/social-store';
-import { resolveMedia } from '@/lib/media';
+import { useMediaResolver } from '@/lib/media';
 import type { Post } from '@/domain/types';
 
 export function PhotoGrid({ posts, showPinned = false }: { posts: Post[]; showPinned?: boolean }) {
+  const resolveMedia = useMediaResolver();
   const { state } = useSocial();
   return (
     <div className="grid grid-cols-3 gap-[3px] sm:gap-1.5">
@@ -20,9 +21,9 @@ export function PhotoGrid({ posts, showPinned = false }: { posts: Post[]; showPi
                 <span className="line-clamp-7">{p.caption || 'Publicación de texto'}</span>
               </div>
             ) : cover.type === 'video' ? (
-              <video src={`${resolveMedia(cover.url)}#t=0.1`} muted playsInline preload="metadata" aria-label={p.caption || 'Video'} className="pointer-events-none aspect-[4/5] w-full bg-black object-cover" data-testid={`video-grid-post-${p.id}`} />
+              <video src={`${resolveMedia(cover.url, { sourceType: 'post', sourceContentId: p.id })}#t=0.1`} muted playsInline preload="metadata" aria-label={p.caption || 'Video'} className="pointer-events-none aspect-[4/5] w-full bg-black object-cover" data-testid={`video-grid-post-${p.id}`} />
             ) : (
-              <img src={resolveMedia(cover.url)} alt={p.caption} loading="lazy" className="aspect-[4/5] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+              <img src={resolveMedia(cover.url, { sourceType: 'post', sourceContentId: p.id })} alt={p.caption} loading="lazy" className="aspect-[4/5] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
             )}
             <span className="pointer-events-none absolute right-1.5 top-1.5 flex gap-1 drop-shadow">
               {showPinned && p.pinned && <Pin className="h-4 w-4 fill-foreground" aria-label="Fijada" data-testid={`status-grid-pinned-${p.id}`} />}

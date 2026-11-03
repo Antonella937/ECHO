@@ -8,7 +8,7 @@ import { CharacterAvatar } from '@/components/echo/avatar';
 import { EmptyState } from '@/components/echo/skeletons';
 import { useBack } from '@/components/echo/top-bar';
 import { AttachmentView } from '@/components/echo/dm-attachment-view';
-import { resolveMedia, timeAgo } from '@/lib/media';
+import { useMediaResolver, timeAgo } from '@/lib/media';
 import { formatDuration, kindOf, uploadAttachment, validateAttachments, MAX_RECORDING_MS } from '@/lib/dm-attachments';
 import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { cn } from '@/lib/utils';
@@ -261,6 +261,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
 }) {
+  const resolveMedia = useMediaResolver();
   const story = m.storyId ? state.stories.find((s) => s.id === m.storyId) : undefined;
   const post = m.postId ? state.posts.find((p) => p.id === m.postId) : undefined;
   const reactions = m.reactions ?? [];
@@ -274,7 +275,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
             ? (mine ? 'Reaccionaste a su historia' : 'Reaccionó a tu historia')
             : (mine ? 'Respondiste a su historia' : 'Respondió a tu historia')}</span>
           {story ? (
-            <img src={resolveMedia(story.image)} alt="Historia" className="h-36 w-24 rounded-xl object-cover opacity-90" />
+            <img src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })} alt="Historia" className="h-36 w-24 rounded-xl object-cover opacity-90" />
           ) : (
             <span className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">Historia no disponible</span>
           )}
@@ -282,7 +283,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
       )}
       {post && (
         <Link href={`/p/${post.id}`} className="mb-1 block w-48 overflow-hidden rounded-2xl border border-border bg-card" data-testid={`link-shared-post-${m.id}`}>
-          {postMedia(post).length > 0 && <img src={resolveMedia(post.image)} alt="" className="aspect-[4/5] w-full object-cover" />}
+          {postMedia(post).length > 0 && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="aspect-[4/5] w-full object-cover" />}
           <p className="truncate px-3 py-2 text-xs text-muted-foreground">{post.caption}</p>
         </Link>
       )}
@@ -296,7 +297,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
       )}
       {m.attachments?.length ? (
         <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
-          {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} />)}
+          {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
         </div>
       ) : null}
       <div className={cn('flex max-w-full items-center gap-1', mine ? 'flex-row-reverse' : 'flex-row')}>

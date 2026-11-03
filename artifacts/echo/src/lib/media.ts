@@ -20,6 +20,8 @@ import a3 from '@/assets/media/official-stray-kids.svg';
 import a4 from '@/assets/media/official-the-hollow.svg';
 import a5 from '@/assets/media/official-dead-static.svg';
 import a6 from '@/assets/media/account-default.svg';
+import { createContext, useContext } from 'react';
+import { mediaSourceFor, privateMediaUrl, type MediaHint, type MediaScope, type MediaSource } from './media-source';
 
 const MEDIA: Record<string, string> = {
   'nela-avatar': nelaAvatar,
@@ -46,10 +48,17 @@ const MEDIA: Record<string, string> = {
   'account-default': a6,
 };
 
-export function resolveMedia(ref: string): string {
+export function resolveMedia(ref: string, source?: MediaSource): string {
   if (ref.startsWith('asset:')) return MEDIA[ref.slice(6)] ?? '';
-  if (ref.startsWith('/objects/')) return `/api/storage${ref}`;
-  return ref;
+  return privateMediaUrl(ref, source);
+}
+
+export const MediaScopeContext = createContext<MediaScope | null>(null);
+
+/** All existing media callers share the loaded owner/universe scope without global mutable caches. */
+export function useMediaResolver() {
+  const scope = useContext(MediaScopeContext);
+  return (ref: string, hint?: MediaHint) => resolveMedia(ref, mediaSourceFor(scope, ref, hint));
 }
 
 /** Downscale and re-encode an image before moving it to private object storage. */

@@ -9,13 +9,14 @@ import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { Switch } from '@/components/ui/switch';
-import { compressImage, resolveMedia, uploadPrivateFile, uploadPrivateImage } from '@/lib/media';
+import { compressImage, useMediaResolver, uploadPrivateFile, uploadPrivateImage } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 type Mode = 'post' | 'story';
 
 export default function CreatePage() {
+  const resolveMedia = useMediaResolver();
   const search = useSearch();
   const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
   const { me, actions } = useSocial();

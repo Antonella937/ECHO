@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mediaSourceFor, privateMediaUrl, type MediaScope } from "../../echo/src/lib/media-source";
 import { after, afterEach, before, beforeEach, test } from "node:test";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
@@ -42,7 +43,7 @@ const allPaths = Object.values(objectPaths);
 type SourceAssociation = {
   universeId: string;
   characterId: string;
-  sourceType: "post" | "story" | "avatar";
+  sourceType: "post" | "story" | "avatar" | "message";
   contentId: string;
 };
 
@@ -285,7 +286,9 @@ before(async () => {
       return { status: 200, headers: new Headers({ "Content-Type": "image/jpeg" }), body: null };
     },
   } as unknown as NonNullable<Parameters<typeof createStorageRouter>[0]>["storage"];
-  app.use(createStorageRouter({ authenticate: syntheticAuth, storage: fakeStorage }));
+  const router = createStorageRouter({ authenticate: syntheticAuth, storage: fakeStorage });
+  app.use("/api", router);
+  app.use(router);
   server = createServer(app);
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -305,6 +308,101 @@ after(async () => {
   server?.closeAllConnections();
   if (server?.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
   await cleanup();
+});
+
+test("real caller URLs serve all active associations of a shared object while archived contexts stay 404", async () => {
+  const scopes: Record<string, MediaScope> = {};
+  for (const universeId of ["primary", "studio"]) {
+    const where = and(eq(echoUniversesTable.ownerId, contentOwner), eq(echoUniversesTable.universeId, universeId));
+    const [row] = await db.select().from(echoUniversesTable).where(where);
+    const state = structuredClone(row.state) as unknown as MediaScope["state"];
+    state.characters[0].avatar = objectPaths.sharedAcrossUniverses;
+    state.posts[0].image = objectPaths.sharedAcrossUniverses;
+    state.stories[0].image = objectPaths.sharedAcrossUniverses;
+    state.messages = [{
+      id: "same-message", senderId: "same-id", recipientId: "same-id", threadId: "fixture",
+      text: "", createdAt: new Date().toISOString(), storyId: null, postId: null, readBy: [], origin: "user",
+      attachments: [{ id: "attachment", type: "image", url: objectPaths.sharedAcrossUniverses }],
+    }];
+    await db.update(echoUniversesTable).set({ state: state as unknown as Record<string, unknown> }).where(where);
+    scopes[universeId] = { universeId, state };
+  }
+  const request = (universe: string, type: SourceAssociation["sourceType"], owner: string, viewer = false) => {
+    const state = scopes[universe].state;
+    const id = type === "avatar" ? "same-id" : type === "post" ? state.posts[0].id :
+      type === "story" ? state.stories[0].id : "same-message";
+    const source = mediaSourceFor(scopes[universe], objectPaths.sharedAcrossUniverses,
+      { sourceType: type, sourceContentId: id });
+    assert.ok(source);
+    const url = new URL(privateMediaUrl(objectPaths.sharedAcrossUniverses, source), baseUrl);
+    if (viewer) {
+      url.searchParams.set("viewerUniverseId", "primary");
+      url.searchParams.set("viewerCharacterId", "accepted-viewer");
+    }
+    return fetch(url, { headers: authHeaders(owner) });
+  };
+  await manageUniverse(contentOwner, "primary", { action: "archive", expectedRevision: 1 });
+  for (const type of ["avatar", "post", "story", "message"] as const) {
+    const count = downloadCount;
+    assert.equal((await request("primary", type, contentOwner)).status, 404);
+    assert.equal((await request("primary", type, followerOwner, true)).status, 404);
+    assert.equal((await request("primary", type, strangerOwner)).status, 404);
+    assert.equal(downloadCount, count);
+    const active = await request("studio", type, contentOwner);
+    assert.equal(active.status, 200);
+    assert.equal(active.headers.get("cache-control"), "private, no-store");
+    assert.equal((await request("studio", type, strangerOwner)).status, type === "message" ? 404 : 200);
+  }
+  assert.equal((await getMedia(contentOwner, objectPaths.sharedAcrossUniverses, undefined, null)).status, 404);
+  await db.update(echoUniversesTable).set({ sharingEnabled: false }).where(and(
+    eq(echoUniversesTable.ownerId, contentOwner), eq(echoUniversesTable.universeId, "studio")));
+  for (const type of ["avatar", "post", "story", "message"] as const) {
+    assert.equal((await request("studio", type, contentOwner)).status, 200);
+    assert.equal((await request("studio", type, strangerOwner)).status, 404);
+  }
+  await manageUniverse(contentOwner, "primary", { action: "restore", expectedRevision: 2 });
+  for (const type of ["avatar", "post", "story", "message"] as const) {
+    assert.equal((await request("primary", type, contentOwner)).status, 200);
+    assert.equal((await request("primary", type, strangerOwner)).status, 404);
+    assert.equal((await request("primary", type, followerOwner, true)).status, type === "message" ? 404 : 200);
+  }
+  for (const universe of ["primary", "studio"]) {
+    const [row] = await db.select().from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId, contentOwner), eq(echoUniversesTable.universeId, universe)));
+    assert.deepEqual(row.state, scopes[universe].state);
+  }
+});
+
+test("forged active context, author, content, attachment or viewer cannot authorize unrelated media", async () => {
+  const source = { universeId: "studio", characterId: "same-id", sourceType: "post" as const, contentId: "same-post" };
+  const count = downloadCount;
+  for (const forged of [
+    { ...source, universeId: "missing" }, { ...source, characterId: "missing" },
+    { ...source, contentId: "missing" }, { ...source, sourceType: "story" as const },
+    { ...source, sourceType: "message" as const, contentId: "missing" },
+  ]) assert.equal((await getMedia(contentOwner, objectPaths.publicPost, undefined, forged)).status, 404);
+  assert.equal((await getMedia(contentOwner, objectPaths.unattached, undefined, source)).status, 404);
+  assert.equal((await getMedia(strangerOwner, objectPaths.publicPost,
+    { universeId: "primary", characterId: "accepted-viewer" }, source)).status, 404);
+  assert.equal(downloadCount, count);
+});
+
+test("legacy local protected URL aliases remain readable with context and cannot bypass archive without it", async () => {
+  const scope = and(eq(echoUniversesTable.ownerId, contentOwner), eq(echoUniversesTable.universeId, "studio"));
+  const [row] = await db.select().from(echoUniversesTable).where(scope);
+  const state = structuredClone(row.state) as unknown as MediaScope["state"];
+  state.characters[0].avatar = `/api/storage${objectPaths.sharedAcrossUniverses}?sourceUniverseId=primary&sourceCharacterId=same-id&sourceType=avatar&sourceContentId=same-id#preview`;
+  await db.update(echoUniversesTable).set({ state: state as unknown as Record<string, unknown> }).where(scope);
+  const source = mediaSourceFor({ universeId: "studio", state }, state.characters[0].avatar,
+    { sourceType: "avatar", sourceContentId: "same-id" });
+  assert.ok(source);
+  const url = privateMediaUrl(state.characters[0].avatar, source);
+  assert.equal((await fetch(new URL(url, baseUrl), { headers: authHeaders(contentOwner) })).status, 200);
+  await manageUniverse(contentOwner, "studio", { action: "archive", expectedRevision: 1 });
+  assert.equal((await fetch(new URL(url, baseUrl), { headers: authHeaders(contentOwner) })).status, 404);
+  assert.equal((await getMedia(contentOwner, objectPaths.sharedAcrossUniverses, undefined, null)).status, 404);
+  await manageUniverse(contentOwner, "studio", { action: "restore", expectedRevision: 2 });
+  assert.equal((await fetch(new URL(url, baseUrl), { headers: authHeaders(contentOwner) })).status, 200);
 });
 
 test("archive revokes owner, follower and raw media URLs before bytes; restore preserves all content", async () => {

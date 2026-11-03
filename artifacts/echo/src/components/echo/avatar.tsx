@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { resolveMedia } from '@/lib/media';
+import { useMediaResolver } from '@/lib/media';
 import type { Character } from '@/domain/types';
 
 interface Props {
@@ -10,6 +10,9 @@ interface Props {
 }
 
 export function CharacterAvatar({ character, size = 36, ring = 'none', className }: Props) {
+  const resolveScopedMedia = useMediaResolver();
+  const resolveMedia = (ref: string) => resolveScopedMedia(ref,
+    { sourceType: 'avatar', sourceContentId: character.id, sourceCharacterId: character.id });
   const img = (
     <img
       src={resolveMedia(character.avatar)}
