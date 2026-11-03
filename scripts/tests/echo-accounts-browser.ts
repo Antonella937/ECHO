@@ -20,6 +20,7 @@ const {
 } = serverRequire('@workspace/db');
 const { eq, inArray } = serverRequire('drizzle-orm');
 const { ObjectStorageService } = await import('../../artifacts/api-server/src/lib/objectStorage');
+const { defaultCharacterConfig } = await import('../../artifacts/echo/src/domain/character-core');
 const base = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:80';
 if (process.env.NODE_ENV === 'production'
   || !process.env.CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_')
@@ -35,8 +36,12 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 const nonce = Date.now().toString(36);
 const out = new URL('../../generated-artifacts/echo-stage2/', import.meta.url).pathname;
 await mkdir(out, { recursive: true });
-async function createUser() {
-  const user = await clerkClient.users.createUser({ emailAddress: [`echo_${nonce}_${created.length}+clerk_test@example.com`], skipPasswordRequirement: true });
+async function createUser(autonomyPreviewTest = false) {
+  const user = await clerkClient.users.createUser({
+    emailAddress: [`echo_${nonce}_${created.length}+clerk_test@example.com`],
+    skipPasswordRequirement: true,
+    ...(autonomyPreviewTest ? { publicMetadata: { echoAutonomyPreviewTest: true } } : {}),
+  });
   created.push(user.id); return user.id;
 }
 async function signedIn(userId: string): Promise<Page> {
@@ -62,11 +67,191 @@ async function state(page: Page): Promise<any> {
     return (await response.json()).state;
   });
 }
+async function universeEnvelope(page: Page, baseUrl: string) {
+  const response = await page.context().request.get(`${baseUrl}/api/universe`, { headers: { 'cache-control': 'no-store' } });
+  assert.equal(response.status(), 200);
+  return response.json();
+}
+function autonomyPreviewFixture(state: any, situation: string) {
+  const now = Date.now();
+  const actor = state.characters.find((character: any) => character.id === 'mar');
+  const other = state.characters.find((character: any) => character.id === 'noah');
+  const friend = state.characters.find((character: any) => character.id === 'nela');
+  assert.ok(actor && other && friend, 'test universe seed accounts must exist');
+  actor.configuration = defaultCharacterConfig(actor);
+  state.follows = { ...state.follows, mar: ['nela', 'noah'] };
+  state.posts = [];
+  state.comments = [];
+  state.stories = [];
+  state.messages = [];
+  state.notifications = [];
+  const targetId = `test-${situation}-target`;
+  const post = {
+    id: 'test-preview-parent-post',
+    authorId: other.id,
+    image: 'asset:noah-1',
+    caption: 'Disposable preview target post.',
+    location: 'Test universe',
+    createdAt: new Date(now - 60 * 60_000).toISOString(),
+    likes: [] as string[],
+    savedBy: [],
+    origin: 'seed',
+    illustrative: true,
+    commentsEnabled: false,
+  };
+  const targetLabel: Record<string, string> = {
+    like_post: 'recent post by a followed test character',
+    like_comment: 'text comment on a followed test character post',
+    story_reaction: 'viewed, unexpired text Story by a followed test character',
+    dm_reaction: 'incoming text DM in the disposable test universe',
+  };
+  if (situation === 'like_post') {
+    state.posts = [{ ...post, id: targetId }];
+  } else if (situation === 'like_comment') {
+    state.posts = [{ ...post, likes: [actor.id] }];
+    state.comments = [{
+      id: targetId,
+      postId: post.id,
+      authorId: friend.id,
+      text: 'A synthetic comment target for this isolated preview.',
+      createdAt: new Date(now - 30 * 60_000).toISOString(),
+      parentId: null,
+      replyToAuthorId: null,
+      likes: [],
+      origin: 'seed',
+    }];
+  } else if (situation === 'story_reaction') {
+    state.stories = [{
+      id: targetId,
+      authorId: other.id,
+      image: 'asset:noah-2',
+      caption: 'A synthetic Story target for this isolated preview.',
+      createdAt: new Date(now - 30 * 60_000).toISOString(),
+      seenBy: [actor.id],
+      reactions: [],
+      origin: 'seed',
+    }];
+  } else if (situation === 'dm_reaction') {
+    state.messages = [{
+      id: targetId,
+      threadId: `test-thread-${actor.id}-${other.id}`,
+      senderId: other.id,
+      recipientId: actor.id,
+      text: 'A synthetic incoming DM target for this isolated preview.',
+      createdAt: new Date(now - 15 * 60_000).toISOString(),
+      storyId: null,
+      postId: null,
+      readBy: [actor.id],
+      origin: 'seed',
+      reactions: [],
+    }];
+  } else {
+    throw new Error(`Unsupported autonomy preview scenario: ${situation}`);
+  }
+  return { state, characterId: actor.id, targetId, targetLabel: targetLabel[situation] };
+}
 try {
-  const owner = await createUser(), page = await signedIn(owner);
+  const autonomyPreviewOnly = process.env.ECHO_AUTONOMY_PREVIEWS_ONLY === '1';
+  const owner = await createUser(autonomyPreviewOnly), page = await signedIn(owner);
   const initial = await state(page);
   assert.equal(initial.currentCharacterId, 'nela');
-  if (process.env.ECHO_AUTONOMY_BLOCKER_AUDIT === '1') {
+  if (autonomyPreviewOnly) {
+    const scenarios = ['like_post', 'like_comment', 'story_reaction', 'dm_reaction'];
+    const reports: any[] = [];
+    for (let index = 0; index < scenarios.length; index++) {
+      const situation = scenarios[index];
+      const testOwner = index === 0 ? owner : await createUser(true);
+      const testPage = index === 0 ? page : await signedIn(testOwner);
+      const beforeSetup = await universeEnvelope(testPage, base);
+      const fixture = autonomyPreviewFixture(structuredClone(beforeSetup.state), situation);
+      const setupResponse = await testPage.context().request.put(`${base}/api/universe`, {
+        data: { state: fixture.state, expectedRevision: beforeSetup.revision },
+      });
+      assert.equal(setupResponse.status(), 200, `failed to seed disposable ${situation} target`);
+      const baseline = await universeEnvelope(testPage, base);
+      const settingsResponse = await testPage.context().request.get(`${base}/api/autonomy/settings`);
+      assert.equal(settingsResponse.status(), 200);
+      const settings = await settingsResponse.json();
+      assert.equal(settings.liveExecutionEnabled, false);
+      assert.ok(settings.globalKillSwitchEngaged);
+      assert.ok(settings.characters.every((character: any) => character.enabled === false));
+
+      const response = await testPage.context().request.post(`${base}/api/autonomy/test-preview`, {
+        data: {
+          characterId: fixture.characterId,
+          situation,
+          targetId: fixture.targetId,
+          idempotencyKey: randomUUID(),
+        },
+      });
+      const report = await response.json();
+      const attempts = report.attempts ?? report.preview?.attempts ?? [];
+      const record = {
+        situation,
+        eligibleTarget: fixture.targetLabel,
+        targetId: fixture.targetId,
+        providerCalled: report.providerCalled === true,
+        provider: report.preview?.provider ?? null,
+        model: report.preview?.model ?? attempts.find((attempt: any) => attempt.outcome === 'success')?.model ?? null,
+        validatorAccepted: report.validatorAccepted === true,
+        decision: report.preview?.decision ? {
+          action: report.preview.decision.action,
+          situation: report.preview.decision.situation,
+          text: report.preview.decision.text ?? null,
+          reaction: report.preview.decision.reaction ?? null,
+        } : null,
+        cost: report.preview?.usage?.cost ?? null,
+        attempts: attempts.map((attempt: any) => ({
+          model: attempt.model, outcome: attempt.outcome, code: attempt.code, cost: attempt.usage?.cost ?? null,
+        })),
+        error: report.error ?? null,
+        executed: report.executed ?? null,
+        socialActionsExecuted: report.socialActionsExecuted ?? null,
+        liveExecutionEnabled: report.liveExecutionEnabled,
+        sourceRevision: report.preview?.sourceRevision ?? null,
+      };
+      reports.push(record);
+      const after = await universeEnvelope(testPage, base);
+      assert.deepEqual(after, baseline, `preview wrote social data for ${situation}`);
+      assert.equal(after.revision, baseline.revision);
+      const settingsAfterResponse = await testPage.context().request.get(`${base}/api/autonomy/settings`);
+      assert.deepEqual(await settingsAfterResponse.json(), settings, `preview changed controls for ${situation}`);
+      if (!record.providerCalled) {
+        console.log(JSON.stringify({ blockedAt: situation, reports }));
+        throw new Error(`AUTONOMY_TEST_PREVIEW_DID_NOT_REACH_PROVIDER:${situation}:${record.error ?? response.status()}`);
+      }
+      assert.ok(record.attempts.every((attempt: any) => attempt.model.endsWith(':free')), `${situation} included a non-free provider attempt`);
+      if (response.status() !== 200 || !record.validatorAccepted) {
+        console.log(JSON.stringify({ providerReachedButPreviewRejectedAt: situation, reports }));
+        const routeUnavailableCodes = new Set([
+          'OPENROUTER_RATE_LIMITED', 'MODEL_COOLDOWN', 'FREE_MODEL_CATALOG_UNAVAILABLE',
+        ]);
+        if (!record.attempts.length || record.attempts.every((attempt: any) => routeUnavailableCodes.has(attempt.code))) {
+          throw new Error(`FREE_OPENROUTER_ROUTE_UNAVAILABLE:${situation}:${record.error ?? response.status()}`);
+        }
+        continue;
+      }
+      assert.equal(record.executed, false);
+      assert.equal(record.socialActionsExecuted, false);
+      assert.equal(record.liveExecutionEnabled, false);
+      assert.ok(String(record.model).endsWith(':free'), `${situation} did not use a free model`);
+      assert.ok(String(record.provider).toLowerCase().includes('openrouter'), `${situation} did not use OpenRouter`);
+      assert.ok(record.attempts.every((attempt: any) => attempt.model.endsWith(':free')), `${situation} included a non-free fallback`);
+      assert.ok(record.cost == null || record.cost <= 0, `${situation} reported non-zero cost`);
+      const expectedAction = situation === 'like_post' || situation === 'like_comment' ? 'like' : 'react';
+      assert.ok(record.decision.action === 'none' || record.decision.action === expectedAction);
+      assert.equal(record.decision.situation, situation);
+    }
+    console.log(JSON.stringify({
+      audit: 'four-authenticated-disposable-openrouter-previews',
+      previews: reports,
+      universeUnchangedDuringEachPreview: true,
+      disposableAccountsAndUniversesCleanedInFinally: true,
+      liveExecutionEnabled: false,
+      realOwnerTouched: false,
+      uiChanged: false,
+    }));
+  } else if (process.env.ECHO_AUTONOMY_BLOCKER_AUDIT === '1') {
     const envelope = async () => {
       const response = await page.context().request.get(`${base}/api/universe`, { headers: { 'cache-control': 'no-store' } });
       assert.equal(response.status(), 200);
