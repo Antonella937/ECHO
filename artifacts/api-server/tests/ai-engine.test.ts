@@ -95,21 +95,20 @@ test('permite borrador de post válido con personaje sin ficha profunda', async 
 });
 test('diagnostica cada inconsistencia semántica sin conservar la salida del modelo', async () => {
   const s = fixture(), input = { characterId: 'mar', situation: 'post' as const };
+  const unconfigured = fixture();
+  delete unconfigured.characters.find(c => c.id === 'mar')!.configuration;
   const cases: Array<{ value: unknown; diagnostic: string; state?: ReturnType<typeof fixture> }> = [
     { value: result('dm'), diagnostic: 'SITUATION_MISMATCH' },
     { value: result('post', { action: 'none', text: 'Aun así publica' }), diagnostic: 'NONE_TEXT_NOT_NULL' },
     { value: result('post', { text: '   ' }), diagnostic: 'DRAFT_TEXT_EMPTY' },
     { value: result('post', { text: 'x'.repeat(601) }), diagnostic: 'DRAFT_TEXT_LIMIT_EXCEEDED' },
-    { value: result('post', { contextSections: ['identity', 'voice'] }), diagnostic: 'CONTEXT_SECTION_UNAVAILABLE' },
+    { value: result('post', { contextSections: ['identity', 'personality'] }),
+      diagnostic: 'CONTEXT_SECTION_UNAVAILABLE', state: unconfigured },
     { value: result('post', { contextSections: ['identity', 'identity'] }), diagnostic: 'DUPLICATE_CONTEXT_SECTION' },
     { value: result('post', { text: 'http://example.com/private' }), diagnostic: 'FORBIDDEN_URL_OR_SECRET_PATTERN' },
     { value: result('post', { text: '/objects/private-file' }), diagnostic: 'FORBIDDEN_URL_OR_SECRET_PATTERN' },
     { value: result('post', { reason: 'Credential sk-or-v1-never-log-this' }), diagnostic: 'FORBIDDEN_URL_OR_SECRET_PATTERN' },
   ];
-  const unconfigured = fixture();
-  delete unconfigured.characters.find(c => c.id === 'mar')!.configuration;
-  cases.push({ value: result('post', { contextSections: ['identity', 'personality'] }),
-    diagnostic: 'CONTEXT_SECTION_UNAVAILABLE', state: unconfigured });
   for (const item of cases) {
     const secretLikeOutput = JSON.stringify(item.value);
     const fake: TextProvider = { name: 'synthetic', complete: async request => {
