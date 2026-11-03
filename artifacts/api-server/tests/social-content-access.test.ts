@@ -33,9 +33,45 @@ const objectPaths = {
   publicCarouselItem: `/objects/uploads/${crypto.randomUUID()}`,
   publicStory: `/objects/uploads/${crypto.randomUUID()}`,
   publicAvatar: `/objects/uploads/${crypto.randomUUID()}`,
+  sharedAcrossUniverses: `/objects/uploads/${crypto.randomUUID()}`,
   unattached: `/objects/uploads/${crypto.randomUUID()}`,
 };
 const allPaths = Object.values(objectPaths);
+
+type SourceAssociation = {
+  universeId: string;
+  characterId: string;
+  sourceType: "post" | "story" | "avatar";
+  contentId: string;
+};
+
+function sourceForPath(objectPath: string): SourceAssociation | undefined {
+  if (objectPath === objectPaths.privatePost || objectPath === objectPaths.privateCarouselItem) {
+    return { universeId: "primary", characterId: "same-id", sourceType: "post", contentId: "same-post" };
+  }
+  if (objectPath === objectPaths.privateStory) {
+    return { universeId: "primary", characterId: "same-id", sourceType: "story", contentId: "active-story" };
+  }
+  if (objectPath === objectPaths.expiredStory) {
+    return { universeId: "primary", characterId: "same-id", sourceType: "story", contentId: "expired-story" };
+  }
+  if (objectPath === objectPaths.highlightedStory) {
+    return { universeId: "primary", characterId: "same-id", sourceType: "story", contentId: "highlighted-story" };
+  }
+  if (objectPath === objectPaths.privateAvatar) {
+    return { universeId: "primary", characterId: "same-id", sourceType: "avatar", contentId: "same-id" };
+  }
+  if (objectPath === objectPaths.publicPost || objectPath === objectPaths.publicCarouselItem) {
+    return { universeId: "studio", characterId: "same-id", sourceType: "post", contentId: "same-post" };
+  }
+  if (objectPath === objectPaths.publicStory) {
+    return { universeId: "studio", characterId: "same-id", sourceType: "story", contentId: "public-story" };
+  }
+  if (objectPath === objectPaths.publicAvatar) {
+    return { universeId: "studio", characterId: "same-id", sourceType: "avatar", contentId: "same-id" };
+  }
+  return undefined;
+}
 
 let server: Server;
 let baseUrl = "";
@@ -60,11 +96,13 @@ async function seedUniverse(
   ownerId: string,
   universeId: string,
   state: Record<string, unknown>,
+  sharingEnabled = false,
 ): Promise<void> {
   await db.insert(echoUniversesTable).values({
     ownerId,
     universeId,
     revision: 1,
+    sharingEnabled,
     state,
   });
 }
@@ -81,7 +119,10 @@ async function seedFixture(): Promise<void> {
       id: "same-post",
       authorId: "same-id",
       image: objectPaths.privatePost,
-      media: [{ url: objectPaths.privateCarouselItem, position: 1 }],
+      media: [
+        { url: objectPaths.privateCarouselItem, position: 1 },
+        { url: objectPaths.sharedAcrossUniverses, position: 2 },
+      ],
     }],
     stories: [
       { id: "active-story", authorId: "same-id", image: objectPaths.privateStory, createdAt: new Date().toISOString() },
@@ -89,7 +130,7 @@ async function seedFixture(): Promise<void> {
       { id: "highlighted-story", authorId: "same-id", image: objectPaths.highlightedStory, createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() },
     ],
     highlights: [{ id: "highlight", authorId: "same-id", storyIds: ["highlighted-story"] }],
-  });
+  }, true);
   await seedUniverse(contentOwner, "studio", {
     characters: [{ id: "same-id", avatar: objectPaths.publicAvatar }],
     follows: {},
@@ -97,7 +138,10 @@ async function seedFixture(): Promise<void> {
       id: "same-post",
       authorId: "same-id",
       image: objectPaths.publicPost,
-      media: [{ url: objectPaths.publicCarouselItem, position: 1 }],
+      media: [
+        { url: objectPaths.publicCarouselItem, position: 1 },
+        { url: objectPaths.sharedAcrossUniverses, position: 2 },
+      ],
     }],
     stories: [{
       id: "public-story",
@@ -105,7 +149,7 @@ async function seedFixture(): Promise<void> {
       image: objectPaths.publicStory,
       createdAt: new Date().toISOString(),
     }],
-  });
+  }, true);
   await seedUniverse(followerOwner, "primary", {
     characters: [
       { id: "accepted-viewer" },
@@ -184,12 +228,22 @@ function authHeaders(ownerId?: string): HeadersInit {
   return ownerId ? { "x-test-owner": ownerId } : {};
 }
 
-function objectUrl(objectPath: string, viewer?: { universeId: string; characterId: string }): string {
+function objectUrl(
+  objectPath: string,
+  viewer?: { universeId: string; characterId: string },
+  source: SourceAssociation | null = sourceForPath(objectPath) ?? null,
+): string {
   const objectKey = objectPath.replace(/^\/objects\//, "");
   const url = new URL(`/storage/objects/${objectKey}`, baseUrl);
   if (viewer) {
     url.searchParams.set("viewerUniverseId", viewer.universeId);
     url.searchParams.set("viewerCharacterId", viewer.characterId);
+  }
+  if (source) {
+    url.searchParams.set("sourceUniverseId", source.universeId);
+    url.searchParams.set("sourceCharacterId", source.characterId);
+    url.searchParams.set("sourceType", source.sourceType);
+    url.searchParams.set("sourceContentId", source.contentId);
   }
   return url.toString();
 }
@@ -198,8 +252,12 @@ async function getMedia(
   ownerId: string | undefined,
   objectPath: string,
   viewer?: { universeId: string; characterId: string },
+  source?: SourceAssociation | null,
 ): Promise<Response> {
-  return fetch(objectUrl(objectPath, viewer), { headers: authHeaders(ownerId) });
+  return fetch(
+    source === undefined ? objectUrl(objectPath, viewer) : objectUrl(objectPath, viewer, source),
+    { headers: authHeaders(ownerId) },
+  );
 }
 
 const syntheticAuth: RequestHandler = (req, res, next) => {

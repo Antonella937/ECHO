@@ -37,7 +37,7 @@ const viewerQuerySchema = z.object({
   viewerCharacterId: z.string().trim().min(1).max(120).optional(),
   sourceUniverseId: z.string().trim().min(1).max(120).optional(),
   sourceCharacterId: z.string().trim().min(1).max(120).optional(),
-  sourceContentType: z.enum(["post", "story", "avatar"]).optional(),
+  sourceType: z.enum(["post", "story", "avatar"]).optional(),
   sourceContentId: z.string().trim().min(1).max(160).optional(),
 }).strict().refine((value) =>
   Boolean(value.viewerUniverseId) === Boolean(value.viewerCharacterId),
@@ -45,7 +45,7 @@ const viewerQuerySchema = z.object({
   const sourceParts = [
     value.sourceUniverseId,
     value.sourceCharacterId,
-    value.sourceContentType,
+    value.sourceType,
     value.sourceContentId,
   ];
   return sourceParts.every(Boolean) || sourceParts.every((part) => !part);
@@ -164,7 +164,7 @@ export function createStorageRouter(options: StorageRouterOptions = {}): IRouter
       ? {
         universeId: parsedViewer.data.sourceUniverseId,
         characterId: parsedViewer.data.sourceCharacterId!,
-        contentType: parsedViewer.data.sourceContentType!,
+        contentType: parsedViewer.data.sourceType!,
         contentId: parsedViewer.data.sourceContentId!,
       }
       : undefined;
