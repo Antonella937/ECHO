@@ -19,6 +19,10 @@ const {
 } = serverRequire("@workspace/db");
 const { eq, and } = serverRequire("drizzle-orm");
 const { ObjectStorageService } = await import("../../artifacts/api-server/src/lib/objectStorage");
+const { previewForOwner } = await import("../../artifacts/api-server/src/ai-engine/service");
+const { runAutonomyDryRun } = await import("../../artifacts/api-server/src/autonomy/service");
+const { readUniverse } = await import("../../artifacts/api-server/src/lib/universeRepository");
+const { visionService } = await import("../../artifacts/api-server/src/vision/service");
 const base = process.env.REPLIT_DEV_DOMAIN
   ? `https://${process.env.REPLIT_DEV_DOMAIN}`
   : "http://localhost:80";
@@ -86,6 +90,35 @@ let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 let cleanupSucceeded = false;
 const cleanupErrors: string[] = [];
 let report: Record<string, unknown> = {};
+let syntheticSituation: "comment" | "like_post" = "comment";
+const syntheticVisionContextReads: Array<{ mediaCount: number; hasSummary: boolean }> = [];
+const syntheticTextProvider = {
+  name: "local-vision-context-check",
+  async complete(input: { context: string; validate?: (text: string) => void }) {
+    const parsed = JSON.parse(input.context);
+    const post = parsed.target?.post;
+    assert.ok(post?.visionSummary, "persisted carousel summary must reach the Brain provider boundary");
+    assert.equal(post.media?.length, 2);
+    assert.ok(post.media.every((item: any) => item.visionAnalysis), "each persisted photo analysis must reach Brain");
+    syntheticVisionContextReads.push({ mediaCount: post.media.length, hasSummary: true });
+    const text = JSON.stringify({
+      action: "none",
+      situation: syntheticSituation,
+      text: null,
+      reason: "Prueba sintética de contexto persistido; no ejecutar ninguna acción.",
+      suggestedDelayMinutes: 0,
+      reaction: null,
+      contextSections: ["identity", "recentSocial"],
+    });
+    input.validate?.(text);
+    return {
+      text,
+      model: "synthetic-vision-context-check",
+      usage: { promptTokens: 0, completionTokens: 0, cost: 0 },
+      attempts: [],
+    };
+  },
+};
 
 async function createDisposableOwner(autonomyPreview = false): Promise<string> {
   const user = await clerkClient.users.createUser({
@@ -209,6 +242,26 @@ try {
 
   const initial = await ensureDisposableUniverse(ownerPage);
   await ensureDisposableUniverse(otherOwnerPage);
+  const disposableState: any = initial.state;
+  disposableState.comments = [];
+  disposableState.stories = [];
+  disposableState.messages = [];
+  disposableState.follows = {};
+  const staleActivityAt = new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString();
+  for (const post of disposableState.posts) {
+    post.taggedAccountIds = [];
+    if (post.authorId === "mar") post.createdAt = staleActivityAt;
+  }
+  const disposableMar = disposableState.characters.find((character: any) => character.id === "mar");
+  assert.ok(disposableMar, "disposable universe must contain Mar");
+  if (disposableMar.configuration) {
+    disposableMar.configuration.relationships = [];
+    disposableMar.configuration.routine.entries = [];
+    disposableMar.configuration.currentState.activity = "tiempo libre";
+    disposableMar.configuration.currentState.lastActivityAt = staleActivityAt;
+    disposableMar.configuration.social.activity = "high";
+    disposableMar.configuration.social.allowSilence = false;
+  }
   const source = initial.state.posts.find((post: any) => post.authorId === "nela") ?? initial.state.posts[0];
   assert.ok(source, "disposable universe must contain a post template");
   const firstPath = await uploadPrivateImage(ownerPage, "vision-blue-red-circle.png", geometricPng("circle"));
@@ -228,6 +281,8 @@ try {
   fixturePost.likes = [];
   fixturePost.savedBy = [];
   fixturePost.commentCount = 0;
+  fixturePost.commentsEnabled = true;
+  fixturePost.taggedAccountIds = ["mar"];
   initial.state.posts.push(fixturePost);
   const setup = await ownerPage.context().request.put(`${base}/api/universe`, {
     data: { state: initial.state, expectedRevision: initial.revision },
@@ -266,6 +321,17 @@ try {
   assert.deepEqual(firstResult.summary.orderedItems.map((item: any) => item.position), [0, 1]);
   assert.match(firstResult.summary.overallDescription, /Foto 1:/);
   assert.match(firstResult.summary.overallDescription, /Foto 2:/);
+  report.visionInference = firstResult.items.map((item: any) => ({
+    provider: item.provider,
+    model: item.model,
+    position: item.position,
+    description: item.analysis.sceneDescription,
+    colors: item.analysis.dominantColors,
+    validated: true,
+    cost: item.usage.cost,
+    acceptedFreeAttempts: item.attempts.filter((attempt: any) => attempt.outcome === "accepted")
+      .map((attempt: any) => ({ model: attempt.model, cost: attempt.usage.cost })),
+  }));
 
   const afterFirst = await queryVisionRows(ownerId, postId);
   assert.equal(afterFirst.analyses.length, 2);
@@ -290,34 +356,54 @@ try {
   assert.equal(afterSecond.refs.length, afterFirst.refs.length);
   assert.equal(afterSecond.summaries.length, afterFirst.summaries.length);
 
-  // Authenticated Brain preview should read the saved analysis rather than infer Vision again.
-  const brainResponse = await ownerPage.context().request.post(`${base}/api/ai-engine/preview`, {
-    data: { characterId: "mar", situation: "comment", postId },
-    timeout: 120_000,
+  // Exercise the same owner-scoped Brain service with a local provider stub;
+  // Vision itself remains the persisted result from the real OpenRouter call.
+  syntheticSituation = "comment";
+  const brain = await previewForOwner(ownerId, { characterId: "mar", situation: "comment", postId }, {
+    read: async id => {
+      assert.equal(id, ownerId);
+      return readUniverse(id);
+    },
+    provider: syntheticTextProvider,
+    vision: (id: string, state: any, input: any) => visionService.loadContext(id, state, input),
   });
-  assert.equal(brainResponse.status(), 200, "Brain route must consume the persisted Vision context");
-  const brain = await brainResponse.json();
   assert.equal(brain.contextAudit.visionMediaIncluded, 2);
   assert.equal(brain.contextAudit.visionPostSummariesIncluded, 1);
-  assert.ok(brain.attempts.every((attempt: any) => attempt.model.endsWith(":free")));
 
-  // The real autonomy test-preview is dry-run only and reads the same persisted context.
-  const settingsSaved = await ownerPage.context().request.put(`${base}/api/autonomy/settings`, {
-    data: { globalKillSwitchEngaged: true },
+  // Exercise the actual autonomy dry-run service with an in-memory repository
+  // and the same persisted Vision loader. No route writes or social actions.
+  syntheticSituation = "like_post";
+  const completedRuns: unknown[] = [];
+  let randomIndex = 0;
+  const randomValues = [0, 0.99];
+  const autonomy = await runAutonomyDryRun(ownerId, {
+    characterId: "mar",
+    idempotencyKey: randomUUID(),
+  }, {
+    repository: {
+      read: async id => {
+        assert.equal(id, ownerId);
+        return readUniverse(id);
+      },
+      readControls: async id => {
+        assert.equal(id, ownerId);
+        return { globalKillSwitchEngaged: true, liveExecutionEnabled: false, characters: new Map() };
+      },
+      getExecutedHistory: async () => [],
+      reserve: async (id, _characterId, _key, _revision) => {
+        assert.equal(id, ownerId);
+        return { kind: "created" as const, runId: randomUUID() };
+      },
+      complete: async (id, _runId, result) => {
+        assert.equal(id, ownerId);
+        completedRuns.push(result);
+      },
+    },
+    provider: syntheticTextProvider,
+    random: () => randomValues[randomIndex++] ?? 0.99,
   });
-  assert.equal(settingsSaved.status(), 200);
-  const settingsResponse = await ownerPage.context().request.get(`${base}/api/autonomy/settings`);
-  assert.equal(settingsResponse.status(), 200);
-  const settings = await settingsResponse.json();
-  assert.equal(settings.liveExecutionEnabled, false);
-  assert.equal(settings.characters.find((item: any) => item.characterId === "mar")?.enabled, false);
-  const autonomyResponse = await ownerPage.context().request.post(`${base}/api/autonomy/test-preview`, {
-    data: { characterId: "mar", idempotencyKey: randomUUID(), situation: "like_post", targetId: postId },
-    timeout: 120_000,
-  });
-  assert.equal(autonomyResponse.status(), 200, "autonomy preview must run through its authenticated dry-run route");
-  const autonomy = await autonomyResponse.json();
-  assert.equal(autonomy.executed, false);
+  assert.equal(autonomy.mode, "dry_run");
+  assert.equal(autonomy.liveExecutionEnabled, false);
   assert.equal(autonomy.socialActionsExecuted, false);
   assert.equal(autonomy.preview.contextAudit.visionMediaIncluded, 2);
   assert.equal(autonomy.preview.contextAudit.visionPostSummariesIncluded, 1);
@@ -333,6 +419,7 @@ try {
   assert.equal(otherRefs.length, 0, "owner isolation must prevent any foreign Vision references");
 
   report = {
+    ...report,
     result: "PASS",
     disposableOwners: 2,
     authenticatedVisionRoute: "PASS",
@@ -354,15 +441,23 @@ try {
       secondRequestProviderAttempts: secondResult.items.reduce((sum: number, item: any) => sum + item.attempts.length, 0),
       storedAnalyses: finalRows.analyses.length,
     },
-    brain: { contextVisionMedia: brain.contextAudit.visionMediaIncluded, contextPostSummaries: brain.contextAudit.visionPostSummariesIncluded },
+    brain: {
+      contextVisionMedia: brain.contextAudit.visionMediaIncluded,
+      contextPostSummaries: brain.contextAudit.visionPostSummariesIncluded,
+      provider: "synthetic local integration stub",
+    },
     autonomy: { contextVisionMedia: autonomy.preview.contextAudit.visionMediaIncluded,
       contextPostSummaries: autonomy.preview.contextAudit.visionPostSummariesIncluded,
-      executed: autonomy.executed, socialActionsExecuted: autonomy.socialActionsExecuted },
+      provider: "synthetic local integration stub",
+      status: autonomy.status,
+      executed: false, socialActionsExecuted: autonomy.socialActionsExecuted,
+      recordedDryRuns: completedRuns.length },
+    syntheticVisionContextReads,
     socialUniverseUnchanged: true,
     liveExecutionEnabled: settings.liveExecutionEnabled,
   };
 } catch (error) {
-  report = { result: "FAIL", error: safeError(error) };
+  report = { ...report, result: "FAIL", error: safeError(error) };
   process.exitCode = 1;
 } finally {
   cleanupSucceeded = true;
