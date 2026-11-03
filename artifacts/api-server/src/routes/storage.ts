@@ -7,7 +7,7 @@ import {
 import { db, echoMediaTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { pipeMedia } from "../lib/pipeMedia";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectPermission } from "../lib/objectAcl";
 import { mediaLimits, validMediaHeader } from "../lib/mediaSafety";
@@ -15,13 +15,39 @@ import {
   ObjectNotFoundError,
   ObjectStorageService,
 } from "../lib/objectStorage";
+import { canReadSocialMedia, type SocialContentViewer } from "../lib/socialContentAccess";
+import { z } from "zod";
 
-const router: IRouter = Router();
-const storage = new ObjectStorageService();
+type StorageAdapter = Pick<
+  ObjectStorageService,
+  "getObjectEntityUploadURL" |
+  "normalizeObjectEntityPath" |
+  "trySetObjectEntityAclPolicy" |
+  "getObjectEntityFile" |
+  "canAccessObjectEntity" |
+  "downloadObject"
+>;
+type StorageRouterOptions = {
+  authenticate?: RequestHandler;
+  storage?: StorageAdapter;
+};
 
-router.post(
+const viewerQuerySchema = z.object({
+  viewerUniverseId: z.string().trim().min(1).max(120).optional(),
+  viewerCharacterId: z.string().trim().min(1).max(120).optional(),
+}).strict().refine((value) =>
+  Boolean(value.viewerUniverseId) === Boolean(value.viewerCharacterId),
+);
+
+/** Uploads remain owner-only; only media attached to readable social content can be shared. */
+export function createStorageRouter(options: StorageRouterOptions = {}): IRouter {
+  const router: IRouter = Router();
+  const storage = options.storage ?? new ObjectStorageService();
+  const authenticate = options.authenticate ?? requireAuth;
+
+  router.post(
   "/storage/uploads/request-url",
-  requireAuth,
+  authenticate,
   async (req, res): Promise<void> => {
     const parsed = RequestUploadUrlBody.safeParse(req.body);
     if (!parsed.success || parsed.data.size > mediaLimits[parsed.data.contentType] * 1024 * 1024) {
@@ -50,9 +76,9 @@ router.post(
   },
 );
 
-router.post(
+  router.post(
   "/storage/uploads/claim",
-  requireAuth,
+  authenticate,
   async (req, res): Promise<void> => {
     const parsed = ClaimUploadBody.safeParse(req.body);
     if (!parsed.success || !/^\/objects\/uploads\/[a-f0-9-]+$/i.test(parsed.data.objectPath)) {
@@ -104,38 +130,59 @@ router.post(
   },
 );
 
-router.get(
+  router.get(
   "/storage/objects/*objectPath",
-  requireAuth,
+  authenticate,
   async (req, res): Promise<void> => {
     const rawPath = req.params.objectPath;
     const objectPath = `/objects/${Array.isArray(rawPath) ? rawPath.join("/") : rawPath}`;
+    const parsedViewer = viewerQuerySchema.safeParse(req.query);
+    if (!parsedViewer.success) {
+      res.status(400).json({ error: "INVALID_MEDIA_VIEWER" });
+      return;
+    }
+    const viewer: SocialContentViewer | undefined = parsedViewer.data.viewerUniverseId
+      ? {
+        universeId: parsedViewer.data.viewerUniverseId,
+        characterId: parsedViewer.data.viewerCharacterId!,
+      }
+      : undefined;
     const [media] = await db
-      .select({ objectPath: echoMediaTable.objectPath })
+      .select({ objectPath: echoMediaTable.objectPath, ownerId: echoMediaTable.ownerId })
       .from(echoMediaTable)
-      .where(
-        and(
-          eq(echoMediaTable.objectPath, objectPath),
-          eq(echoMediaTable.ownerId, req.userId!),
-        ),
-      )
+      .where(eq(echoMediaTable.objectPath, objectPath))
       .limit(1);
-
     if (!media) {
+      res.status(404).json({ error: "Image not found" });
+      return;
+    }
+
+    const authorized = await canReadSocialMedia(
+      req.userId!,
+      media.ownerId,
+      objectPath,
+      viewer,
+    );
+    if (!authorized) {
       res.status(404).json({ error: "Image not found" });
       return;
     }
 
     try {
       const file = await storage.getObjectEntityFile(media.objectPath);
-      const allowed = await storage.canAccessObjectEntity({
-        userId: req.userId!,
-        objectFile: file,
-        requestedPermission: ObjectPermission.READ,
-      });
-      if (!allowed) {
-        res.status(404).json({ error: "Image not found" });
-        return;
+      // Keep the object-store ACL as a second check for direct owner reads.
+      // Cross-owner delivery is only through this authenticated, no-store
+      // proxy after character-level DB authorization above.
+      if (media.ownerId === req.userId!) {
+        const ownerCanRead = await storage.canAccessObjectEntity({
+          userId: req.userId!,
+          objectFile: file,
+          requestedPermission: ObjectPermission.READ,
+        });
+        if (!ownerCanRead) {
+          res.status(404).json({ error: "Image not found" });
+          return;
+        }
       }
       const response = await storage.downloadObject(file, 0, req.headers.range);
       response.headers.forEach((value, key) => res.setHeader(key, value));
@@ -154,7 +201,10 @@ router.get(
       req.log.error({ err: error }, "Could not serve private image");
       res.status(500).json({ error: "Could not serve image" });
     }
-  },
-);
+    },
+  );
 
-export default router;
+  return router;
+}
+
+export default createStorageRouter();
