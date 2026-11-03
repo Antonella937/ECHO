@@ -20,7 +20,7 @@ export const echoCreatorEntitlementsTable = pgTable("echo_creator_entitlements",
   addonUniverses: integer("addon_universes").notNull().default(0),
   /** Temporary internal safety ceiling, not a customer-facing plan allowance. */
   monthlyHardCeilingUnits: integer("monthly_hard_ceiling_units").notNull().default(500),
-  /** Keep a non-autonomy reserve whenever an internal ceiling is configured. */
+  /** Owner-wide portion protected from non-Autonomy usage; Autonomy also has an equal individual cap. */
   autonomyReservePercent: integer("autonomy_reserve_percent").notNull().default(20),
   categoryWeights: jsonb("category_weights").$type<Record<AiUsageCategory, number>>().notNull().default({
     autonomy: 1,

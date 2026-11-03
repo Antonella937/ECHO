@@ -23,7 +23,7 @@ export const DEFAULT_AI_CATEGORY_WEIGHTS = {
 } satisfies Record<AiUsageCategory, number>;
 
 export class AiBudgetExceededError extends Error {
-  constructor(readonly code: "AI_MONTHLY_HARD_CEILING" | "AUTONOMY_BUDGET_PROTECTED") { super(code); }
+  constructor(readonly code: "AI_MONTHLY_HARD_CEILING" | "AUTONOMY_BUDGET_PROTECTED" | "AUTONOMY_BUDGET_RESERVED") { super(code); }
 }
 
 export interface UsageReservation {
@@ -58,7 +58,8 @@ async function ensureEntitlements(tx: Parameters<Parameters<typeof db.transactio
 
 /**
  * Reserves weighted internal units before an external call. The ceiling is
- * always finite; Autonomy can use only the portion above the protected reserve.
+ * owner-wide; both Autonomy and other categories are capped below it, protecting
+ * the reserved Autonomy share while leaving the global ceiling authoritative.
  */
 export async function reserveAiUsage(ownerId: string, category: AiUsageCategory, operation: string): Promise<UsageReservation> {
   const id = randomUUID();
@@ -76,6 +77,7 @@ export async function reserveAiUsage(ownerId: string, category: AiUsageCategory,
     ));
     const used = Number(totals?.charged ?? 0) + Number(totals?.reserved ?? 0);
     const autonomyUsed = Number(totals?.autonomy ?? 0);
+    const nonAutonomyUsed = Math.max(0, used - autonomyUsed);
     const storedCeiling = entitlements.monthlyHardCeilingUnits;
     const ceiling = typeof storedCeiling === "number" && Number.isSafeInteger(storedCeiling) && storedCeiling > 0
       ? Math.min(storedCeiling, MAX_MONTHLY_HARD_CEILING_UNITS)
@@ -84,11 +86,15 @@ export async function reserveAiUsage(ownerId: string, category: AiUsageCategory,
     const autonomyReservePercent = typeof storedReserve === "number" && Number.isSafeInteger(storedReserve)
       ? Math.max(MIN_AUTONOMY_RESERVE_PERCENT, Math.min(MAX_AUTONOMY_RESERVE_PERCENT, storedReserve))
       : MIN_AUTONOMY_RESERVE_PERCENT;
+    const autonomyReserveUnits = Math.min(ceiling, Math.max(1, Math.ceil(ceiling * autonomyReservePercent / 100)));
+    const categoryBudget = Math.max(0, ceiling - autonomyReserveUnits);
     let blocked: AiBudgetExceededError["code"] | null = null;
-    if (used + weight > ceiling) blocked = "AI_MONTHLY_HARD_CEILING";
-    if (category === "autonomy") {
-      const autonomousBudget = Math.floor(ceiling * (100 - autonomyReservePercent) / 100);
-      if (autonomyUsed + weight > autonomousBudget) blocked = "AUTONOMY_BUDGET_PROTECTED";
+    if (used + weight > ceiling) {
+      blocked = "AI_MONTHLY_HARD_CEILING";
+    } else if (category === "autonomy" && autonomyUsed + weight > categoryBudget) {
+      blocked = "AUTONOMY_BUDGET_PROTECTED";
+    } else if (category !== "autonomy" && nonAutonomyUsed + weight > categoryBudget) {
+      blocked = "AUTONOMY_BUDGET_RESERVED";
     }
     await tx.insert(echoAiUsageEventsTable).values({
       id, ownerId, monthKey: month, category, operation,

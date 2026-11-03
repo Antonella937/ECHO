@@ -44,9 +44,3 @@ ECHO currently uses simulated character activity without API keys. Later phases 
 **Why:** The user requested a usable first prototype without requiring credentials, while preserving a path to autonomous social activity.
 
 **How to apply:** Keep provider contracts separate from UI and distinguish simulated activity from live AI.
-
-AI usage ceilings and category weights are internal safety controls, not customer-facing plan quotas. Structural character/universe add-ons do not add AI budget.
-
-**Why:** The user explicitly said the internal ceiling is a technical calibration value, not a final commercial allowance, and add-ons must not grant an extra AI pool.
-
-**How to apply:** Keep the hard ceiling enforced server-side, reserve budget from nonessential Autonomy, and do not expose the internal ceiling or reserve as a plan promise.

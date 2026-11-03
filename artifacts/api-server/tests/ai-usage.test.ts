@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   pool,
   echoAiUsageEventsTable,
   echoCreatorEntitlementsTable,
+  echoUniversesTable,
 } from "@workspace/db";
 import type { TextProvider } from "../src/ai-engine/contracts";
 import { MeteredTextProvider } from "../src/lib/metered-ai";
@@ -44,13 +45,18 @@ async function configure(ownerId: string, ceiling: number, reserve = 20, categor
   });
 }
 
-async function seedCharge(ownerId: string, category: "autonomy" | "brain_text" | "memory_context" | "vision" | "images", units: number) {
+async function seedCharge(
+  ownerId: string,
+  category: "autonomy" | "brain_text" | "memory_context" | "vision" | "images",
+  units: number,
+  operation = "synthetic_budget_fixture",
+) {
   await db.insert(echoAiUsageEventsTable).values({
     id: randomUUID(),
     ownerId,
     monthKey: currentMonth,
     category,
-    operation: "synthetic_budget_fixture",
+    operation,
     status: "succeeded",
     chargedUnits: units,
     reservedUnits: 0,
@@ -61,6 +67,7 @@ async function seedCharge(ownerId: string, category: "autonomy" | "brain_text" |
 after(async () => {
   if (fixtureOwners.length) {
     await db.delete(echoAiUsageEventsTable).where(inArray(echoAiUsageEventsTable.ownerId, fixtureOwners));
+    await db.delete(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, fixtureOwners));
     await db.delete(echoCreatorEntitlementsTable).where(inArray(echoCreatorEntitlementsTable.ownerId, fixtureOwners));
   }
   await pool.end();
@@ -109,30 +116,62 @@ test("new owner entitlements persist the safe non-null default ceiling", async (
   assert.equal(entitlement.monthlyHardCeilingUnits, 500);
 });
 
-test("protects the non-autonomy reserve and stops Autonomy at its safe share", async () => {
+test("protects Autonomy's reserve across two universes and keeps one owner-wide pool", async () => {
   const owner = ownerId();
   await configure(owner, 100, 20, weights({ autonomy: 10, brain_text: 5 }));
-  await seedCharge(owner, "autonomy", 70);
+  await db.insert(echoUniversesTable).values([
+    { ownerId: owner, universeId: "budget-universe-a", state: { characters: [] }, revision: 1 },
+    { ownerId: owner, universeId: "budget-universe-b", state: { characters: [] }, revision: 1 },
+  ]);
+  await seedCharge(owner, "brain_text", 80, "synthetic_universe_a");
 
-  const finalAllowedAutonomy = await reserveAiUsage(owner, "autonomy", "synthetic_autonomy");
-  assert.equal(finalAllowedAutonomy.units, 10);
-  await settleAiUsage(finalAllowedAutonomy, { attempted: true, succeeded: true });
+  const [universeCount] = await db.select({ count: sql<number>`count(*)` })
+    .from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, owner));
+  assert.equal(Number(universeCount.count), 2);
+  const [entitlementCount] = await db.select({ count: sql<number>`count(*)` })
+    .from(echoCreatorEntitlementsTable).where(eq(echoCreatorEntitlementsTable.ownerId, owner));
+  assert.equal(Number(entitlementCount.count), 1);
+
+  // Heavy use in universe A cannot consume the Autonomy share before work in B.
+  await assert.rejects(
+    reserveAiUsage(owner, "brain_text", "synthetic_universe_b"),
+    (error: unknown) => error instanceof AiBudgetExceededError && error.code === "AUTONOMY_BUDGET_RESERVED",
+  );
+  let rejectedProviderCalls = 0;
+  const protectedBrainProvider = new MeteredTextProvider(owner, "brain_text", {
+    name: "synthetic-protected-brain",
+    complete: async () => {
+      rejectedProviderCalls += 1;
+      return { text: "must not be called" };
+    },
+  } as unknown as TextProvider);
+  await assert.rejects(
+    protectedBrainProvider.complete({} as Parameters<TextProvider["complete"]>[0]),
+    (error: unknown) => error instanceof Error && error.message === "AUTONOMY_BUDGET_RESERVED",
+  );
+  assert.equal(rejectedProviderCalls, 0);
+
+  // Autonomy can spend its protected 20-unit share after other categories reach 80.
+  const firstReservedAutonomy = await reserveAiUsage(owner, "autonomy", "synthetic_autonomy_reserved_1");
+  const secondReservedAutonomy = await reserveAiUsage(owner, "autonomy", "synthetic_autonomy_reserved_2");
+  await settleAiUsage(firstReservedAutonomy, { attempted: true, succeeded: true });
+  await settleAiUsage(secondReservedAutonomy, { attempted: true, succeeded: true });
+  const [totals] = await db.select({
+    charged: sql<number>`coalesce(sum(${echoAiUsageEventsTable.chargedUnits}), 0)`,
+    reserved: sql<number>`coalesce(sum(${echoAiUsageEventsTable.reservedUnits}), 0)`,
+  }).from(echoAiUsageEventsTable).where(eq(echoAiUsageEventsTable.ownerId, owner));
+  assert.equal(Number(totals.charged) + Number(totals.reserved), 100);
 
   await assert.rejects(
-    reserveAiUsage(owner, "autonomy", "synthetic_autonomy_over_reserve"),
-    (error: unknown) => error instanceof AiBudgetExceededError && error.code === "AUTONOMY_BUDGET_PROTECTED",
+    reserveAiUsage(owner, "autonomy", "synthetic_over_total_ceiling"),
+    (error: unknown) => error instanceof AiBudgetExceededError && error.code === "AI_MONTHLY_HARD_CEILING",
   );
-
-  // The units protected from Autonomy remain available to other categories.
-  const protectedForOtherWork = await reserveAiUsage(owner, "brain_text", "synthetic_brain");
-  assert.equal(protectedForOtherWork.units, 5);
-  await settleAiUsage(protectedForOtherWork, { attempted: true, succeeded: true });
-  const [blockedAutonomy] = await db.select().from(echoAiUsageEventsTable).where(and(
+  const [blockedNonAutonomy] = await db.select().from(echoAiUsageEventsTable).where(and(
     eq(echoAiUsageEventsTable.ownerId, owner),
-    eq(echoAiUsageEventsTable.operation, "synthetic_autonomy_over_reserve"),
+    eq(echoAiUsageEventsTable.operation, "synthetic_universe_b"),
   )).limit(1);
-  assert.equal(blockedAutonomy.status, "blocked");
-  assert.equal(blockedAutonomy.errorCode, "AUTONOMY_BUDGET_PROTECTED");
+  assert.equal(blockedNonAutonomy.status, "blocked");
+  assert.equal(blockedNonAutonomy.errorCode, "AUTONOMY_BUDGET_RESERVED");
 });
 
 test("degrades an autonomy provider call before reaching the external provider", async () => {
@@ -155,6 +194,42 @@ test("degrades an autonomy provider call before reaching the external provider",
     (error: unknown) => error instanceof Error && error.message === "AUTONOMY_BUDGET_PROTECTED",
   );
   assert.equal(externalCalls, 0);
+});
+
+test("Autonomy's individual cap leaves room for other categories, and budget blocks happen pre-provider", async () => {
+  const autonomyOwner = ownerId();
+  await configure(autonomyOwner, 100, 20, weights({ autonomy: 10 }));
+  await seedCharge(autonomyOwner, "autonomy", 80);
+  let autonomyExternalCalls = 0;
+  const autonomyProvider = new MeteredTextProvider(autonomyOwner, "autonomy", {
+    name: "synthetic-autonomy-provider",
+    complete: async () => {
+      autonomyExternalCalls += 1;
+      return { text: "must not be called" };
+    },
+  } as unknown as TextProvider);
+  await assert.rejects(
+    autonomyProvider.complete({} as Parameters<TextProvider["complete"]>[0]),
+    (error: unknown) => error instanceof Error && error.message === "AUTONOMY_BUDGET_PROTECTED",
+  );
+  assert.equal(autonomyExternalCalls, 0);
+
+  const fullOwner = ownerId();
+  await configure(fullOwner, 100, 20, weights({ brain_text: 10 }));
+  await seedCharge(fullOwner, "brain_text", 100);
+  let otherExternalCalls = 0;
+  const otherProvider = new MeteredTextProvider(fullOwner, "brain_text", {
+    name: "synthetic-brain-provider",
+    complete: async () => {
+      otherExternalCalls += 1;
+      return { text: "must not be called" };
+    },
+  } as unknown as TextProvider);
+  await assert.rejects(
+    otherProvider.complete({} as Parameters<TextProvider["complete"]>[0]),
+    (error: unknown) => error instanceof Error && error.message === "AI_MONTHLY_HARD_CEILING",
+  );
+  assert.equal(otherExternalCalls, 0);
 });
 
 test("blocks all categories after the hard ceiling is exhausted", async () => {
