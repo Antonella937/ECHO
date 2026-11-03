@@ -8,6 +8,7 @@ import autonomyRouter from "./autonomy";
 import creatorRouter from "./creator";
 import { characterPrivacyRouter } from "./character-privacy";
 import { socialFollowsRouter } from "./social-follows";
+import { socialReadRouter } from "./social-reads";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(autonomyRouter);
 router.use(creatorRouter);
 router.use(characterPrivacyRouter);
 router.use(socialFollowsRouter);
+router.use(socialReadRouter);
 
 export default router;

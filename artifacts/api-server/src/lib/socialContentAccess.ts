@@ -180,7 +180,7 @@ export async function canReadSocialCharacter(
   );
 }
 
-function storyIsStillVisible(state: PlainRecord, story: PlainRecord, nowMs: number): boolean {
+export function storyIsStillVisible(state: PlainRecord, story: PlainRecord, nowMs: number): boolean {
   const storyId = stringValue(story.id);
   const authorId = stringValue(story.authorId);
   const createdAt = typeof story.createdAt === "string" || story.createdAt instanceof Date
