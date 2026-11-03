@@ -6,6 +6,7 @@ import type { Appearance } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
+import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
 import { characterProvider, imageProvider } from '@/domain/providers';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -48,12 +49,14 @@ export default function SettingsPage() {
 
         <AppearanceSection />
 
+        <AutonomySettingsSection />
+
         <section className="mt-9" aria-labelledby="about-h">
           <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sobre ECHO</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
             <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
               <span>Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.</span></p>
-            <p className="mt-2.5 pl-[26px]">Los personajes y su actividad son simulados: no hay IA conectada ni respuestas en vivo.</p>
+            <p className="mt-2.5 pl-[26px]">La IA de texto solo genera previews manuales; la autonomía y las acciones en vivo están desactivadas.</p>
             <p className="mt-2.5 pl-[26px]">Las fotos de ejemplo son ilustrativas y no muestran a personas reales.</p>
             <p className="mt-2.5 pl-[26px]">Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.</p>
           </div>

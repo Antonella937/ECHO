@@ -23,5 +23,10 @@ export interface CharacterDecisionInput {
      * @minLength 1
      * @maxLength 120
      */
+  commentId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
   recipientId?: string;
 }

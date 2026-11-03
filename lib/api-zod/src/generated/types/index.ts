@@ -8,6 +8,13 @@
 
 export * from './appearance';
 export * from './appearanceTheme';
+export * from './autonomyCharacterControl';
+export * from './autonomyDryRunInput';
+export * from './autonomyDryRunResult';
+export * from './autonomyDryRunResultMode';
+export * from './autonomyDryRunResultStatus';
+export * from './autonomySettings';
+export * from './autonomySettingsUpdate';
 export * from './character';
 export * from './characterAccountType';
 export * from './characterAssistanceStatus';

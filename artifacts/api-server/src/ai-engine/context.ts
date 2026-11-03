@@ -9,8 +9,11 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const actor = state.characters.find(c => c.id === input.characterId && !c.archived);
   if (!actor) throw new EngineError('CHARACTER_NOT_FOUND', 404);
   const post = input.postId ? state.posts.find(p => p.id === input.postId) : undefined;
+  const comment = input.commentId ? state.comments.find(c => c.id === input.commentId) : undefined;
   const recipient = input.recipientId ? state.characters.find(c => c.id === input.recipientId && !c.archived) : undefined;
-  if (input.situation === 'comment' ? !post || post.commentsEnabled === false : !!input.postId)
+  if (input.situation === 'comment'
+    ? !post || post.commentsEnabled === false || (!!input.commentId && (!comment || comment.postId !== post.id || comment.authorId === actor.id))
+    : !!input.postId || !!input.commentId)
     throw new EngineError('INVALID_POST_TARGET');
   if (input.situation === 'dm' ? !recipient || recipient.id === actor.id : !!input.recipientId)
     throw new EngineError('INVALID_DM_TARGET');
@@ -76,7 +79,10 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   if (!c) warnings.push('CHARACTER_CONFIGURATION_MISSING: only real profile and available social context supplied');
   const availableSections = sections.filter(key => data[key] !== null);
   const context = bounded({ now: now.toISOString(), situation: input.situation,
-    target: post ? postText(post) : recipient ? identityOf(recipient.id) : null, ...data });
+    target: post
+      ? { post: postText(post), replyTo: comment ? { author: identityOf(comment.authorId), text: comment.text, parentId: comment.parentId } : null }
+      : recipient ? identityOf(recipient.id) : null,
+    ...data });
   const serialized = JSON.stringify(context);
   if (serialized.length > 60000) throw new EngineError('CONTEXT_BUDGET_EXCEEDED');
   if (truncated) warnings.push('CONTEXT_TRUNCATED: long fields or arrays were bounded for this preview');

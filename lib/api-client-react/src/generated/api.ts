@@ -20,6 +20,10 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AutonomyDryRunInput,
+  AutonomyDryRunResult,
+  AutonomySettings,
+  AutonomySettingsUpdate,
   CharacterAssistanceStatus,
   CharacterDecisionInput,
   CharacterDecisionPreview,
@@ -148,6 +152,259 @@ export const usePreviewCharacterDecision = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPreviewCharacterDecisionMutationOptions(options));
+    }
+
+export const getGetAutonomySettingsUrl = () => {
+
+
+
+
+  return `/api/autonomy/settings`
+}
+
+/**
+ * @summary Load owner-private text autonomy controls
+ */
+export const getAutonomySettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<AutonomySettings> => {
+
+  return customFetch<AutonomySettings>(getGetAutonomySettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAutonomySettingsQueryKey = () => {
+    return [
+    `/api/autonomy/settings`
+    ] as const;
+    }
+
+
+export const getGetAutonomySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAutonomySettings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAutonomySettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutonomySettings>>> = ({ signal }) => getAutonomySettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAutonomySettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAutonomySettings>>>
+export type GetAutonomySettingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Load owner-private text autonomy controls
+ */
+
+export function useGetAutonomySettings<TData = Awaited<ReturnType<typeof getAutonomySettings>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAutonomySettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAutonomySettingsUrl = () => {
+
+
+
+
+  return `/api/autonomy/settings`
+}
+
+/**
+ * @summary Update the owner's kill switch or one character's explicit opt-in
+ */
+export const updateAutonomySettings = async (autonomySettingsUpdate: AutonomySettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AutonomySettings> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AutonomySettings>(getUpdateAutonomySettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(autonomySettingsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAutonomySettingsMutationKey = () => ['updateAutonomySettings'] as const;
+
+export const getUpdateAutonomySettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAutonomySettings>>, TError,UpdateAutonomySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAutonomySettings>>, TError,UpdateAutonomySettingsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateAutonomySettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAutonomySettings>>, UpdateAutonomySettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAutonomySettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAutonomySettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAutonomySettings>>>
+    export type UpdateAutonomySettingsMutationBody = BodyType<AutonomySettingsUpdate>
+    export type UpdateAutonomySettingsMutationError = ErrorType<void>
+    export type UpdateAutonomySettingsMutationVariables = {data: BodyType<AutonomySettingsUpdate>}
+
+    /**
+ * @summary Update the owner's kill switch or one character's explicit opt-in
+ */
+export const useUpdateAutonomySettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAutonomySettings>>, TError,UpdateAutonomySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAutonomySettings>>,
+        TError,
+        UpdateAutonomySettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateAutonomySettingsMutationOptions(options));
+    }
+
+export const getRunAutonomyDryRunUrl = () => {
+
+
+
+
+  return `/api/autonomy/dry-run`
+}
+
+/**
+ * @summary Run one owner-requested text autonomy simulation without social writes
+ */
+export const runAutonomyDryRun = async (autonomyDryRunInput: AutonomyDryRunInput, options?: Parameters<typeof customFetch>[1]): Promise<AutonomyDryRunResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AutonomyDryRunResult>(getRunAutonomyDryRunUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(autonomyDryRunInput)
+  }
+);}
+
+
+
+
+
+export const getRunAutonomyDryRunMutationKey = () => ['runAutonomyDryRun'] as const;
+
+export const getRunAutonomyDryRunMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runAutonomyDryRun>>, TError,RunAutonomyDryRunMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runAutonomyDryRun>>, TError,RunAutonomyDryRunMutationVariables, TContext> => {
+
+const mutationKey = getRunAutonomyDryRunMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runAutonomyDryRun>>, RunAutonomyDryRunMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  runAutonomyDryRun(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunAutonomyDryRunMutationResult = NonNullable<Awaited<ReturnType<typeof runAutonomyDryRun>>>
+    export type RunAutonomyDryRunMutationBody = BodyType<AutonomyDryRunInput>
+    export type RunAutonomyDryRunMutationError = ErrorType<void>
+    export type RunAutonomyDryRunMutationVariables = {data: BodyType<AutonomyDryRunInput>}
+
+    /**
+ * @summary Run one owner-requested text autonomy simulation without social writes
+ */
+export const useRunAutonomyDryRun = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runAutonomyDryRun>>, TError,RunAutonomyDryRunMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runAutonomyDryRun>>,
+        TError,
+        RunAutonomyDryRunMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRunAutonomyDryRunMutationOptions(options));
     }
 
 export const getGetCharacterAssistanceUrl = () => {

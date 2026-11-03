@@ -36,6 +36,57 @@ paths:
         "429": { description: Another preview is running or cooldown active }
         "502": { description: Provider failure or invalid model output; no action executed }
         "503": { description: Provider is not configured }
+  /autonomy/settings:
+    get:
+      operationId: getAutonomySettings
+      summary: Load owner-private text autonomy controls
+      responses:
+        "200":
+          description: Owner controls and per-character opt-ins; live execution remains disabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AutonomySettings" }
+        "401": { description: Authentication required }
+        "404": { description: No owner universe exists }
+    put:
+      operationId: updateAutonomySettings
+      summary: Update the owner's kill switch or one character's explicit opt-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutonomySettingsUpdate" }
+      responses:
+        "200":
+          description: Updated owner-private controls
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AutonomySettings" }
+        "400": { description: Invalid control update }
+        "401": { description: Authentication required }
+        "404": { description: Character or owner universe not found }
+  /autonomy/dry-run:
+    post:
+      operationId: runAutonomyDryRun
+      summary: Run one owner-requested text autonomy simulation without social writes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutonomyDryRunInput" }
+      responses:
+        "200":
+          description: Dry-run result; no post, comment, or message was executed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AutonomyDryRunResult" }
+        "400": { description: Invalid input or unavailable character }
+        "401": { description: Authentication required }
+        "404": { description: Character or owner universe not found }
+        "409": { description: Duplicate request already in progress or universe changed during preview }
+        "429": { description: Owner or character dry-run rate limit reached }
+        "502": { description: Free provider failure or invalid model output }
+        "503": { description: No free provider is configured }
   /characters/assistance:
     get:
       operationId: getCharacterAssistance
@@ -200,6 +251,62 @@ paths:
           description: Image not found
 components:
   schemas:
+    AutonomyCharacterControl:
+      type: object
+      required: [characterId, displayName, username, enabled, maxActionsPerDay, minCooldownMinutes]
+      properties:
+        characterId: { type: string }
+        displayName: { type: string }
+        username: { type: string }
+        enabled: { type: boolean }
+        maxActionsPerDay: { type: integer, minimum: 1, maximum: 4 }
+        minCooldownMinutes: { type: integer, minimum: 60, maximum: 1440 }
+    AutonomySettings:
+      type: object
+      required: [globalKillSwitchEngaged, liveExecutionEnabled, characters]
+      properties:
+        globalKillSwitchEngaged: { type: boolean }
+        liveExecutionEnabled: { type: boolean, enum: [false] }
+        characters:
+          type: array
+          items: { $ref: "#/components/schemas/AutonomyCharacterControl" }
+    AutonomySettingsUpdate:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [globalKillSwitchEngaged]
+          properties:
+            globalKillSwitchEngaged: { type: boolean }
+        - type: object
+          additionalProperties: false
+          required: [characterId, enabled]
+          properties:
+            characterId: { type: string, minLength: 1, maxLength: 120 }
+            enabled: { type: boolean }
+    AutonomyDryRunInput:
+      type: object
+      additionalProperties: false
+      required: [characterId, idempotencyKey]
+      properties:
+        characterId: { type: string, minLength: 1, maxLength: 120 }
+        idempotencyKey: { type: string, format: uuid }
+    AutonomyDryRunResult:
+      type: object
+      required: [mode, runId, characterId, status, liveExecutionEnabled, liveEligible, socialActionsExecuted, reason, preview, createdAt]
+      properties:
+        mode: { type: string, enum: [dry_run] }
+        runId: { type: [string, "null"] }
+        characterId: { type: string }
+        status: { type: string, enum: [previewed, no_opportunity, cooldown, rate_limited, duplicate, in_progress] }
+        liveExecutionEnabled: { type: boolean, enum: [false] }
+        liveEligible: { type: boolean }
+        socialActionsExecuted: { type: boolean, enum: [false] }
+        reason: { type: string, maxLength: 300 }
+        preview:
+          oneOf:
+            - $ref: "#/components/schemas/CharacterDecisionPreview"
+            - type: "null"
+        createdAt: { type: string, format: date-time }
     HealthStatus:
       type: object
       properties:
@@ -331,6 +438,7 @@ components:
         characterId: { type: string, minLength: 1, maxLength: 120 }
         situation: { type: string, enum: [post, comment, dm] }
         postId: { type: string, minLength: 1, maxLength: 120 }
+        commentId: { type: string, minLength: 1, maxLength: 120 }
         recipientId: { type: string, minLength: 1, maxLength: 120 }
     CharacterDecision:
       type: object

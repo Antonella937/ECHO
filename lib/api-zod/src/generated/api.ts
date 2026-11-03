@@ -15,6 +15,8 @@ export const previewCharacterDecisionBodyCharacterIdMax = 120;
 
 export const previewCharacterDecisionBodyPostIdMax = 120;
 
+export const previewCharacterDecisionBodyCommentIdMax = 120;
+
 export const previewCharacterDecisionBodyRecipientIdMax = 120;
 
 
@@ -23,6 +25,7 @@ export const PreviewCharacterDecisionBody = zod.object({
   "characterId": zod.string().min(1).max(previewCharacterDecisionBodyCharacterIdMax),
   "situation": zod.enum(['post', 'comment', 'dm']),
   "postId": zod.string().min(1).max(previewCharacterDecisionBodyPostIdMax).optional(),
+  "commentId": zod.string().min(1).max(previewCharacterDecisionBodyCommentIdMax).optional(),
   "recipientId": zod.string().min(1).max(previewCharacterDecisionBodyRecipientIdMax).optional()
 })
 
@@ -103,6 +106,170 @@ export const PreviewCharacterDecisionResponse = zod.object({
   "cost": zod.number().min(previewCharacterDecisionResponseAttemptsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
 })
 }))
+})
+
+
+/**
+ * @summary Load owner-private text autonomy controls
+ */
+export const getAutonomySettingsResponseCharactersItemMaxActionsPerDayMax = 4;
+
+export const getAutonomySettingsResponseCharactersItemMinCooldownMinutesMin = 60;
+export const getAutonomySettingsResponseCharactersItemMinCooldownMinutesMax = 1440;
+
+
+
+export const GetAutonomySettingsResponse = zod.object({
+  "globalKillSwitchEngaged": zod.boolean(),
+  "liveExecutionEnabled": zod.literal(false),
+  "characters": zod.array(zod.object({
+  "characterId": zod.string(),
+  "displayName": zod.string(),
+  "username": zod.string(),
+  "enabled": zod.boolean(),
+  "maxActionsPerDay": zod.number().int().min(1).max(getAutonomySettingsResponseCharactersItemMaxActionsPerDayMax),
+  "minCooldownMinutes": zod.number().int().min(getAutonomySettingsResponseCharactersItemMinCooldownMinutesMin).max(getAutonomySettingsResponseCharactersItemMinCooldownMinutesMax)
+}))
+})
+
+
+/**
+ * @summary Update the owner's kill switch or one character's explicit opt-in
+ */
+export const updateAutonomySettingsBodyTwoCharacterIdMax = 120;
+
+
+
+export const UpdateAutonomySettingsBody = zod.union([zod.object({
+  "globalKillSwitchEngaged": zod.boolean()
+}),zod.object({
+  "characterId": zod.string().min(1).max(updateAutonomySettingsBodyTwoCharacterIdMax),
+  "enabled": zod.boolean()
+})])
+
+export const updateAutonomySettingsResponseCharactersItemMaxActionsPerDayMax = 4;
+
+export const updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMin = 60;
+export const updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMax = 1440;
+
+
+
+export const UpdateAutonomySettingsResponse = zod.object({
+  "globalKillSwitchEngaged": zod.boolean(),
+  "liveExecutionEnabled": zod.literal(false),
+  "characters": zod.array(zod.object({
+  "characterId": zod.string(),
+  "displayName": zod.string(),
+  "username": zod.string(),
+  "enabled": zod.boolean(),
+  "maxActionsPerDay": zod.number().int().min(1).max(updateAutonomySettingsResponseCharactersItemMaxActionsPerDayMax),
+  "minCooldownMinutes": zod.number().int().min(updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMin).max(updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMax)
+}))
+})
+
+
+/**
+ * @summary Run one owner-requested text autonomy simulation without social writes
+ */
+export const runAutonomyDryRunBodyCharacterIdMax = 120;
+
+
+
+export const RunAutonomyDryRunBody = zod.object({
+  "characterId": zod.string().min(1).max(runAutonomyDryRunBodyCharacterIdMax),
+  "idempotencyKey": zod.string().uuid()
+})
+
+export const runAutonomyDryRunResponseReasonMax = 300;
+
+export const runAutonomyDryRunResponsePreviewOneSourceRevisionMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneDecisionTextMax = 2000;
+
+export const runAutonomyDryRunResponsePreviewOneDecisionReasonMax = 400;
+
+export const runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMin = 0;
+export const runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMax = 10080;
+
+export const runAutonomyDryRunResponsePreviewOneDecisionContextSectionsMax = 8;
+
+export const runAutonomyDryRunResponsePreviewOneContextAuditSourceRevisionMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneContextAuditSectionsItemRecordCountMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneContextAuditRecentCountsMinOne = 0;
+
+export const runAutonomyDryRunResponsePreviewOneUsagePromptTokensMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneUsageCompletionTokensMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneUsageCostMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneAttemptsItemUsagePromptTokensMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneAttemptsItemUsageCompletionTokensMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneAttemptsItemUsageCostMin = 0;
+
+
+
+export const RunAutonomyDryRunResponse = zod.object({
+  "mode": zod.enum(['dry_run']),
+  "runId": zod.string().nullable(),
+  "characterId": zod.string(),
+  "status": zod.enum(['previewed', 'no_opportunity', 'cooldown', 'rate_limited', 'duplicate', 'in_progress']),
+  "liveExecutionEnabled": zod.literal(false),
+  "liveEligible": zod.boolean(),
+  "socialActionsExecuted": zod.literal(false),
+  "reason": zod.string().max(runAutonomyDryRunResponseReasonMax),
+  "preview": zod.union([zod.object({
+  "mode": zod.enum(['preview']),
+  "executed": zod.literal(false),
+  "characterId": zod.string(),
+  "sourceRevision": zod.number().int().min(runAutonomyDryRunResponsePreviewOneSourceRevisionMin),
+  "provider": zod.string(),
+  "model": zod.string(),
+  "decision": zod.object({
+  "action": zod.enum(['none', 'draft']),
+  "situation": zod.enum(['post', 'comment', 'dm']),
+  "text": zod.string().max(runAutonomyDryRunResponsePreviewOneDecisionTextMax).nullable(),
+  "reason": zod.string().min(1).max(runAutonomyDryRunResponsePreviewOneDecisionReasonMax).describe('Brief explanation'),
+  "suggestedDelayMinutes": zod.number().int().min(runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMin).max(runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMax),
+  "contextSections": zod.array(zod.enum(['identity', 'personality', 'relationships', 'routine', 'social', 'memory', 'currentState', 'recentSocial'])).max(runAutonomyDryRunResponsePreviewOneDecisionContextSectionsMax)
+}),
+  "availableContextSections": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "contextAudit": zod.object({
+  "source": zod.enum(['persisted_owner_universe', 'provided_snapshot']),
+  "contextHash": zod.string().describe('SHA-256 of the exact bounded text context'),
+  "characterId": zod.string(),
+  "sourceRevision": zod.number().int().min(runAutonomyDryRunResponsePreviewOneContextAuditSourceRevisionMin),
+  "sections": zod.array(zod.object({
+  "name": zod.string(),
+  "hasContent": zod.boolean().describe('Meaningful content'),
+  "recordCount": zod.number().int().min(runAutonomyDryRunResponsePreviewOneContextAuditSectionsItemRecordCountMin),
+  "fields": zod.array(zod.string()).describe('Included field paths only; never private field values')
+})),
+  "recentCounts": zod.record(zod.string(), zod.number().int().min(runAutonomyDryRunResponsePreviewOneContextAuditRecentCountsMinOne)),
+  "privateDmScope": zod.enum(['none', 'actor_and_recipient_only'])
+}),
+  "usage": zod.object({
+  "promptTokens": zod.number().int().min(runAutonomyDryRunResponsePreviewOneUsagePromptTokensMin).nullable(),
+  "completionTokens": zod.number().int().min(runAutonomyDryRunResponsePreviewOneUsageCompletionTokensMin).nullable(),
+  "cost": zod.number().min(runAutonomyDryRunResponsePreviewOneUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
+}),
+  "attempts": zod.array(zod.object({
+  "model": zod.string(),
+  "outcome": zod.enum(['success', 'failure', 'skipped']),
+  "code": zod.string().nullable(),
+  "usage": zod.object({
+  "promptTokens": zod.number().int().min(runAutonomyDryRunResponsePreviewOneAttemptsItemUsagePromptTokensMin).nullable(),
+  "completionTokens": zod.number().int().min(runAutonomyDryRunResponsePreviewOneAttemptsItemUsageCompletionTokensMin).nullable(),
+  "cost": zod.number().min(runAutonomyDryRunResponsePreviewOneAttemptsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
+})
+}))
+}),zod.null()]),
+  "createdAt": zod.coerce.date()
 })
 
 
