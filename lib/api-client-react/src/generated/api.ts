@@ -36,7 +36,9 @@ import type {
   UploadClaimInput,
   UploadClaimResult,
   UploadUrlInput,
-  UploadUrlResult
+  UploadUrlResult,
+  VisionAnalysisResponse,
+  VisionAnalyzeInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -152,6 +154,94 @@ export const usePreviewCharacterDecision = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPreviewCharacterDecisionMutationOptions(options));
+    }
+
+export const getAnalyzeOwnerImageMediaUrl = () => {
+
+
+
+
+  return `/api/ai-engine/vision/analyze`
+}
+
+/**
+ * @summary Analyze persisted owner-uploaded post/story images; videos and audio are excluded
+ */
+export const analyzeOwnerImageMedia = async (visionAnalyzeInput: VisionAnalyzeInput, options?: Parameters<typeof customFetch>[1]): Promise<VisionAnalysisResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VisionAnalysisResponse>(getAnalyzeOwnerImageMediaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(visionAnalyzeInput)
+  }
+);}
+
+
+
+
+
+export const getAnalyzeOwnerImageMediaMutationKey = () => ['analyzeOwnerImageMedia'] as const;
+
+export const getAnalyzeOwnerImageMediaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeOwnerImageMedia>>, TError,AnalyzeOwnerImageMediaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeOwnerImageMedia>>, TError,AnalyzeOwnerImageMediaMutationVariables, TContext> => {
+
+const mutationKey = getAnalyzeOwnerImageMediaMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeOwnerImageMedia>>, AnalyzeOwnerImageMediaMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeOwnerImageMedia(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeOwnerImageMediaMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeOwnerImageMedia>>>
+    export type AnalyzeOwnerImageMediaMutationBody = BodyType<VisionAnalyzeInput>
+    export type AnalyzeOwnerImageMediaMutationError = ErrorType<void>
+    export type AnalyzeOwnerImageMediaMutationVariables = {data: BodyType<VisionAnalyzeInput>}
+
+    /**
+ * @summary Analyze persisted owner-uploaded post/story images; videos and audio are excluded
+ */
+export const useAnalyzeOwnerImageMedia = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeOwnerImageMedia>>, TError,AnalyzeOwnerImageMediaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeOwnerImageMedia>>,
+        TError,
+        AnalyzeOwnerImageMediaMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAnalyzeOwnerImageMediaMutationOptions(options));
     }
 
 export const getGetAutonomySettingsUrl = () => {

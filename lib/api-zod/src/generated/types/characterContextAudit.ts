@@ -20,4 +20,14 @@ export interface CharacterContextAudit {
   sections: CharacterContextSection[];
   recentCounts: CharacterContextAuditRecentCounts;
   privateDmScope: CharacterContextAuditPrivateDmScope;
+  /**
+     * Count of persisted per-item vision analyses included; no image bytes or URLs
+     * @minimum 0
+     */
+  visionMediaIncluded: number;
+  /**
+     * Count of persisted ordered post summaries included
+     * @minimum 0
+     */
+  visionPostSummariesIncluded: number;
 }

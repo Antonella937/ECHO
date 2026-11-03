@@ -12,6 +12,7 @@ import { readUniverse } from "../lib/universeRepository";
 import { EngineError } from "../ai-engine/contracts";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { previewForOwner } from "../ai-engine/service";
+import { visionService } from "../vision/service";
 import {
   DEFAULT_CHARACTER_CONTROL,
   isAutonomyLiveExecutionEnabled,
@@ -241,6 +242,7 @@ if (testPreviewRouteEnabled) {
       const preview = await previewForOwner(ownerId, decisionInput as unknown as CharacterDecisionInput, {
         read: readUniverse,
         provider,
+        vision: (id, state, input) => visionService.loadContext(id, state, input),
       });
       const attempts = preview.attempts;
       const freeOnly = preview.model.endsWith(":free") &&
@@ -354,7 +356,11 @@ if (testPreviewRouteEnabled) {
     testLiveOwnersUsed.add(ownerId);
     let preview: Awaited<ReturnType<typeof previewForOwner>>;
     try {
-      preview = await previewForOwner(ownerId, testInput, { read: readUniverse, provider });
+      preview = await previewForOwner(ownerId, testInput, {
+        read: readUniverse,
+        provider,
+        vision: (id, state, input) => visionService.loadContext(id, state, input),
+      });
     } catch (error) {
       const safe = error instanceof EngineError ? error : new EngineError("TEST_PREVIEW_FAILED", 502);
       const attempts = safeProviderAttempts(error);

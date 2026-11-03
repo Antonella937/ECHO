@@ -8,7 +8,7 @@
 import type { PostMediaType } from './postMediaType';
 
 /**
- * Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.
+ * Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.
  */
 export interface PostMedia {
   /**

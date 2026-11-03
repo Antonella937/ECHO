@@ -177,6 +177,16 @@ export interface CharacterContextAudit {
   sections: CharacterContextSection[];
   recentCounts: CharacterContextAuditRecentCounts;
   privateDmScope: CharacterContextAuditPrivateDmScope;
+  /**
+     * Count of persisted per-item vision analyses included; no image bytes or URLs
+     * @minimum 0
+     */
+  visionMediaIncluded: number;
+  /**
+     * Count of persisted ordered post summaries included
+     * @minimum 0
+     */
+  visionPostSummariesIncluded: number;
 }
 
 export interface EngineUsage {
@@ -815,7 +825,7 @@ export const PostMediaType = {
 } as const;
 
 /**
- * Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.
+ * Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.
  */
 export interface PostMedia {
   /**
@@ -1091,6 +1101,191 @@ export interface CharacterDecisionInput {
      */
   messageId?: string;
 }
+
+export type VisionAnalysisResponseEntityType = typeof VisionAnalysisResponseEntityType[keyof typeof VisionAnalysisResponseEntityType];
+
+
+export const VisionAnalysisResponseEntityType = {
+  post: 'post',
+  story: 'story',
+} as const;
+
+export type VisionPostSummaryOrderedItemsItem = {
+  mediaId: string;
+  /** @minimum 0 */
+  position: number;
+  /** @maxLength 1400 */
+  description: string;
+  /** @items.maxLength 120 */
+  objects: string[];
+  /** @items.maxLength 120 */
+  colors: string[];
+};
+
+export interface VisionPostSummary {
+  postId: string;
+  /** @maxLength 500 */
+  caption: string;
+  /** @minimum 0 */
+  imageCount: number;
+  /** @minimum 0 */
+  unsupportedImageCount: number;
+  /** @minimum 0 */
+  unsupportedVideoCount: number;
+  /** @maxLength 12000 */
+  overallDescription: string;
+  orderedItems: VisionPostSummaryOrderedItemsItem[];
+}
+
+export type VisionAnalysisObjectsItemCategory = typeof VisionAnalysisObjectsItemCategory[keyof typeof VisionAnalysisObjectsItemCategory];
+
+
+export const VisionAnalysisObjectsItemCategory = {
+  object: 'object',
+  person: 'person',
+  animal: 'animal',
+  text: 'text',
+  setting: 'setting',
+  other: 'other',
+} as const;
+
+export type VisionAnalysisObjectsItemPosition = typeof VisionAnalysisObjectsItemPosition[keyof typeof VisionAnalysisObjectsItemPosition];
+
+
+export const VisionAnalysisObjectsItemPosition = {
+  foreground: 'foreground',
+  center: 'center',
+  background: 'background',
+  left: 'left',
+  right: 'right',
+  top: 'top',
+  bottom: 'bottom',
+  unknown: 'unknown',
+} as const;
+
+export type VisionAnalysisObjectsItem = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  label: string;
+  category: VisionAnalysisObjectsItemCategory;
+  /**
+     * @maxItems 8
+     * @items.maxLength 320
+     */
+  attributes: string[];
+  position: VisionAnalysisObjectsItemPosition;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  confidence: number;
+};
+
+export type VisionAnalysisPeople = {
+  /**
+     * @minimum 0
+     * @maximum 40
+     */
+  count: number;
+  /**
+     * @maxItems 8
+     * @items.maxLength 320
+     */
+  nonIdentifyingDetails: string[];
+};
+
+export interface VisionAnalysis {
+  /**
+     * @minLength 8
+     * @maxLength 1400
+     */
+  sceneDescription: string;
+  /** @maxLength 320 */
+  setting: string;
+  /** @maxItems 40 */
+  objects: VisionAnalysisObjectsItem[];
+  people: VisionAnalysisPeople;
+  /**
+     * @maxItems 20
+     * @items.maxLength 320
+     */
+  activities: string[];
+  /**
+     * @maxItems 12
+     * @items.minLength 1
+     * @items.maxLength 120
+     */
+  dominantColors: string[];
+  /**
+     * @maxItems 20
+     * @items.maxLength 320
+     */
+  visibleText: string[];
+  /**
+     * @maxItems 24
+     * @items.maxLength 320
+     */
+  notableDetails: string[];
+  /**
+     * @maxItems 12
+     * @items.maxLength 320
+     */
+  uncertainty: string[];
+}
+
+export type VisionAttemptOutcome = typeof VisionAttemptOutcome[keyof typeof VisionAttemptOutcome];
+
+
+export const VisionAttemptOutcome = {
+  accepted: 'accepted',
+  rejected: 'rejected',
+} as const;
+
+export interface VisionAttempt {
+  model: string;
+  outcome: VisionAttemptOutcome;
+  /** @nullable */
+  errorCode: string | null;
+  usage: EngineUsage;
+}
+
+export interface VisionAnalyzedMediaItem {
+  mediaId: string;
+  /** @minimum 0 */
+  position: number;
+  analysisId: string;
+  analysis: VisionAnalysis;
+  provider: string;
+  model: string;
+  cacheHit: boolean;
+  attempts: VisionAttempt[];
+  usage: EngineUsage;
+}
+
+export interface VisionAnalysisResponse {
+  entityType: VisionAnalysisResponseEntityType;
+  entityId: string;
+  summary: VisionPostSummary | null;
+  items: VisionAnalyzedMediaItem[];
+  /** @minimum 0 */
+  skippedVideoCount: number;
+}
+
+export type VisionAnalyzeInput = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  postId: string;
+} | {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  storyId: string;
+};
 
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];
 

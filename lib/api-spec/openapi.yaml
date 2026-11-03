@@ -44,16 +44,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              oneOf:
-                - type: object
-                  required: [postId]
-                  additionalProperties: false
-                  properties: { postId: { type: string, minLength: 1, maxLength: 120 } }
-                - type: object
-                  required: [storyId]
-                  additionalProperties: false
-                  properties: { storyId: { type: string, minLength: 1, maxLength: 120 } }
+            schema: { $ref: "#/components/schemas/VisionAnalyzeInput" }
       responses:
         "200":
           description: Persisted per-image results and ordered post summary; repeat requests reuse completed analyses
@@ -61,10 +52,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VisionAnalysisResponse" }
         "401": { description: Authentication required }
-        "404": { description: Owner universe, post, story, or owned media not found }
+        "404": { description: "Owner universe, post, story, or owned media not found" }
         "409": { description: The same image is currently being analyzed }
         "413": { description: Image exceeds the analysis size limit }
-        "415": { description: Unsupported media type; only PNG, JPEG, and WebP images are analyzed }
+        "415": { description: "Unsupported media type; only PNG, JPEG, and WebP images are analyzed" }
         "422": { description: Invalid media reference or structured model result }
         "502": { description: Storage or provider failure; no social action is executed }
         "503": { description: No free image-capable model is available }
@@ -546,6 +537,99 @@ components:
         privateDmScope: { type: string, enum: [none, actor_and_recipient_only] }
         visionMediaIncluded: { type: integer, minimum: 0, description: Count of persisted per-item vision analyses included; no image bytes or URLs }
         visionPostSummariesIncluded: { type: integer, minimum: 0, description: Count of persisted ordered post summaries included }
+    VisionAnalysisResponse:
+      type: object
+      required: [entityType, entityId, summary, items, skippedVideoCount]
+      properties:
+        entityType: { type: string, enum: [post, story] }
+        entityId: { type: string }
+        summary: { oneOf: [{ $ref: "#/components/schemas/VisionPostSummary" }, { type: "null" }] }
+        items: { type: array, items: { $ref: "#/components/schemas/VisionAnalyzedMediaItem" } }
+        skippedVideoCount: { type: integer, minimum: 0 }
+    VisionAnalyzeInput:
+      oneOf:
+        - type: object
+          required: [postId]
+          additionalProperties: false
+          properties: { postId: { type: string, minLength: 1, maxLength: 120 } }
+        - type: object
+          required: [storyId]
+          additionalProperties: false
+          properties: { storyId: { type: string, minLength: 1, maxLength: 120 } }
+    VisionAnalyzedMediaItem:
+      type: object
+      required: [mediaId, position, analysisId, analysis, provider, model, cacheHit, attempts, usage]
+      properties:
+        mediaId: { type: string }
+        position: { type: integer, minimum: 0 }
+        analysisId: { type: string }
+        analysis: { $ref: "#/components/schemas/VisionAnalysis" }
+        provider: { type: string }
+        model: { type: string }
+        cacheHit: { type: boolean }
+        attempts: { type: array, items: { $ref: "#/components/schemas/VisionAttempt" } }
+        usage: { $ref: "#/components/schemas/EngineUsage" }
+    VisionAttempt:
+      type: object
+      required: [model, outcome, errorCode, usage]
+      properties:
+        model: { type: string }
+        outcome: { type: string, enum: [accepted, rejected] }
+        errorCode: { type: [string, "null"] }
+        usage: { $ref: "#/components/schemas/EngineUsage" }
+    VisionAnalysis:
+      type: object
+      additionalProperties: false
+      required: [sceneDescription, setting, objects, people, activities, dominantColors, visibleText, notableDetails, uncertainty]
+      properties:
+        sceneDescription: { type: string, minLength: 8, maxLength: 1400 }
+        setting: { type: string, maxLength: 320 }
+        objects:
+          type: array
+          maxItems: 40
+          items:
+            type: object
+            additionalProperties: false
+            required: [label, category, attributes, position, confidence]
+            properties:
+              label: { type: string, minLength: 1, maxLength: 120 }
+              category: { type: string, enum: [object, person, animal, text, setting, other] }
+              attributes: { type: array, maxItems: 8, items: { type: string, maxLength: 320 } }
+              position: { type: string, enum: [foreground, center, background, left, right, top, bottom, unknown] }
+              confidence: { type: number, minimum: 0, maximum: 1 }
+        people:
+          type: object
+          additionalProperties: false
+          required: [count, nonIdentifyingDetails]
+          properties:
+            count: { type: integer, minimum: 0, maximum: 40 }
+            nonIdentifyingDetails: { type: array, maxItems: 8, items: { type: string, maxLength: 320 } }
+        activities: { type: array, maxItems: 20, items: { type: string, maxLength: 320 } }
+        dominantColors: { type: array, maxItems: 12, items: { type: string, minLength: 1, maxLength: 120 } }
+        visibleText: { type: array, maxItems: 20, items: { type: string, maxLength: 320 } }
+        notableDetails: { type: array, maxItems: 24, items: { type: string, maxLength: 320 } }
+        uncertainty: { type: array, maxItems: 12, items: { type: string, maxLength: 320 } }
+    VisionPostSummary:
+      type: object
+      required: [postId, caption, imageCount, unsupportedImageCount, unsupportedVideoCount, orderedItems, overallDescription]
+      properties:
+        postId: { type: string }
+        caption: { type: string, maxLength: 500 }
+        imageCount: { type: integer, minimum: 0 }
+        unsupportedImageCount: { type: integer, minimum: 0 }
+        unsupportedVideoCount: { type: integer, minimum: 0 }
+        overallDescription: { type: string, maxLength: 12000 }
+        orderedItems:
+          type: array
+          items:
+            type: object
+            required: [mediaId, position, description, objects, colors]
+            properties:
+              mediaId: { type: string }
+              position: { type: integer, minimum: 0 }
+              description: { type: string, maxLength: 1400 }
+              objects: { type: array, items: { type: string, maxLength: 120 } }
+              colors: { type: array, items: { type: string, maxLength: 120 } }
     CharacterConfiguration:
       type: object
       required: [version, basic, personality, voice, relationships, routine, social, memory, currentState, assistance]
@@ -726,7 +810,7 @@ components:
         providerRef: { type: string, maxLength: 300 }
     PostMedia:
       type: object
-      description: Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.
+      description: Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.
       required: [id, type, url]
       properties:
         id: { type: string, minLength: 1, maxLength: 120 }

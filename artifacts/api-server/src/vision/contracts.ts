@@ -38,6 +38,7 @@ export interface VisionPostSummary {
   postId: string;
   caption: string;
   imageCount: number;
+  unsupportedImageCount: number;
   unsupportedVideoCount: number;
   orderedItems: Array<{
     mediaId: string;
@@ -61,6 +62,7 @@ export class VisionError extends Error {
     readonly code: string,
     readonly status = 502,
     readonly attempts: VisionAttempt[] = [],
+    readonly usage?: VisionUsage,
   ) {
     super(code);
     this.name = "VisionError";

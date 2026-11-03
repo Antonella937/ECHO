@@ -8,7 +8,7 @@ interface CatalogModel {
   supported_parameters?: string[];
 }
 
-interface FreeVisionModel {
+export interface FreeVisionModel {
   id: string;
   jsonMode: boolean;
 }
@@ -45,7 +45,8 @@ function freeZeroCostModel(item: CatalogModel): boolean {
     item.architecture?.input_modalities?.includes("image") === true &&
     item.architecture?.input_modalities?.includes("text") === true &&
     item.architecture?.output_modalities?.includes("text") === true &&
-    p?.prompt === "0" && p?.completion === "0" && (p.request === undefined || p.request === "0");
+    p?.prompt === "0" && p?.completion === "0" &&
+    (p.request === undefined || p.request === null || p.request === "0");
 }
 
 /** Discovers image-capable models live and admits only explicitly free catalog entries. */
@@ -154,7 +155,7 @@ async function requestModel(
   }
   const body: unknown = await response.json().catch(() => null);
   const result = extractText(body);
-  if (result.error) throw new VisionError(result.error);
+  if (result.error) throw new VisionError(result.error, 502, [], result.usage);
   return { text: result.text, model: result.model, usage: result.usage };
 }
 
@@ -177,18 +178,23 @@ export class OpenRouterVisionProvider implements VisionProvider {
         attempts.push({ model: model.id, outcome: "rejected", errorCode: "MODEL_COOLDOWN", usage: emptyUsage() });
         continue;
       }
+      let response: ProviderResult | undefined;
       try {
-        const response = await requestModel(model, input.image, input.prompt, this.request);
-        if (!response.model.endsWith(":free")) throw new VisionError("UNVERIFIED_FREE_RESPONSE_MODEL");
-        if (response.usage.cost !== null && response.usage.cost > 0) throw new VisionError("NONZERO_FREE_MODEL_COST");
+        response = await requestModel(model, input.image, input.prompt, this.request);
+        if (!models.some(candidate => candidate.id === response!.model))
+          throw new VisionError("UNVERIFIED_FREE_RESPONSE_MODEL", 502, [], response.usage);
+        if (response.usage.cost !== null && response.usage.cost > 0)
+          throw new VisionError("NONZERO_FREE_MODEL_COST", 502, [], response.usage);
         const analysis = input.validate(response.text);
         attempts.push({ model: response.model, outcome: "accepted", errorCode: null, usage: response.usage });
         return { analysis, provider: this.name, model: response.model, usage: response.usage, attempts };
       } catch (error) {
-        const visionError = error instanceof VisionError ? error : new VisionError("VISION_PROVIDER_FAILED");
+        const source = error instanceof VisionError ? error : new VisionError("VISION_PROVIDER_FAILED");
+        const visionError = source.usage || !response ? source
+          : new VisionError(source.code, source.status, source.attempts, response.usage);
         lastError = visionError;
         if (visionError.code === "OPENROUTER_RATE_LIMITED") MODEL_COOLDOWN.set(model.id, Date.now() + 30_000);
-        attempts.push({ model: model.id, outcome: "rejected", errorCode: visionError.code, usage: emptyUsage() });
+        attempts.push({ model: model.id, outcome: "rejected", errorCode: visionError.code, usage: visionError.usage ?? emptyUsage() });
       }
     }
     throw new VisionError(lastError?.code ?? "FREE_VISION_MODELS_EXHAUSTED", lastError?.status ?? 503, attempts);

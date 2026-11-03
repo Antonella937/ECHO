@@ -6,6 +6,7 @@ import {
 } from "@workspace/api-zod";
 import { EngineError } from "../ai-engine/contracts";
 import { previewForOwner } from "../ai-engine/service";
+import { visionService } from "../vision/service";
 import type { TextProvider } from "../ai-engine/contracts";
 import { chooseAutonomyOpportunity, liveEligibility, type ExecutedAutonomyAction } from "./policy";
 import {
@@ -180,6 +181,7 @@ export async function runAutonomyDryRun(
     const preview = await previewForOwner(ownerId, decisionInput, {
       read: dependencies.repository.read,
       provider: dependencies.provider,
+      vision: (id, state, input) => visionService.loadContext(id, state, input),
     });
     await dependencies.repository.complete(ownerId, runId, {
       status: preview.decision.action === "none" ? "no_action" : "previewed",
@@ -290,6 +292,7 @@ export async function runAutonomyLiveCycle(
     };
     const preview = await previewForOwner(ownerId, decisionInput, {
       read: dependencies.repository.read, provider: dependencies.provider,
+      vision: (id, state, input) => visionService.loadContext(id, state, input),
     });
     if (preview.decision.action === "none") {
       await dependencies.repository.complete(ownerId, runId, {

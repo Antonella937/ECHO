@@ -54,6 +54,10 @@ export const previewCharacterDecisionResponseContextAuditSectionsItemRecordCount
 
 export const previewCharacterDecisionResponseContextAuditRecentCountsMinOne = 0;
 
+export const previewCharacterDecisionResponseContextAuditVisionMediaIncludedMin = 0;
+
+export const previewCharacterDecisionResponseContextAuditVisionPostSummariesIncludedMin = 0;
+
 export const previewCharacterDecisionResponseUsagePromptTokensMin = 0;
 
 export const previewCharacterDecisionResponseUsageCompletionTokensMin = 0;
@@ -98,7 +102,9 @@ export const PreviewCharacterDecisionResponse = zod.object({
   "fields": zod.array(zod.string()).describe('Included field paths only; never private field values')
 })),
   "recentCounts": zod.record(zod.string(), zod.number().int().min(previewCharacterDecisionResponseContextAuditRecentCountsMinOne)),
-  "privateDmScope": zod.enum(['none', 'actor_and_recipient_only'])
+  "privateDmScope": zod.enum(['none', 'actor_and_recipient_only']),
+  "visionMediaIncluded": zod.number().int().min(previewCharacterDecisionResponseContextAuditVisionMediaIncludedMin).describe('Count of persisted per-item vision analyses included; no image bytes or URLs'),
+  "visionPostSummariesIncluded": zod.number().int().min(previewCharacterDecisionResponseContextAuditVisionPostSummariesIncludedMin).describe('Count of persisted ordered post summaries included')
 }),
   "usage": zod.object({
   "promptTokens": zod.number().int().min(previewCharacterDecisionResponseUsagePromptTokensMin).nullable(),
@@ -116,6 +122,165 @@ export const PreviewCharacterDecisionResponse = zod.object({
 })
 })),
   "targetId": zod.string().nullish()
+})
+
+
+/**
+ * @summary Analyze persisted owner-uploaded post/story images; videos and audio are excluded
+ */
+export const analyzeOwnerImageMediaBodyOnePostIdMax = 120;
+
+export const analyzeOwnerImageMediaBodyTwoStoryIdMax = 120;
+
+
+
+export const AnalyzeOwnerImageMediaBody = zod.union([zod.object({
+  "postId": zod.string().min(1).max(analyzeOwnerImageMediaBodyOnePostIdMax)
+}),zod.object({
+  "storyId": zod.string().min(1).max(analyzeOwnerImageMediaBodyTwoStoryIdMax)
+})])
+
+export const analyzeOwnerImageMediaResponseSummaryOneCaptionMax = 500;
+
+export const analyzeOwnerImageMediaResponseSummaryOneImageCountMin = 0;
+
+export const analyzeOwnerImageMediaResponseSummaryOneUnsupportedImageCountMin = 0;
+
+export const analyzeOwnerImageMediaResponseSummaryOneUnsupportedVideoCountMin = 0;
+
+export const analyzeOwnerImageMediaResponseSummaryOneOverallDescriptionMax = 12000;
+
+export const analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemPositionMin = 0;
+
+export const analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemDescriptionMax = 1400;
+
+export const analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemObjectsItemMax = 120;
+
+export const analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemColorsItemMax = 120;
+
+export const analyzeOwnerImageMediaResponseItemsItemPositionMin = 0;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisSceneDescriptionMin = 8;
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisSceneDescriptionMax = 1400;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisSettingMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemLabelMax = 120;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemAttributesItemMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemAttributesMax = 8;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemConfidenceMin = 0;
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemConfidenceMax = 1;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsMax = 40;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleCountMin = 0;
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleCountMax = 40;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleNonIdentifyingDetailsItemMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleNonIdentifyingDetailsMax = 8;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisActivitiesItemMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisActivitiesMax = 20;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisDominantColorsItemMax = 120;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisDominantColorsMax = 12;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisVisibleTextItemMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisVisibleTextMax = 20;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisNotableDetailsItemMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisNotableDetailsMax = 24;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisUncertaintyItemMax = 320;
+
+export const analyzeOwnerImageMediaResponseItemsItemAnalysisUncertaintyMax = 12;
+
+export const analyzeOwnerImageMediaResponseItemsItemAttemptsItemUsagePromptTokensMin = 0;
+
+export const analyzeOwnerImageMediaResponseItemsItemAttemptsItemUsageCompletionTokensMin = 0;
+
+export const analyzeOwnerImageMediaResponseItemsItemAttemptsItemUsageCostMin = 0;
+
+export const analyzeOwnerImageMediaResponseItemsItemUsagePromptTokensMin = 0;
+
+export const analyzeOwnerImageMediaResponseItemsItemUsageCompletionTokensMin = 0;
+
+export const analyzeOwnerImageMediaResponseItemsItemUsageCostMin = 0;
+
+export const analyzeOwnerImageMediaResponseSkippedVideoCountMin = 0;
+
+
+
+export const AnalyzeOwnerImageMediaResponse = zod.object({
+  "entityType": zod.enum(['post', 'story']),
+  "entityId": zod.string(),
+  "summary": zod.union([zod.object({
+  "postId": zod.string(),
+  "caption": zod.string().max(analyzeOwnerImageMediaResponseSummaryOneCaptionMax),
+  "imageCount": zod.number().int().min(analyzeOwnerImageMediaResponseSummaryOneImageCountMin),
+  "unsupportedImageCount": zod.number().int().min(analyzeOwnerImageMediaResponseSummaryOneUnsupportedImageCountMin),
+  "unsupportedVideoCount": zod.number().int().min(analyzeOwnerImageMediaResponseSummaryOneUnsupportedVideoCountMin),
+  "overallDescription": zod.string().max(analyzeOwnerImageMediaResponseSummaryOneOverallDescriptionMax),
+  "orderedItems": zod.array(zod.object({
+  "mediaId": zod.string(),
+  "position": zod.number().int().min(analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemPositionMin),
+  "description": zod.string().max(analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemDescriptionMax),
+  "objects": zod.array(zod.string().max(analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemObjectsItemMax)),
+  "colors": zod.array(zod.string().max(analyzeOwnerImageMediaResponseSummaryOneOrderedItemsItemColorsItemMax))
+}))
+}),zod.null()]),
+  "items": zod.array(zod.object({
+  "mediaId": zod.string(),
+  "position": zod.number().int().min(analyzeOwnerImageMediaResponseItemsItemPositionMin),
+  "analysisId": zod.string(),
+  "analysis": zod.object({
+  "sceneDescription": zod.string().min(analyzeOwnerImageMediaResponseItemsItemAnalysisSceneDescriptionMin).max(analyzeOwnerImageMediaResponseItemsItemAnalysisSceneDescriptionMax),
+  "setting": zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisSettingMax),
+  "objects": zod.array(zod.object({
+  "label": zod.string().min(1).max(analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemLabelMax),
+  "category": zod.enum(['object', 'person', 'animal', 'text', 'setting', 'other']),
+  "attributes": zod.array(zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemAttributesItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemAttributesMax),
+  "position": zod.enum(['foreground', 'center', 'background', 'left', 'right', 'top', 'bottom', 'unknown']),
+  "confidence": zod.number().min(analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemConfidenceMin).max(analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsItemConfidenceMax)
+})).max(analyzeOwnerImageMediaResponseItemsItemAnalysisObjectsMax),
+  "people": zod.object({
+  "count": zod.number().int().min(analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleCountMin).max(analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleCountMax),
+  "nonIdentifyingDetails": zod.array(zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleNonIdentifyingDetailsItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisPeopleNonIdentifyingDetailsMax)
+}),
+  "activities": zod.array(zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisActivitiesItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisActivitiesMax),
+  "dominantColors": zod.array(zod.string().min(1).max(analyzeOwnerImageMediaResponseItemsItemAnalysisDominantColorsItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisDominantColorsMax),
+  "visibleText": zod.array(zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisVisibleTextItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisVisibleTextMax),
+  "notableDetails": zod.array(zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisNotableDetailsItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisNotableDetailsMax),
+  "uncertainty": zod.array(zod.string().max(analyzeOwnerImageMediaResponseItemsItemAnalysisUncertaintyItemMax)).max(analyzeOwnerImageMediaResponseItemsItemAnalysisUncertaintyMax)
+}),
+  "provider": zod.string(),
+  "model": zod.string(),
+  "cacheHit": zod.boolean(),
+  "attempts": zod.array(zod.object({
+  "model": zod.string(),
+  "outcome": zod.enum(['accepted', 'rejected']),
+  "errorCode": zod.string().nullable(),
+  "usage": zod.object({
+  "promptTokens": zod.number().int().min(analyzeOwnerImageMediaResponseItemsItemAttemptsItemUsagePromptTokensMin).nullable(),
+  "completionTokens": zod.number().int().min(analyzeOwnerImageMediaResponseItemsItemAttemptsItemUsageCompletionTokensMin).nullable(),
+  "cost": zod.number().min(analyzeOwnerImageMediaResponseItemsItemAttemptsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
+})
+})),
+  "usage": zod.object({
+  "promptTokens": zod.number().int().min(analyzeOwnerImageMediaResponseItemsItemUsagePromptTokensMin).nullable(),
+  "completionTokens": zod.number().int().min(analyzeOwnerImageMediaResponseItemsItemUsageCompletionTokensMin).nullable(),
+  "cost": zod.number().min(analyzeOwnerImageMediaResponseItemsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
+})
+})),
+  "skippedVideoCount": zod.number().int().min(analyzeOwnerImageMediaResponseSkippedVideoCountMin)
 })
 
 
@@ -211,6 +376,10 @@ export const runAutonomyDryRunResponsePreviewOneContextAuditSectionsItemRecordCo
 
 export const runAutonomyDryRunResponsePreviewOneContextAuditRecentCountsMinOne = 0;
 
+export const runAutonomyDryRunResponsePreviewOneContextAuditVisionMediaIncludedMin = 0;
+
+export const runAutonomyDryRunResponsePreviewOneContextAuditVisionPostSummariesIncludedMin = 0;
+
 export const runAutonomyDryRunResponsePreviewOneUsagePromptTokensMin = 0;
 
 export const runAutonomyDryRunResponsePreviewOneUsageCompletionTokensMin = 0;
@@ -265,7 +434,9 @@ export const RunAutonomyDryRunResponse = zod.object({
   "fields": zod.array(zod.string()).describe('Included field paths only; never private field values')
 })),
   "recentCounts": zod.record(zod.string(), zod.number().int().min(runAutonomyDryRunResponsePreviewOneContextAuditRecentCountsMinOne)),
-  "privateDmScope": zod.enum(['none', 'actor_and_recipient_only'])
+  "privateDmScope": zod.enum(['none', 'actor_and_recipient_only']),
+  "visionMediaIncluded": zod.number().int().min(runAutonomyDryRunResponsePreviewOneContextAuditVisionMediaIncludedMin).describe('Count of persisted per-item vision analyses included; no image bytes or URLs'),
+  "visionPostSummariesIncluded": zod.number().int().min(runAutonomyDryRunResponsePreviewOneContextAuditVisionPostSummariesIncludedMin).describe('Count of persisted ordered post summaries included')
 }),
   "usage": zod.object({
   "promptTokens": zod.number().int().min(runAutonomyDryRunResponsePreviewOneUsagePromptTokensMin).nullable(),
@@ -1000,7 +1171,7 @@ export const GetUniverseResponse = zod.object({
   "width": zod.number().int().min(1).optional(),
   "height": zod.number().int().min(1).optional(),
   "durationSeconds": zod.number().min(getUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin).optional()
-}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(getUniverseResponseStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
+}).describe('Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.')).min(1).max(getUniverseResponseStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -1482,7 +1653,7 @@ export const SaveUniverseBody = zod.object({
   "width": zod.number().int().min(1).optional(),
   "height": zod.number().int().min(1).optional(),
   "durationSeconds": zod.number().min(saveUniverseBodyStatePostsItemMediaItemDurationSecondsMin).optional()
-}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(saveUniverseBodyStatePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
+}).describe('Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.')).min(1).max(saveUniverseBodyStatePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -1960,7 +2131,7 @@ export const SaveUniverseResponse = zod.object({
   "width": zod.number().int().min(1).optional(),
   "height": zod.number().int().min(1).optional(),
   "durationSeconds": zod.number().min(saveUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin).optional()
-}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(saveUniverseResponseStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
+}).describe('Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.')).min(1).max(saveUniverseResponseStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -2480,7 +2651,7 @@ export const VerifyUniverseResponse = zod.object({
   "width": zod.number().int().min(1).optional(),
   "height": zod.number().int().min(1).optional(),
   "durationSeconds": zod.number().min(verifyUniverseResponseOneStateOnePostsItemMediaItemDurationSecondsMin).optional()
-}).describe('Ordered post item. Its stable id identifies the individual image/video for future analysis; no analysis is generated now.')).min(1).max(verifyUniverseResponseOneStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
+}).describe('Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.')).min(1).max(verifyUniverseResponseOneStateOnePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
   "caption": zod.string(),
   "location": zod.string(),
   "createdAt": zod.coerce.date(),

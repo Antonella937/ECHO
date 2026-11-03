@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { db, echoMediaTable, echoVisionAnalysesTable, echoVisionMediaRefsTable, echoVisionPostSummariesTable } from "@workspace/db";
 import type { CharacterDecisionInput, SocialState } from "@workspace/api-zod";
 import { ObjectPermission } from "../lib/objectAcl";
@@ -228,8 +228,10 @@ function parseStoredAnalysisOrThrow(text: string): VisionAnalysis {
   return parsed.data;
 }
 
-function buildSummary(postId: string, caption: string, images: AnalysisResult[], unsupportedVideoCount: number): VisionPostSummary {
-  const orderedItems = images.sort((a, b) => a.position - b.position).map((entry) => ({
+export function buildVisionPostSummary(postId: string, caption: string,
+  images: Array<Pick<AnalysisResult, "mediaId" | "position" | "analysis">>,
+  unsupportedImageCount = 0, unsupportedVideoCount = 0): VisionPostSummary {
+  const orderedItems = [...images].sort((a, b) => a.position - b.position).map((entry) => ({
     mediaId: entry.mediaId,
     position: entry.position,
     description: entry.analysis.sceneDescription,
@@ -239,10 +241,14 @@ function buildSummary(postId: string, caption: string, images: AnalysisResult[],
   const overallDescription = [
     `Carrusel con ${orderedItems.length} foto${orderedItems.length === 1 ? "" : "s"} en orden.`,
     ...orderedItems.map((item) => `Foto ${item.position + 1}: ${item.description}`),
+    unsupportedImageCount ? `${unsupportedImageCount} imagen${unsupportedImageCount === 1 ? "" : "es"} no disponible${unsupportedImageCount === 1 ? "" : "s"} para análisis privado.` : "",
     unsupportedVideoCount ? `${unsupportedVideoCount} elemento${unsupportedVideoCount === 1 ? "" : "s"} de video sin analizar.` : "",
     caption ? `Caption: ${caption.slice(0, 500)}` : "",
   ].filter(Boolean).join(" ");
-  return { postId, caption: caption.slice(0, 500), imageCount: orderedItems.length, unsupportedVideoCount, orderedItems, overallDescription };
+  return {
+    postId, caption: caption.slice(0, 500), imageCount: orderedItems.length,
+    unsupportedImageCount, unsupportedVideoCount, orderedItems, overallDescription,
+  };
 }
 
 export class VisionService {
@@ -254,7 +260,8 @@ export class VisionService {
     if (!post) throw new VisionError("POST_NOT_FOUND", 404);
     const items = mediaItems(post);
     if (!items.length) throw new VisionError("POST_HAS_NO_MEDIA", 422);
-    const imageItems = items.filter((item) => item.type === "image");
+    const allImageItems = items.filter((item) => item.type === "image");
+    const imageItems = allImageItems.filter((item) => safeImagePath(item.url));
     const videoItems = items.filter((item) => item.type === "video");
     if (!imageItems.length) throw new VisionError("POST_HAS_NO_IMAGE_MEDIA", 415);
 
@@ -263,7 +270,8 @@ export class VisionService {
 
     const overallHash = hashPost(items.map((item) => ({ id: item.id, type: item.type, path: item.url })),
       post.caption ?? "", post.location ?? "");
-    const summary = buildSummary(post.id, post.caption ?? "", results, videoItems.length);
+    const summary = buildVisionPostSummary(post.id, post.caption ?? "", results,
+      allImageItems.length - imageItems.length, videoItems.length);
     await db.insert(echoVisionPostSummariesTable).values({
       ownerId, postId: post.id, contentHash: overallHash, summary, updatedAt: new Date(),
     }).onConflictDoUpdate({
@@ -297,8 +305,20 @@ export class VisionService {
   }
 
   async ensureForDecision(ownerId: string, state: SocialState, input: CharacterDecisionInput): Promise<VisionContext> {
-    if (input.postId) await this.analyzePost(ownerId, state, input.postId);
-    if (input.storyId) await this.analyzeStory(ownerId, state, input.storyId);
+    if (input.postId) {
+      try { await this.analyzePost(ownerId, state, input.postId); }
+      catch (error) {
+        // Existing posts using bundled/legacy media remain usable by the Brain;
+        // only persisted private uploads are eligible for first-time Vision analysis.
+        if (!(error instanceof VisionError) || !["POST_HAS_NO_IMAGE_MEDIA"].includes(error.code)) throw error;
+      }
+    }
+    if (input.storyId) {
+      try { await this.analyzeStory(ownerId, state, input.storyId); }
+      catch (error) {
+        if (!(error instanceof VisionError) || error.code !== "VISION_MEDIA_NOT_PRIVATE_UPLOAD") throw error;
+      }
+    }
     return this.loadContext(ownerId, state, input);
   }
 
@@ -311,12 +331,15 @@ export class VisionService {
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 4);
     const postIds = relevantPosts.map((post) => post.id);
     const storyIds = relevantStories.map((story) => story.id);
-    const refs = await db.select().from(echoVisionMediaRefsTable).where(and(
-      eq(echoVisionMediaRefsTable.ownerId, ownerId),
-      postIds.length || storyIds.length
-        ? inArray(echoVisionMediaRefsTable.entityId, [...postIds, ...storyIds])
-        : eq(echoVisionMediaRefsTable.entityId, "__no_vision_entity__"),
-    ));
+    const entityFilters = [
+      ...(postIds.length ? [and(eq(echoVisionMediaRefsTable.entityType, "post"), inArray(echoVisionMediaRefsTable.entityId, postIds))] : []),
+      ...(storyIds.length ? [and(eq(echoVisionMediaRefsTable.entityType, "story"), inArray(echoVisionMediaRefsTable.entityId, storyIds))] : []),
+    ];
+    const refs = entityFilters.length
+      ? await db.select().from(echoVisionMediaRefsTable).where(and(
+        eq(echoVisionMediaRefsTable.ownerId, ownerId), or(...entityFilters)!,
+      ))
+      : [];
     const hashes = [...new Set(refs.map((ref) => ref.contentHash))];
     const analysisRows = hashes.length
       ? await db.select().from(echoVisionAnalysesTable).where(and(
