@@ -20,3 +20,9 @@ Open forms need their own original-value snapshot in addition to universe revisi
 **Why:** Background synchronization can advance the universe's merge base while an editor still contains old values. Saving the entire old form would then look like a valid new edit and silently undo another device's work.
 
 **How to apply:** Use this rule for account fields, audience figures and future editing forms. Keep independent remote edits even if the user leaves their corresponding form inputs untouched.
+
+Universe switching deliberately finishes synchronization before changing the owner-scoped selection, then loads a fresh document instead of reusing the previous universe's in-memory store.
+
+**Why:** A partial client-side switch can leave old characters, pending writes or query results associated with the new selection. Failed synchronization must leave the current universe selected.
+
+**How to apply:** Preserve this boundary when extending the universe selector; do not optimize away the reload without equivalent store/cache teardown and pending-write guarantees.

@@ -6,6 +6,7 @@ import type { Appearance } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
+import { UniverseSelector } from '@/components/echo/universe-selector';
 import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
 import { characterProvider, imageProvider } from '@/domain/providers';
 import { toast } from '@/hooks/use-toast';
@@ -37,6 +38,7 @@ export default function SettingsPage() {
               <LogOut className="h-4 w-4" /> Cerrar sesión
             </button>
           </div>
+          <UniverseSelector />
         </section>
 
         <section className="mt-9" aria-labelledby="identity-h">
