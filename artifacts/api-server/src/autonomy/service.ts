@@ -180,6 +180,7 @@ export async function runAutonomyDryRun(
     const decisionInput = {
       characterId: character.id,
       situation: opportunity.situation,
+      universeId,
       ...(opportunity.postId ? { postId: opportunity.postId } : {}),
       ...(opportunity.commentId ? { commentId: opportunity.commentId } : {}),
       ...(opportunity.recipientId ? { recipientId: opportunity.recipientId } : {}),
@@ -305,6 +306,7 @@ export async function runAutonomyLiveCycle(
     const decisionInput = {
       characterId: character.id,
       situation: opportunity.situation,
+      universeId,
       ...(opportunity.postId ? { postId: opportunity.postId } : {}),
       ...(opportunity.commentId ? { commentId: opportunity.commentId } : {}),
       ...(opportunity.recipientId ? { recipientId: opportunity.recipientId } : {}),

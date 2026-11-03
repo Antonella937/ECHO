@@ -1,6 +1,7 @@
 import test from "node:test";
 import { after } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { SaveUniverseBody, type CharacterDecision, type SocialState } from "@workspace/api-zod";
 import {
@@ -11,16 +12,20 @@ import {
   echoAutonomyRunsTable,
   echoAutonomyWorkerLeasesTable,
   echoUniversesTable,
+  echoVisionAnalysesTable,
+  echoVisionMediaRefsTable,
+  echoVisionPostSummariesTable,
 } from "@workspace/db";
 import { createSeedState } from "../../echo/src/store/seed";
 import { defaultCharacterConfig } from "../../echo/src/domain/character-core";
 import { applyAutonomyDecision, executeAutonomyDecision } from "../src/autonomy/executor";
 import { chooseAutonomyOpportunity, liveEligibility, type Opportunity } from "../src/autonomy/policy";
 import { runAutonomyDryRun, runAutonomyLiveCycle } from "../src/autonomy/service";
+import { readUniverse } from "../src/lib/universeRepository";
 import { buildCharacterContext } from "../src/ai-engine/context";
 import { previewDecision } from "../src/ai-engine/engine";
 import { postMedia } from "../../echo/src/domain/post-media";
-import type { AutonomyRepository } from "../src/autonomy/service";
+import type { AutonomyRepository, LiveAutonomyRepository } from "../src/autonomy/service";
 import { EngineError, type TextProvider } from "../src/ai-engine/contracts";
 import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "../src/autonomy/constants";
 import {
@@ -50,6 +55,9 @@ function syntheticOwnerId() {
 }
 
 after(async () => {
+  await db.delete(echoVisionPostSummariesTable).where(inArray(echoVisionPostSummariesTable.ownerId, dbOwners));
+  await db.delete(echoVisionMediaRefsTable).where(inArray(echoVisionMediaRefsTable.ownerId, dbOwners));
+  await db.delete(echoVisionAnalysesTable).where(inArray(echoVisionAnalysesTable.ownerId, dbOwners));
   await db.delete(echoAutonomyRunsTable).where(inArray(echoAutonomyRunsTable.ownerId, dbOwners));
   await db.delete(echoAutonomyCharactersTable).where(inArray(echoAutonomyCharactersTable.ownerId, dbOwners));
   await db.delete(echoAutonomyOwnersTable).where(inArray(echoAutonomyOwnersTable.ownerId, dbOwners));
@@ -616,6 +624,260 @@ test("dry run uses owner-scoped data, is idempotent, and does not mutate social 
     /UNIVERSE_NOT_FOUND/,
   );
   assert.equal(providerCalls, 1);
+});
+
+test("Autonomy sends the selected owner universe to persisted Vision context in dry-run and live-cycle", async () => {
+  const ownerA = syntheticOwnerId();
+  const ownerB = syntheticOwnerId();
+  const postId = "autonomy-vision-shared-post";
+  const postMediaId = "autonomy-vision-shared-media";
+  const storyId = "autonomy-vision-shared-story";
+  const postPath = "/objects/uploads/autonomy-vision-shared-post-image";
+  const storyPath = "/objects/uploads/autonomy-vision-shared-story-image";
+  const postHash = "synthetic-autonomy-vision-post-hash";
+  const storyHash = "synthetic-autonomy-vision-story-hash";
+  const caption = "Prueba sintética de ensayo";
+  const location = "Sala compartida";
+  const postSummaryHash = createHash("sha256").update(JSON.stringify({
+    items: [{ id: postMediaId, type: "image", path: postPath }],
+    caption,
+    location,
+  })).digest("hex");
+
+  function autonomyVisionState(): SocialState {
+    const { state, mar } = fixture();
+    const noah = state.characters.find((character) => character.id === "noah")!;
+    addNoahRelationship(mar, noah.id);
+    state.posts = [{
+      id: postId,
+      authorId: noah.id,
+      caption,
+      location,
+      createdAt: new Date(NOW.getTime() - 60 * 60_000),
+      likes: [],
+      savedBy: [],
+      commentsEnabled: true,
+      image: postPath,
+      media: [{ id: postMediaId, type: "image", url: postPath }],
+      origin: "user",
+      illustrative: false,
+    } as unknown as SocialState["posts"][number]];
+    state.comments = [];
+    state.stories = [{
+      id: storyId,
+      authorId: noah.id,
+      image: storyPath,
+      caption: "Prueba de sonido",
+      createdAt: new Date(NOW.getTime() - 30 * 60_000),
+      seenBy: [],
+      mentionedAccountIds: [mar.id],
+      reactions: [],
+      origin: "user",
+    } as unknown as SocialState["stories"][number]];
+    state.messages = [];
+    return state;
+  }
+
+  const universeFixtures = [
+    { ownerId: ownerA, universeId: "primary", marker: "AUTONOMY_ALPHA_PRIMARY" },
+    { ownerId: ownerA, universeId: "studio", marker: "AUTONOMY_ALPHA_STUDIO" },
+    { ownerId: ownerB, universeId: "studio", marker: "AUTONOMY_BETA_STUDIO" },
+    { ownerId: ownerB, universeId: "foreign-only", marker: "AUTONOMY_BETA_FOREIGN" },
+  ];
+  for (const item of universeFixtures) {
+    const state = autonomyVisionState();
+    await insertSyntheticUniverse(item.ownerId, state, NOW, 1, item.universeId);
+    const postAnalysis = {
+      sceneDescription: `Escena sintética ${item.marker} del post.`,
+      setting: "Fixture de autonomía aislado",
+      objects: [{ label: `${item.marker}_POST`, category: "object", attributes: [], position: "center", confidence: 1 }],
+      people: { count: 0, nonIdentifyingDetails: [] },
+      activities: [],
+      dominantColors: ["gris"],
+      visibleText: [],
+      notableDetails: [`${item.marker}_POST`],
+      uncertainty: [],
+    };
+    const storyAnalysis = {
+      ...postAnalysis,
+      sceneDescription: `Escena sintética ${item.marker} de Story.`,
+      objects: [{ label: `${item.marker}_STORY`, category: "object", attributes: [], position: "center", confidence: 1 }],
+      notableDetails: [`${item.marker}_STORY`],
+    };
+    await db.insert(echoVisionAnalysesTable).values([
+      {
+        id: crypto.randomUUID(), ownerId: item.ownerId, universeId: item.universeId,
+        contentHash: postHash, mimeType: "image/png", byteSize: 100, status: "complete",
+        provider: "synthetic", model: "synthetic", analysis: postAnalysis, createdAt: NOW, updatedAt: NOW,
+      },
+      {
+        id: crypto.randomUUID(), ownerId: item.ownerId, universeId: item.universeId,
+        contentHash: storyHash, mimeType: "image/png", byteSize: 90, status: "complete",
+        provider: "synthetic", model: "synthetic", analysis: storyAnalysis, createdAt: NOW, updatedAt: NOW,
+      },
+    ]);
+    await db.insert(echoVisionMediaRefsTable).values([
+      {
+        ownerId: item.ownerId, universeId: item.universeId, entityType: "post", entityId: postId,
+        mediaId: postMediaId, position: 0, contentHash: postHash, sourcePath: postPath,
+      },
+      {
+        ownerId: item.ownerId, universeId: item.universeId, entityType: "story", entityId: storyId,
+        mediaId: `story:${storyId}`, position: 0, contentHash: storyHash, sourcePath: storyPath,
+      },
+    ]);
+    await db.insert(echoVisionPostSummariesTable).values({
+      ownerId: item.ownerId,
+      universeId: item.universeId,
+      postId,
+      contentHash: postSummaryHash,
+      summary: {
+        postId,
+        caption,
+        imageCount: 1,
+        unsupportedImageCount: 0,
+        unsupportedVideoCount: 0,
+        orderedItems: [{
+          mediaId: postMediaId,
+          position: 0,
+          description: `${item.marker}_POST`,
+          objects: [`${item.marker}_POST`],
+          colors: ["gris"],
+        }],
+        overallDescription: `${item.marker}_SUMMARY`,
+      },
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+  }
+
+  type CapturedContext = {
+    situation: string;
+    target?: {
+      post?: {
+        id: string;
+        media: Array<{ visionAnalysis?: { objects: Array<{ label: string }> } }>;
+        visionSummary?: { overallDescription: string } | null;
+      };
+    };
+    recentSocial?: {
+      stories: Array<{ id: string; visionAnalysis?: { objects: Array<{ label: string }> } | null }>;
+    };
+  };
+  const providerContexts: CapturedContext[] = [];
+  const provider: TextProvider = {
+    name: "synthetic-autonomy-vision-context",
+    complete: async ({ context }) => {
+      const parsed = JSON.parse(context) as CapturedContext;
+      providerContexts.push(parsed);
+      return {
+        model: "synthetic:free",
+        text: JSON.stringify({
+          action: "none",
+          situation: parsed.situation,
+          text: null,
+          reaction: null,
+          reason: "Synthetic context-isolation check.",
+          suggestedDelayMinutes: 0,
+          contextSections: ["identity", "recentSocial"],
+        }),
+      };
+    },
+  };
+  let nextRun = 0;
+  let executeDecisionCalls = 0;
+  const repository: LiveAutonomyRepository = {
+    read: (ownerId, universeId) => readUniverse(ownerId, universeId),
+    readControls: async () => ({
+      globalKillSwitchEngaged: false,
+      liveExecutionEnabled: true,
+      characters: new Map([["mar", {
+        enabled: true,
+        maxActionsPerDay: 10,
+        minCooldownMinutes: 60,
+      }]]),
+    }),
+    getExecutedHistory: async () => [],
+    reserve: async () => ({ kind: "created", runId: `synthetic-autonomy-run-${++nextRun}` }),
+    complete: async () => undefined,
+    executeDecision: async () => {
+      executeDecisionCalls += 1;
+      throw new Error("SYNTHETIC_TEST_MUST_NOT_EXECUTE_SOCIAL_ACTION");
+    },
+  };
+  const selectedRandom = () => {
+    const values = [0, 0.95];
+    return () => values.shift() ?? 0.95;
+  };
+  const input = (universeId?: string) => ({
+    characterId: "mar",
+    idempotencyKey: crypto.randomUUID(),
+    ...(universeId ? { universeId } : {}),
+  });
+  const assertContextMarker = (context: CapturedContext, marker: string, forbidden: string[]) => {
+    assert.equal(context.situation, "like_post");
+    assert.equal(context.target?.post?.id, postId);
+    assert.equal(context.target?.post?.media[0]?.visionAnalysis?.objects[0]?.label, `${marker}_POST`);
+    assert.equal(context.target?.post?.visionSummary?.overallDescription, `${marker}_SUMMARY`);
+    assert.equal(
+      context.recentSocial?.stories.find((story) => story.id === storyId)?.visionAnalysis?.objects[0]?.label,
+      `${marker}_STORY`,
+    );
+    const serialized = JSON.stringify(context);
+    for (const otherMarker of forbidden) assert.equal(serialized.includes(otherMarker), false);
+  };
+
+  const studioDryRun = await runAutonomyDryRun(ownerA, input("studio"), {
+    repository, provider, now: NOW, random: selectedRandom(),
+  });
+  assert.equal(studioDryRun.preview?.decision.action, "none");
+  assert.equal(studioDryRun.socialActionsExecuted, false);
+  assertContextMarker(providerContexts.at(-1)!, "AUTONOMY_ALPHA_STUDIO", [
+    "AUTONOMY_ALPHA_PRIMARY", "AUTONOMY_BETA_STUDIO", "AUTONOMY_BETA_FOREIGN",
+  ]);
+
+  const legacyDryRun = await runAutonomyDryRun(ownerA, input(), {
+    repository, provider, now: NOW, random: selectedRandom(),
+  });
+  assert.equal(legacyDryRun.preview?.decision.action, "none");
+  assertContextMarker(providerContexts.at(-1)!, "AUTONOMY_ALPHA_PRIMARY", [
+    "AUTONOMY_ALPHA_STUDIO", "AUTONOMY_BETA_STUDIO", "AUTONOMY_BETA_FOREIGN",
+  ]);
+
+  const otherOwnerDryRun = await runAutonomyDryRun(ownerB, input("studio"), {
+    repository, provider, now: NOW, random: selectedRandom(),
+  });
+  assert.equal(otherOwnerDryRun.preview?.decision.action, "none");
+  assertContextMarker(providerContexts.at(-1)!, "AUTONOMY_BETA_STUDIO", [
+    "AUTONOMY_ALPHA_PRIMARY", "AUTONOMY_ALPHA_STUDIO", "AUTONOMY_BETA_FOREIGN",
+  ]);
+
+  const callsBeforeForeignUniverse = providerContexts.length;
+  await assert.rejects(
+    runAutonomyDryRun(ownerA, input("foreign-only"), {
+      repository, provider, now: NOW, random: selectedRandom(),
+    }),
+    (error: unknown) => error instanceof EngineError && error.code === "UNIVERSE_NOT_FOUND",
+  );
+  assert.equal(providerContexts.length, callsBeforeForeignUniverse);
+
+  const liveCycle = await runAutonomyLiveCycle(ownerA, input("studio"), {
+    repository, provider, liveExecutionEnabled: true, now: NOW, random: selectedRandom(),
+  });
+  assert.equal(liveCycle.status, "no_action");
+  assertContextMarker(providerContexts.at(-1)!, "AUTONOMY_ALPHA_STUDIO", [
+    "AUTONOMY_ALPHA_PRIMARY", "AUTONOMY_BETA_STUDIO", "AUTONOMY_BETA_FOREIGN",
+  ]);
+
+  const legacyLiveCycle = await runAutonomyLiveCycle(ownerA, input(), {
+    repository, provider, liveExecutionEnabled: true, now: NOW, random: selectedRandom(),
+  });
+  assert.equal(legacyLiveCycle.status, "no_action");
+  assertContextMarker(providerContexts.at(-1)!, "AUTONOMY_ALPHA_PRIMARY", [
+    "AUTONOMY_ALPHA_STUDIO", "AUTONOMY_BETA_STUDIO", "AUTONOMY_BETA_FOREIGN",
+  ]);
+  assert.equal(executeDecisionCalls, 0);
+  assert.equal(providerContexts.length, 5);
 });
 
 test("dry run safely degrades to no action when the Autonomy budget reserve is reached", async () => {
