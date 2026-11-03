@@ -483,13 +483,15 @@ test("PostgreSQL controls and idempotency are isolated by owner and rate-capped"
   assert.equal(capped.kind, "rate_limited");
 
   const staleKey = crypto.randomUUID();
+  const staleAt = new Date(Date.now() - 5 * 60_000);
   const [stale] = await db.insert(echoAutonomyRunsTable).values({
     ownerId: ownerB,
     characterId: "mar",
     idempotencyKey: staleKey,
     status: "running",
     sourceRevision: 1,
-    createdAt: new Date(Date.now() - 5 * 60_000),
+    createdAt: staleAt,
+    updatedAt: staleAt,
   }).returning({ id: echoAutonomyRunsTable.id });
   const recovered = await reserveDryRun(ownerB, "mar", staleKey, 2);
   assert.equal(recovered.kind, "created");
