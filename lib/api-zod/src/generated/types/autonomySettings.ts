@@ -8,6 +8,11 @@
 import type { AutonomyCharacterControl } from './autonomyCharacterControl';
 
 export interface AutonomySettings {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId: string;
   globalKillSwitchEngaged: boolean;
   liveExecutionEnabled: false;
   characters: AutonomyCharacterControl[];

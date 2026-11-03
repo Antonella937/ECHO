@@ -249,6 +249,7 @@ function recentActorActivityCount(state: SocialState, characterId: string, now: 
 
 export async function executeAutonomyDecision(input: {
   ownerId: string;
+  universeId?: string;
   runId: string;
   characterId: string;
   sourceRevision: number;
@@ -262,9 +263,11 @@ export async function executeAutonomyDecision(input: {
   if (!(input.liveEnabled ?? isAutonomyLiveExecutionEnabled())) return { status: "disabled", reasonCode: "LIVE_EXECUTION_DISABLED" };
   if (!input.ownerId) return { status: "disabled", reasonCode: "OWNER_REQUIRED" };
   const now = input.now ?? new Date();
+  const universeId = input.universeId ?? "primary";
   return db.transaction(async (tx) => {
     const [run] = await tx.select().from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+      eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.id, Number(input.runId)),
     )).for("update").limit(1);
     if (!run || run.characterId !== input.characterId) return { status: "blocked", reasonCode: "RUN_NOT_OWNED" };
@@ -276,29 +279,45 @@ export async function executeAutonomyDecision(input: {
     ).for("update").limit(1);
     const [characterControl] = await tx.select().from(echoAutonomyCharactersTable).where(and(
       eq(echoAutonomyCharactersTable.ownerId, input.ownerId),
+      eq(echoAutonomyCharactersTable.universeId, universeId),
       eq(echoAutonomyCharactersTable.characterId, input.characterId),
     )).for("update").limit(1);
     if ((owner?.killSwitchEngaged ?? true) || !(characterControl?.enabled ?? false)) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "blocked", lastErrorCode: "OPT_IN_OR_KILL_SWITCH", finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH" };
     }
 
     const [universe] = await tx.select().from(echoUniversesTable).where(
-      eq(echoUniversesTable.ownerId, input.ownerId),
+      and(
+        eq(echoUniversesTable.ownerId, input.ownerId),
+        eq(echoUniversesTable.universeId, universeId),
+      ),
     ).for("update").limit(1);
     if (!universe || universe.revision !== input.sourceRevision) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "stale_revision", lastErrorCode: "UNIVERSE_REVISION_CHANGED", finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "stale_revision", reasonCode: "UNIVERSE_REVISION_CHANGED" };
     }
     const stored = SaveUniverseBody.safeParse({ state: universe.state, expectedRevision: universe.revision });
     if (!stored.success) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "blocked", lastErrorCode: "INVALID_UNIVERSE", finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "blocked", reasonCode: "INVALID_UNIVERSE" };
     }
 
@@ -315,6 +334,7 @@ export async function executeAutonomyDecision(input: {
       createdAt: echoAutonomyRunsTable.createdAt,
     }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+      eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.characterId, input.characterId),
       eq(echoAutonomyRunsTable.status, "executed"),
       gte(echoAutonomyRunsTable.createdAt, since),
@@ -330,7 +350,11 @@ export async function executeAutonomyDecision(input: {
     if ((ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "rate_limited", lastErrorCode: "OWNER_ACTION_CAP", finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "rate_limited", reasonCode: "OWNER_ACTION_CAP" };
     }
 
@@ -372,7 +396,11 @@ export async function executeAutonomyDecision(input: {
       await tx.update(echoAutonomyRunsTable).set({
         status: "rate_limited", lastErrorCode: totalLimitHit ? "CHARACTER_COOLDOWN_OR_DAILY_CAP" : "ACTION_TYPE_CAP",
         finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "rate_limited", reasonCode: totalLimitHit ? "CHARACTER_COOLDOWN_OR_DAILY_CAP" : "ACTION_TYPE_CAP" };
     }
 
@@ -383,7 +411,11 @@ export async function executeAutonomyDecision(input: {
       const reasonCode = error instanceof SocialExecutionError ? error.reasonCode : "ACTION_REVALIDATION_FAILED";
       await tx.update(echoAutonomyRunsTable).set({
         status: "blocked", lastErrorCode: reasonCode, finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "blocked", reasonCode };
     }
     if (!mutation.changed) {
@@ -391,7 +423,11 @@ export async function executeAutonomyDecision(input: {
         status: "no_action", action: "none", situation: input.decision.situation,
         contextHash: input.contextHash ?? null, model: input.model ?? null,
         finishedAt: now, updatedAt: now,
-      }).where(eq(echoAutonomyRunsTable.id, run.id));
+      }).where(and(
+        eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.id, run.id),
+      ));
       return { status: "no_action", reasonCode: "MODEL_SELECTED_NONE" };
     }
 
@@ -401,6 +437,7 @@ export async function executeAutonomyDecision(input: {
       updatedAt: now,
     }).where(and(
       eq(echoUniversesTable.ownerId, input.ownerId),
+      eq(echoUniversesTable.universeId, universeId),
       eq(echoUniversesTable.revision, input.sourceRevision),
     )).returning({ revision: echoUniversesTable.revision });
     if (!saved) throw new SocialExecutionError("UNIVERSE_REVISION_CHANGED");
@@ -418,6 +455,7 @@ export async function executeAutonomyDecision(input: {
       updatedAt: now,
     }).where(and(
       eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+      eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.id, run.id),
       eq(echoAutonomyRunsTable.status, "running"),
     ));

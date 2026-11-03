@@ -69,13 +69,22 @@ function safeProviderAttempts(error: unknown) {
   });
 }
 
-async function ownerSettings(ownerId: string) {
-  const snapshot = await readUniverse(ownerId);
+function requestedUniverseId(value: unknown): string {
+  if (value === undefined) return "primary";
+  if (typeof value !== "string" || !value.trim() || value.length > 120) {
+    throw new EngineError("INVALID_UNIVERSE_ID", 400);
+  }
+  return value;
+}
+
+async function ownerSettings(ownerId: string, universeId = "primary") {
+  const snapshot = await readUniverse(ownerId, universeId);
   if (!snapshot.state) throw new EngineError("UNIVERSE_NOT_FOUND", 404);
   const parsed = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
   if (!parsed.success) throw new EngineError("INVALID_STORED_UNIVERSE", 422);
-  const controls = await readOwnerControls(ownerId);
+  const controls = await readOwnerControls(ownerId, universeId);
   return GetAutonomySettingsResponse.parse({
+    universeId,
     globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled(),
     characters: parsed.data.state.characters.filter((character) => !character.archived).map((character) => {
@@ -94,7 +103,8 @@ async function ownerSettings(ownerId: string) {
 
 router.get("/autonomy/settings", requireAuth, async (req, res): Promise<void> => {
   try {
-    res.json(await ownerSettings(req.userId!));
+    const universeId = requestedUniverseId(req.query.universeId);
+    res.json(await ownerSettings(req.userId!, universeId));
   } catch (error) {
     const safe = error instanceof EngineError ? error : new EngineError("AUTONOMY_SETTINGS_FAILED", 500);
     res.status(safe.status).json({ error: safe.code });
@@ -107,11 +117,12 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
   const ownerId = req.userId!;
   const update = parsed.data;
   try {
+    const universeId = update.universeId ?? "primary";
+    const snapshot = await readUniverse(ownerId, universeId);
+    if (!snapshot.state) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
     if ("globalKillSwitchEngaged" in update) {
       await updateOwnerKillSwitch(ownerId, update.globalKillSwitchEngaged);
     } else {
-      const snapshot = await readUniverse(ownerId);
-      if (!snapshot.state) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
       const stored = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
       const account = stored.success
         ? stored.data.state.characters.find((character) => character.id === update.characterId)
@@ -119,9 +130,9 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
       if (!account || (account.archived && update.enabled)) {
         res.status(404).json({ error: "CHARACTER_NOT_FOUND_OR_ARCHIVED" }); return;
       }
-      await updateCharacterControl(ownerId, account.id, update.enabled);
+      await updateCharacterControl(ownerId, account.id, update.enabled, universeId);
     }
-    res.json(await ownerSettings(ownerId));
+    res.json(await ownerSettings(ownerId, universeId));
   } catch (error) {
     const safe = error instanceof EngineError ? error : new EngineError("AUTONOMY_SETTINGS_UPDATE_FAILED", 500);
     res.status(safe.status).json({ error: safe.code });

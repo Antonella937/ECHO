@@ -82,6 +82,7 @@ export * from './creatorUniverseSummary';
 export * from './engineAttempt';
 export * from './engineAttemptOutcome';
 export * from './engineUsage';
+export * from './getAutonomySettingsParams';
 export * from './getUniverseParams';
 export * from './healthStatus';
 export * from './listCreatorUniversesParams';

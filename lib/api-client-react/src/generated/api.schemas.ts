@@ -946,6 +946,11 @@ export interface AutonomyCharacterControl {
 }
 
 export interface AutonomySettings {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId: string;
   globalKillSwitchEngaged: boolean;
   liveExecutionEnabled: false;
   characters: AutonomyCharacterControl[];
@@ -953,6 +958,11 @@ export interface AutonomySettings {
 
 export type AutonomySettingsUpdate = {
   globalKillSwitchEngaged: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 } | {
   /**
      * @minLength 1
@@ -960,6 +970,11 @@ export type AutonomySettingsUpdate = {
      */
   characterId: string;
   enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 };
 
 export interface AutonomyDryRunInput {
@@ -969,6 +984,11 @@ export interface AutonomyDryRunInput {
      */
   characterId: string;
   idempotencyKey: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 }
 
 export type AutonomyDryRunResultMode = typeof AutonomyDryRunResultMode[keyof typeof AutonomyDryRunResultMode];
@@ -1501,6 +1521,14 @@ export interface UploadClaimInput {
 export interface UploadClaimResult {
   objectPath: string;
 }
+
+export type GetAutonomySettingsParams = {
+/**
+ * @minLength 1
+ * @maxLength 120
+ */
+universeId?: string;
+};
 
 export type GetUniverseParams = {
 /**

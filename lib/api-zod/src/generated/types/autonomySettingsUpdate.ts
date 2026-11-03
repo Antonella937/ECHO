@@ -8,6 +8,11 @@
 
 export type AutonomySettingsUpdate = {
   globalKillSwitchEngaged: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 } | {
   /**
      * @minLength 1
@@ -15,4 +20,9 @@ export type AutonomySettingsUpdate = {
      */
   characterId: string;
   enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 };

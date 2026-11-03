@@ -19,14 +19,14 @@ import type { LiveExecutionOutcome } from "./executor";
 const DAY_MS = 24 * 60 * 60_000;
 
 export interface AutonomyRepository {
-  read(ownerId: string): Promise<{ state: unknown; revision: number }>;
-  readControls(ownerId: string): Promise<{
+  read(ownerId: string, universeId?: string): Promise<{ state: unknown; revision: number }>;
+  readControls(ownerId: string, universeId?: string): Promise<{
     globalKillSwitchEngaged: boolean;
     liveExecutionEnabled: boolean;
     characters: Map<string, { enabled: boolean; maxActionsPerDay: number; minCooldownMinutes: number }>;
   }>;
-  getExecutedHistory(ownerId: string, characterId: string, since: Date): Promise<ExecutedAutonomyAction[]>;
-  reserve(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number): Promise<
+  getExecutedHistory(ownerId: string, characterId: string, since: Date, universeId?: string): Promise<ExecutedAutonomyAction[]>;
+  reserve(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number, universeId?: string): Promise<
     | { kind: "created"; runId: string }
     | { kind: "duplicate"; runId: string; status: string; characterId: string }
     | { kind: "idempotency_conflict"; runId: string; characterId: string }
@@ -41,12 +41,13 @@ export interface AutonomyRepository {
     contextHash?: string | null;
     model?: string | null;
     lastErrorCode?: string | null;
-  }): Promise<void>;
+  }, universeId?: string): Promise<void>;
 }
 
 export interface LiveAutonomyRepository extends AutonomyRepository {
   executeDecision(input: {
     ownerId: string;
+    universeId: string;
     runId: string;
     characterId: string;
     sourceRevision: number;
@@ -99,7 +100,8 @@ export async function runAutonomyDryRun(
   if (!RunAutonomyDryRunBody.strict().safeParse(input).success) throw new EngineError("INVALID_AUTONOMY_DRY_RUN_INPUT", 400);
 
   const now = dependencies.now ?? new Date();
-  const snapshot = await dependencies.repository.read(ownerId);
+  const universeId = input.universeId ?? "primary";
+  const snapshot = await dependencies.repository.read(ownerId, universeId);
   if (!snapshot.state) throw new EngineError("UNIVERSE_NOT_FOUND", 404);
   const stored = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
   if (!stored.success) throw new EngineError("INVALID_STORED_UNIVERSE", 422);
@@ -107,7 +109,7 @@ export async function runAutonomyDryRun(
   const character = state.characters.find((item) => item.id === input.characterId && !item.archived);
   if (!character) throw new EngineError("CHARACTER_NOT_FOUND", 404);
 
-  const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision);
+  const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision, universeId);
   if (reservation.kind === "rate_limited") {
     return result({
       runId: null, characterId: character.id, status: "rate_limited", liveEligible: false,
@@ -135,10 +137,11 @@ export async function runAutonomyDryRun(
 
   const runId = reservation.runId;
   try {
-    const controls = await dependencies.repository.readControls(ownerId);
+    const controls = await dependencies.repository.readControls(ownerId, universeId);
     const characterControl = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
     const history = await dependencies.repository.getExecutedHistory(
       ownerId, character.id, new Date(now.getTime() - 24 * 60 * 60_000),
+      universeId,
     );
     const opportunity = chooseAutonomyOpportunity({
       state,
@@ -162,7 +165,7 @@ export async function runAutonomyDryRun(
         : opportunity.reasonCode === "DAILY_CAP" ? "rate_limited" : "no_opportunity";
       await dependencies.repository.complete(ownerId, runId, {
         status, sourceRevision: snapshot.revision,
-      });
+      }, universeId);
       return result({
         runId, characterId: character.id, status, liveEligible: false,
         reason: opportunity.reason, preview: null, createdAt: now,
@@ -179,7 +182,7 @@ export async function runAutonomyDryRun(
       ...(opportunity.messageId ? { messageId: opportunity.messageId } : {}),
     };
     const preview = await previewForOwner(ownerId, decisionInput, {
-      read: dependencies.repository.read,
+      read: (id) => dependencies.repository.read(id, universeId),
       provider: dependencies.provider,
       vision: (id, state, input) => visionService.loadContext(id, state, input),
     });
@@ -191,7 +194,7 @@ export async function runAutonomyDryRun(
       sourceRevision: preview.sourceRevision,
       contextHash: preview.contextAudit.contextHash,
       model: preview.model,
-    });
+    }, universeId);
 
     return result({
       runId,
@@ -211,7 +214,7 @@ export async function runAutonomyDryRun(
     await dependencies.repository.complete(ownerId, runId, {
       status: "provider_failed",
       sourceRevision: snapshot.revision,
-    }).catch(() => undefined);
+    }, universeId).catch(() => undefined);
     throw error;
   }
 }
@@ -234,7 +237,8 @@ export async function runAutonomyLiveCycle(
   if (!ownerId) throw new EngineError("AUTHENTICATION_REQUIRED", 401);
   if (!RunAutonomyDryRunBody.strict().safeParse(input).success) throw new EngineError("INVALID_AUTONOMY_DRY_RUN_INPUT", 400);
   const now = dependencies.now ?? new Date();
-  const snapshot = await dependencies.repository.read(ownerId);
+  const universeId = input.universeId ?? "primary";
+  const snapshot = await dependencies.repository.read(ownerId, universeId);
   if (!snapshot.state) throw new EngineError("UNIVERSE_NOT_FOUND", 404);
   const stored = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
   if (!stored.success) throw new EngineError("INVALID_STORED_UNIVERSE", 422);
@@ -242,13 +246,13 @@ export async function runAutonomyLiveCycle(
   const character = state.characters.find((item) => item.id === input.characterId && !item.archived);
   if (!character) throw new EngineError("CHARACTER_NOT_FOUND", 404);
 
-  const controls = await dependencies.repository.readControls(ownerId);
+  const controls = await dependencies.repository.readControls(ownerId, universeId);
   const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
   if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged || !control.enabled) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
-  const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision);
+  const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision, universeId);
   if (reservation.kind === "rate_limited") {
     return { status: "rate_limited", reasonCode: "RUN_RATE_LIMIT", characterId: character.id, runId: null, model: null };
   }
@@ -266,7 +270,7 @@ export async function runAutonomyLiveCycle(
   const runId = reservation.runId;
   try {
     const history = await dependencies.repository.getExecutedHistory(
-      ownerId, character.id, new Date(now.getTime() - DAY_MS),
+      ownerId, character.id, new Date(now.getTime() - DAY_MS), universeId,
     );
     const opportunity = chooseAutonomyOpportunity({
       state, character, history, now, random: dependencies.random,
@@ -277,7 +281,7 @@ export async function runAutonomyLiveCycle(
         ? "cooldown" : opportunity.reasonCode === "DAILY_CAP" ? "rate_limited" : "no_action";
       await dependencies.repository.complete(ownerId, runId, {
         status, sourceRevision: snapshot.revision, lastErrorCode: null,
-      });
+      }, universeId);
       return { status, reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };
     }
 
@@ -291,7 +295,7 @@ export async function runAutonomyLiveCycle(
       ...(opportunity.messageId ? { messageId: opportunity.messageId } : {}),
     };
     const preview = await previewForOwner(ownerId, decisionInput, {
-      read: dependencies.repository.read, provider: dependencies.provider,
+      read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
       vision: (id, state, input) => visionService.loadContext(id, state, input),
     });
     if (preview.decision.action === "none") {
@@ -299,7 +303,7 @@ export async function runAutonomyLiveCycle(
         status: "no_action", action: "none", situation: preview.decision.situation,
         targetId: preview.targetId ?? null, sourceRevision: preview.sourceRevision,
         contextHash: preview.contextAudit.contextHash, model: preview.model, lastErrorCode: null,
-      });
+      }, universeId);
       return {
         status: "no_action", reasonCode: "MODEL_SELECTED_NONE", characterId: character.id,
         runId, model: preview.model,
@@ -308,6 +312,7 @@ export async function runAutonomyLiveCycle(
 
     const outcome = await dependencies.repository.executeDecision({
       ownerId, runId, characterId: character.id, sourceRevision: preview.sourceRevision,
+      universeId,
       opportunity, decision: preview.decision, contextHash: preview.contextAudit.contextHash,
       model: preview.model, liveEnabled, now,
     });
@@ -324,7 +329,7 @@ export async function runAutonomyLiveCycle(
     await dependencies.repository.complete(ownerId, runId, {
       status: error instanceof EngineError ? "provider_failed" : "live_failed",
       sourceRevision: snapshot.revision, lastErrorCode: code,
-    }).catch(() => undefined);
+    }, universeId).catch(() => undefined);
     return { status: "failed", reasonCode: code, characterId: character.id, runId, model: null };
   }
 }

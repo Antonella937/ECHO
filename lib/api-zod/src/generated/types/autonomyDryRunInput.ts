@@ -13,4 +13,9 @@ export interface AutonomyDryRunInput {
      */
   characterId: string;
   idempotencyKey: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
 }

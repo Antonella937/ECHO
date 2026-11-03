@@ -28,6 +28,7 @@ import {
   completeDryRun,
   releaseAutonomyWorkerLease,
   listLiveOptInTargets,
+  getExecutedActionHistory,
   updateCharacterControl,
   updateOwnerKillSwitch,
   readOwnerControls,
@@ -88,9 +89,10 @@ const postDecision = (text = "Ensayo y café.") => ({
   contextSections: ["identity"],
 }) satisfies CharacterDecision;
 
-async function insertSyntheticUniverse(ownerId: string, state: SocialState, now: Date, revision = 1) {
+async function insertSyntheticUniverse(ownerId: string, state: SocialState, now: Date, revision = 1, universeId = "primary") {
   await db.insert(echoUniversesTable).values({
     ownerId,
+    universeId,
     revision,
     state: state as unknown as Record<string, unknown>,
     updatedAt: now,
@@ -100,6 +102,7 @@ async function insertSyntheticUniverse(ownerId: string, state: SocialState, now:
 async function insertAutonomyRun(input: {
   ownerId: string;
   characterId?: string;
+  universeId?: string;
   key?: string;
   status?: string;
   action?: string | null;
@@ -112,6 +115,7 @@ async function insertAutonomyRun(input: {
   const now = input.now ?? new Date();
   const [run] = await db.insert(echoAutonomyRunsTable).values({
     ownerId: input.ownerId,
+    universeId: input.universeId ?? "primary",
     characterId: input.characterId ?? "mar",
     idempotencyKey: input.key ?? crypto.randomUUID(),
     status: input.status ?? "running",
@@ -127,6 +131,7 @@ async function insertAutonomyRun(input: {
 
 async function setupExecutorOwner(input: {
   ownerId: string;
+  universeId?: string;
   state?: SocialState;
   now?: Date;
   killSwitchEngaged?: boolean;
@@ -137,7 +142,8 @@ async function setupExecutorOwner(input: {
   const now = input.now ?? new Date();
   const { state, mar } = fixture();
   const universe = input.state ?? state;
-  await insertSyntheticUniverse(input.ownerId, universe, now);
+  const universeId = input.universeId ?? "primary";
+  await insertSyntheticUniverse(input.ownerId, universe, now, 1, universeId);
   await db.insert(echoAutonomyOwnersTable).values({
     ownerId: input.ownerId,
     killSwitchEngaged: input.killSwitchEngaged ?? false,
@@ -145,13 +151,14 @@ async function setupExecutorOwner(input: {
   });
   await db.insert(echoAutonomyCharactersTable).values({
     ownerId: input.ownerId,
+    universeId,
     characterId: mar.id,
     enabled: input.characterEnabled ?? true,
     maxActionsPerDay: input.maxActionsPerDay ?? 2,
     minCooldownMinutes: input.minCooldownMinutes ?? 60,
     updatedAt: now,
   });
-  const runId = await insertAutonomyRun({ ownerId: input.ownerId, now });
+  const runId = await insertAutonomyRun({ ownerId: input.ownerId, universeId, now });
   return { state: universe, mar, runId };
 }
 
@@ -529,30 +536,43 @@ test("dry run uses owner-scoped data, is idempotent, and does not mutate social 
   const before = structuredClone(state);
   const ledger = new Map<string, { id: string; status: string }>();
   const completed: Array<{ id: string; status: string }> = [];
+  const universesRead: string[] = [];
+  const controlsRead: string[] = [];
+  const historyRead: string[] = [];
   let providerCalls = 0;
   let reserves = 0;
   const repository: AutonomyRepository = {
-    read: async (ownerId) => ownerId === "owner-a"
-      ? { state, revision: 7 }
-      : { state: null, revision: 0 },
-    readControls: async (ownerId) => ({
-      globalKillSwitchEngaged: false,
-      liveExecutionEnabled: false,
-      characters: new Map(ownerId === "owner-a" ? [[mar.id, {
-        enabled: true, maxActionsPerDay: 2, minCooldownMinutes: 360,
-      }]] : []),
-    }),
-    getExecutedHistory: async () => [],
-    reserve: async (ownerId, _characterId, key) => {
+    read: async (ownerId, universeId) => {
+      universesRead.push(universeId ?? "primary");
+      return ownerId === "owner-a" && universeId === "studio"
+        ? { state, revision: 7 }
+        : { state: null, revision: 0 };
+    },
+    readControls: async (ownerId, universeId) => {
+      controlsRead.push(universeId ?? "primary");
+      return {
+        globalKillSwitchEngaged: false,
+        liveExecutionEnabled: false,
+        characters: new Map(ownerId === "owner-a" ? [[mar.id, {
+          enabled: true, maxActionsPerDay: 2, minCooldownMinutes: 360,
+        }]] : []),
+      };
+    },
+    getExecutedHistory: async (_ownerId, _characterId, _since, universeId) => {
+      historyRead.push(universeId ?? "primary");
+      return [];
+    },
+    reserve: async (ownerId, _characterId, key, _revision, universeId) => {
       reserves += 1;
-      const ledgerKey = `${ownerId}:${key}`;
+      const ledgerKey = `${ownerId}:${universeId ?? "primary"}:${key}`;
       const previous = ledger.get(ledgerKey);
       if (previous) return { kind: "duplicate" as const, runId: previous.id, status: previous.status, characterId: "mar" };
       const run = { id: String(ledger.size + 1), status: "running" };
       ledger.set(ledgerKey, run);
       return { kind: "created" as const, runId: run.id };
     },
-    complete: async (_ownerId, runId, result) => {
+    complete: async (_ownerId, runId, result, universeId) => {
+      assert.equal(universeId, "studio");
       const run = [...ledger.values()].find((entry) => entry.id === runId);
       if (run) run.status = result.status;
       completed.push({ id: runId, status: result.status });
@@ -572,7 +592,11 @@ test("dry run uses owner-scoped data, is idempotent, and does not mutate social 
       };
     },
   };
-  const input = { characterId: "mar", idempotencyKey: "00000000-0000-4000-8000-000000000001" };
+  const input = {
+    characterId: "mar",
+    idempotencyKey: "00000000-0000-4000-8000-000000000001",
+    universeId: "studio",
+  };
   const first = await runAutonomyDryRun("owner-a", input, { repository, provider, now: NOW, random: () => 0 });
   const retry = await runAutonomyDryRun("owner-a", input, { repository, provider, now: NOW, random: () => 0 });
   assert.equal(first.preview?.decision.action, "none");
@@ -583,6 +607,9 @@ test("dry run uses owner-scoped data, is idempotent, and does not mutate social 
   assert.equal(providerCalls, 1);
   assert.equal(reserves, 2);
   assert.equal(completed.length, 1);
+  assert.ok(universesRead.length > 0 && universesRead.every((id) => id === "studio"));
+  assert.deepEqual(controlsRead, ["studio"]);
+  assert.deepEqual(historyRead, ["studio"]);
   assert.deepEqual(state, before);
   await assert.rejects(
     runAutonomyDryRun("owner-b", input, { repository, provider, now: NOW, random: () => 0 }),
@@ -638,6 +665,49 @@ test("PostgreSQL controls and idempotency are isolated by owner and rate-capped"
   assert.equal(otherOwner.kind, "created");
 });
 
+test("PostgreSQL controls, idempotency, and execution history are isolated by universe", async () => {
+  const ownerId = syntheticOwnerId();
+  const primaryState = fixture().state;
+  const alternateState = fixture().state;
+  await insertSyntheticUniverse(ownerId, primaryState, NOW, 1, "primary");
+  await insertSyntheticUniverse(ownerId, alternateState, NOW, 1, "studio");
+  await updateOwnerKillSwitch(ownerId, false);
+  await updateCharacterControl(ownerId, "mar", false, "primary");
+  await updateCharacterControl(ownerId, "mar", true, "studio");
+
+  const primaryControls = await readOwnerControls(ownerId, "primary");
+  const studioControls = await readOwnerControls(ownerId, "studio");
+  assert.equal(primaryControls.characters.get("mar")?.enabled, false);
+  assert.equal(studioControls.characters.get("mar")?.enabled, true);
+
+  const key = crypto.randomUUID();
+  const primaryRun = await reserveDryRun(ownerId, "mar", key, 1, "primary");
+  const studioRun = await reserveDryRun(ownerId, "mar", key, 1, "studio");
+  assert.equal(primaryRun.kind, "created");
+  assert.equal(studioRun.kind, "created");
+  const primaryDuplicate = await reserveDryRun(ownerId, "mar", key, 1, "primary");
+  assert.equal(primaryDuplicate.kind, "duplicate");
+  assert.equal(primaryDuplicate.runId, primaryRun.kind === "created" ? primaryRun.runId : null);
+
+  if (primaryRun.kind !== "created" || studioRun.kind !== "created") {
+    throw new Error("SYNTHETIC_UNIVERSE_RUN_RESERVATION_FAILED");
+  }
+  await completeDryRun(ownerId, primaryRun.runId, {
+    status: "executed", action: "like", situation: "like_post", sourceRevision: 1,
+  }, "primary");
+  await completeDryRun(ownerId, studioRun.runId, {
+    status: "executed", action: "react", situation: "story_reaction", sourceRevision: 1,
+  }, "studio");
+  const since = new Date(NOW.getTime() - 24 * 60 * 60_000);
+  const primaryHistory = await getExecutedActionHistory(ownerId, "mar", since, "primary");
+  const studioHistory = await getExecutedActionHistory(ownerId, "mar", since, "studio");
+  assert.deepEqual(primaryHistory.map((item) => item.situation), ["like_post"]);
+  assert.deepEqual(studioHistory.map((item) => item.situation), ["story_reaction"]);
+
+  const eligible = (await listLiveOptInTargets()).filter((target) => target.ownerId === ownerId);
+  assert.deepEqual(eligible, [{ ownerId, universeId: "studio", characterId: "mar" }]);
+});
+
 test("live executor commits one synthetic post and treats a retry as a duplicate", async () => {
   const ownerId = syntheticOwnerId();
   const now = new Date();
@@ -673,6 +743,47 @@ test("live executor commits one synthetic post and treats a retry as a duplicate
   assert.equal(run.status, "executed");
   assert.equal((await db.select().from(echoUniversesTable)
     .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1))[0]?.revision, 2);
+});
+
+test("executor binds a run to its universe when a character exists in two universes", async () => {
+  const ownerId = syntheticOwnerId();
+  const now = new Date();
+  const primary = await setupExecutorOwner({ ownerId, universeId: "primary", now });
+  const studioState = fixture().state;
+  await insertSyntheticUniverse(ownerId, studioState, now, 1, "studio");
+  await updateCharacterControl(ownerId, primary.mar.id, true, "studio");
+  const studioRunId = await insertAutonomyRun({ ownerId, universeId: "studio", now });
+  const base = {
+    ownerId,
+    characterId: primary.mar.id,
+    sourceRevision: 1,
+    opportunity: postOpportunity,
+    decision: postDecision("Studio rehearsal."),
+    liveEnabled: true,
+    now,
+  } as const;
+
+  const crossUniverseRun = await executeAutonomyDecision({
+    ...base, universeId: "studio", runId: primary.runId,
+  });
+  assert.deepEqual(crossUniverseRun, { status: "blocked", reasonCode: "RUN_NOT_OWNED" });
+
+  const studioExecution = await executeAutonomyDecision({
+    ...base, universeId: "studio", runId: studioRunId,
+  });
+  assert.equal(studioExecution.status, "executed");
+
+  const universes = await db.select({
+    universeId: echoUniversesTable.universeId,
+    revision: echoUniversesTable.revision,
+    state: echoUniversesTable.state,
+  }).from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
+  const primaryAfter = universes.find((item) => item.universeId === "primary")!;
+  const studioAfter = universes.find((item) => item.universeId === "studio")!;
+  assert.equal(primaryAfter.revision, 1);
+  assert.equal(studioAfter.revision, 2);
+  assert.equal((primaryAfter.state as unknown as SocialState).posts.length, 0);
+  assert.equal((studioAfter.state as unknown as SocialState).posts.length, 1);
 });
 
 test("executor rejects a decision after the universe revision changes without applying it", async () => {
@@ -821,7 +932,7 @@ test("opt-in target query returns only enabled characters whose owner kill switc
   const ownTargets = targets.filter(({ ownerId }) =>
     [eligibleOwner, killedOwner, optedOutOwner].includes(ownerId),
   );
-  assert.deepEqual(ownTargets, [{ ownerId: eligibleOwner, characterId: "mar" }]);
+  assert.deepEqual(ownTargets, [{ ownerId: eligibleOwner, universeId: "primary", characterId: "mar" }]);
 });
 
 test("worker tick gates disabled and busy states before target selection", async () => {
@@ -829,7 +940,7 @@ test("worker tick gates disabled and busy states before target selection", async
   let processed = 0;
   let claimed = 0;
   const repository = {
-    listLiveOptInTargets: async () => { listed += 1; return [{ ownerId: "synthetic", characterId: "mar" }]; },
+    listLiveOptInTargets: async () => { listed += 1; return [{ ownerId: "synthetic", universeId: "primary", characterId: "mar" }]; },
     claimWorkerLease: async () => { claimed += 1; return false; },
     releaseWorkerLease: async () => undefined,
   };
@@ -850,9 +961,9 @@ test("worker tick gates disabled and busy states before target selection", async
 test("worker tick uses deterministic per-slot keys, continues after a target failure, and releases its lease", async () => {
   const now = new Date("2026-11-03T12:00:00.000Z");
   const targets = [
-    { ownerId: "synthetic-owner-a", characterId: "mar" },
-    { ownerId: "synthetic-owner-b", characterId: "noah" },
-    { ownerId: "synthetic-owner-c", characterId: "felix" },
+    { ownerId: "synthetic-owner-a", universeId: "primary", characterId: "mar" },
+    { ownerId: "synthetic-owner-b", universeId: "studio", characterId: "noah" },
+    { ownerId: "synthetic-owner-c", universeId: "primary", characterId: "felix" },
   ];
   const seenKeys: string[] = [];
   const released: string[] = [];
@@ -867,8 +978,8 @@ test("worker tick uses deterministic per-slot keys, continues after a target fai
     },
     releaseWorkerLease: async (token: string) => { released.push(token); },
   };
-  const processCharacter = async (_ownerId: string, input: { characterId: string; idempotencyKey: string }) => {
-    seenKeys.push(`${input.characterId}:${input.idempotencyKey}`);
+  const processCharacter = async (_ownerId: string, input: { universeId: string; characterId: string; idempotencyKey: string }) => {
+    seenKeys.push(`${input.universeId}:${input.characterId}:${input.idempotencyKey}`);
     if (input.characterId === "mar") return { status: "executed" };
     if (input.characterId === "noah") return { status: "no_action" };
     throw new Error("SYNTHETIC_TARGET_FAILURE");
@@ -879,7 +990,7 @@ test("worker tick uses deterministic per-slot keys, continues after a target fai
   assert.deepEqual(first, { status: "completed", evaluated: 3, executed: 1, noAction: 1, failed: 1 });
   const firstKeys = [...seenKeys];
   assert.equal(firstKeys.length, 3);
-  assert.ok(firstKeys.every((entry) => /^.+:worker:\d+:[a-f0-9]{24}$/.test(entry)));
+  assert.ok(firstKeys.every((entry) => /^.+:.+:worker:\d+:[a-f0-9]{24}$/.test(entry)));
   assert.deepEqual(released, ["synthetic-worker-token"]);
 
   seenKeys.length = 0;

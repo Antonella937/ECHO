@@ -5,6 +5,7 @@ const WORKER_LEASE_MS = 10 * 60_000;
 
 export interface AutonomyWorkerTarget {
   ownerId: string;
+  universeId: string;
   characterId: string;
 }
 
@@ -32,7 +33,7 @@ export async function runAutonomyWorkerTick(input: {
   repository: AutonomyWorkerRepository;
   processCharacter: (
     ownerId: string,
-    input: { characterId: string; idempotencyKey: string },
+    input: { universeId: string; characterId: string; idempotencyKey: string },
     now: Date,
   ) => Promise<{ status: string }>;
   now?: Date;
@@ -51,12 +52,12 @@ export async function runAutonomyWorkerTick(input: {
     const targets = await input.repository.listLiveOptInTargets();
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
     for (const target of targets) {
-      const characterHash = createHash("sha256").update(target.characterId).digest("hex").slice(0, 24);
+      const characterHash = createHash("sha256").update(`${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
       const idempotencyKey = `worker:${slot}:${characterHash}`;
       evaluated += 1;
       try {
         const result = await input.processCharacter(
-          target.ownerId, { characterId: target.characterId, idempotencyKey }, now,
+          target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey }, now,
         );
         if (result.status === "executed") executed += 1;
         else if (result.status === "no_action" || result.status === "disabled" ||

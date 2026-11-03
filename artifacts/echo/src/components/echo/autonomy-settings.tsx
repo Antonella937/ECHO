@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useUser } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetAutonomySettingsQueryKey,
@@ -10,6 +11,7 @@ import type { AutonomyDryRunResult } from "@workspace/api-client-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { getActiveUniverseId } from "@/store/persistence";
 
 const labels: Record<AutonomyDryRunResult["status"], string> = {
   previewed: "Preview completado",
@@ -21,23 +23,25 @@ const labels: Record<AutonomyDryRunResult["status"], string> = {
 };
 
 export function AutonomySettingsSection() {
+  const { user } = useUser();
+  const universeId = user?.id ? getActiveUniverseId(user.id) : "primary";
   const client = useQueryClient();
-  const query = useGetAutonomySettings();
+  const query = useGetAutonomySettings({ universeId });
   const update = useUpdateAutonomySettings();
   const dryRun = useRunAutonomyDryRun();
   const [latest, setLatest] = useState<AutonomyDryRunResult | null>(null);
   const settings = query.data;
   const updateCache = (next: NonNullable<typeof settings>) => {
-    client.setQueryData(getGetAutonomySettingsQueryKey(), next);
+    client.setQueryData(getGetAutonomySettingsQueryKey({ universeId: next.universeId }), next);
   };
 
   const setKillSwitch = (engaged: boolean) => update.mutate(
-    { data: { globalKillSwitchEngaged: engaged } },
+    { data: { globalKillSwitchEngaged: engaged, universeId } },
     { onSuccess: updateCache, onError: () => toast({ title: "No se pudo guardar el bloqueo global", variant: "destructive" }) },
   );
 
   const setCharacter = (characterId: string, enabled: boolean) => update.mutate(
-    { data: { characterId, enabled } },
+    { data: { characterId, enabled, universeId } },
     {
       onSuccess: updateCache,
       onError: () => toast({ title: "No se pudo guardar el control del personaje", variant: "destructive" }),
@@ -50,7 +54,7 @@ export function AutonomySettingsSection() {
       return;
     }
     dryRun.mutate(
-      { data: { characterId, idempotencyKey: globalThis.crypto.randomUUID() } },
+      { data: { characterId, idempotencyKey: globalThis.crypto.randomUUID(), universeId } },
       {
         onSuccess: setLatest,
         onError: () => toast({ title: "No se pudo completar la simulación", description: "No se ejecutó ninguna acción social.", variant: "destructive" }),

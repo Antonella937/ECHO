@@ -63,6 +63,11 @@ paths:
     get:
       operationId: getAutonomySettings
       summary: Load owner-private text autonomy controls
+      parameters:
+        - name: universeId
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 120, default: primary }
       responses:
         "200":
           description: Owner controls and per-character opt-ins; live execution remains disabled
@@ -447,8 +452,9 @@ components:
         minCooldownMinutes: { type: integer, minimum: 60, maximum: 1440 }
     AutonomySettings:
       type: object
-      required: [globalKillSwitchEngaged, liveExecutionEnabled, characters]
+      required: [universeId, globalKillSwitchEngaged, liveExecutionEnabled, characters]
       properties:
+        universeId: { type: string, minLength: 1, maxLength: 120 }
         globalKillSwitchEngaged: { type: boolean }
         liveExecutionEnabled: { type: boolean, enum: [false] }
         characters:
@@ -461,12 +467,14 @@ components:
           required: [globalKillSwitchEngaged]
           properties:
             globalKillSwitchEngaged: { type: boolean }
+            universeId: { type: string, minLength: 1, maxLength: 120, default: primary }
         - type: object
           additionalProperties: false
           required: [characterId, enabled]
           properties:
             characterId: { type: string, minLength: 1, maxLength: 120 }
             enabled: { type: boolean }
+            universeId: { type: string, minLength: 1, maxLength: 120, default: primary }
     AutonomyDryRunInput:
       type: object
       additionalProperties: false
@@ -474,6 +482,7 @@ components:
       properties:
         characterId: { type: string, minLength: 1, maxLength: 120 }
         idempotencyKey: { type: string, format: uuid }
+        universeId: { type: string, minLength: 1, maxLength: 120, default: primary }
     AutonomyDryRunResult:
       type: object
       required: [mode, runId, characterId, status, liveExecutionEnabled, liveEligible, socialActionsExecuted, reason, preview, createdAt]

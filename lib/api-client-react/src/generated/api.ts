@@ -34,6 +34,7 @@ import type {
   CreatorUniverseCreated,
   CreatorUniverseInput,
   CreatorUniverseSummary,
+  GetAutonomySettingsParams,
   GetUniverseParams,
   HealthStatus,
   ListCreatorUniversesParams,
@@ -253,20 +254,27 @@ export const useAnalyzeOwnerImageMedia = <TError = ErrorType<void>,
       return useMutation(getAnalyzeOwnerImageMediaMutationOptions(options));
     }
 
-export const getGetAutonomySettingsUrl = () => {
+export const getGetAutonomySettingsUrl = (params?: GetAutonomySettingsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/autonomy/settings`
+  return stringifiedParams.length > 0 ? `/api/autonomy/settings?${stringifiedParams}` : `/api/autonomy/settings`
 }
 
 /**
  * @summary Load owner-private text autonomy controls
  */
-export const getAutonomySettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<AutonomySettings> => {
+export const getAutonomySettings = async (params?: GetAutonomySettingsParams, options?: Parameters<typeof customFetch>[1]): Promise<AutonomySettings> => {
 
-  return customFetch<AutonomySettings>(getGetAutonomySettingsUrl(),
+  return customFetch<AutonomySettings>(getGetAutonomySettingsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -279,23 +287,23 @@ export const getAutonomySettings = async ( options?: Parameters<typeof customFet
 
 
 
-export const getGetAutonomySettingsQueryKey = () => {
+export const getGetAutonomySettingsQueryKey = (params?: GetAutonomySettingsParams,) => {
     return [
-    `/api/autonomy/settings`
+    `/api/autonomy/settings`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAutonomySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAutonomySettings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAutonomySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAutonomySettings>>, TError = ErrorType<void>>(params?: GetAutonomySettingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAutonomySettingsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetAutonomySettingsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutonomySettings>>> = ({ signal }) => getAutonomySettings({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutonomySettings>>> = ({ signal }) => getAutonomySettings(params, { signal, ...requestOptions });
 
 
 
@@ -313,11 +321,11 @@ export type GetAutonomySettingsQueryError = ErrorType<void>
  */
 
 export function useGetAutonomySettings<TData = Awaited<ReturnType<typeof getAutonomySettings>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetAutonomySettingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutonomySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetAutonomySettingsQueryOptions(options)
+  const queryOptions = getGetAutonomySettingsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

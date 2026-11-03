@@ -10,11 +10,14 @@ import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./con
 
 export { DEFAULT_CHARACTER_CONTROL } from "./constants";
 
-export async function readOwnerControls(ownerId: string) {
+export async function readOwnerControls(ownerId: string, universeId = "primary") {
   const [owner] = await db.select().from(echoAutonomyOwnersTable)
     .where(eq(echoAutonomyOwnersTable.ownerId, ownerId)).limit(1);
   const characters = await db.select().from(echoAutonomyCharactersTable)
-    .where(eq(echoAutonomyCharactersTable.ownerId, ownerId));
+    .where(and(
+      eq(echoAutonomyCharactersTable.ownerId, ownerId),
+      eq(echoAutonomyCharactersTable.universeId, universeId),
+    ));
   return {
     globalKillSwitchEngaged: owner?.killSwitchEngaged ?? true,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled(),
@@ -35,16 +38,20 @@ export async function updateOwnerKillSwitch(ownerId: string, engaged: boolean) {
     });
 }
 
-export async function updateCharacterControl(ownerId: string, characterId: string, enabled: boolean) {
+export async function updateCharacterControl(ownerId: string, characterId: string, enabled: boolean, universeId = "primary") {
   await db.insert(echoAutonomyCharactersTable)
-    .values({ ownerId, characterId, enabled })
+    .values({ ownerId, universeId, characterId, enabled })
     .onConflictDoUpdate({
-      target: [echoAutonomyCharactersTable.ownerId, echoAutonomyCharactersTable.characterId],
+      target: [
+        echoAutonomyCharactersTable.ownerId,
+        echoAutonomyCharactersTable.universeId,
+        echoAutonomyCharactersTable.characterId,
+      ],
       set: { enabled, updatedAt: new Date() },
     });
 }
 
-export async function getExecutedActionHistory(ownerId: string, characterId: string, since: Date) {
+export async function getExecutedActionHistory(ownerId: string, characterId: string, since: Date, universeId = "primary") {
   return db.select({
     status: echoAutonomyRunsTable.status,
     action: echoAutonomyRunsTable.action,
@@ -53,6 +60,7 @@ export async function getExecutedActionHistory(ownerId: string, characterId: str
     createdAt: echoAutonomyRunsTable.createdAt,
   }).from(echoAutonomyRunsTable).where(and(
     eq(echoAutonomyRunsTable.ownerId, ownerId),
+    eq(echoAutonomyRunsTable.universeId, universeId),
     eq(echoAutonomyRunsTable.characterId, characterId),
     eq(echoAutonomyRunsTable.status, "executed"),
     gte(echoAutonomyRunsTable.createdAt, since),
@@ -62,6 +70,7 @@ export async function getExecutedActionHistory(ownerId: string, characterId: str
 export async function listLiveOptInTargets() {
   const rows = await db.select({
     ownerId: echoAutonomyCharactersTable.ownerId,
+    universeId: echoAutonomyCharactersTable.universeId,
     characterId: echoAutonomyCharactersTable.characterId,
   }).from(echoAutonomyCharactersTable).innerJoin(
     echoAutonomyOwnersTable,
@@ -101,9 +110,15 @@ type Reservation =
   | { kind: "rate_limited" };
 
 /** Serialize owner-scoped idempotency reservations and enforce persisted call caps. */
-export async function reserveDryRun(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number): Promise<Reservation> {
+export async function reserveDryRun(
+  ownerId: string,
+  characterId: string,
+  idempotencyKey: string,
+  sourceRevision: number,
+  universeId = "primary",
+): Promise<Reservation> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}), 0)`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}), hashtext(${universeId}))`);
     const [existing] = await tx.select({
       id: echoAutonomyRunsTable.id,
       status: echoAutonomyRunsTable.status,
@@ -112,6 +127,7 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
       attemptCount: echoAutonomyRunsTable.attemptCount,
     }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
+      eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.idempotencyKey, idempotencyKey),
     )).limit(1);
     if (existing) {
@@ -124,6 +140,8 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
           status: "running", sourceRevision, updatedAt: new Date(),
           attemptCount: existing.attemptCount + 1, lastErrorCode: null,
         }).where(and(
+          eq(echoAutonomyRunsTable.ownerId, ownerId),
+          eq(echoAutonomyRunsTable.universeId, universeId),
           eq(echoAutonomyRunsTable.id, existing.id),
           eq(echoAutonomyRunsTable.status, "running"),
           lt(echoAutonomyRunsTable.updatedAt, new Date(Date.now() - 120_000)),
@@ -134,6 +152,8 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
         await tx.update(echoAutonomyRunsTable).set({
           status: "stale_failed", lastErrorCode: "LEASE_EXPIRED", finishedAt: new Date(), updatedAt: new Date(),
         }).where(and(
+          eq(echoAutonomyRunsTable.ownerId, ownerId),
+          eq(echoAutonomyRunsTable.universeId, universeId),
           eq(echoAutonomyRunsTable.id, existing.id),
           eq(echoAutonomyRunsTable.status, "running"),
         ));
@@ -147,6 +167,7 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60_000);
     const [perCharacterHour] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
+      eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.characterId, characterId),
       gte(echoAutonomyRunsTable.createdAt, hourAgo),
     ));
@@ -156,6 +177,7 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
     ));
     const [perCharacterDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
+      eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.characterId, characterId),
       gte(echoAutonomyRunsTable.createdAt, dayAgo),
     ));
@@ -170,6 +192,7 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
 
     const [created] = await tx.insert(echoAutonomyRunsTable).values({
       ownerId,
+      universeId,
       characterId,
       idempotencyKey,
       status: "running",
@@ -193,6 +216,7 @@ export async function completeDryRun(
     model?: string | null;
     lastErrorCode?: string | null;
   },
+  universeId = "primary",
 ) {
   await db.update(echoAutonomyRunsTable).set({
     status: result.status,
@@ -207,6 +231,7 @@ export async function completeDryRun(
     updatedAt: new Date(),
   }).where(and(
     eq(echoAutonomyRunsTable.ownerId, ownerId),
+    eq(echoAutonomyRunsTable.universeId, universeId),
     eq(echoAutonomyRunsTable.id, Number(runId)),
   ));
 }
