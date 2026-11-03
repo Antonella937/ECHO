@@ -6,3 +6,4 @@
 - [Wouter onboarding routes](wouter-onboarding.md) — keep stateful onboarding routes stable across parent rerenders during async saves.
 - [Usage budget boundaries](echo-usage-budget.md) — AI ceilings are internal safety controls, not customer-facing plan quotas; structural add-ons never add AI budget.
 - [Development schema push ordering](database-migration-ordering.md) — when adding required universe keys to existing tables, verify the generated DDL order; stage safely if push sets NOT NULL before adding the column.
+- [Character privacy is not yet enforcement](character-privacy-scope.md) — a stored public/private setting is not content protection until social read routes enforce it.

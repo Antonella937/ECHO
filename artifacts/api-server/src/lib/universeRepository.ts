@@ -4,6 +4,7 @@ import {
   type CreatorPlan, type EchoCreatorEntitlement,
 } from "@workspace/db";
 import { DEFAULT_AI_CATEGORY_WEIGHTS, DEFAULT_MONTHLY_HARD_CEILING_UNITS } from "./ai-usage";
+import { ensureCharacterPrivacyDefaultsInTransaction } from "./characterPrivacy";
 
 export class StructuralLimitError extends Error {
   constructor(readonly code: "UNIVERSE_LIMIT_REACHED" | "CHARACTER_LIMIT_REACHED") { super(code); }
@@ -82,7 +83,11 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
           eq(echoUniversesTable.revision, expectedRevision),
         ))
         .returning({ state: echoUniversesTable.state, revision: echoUniversesTable.revision });
-    return rows[0] ?? null;
+    const saved = rows[0] ?? null;
+    if (saved) {
+      await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
+    }
+    return saved;
   });
 }
 
@@ -114,6 +119,7 @@ export async function createAdditionalUniverse(ownerId: string, name: string, st
       ownerId, universeId, revision: 1, state: canonicalState,
     }).onConflictDoNothing().returning({ state: echoUniversesTable.state, revision: echoUniversesTable.revision });
     if (!saved[0]) throw new Error("UNIVERSE_CREATE_CONFLICT");
+    await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
     await tx.update(echoCreatorEntitlementsTable)
       .set({ updatedAt: new Date() }).where(eq(echoCreatorEntitlementsTable.ownerId, ownerId));
     return { universeId, ...saved[0] };
