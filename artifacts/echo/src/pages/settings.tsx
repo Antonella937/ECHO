@@ -1,6 +1,7 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, Cloud, Info, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Cloud, Info, LogOut, Monitor, Moon, Search, Sun } from 'lucide-react';
+import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
@@ -39,6 +40,9 @@ export default function SettingsPage() {
             </button>
           </div>
           <UniverseSelector />
+          <Link href="/search" className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-sm font-semibold">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> Buscar en este universo
+          </Link>
         </section>
 
         <section className="mt-9" aria-labelledby="identity-h">

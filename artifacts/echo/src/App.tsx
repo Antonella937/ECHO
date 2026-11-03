@@ -20,6 +20,7 @@ import { StoryViewerProvider } from '@/components/echo/story-viewer';
 import { Shell } from '@/components/echo/shell';
 import { AppearanceSync } from '@/components/echo/appearance-sync';
 import HashtagPage from '@/pages/hashtag';
+import SearchPage from '@/pages/search';
 import { AppSkeleton } from '@/components/echo/skeletons';
 import HomePage from '@/pages/home';
 import ProfilePage from '@/pages/profile';
@@ -125,6 +126,7 @@ function ProtectedRouter() {
           <Route path="/saved" component={SavedPage} />
           <Route path="/tags/:tag" component={HashtagPage} />
           <Route path="/settings" component={SettingsPage} />
+          <Route path="/search" component={SearchPage} />
           <Route path="/characters/new" component={CharacterEditorPage} />
           <Route path="/characters/:id/edit" component={CharacterEditorPage} />
           <Route component={NotFound} />

@@ -7,3 +7,4 @@
 - [Usage budget boundaries](echo-usage-budget.md) — AI ceilings are internal safety controls, not customer-facing plan quotas; structural add-ons never add AI budget.
 - [Development schema push ordering](database-migration-ordering.md) — when adding required universe keys to existing tables, verify the generated DDL order; stage safely if push sets NOT NULL before adding the column.
 - [Universe and character privacy gates](character-privacy-scope.md) — cross-owner social reads require universe consent first, then character visibility; follows and media have separate rollout steps.
+- [Disposable validation cleanup](disposable-validation-cleanup.md) — stop test sessions and verify all dependent owner-scoped rows; universe-only cleanup reports are insufficient.
