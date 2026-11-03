@@ -5,3 +5,4 @@
 - [Carousel context](carousel-context.md) — future character reactions must consider individual photos/videos and the complete ordered post, not just its cover.
 - [Wouter onboarding routes](wouter-onboarding.md) — keep stateful onboarding routes stable across parent rerenders during async saves.
 - [Usage budget boundaries](echo-usage-budget.md) — AI ceilings are internal safety controls, not customer-facing plan quotas; structural add-ons never add AI budget.
+- [Development schema push ordering](database-migration-ordering.md) — when adding required universe keys to existing tables, verify the generated DDL order; stage safely if push sets NOT NULL before adding the column.
