@@ -6,5 +6,5 @@
     "noEmit": true,
     "rootDir": "../.."
   },
-  "include": ["tests/autonomy.test.ts"]
+  "include": ["tests/autonomy.test.ts", "tests/ai-usage.test.ts"]
 }

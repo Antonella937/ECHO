@@ -5,7 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { AiUsageCategoryWeight } from './aiUsageCategoryWeight';
 import type { CreatorAiUsageCategories } from './creatorAiUsageCategories';
 
 export interface CreatorAiUsage {
@@ -14,15 +13,4 @@ export interface CreatorAiUsage {
   categories: CreatorAiUsageCategories;
   /** @minimum 0 */
   totalUnits: number;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  monthlyHardCeilingUnits: number | null;
-  /**
-     * @minimum 0
-     * @maximum 90
-     */
-  autonomyReservePercent: number;
-  categoryWeights: AiUsageCategoryWeight;
 }

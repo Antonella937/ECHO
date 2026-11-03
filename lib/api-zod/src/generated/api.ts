@@ -2871,20 +2871,6 @@ export const getCreatorAccountResponseUsageCategoriesImagesCompletionTokensMin =
 export const getCreatorAccountResponseUsageTotalUnitsMin = 0;
 
 
-export const getCreatorAccountResponseUsageAutonomyReservePercentMin = 0;
-export const getCreatorAccountResponseUsageAutonomyReservePercentMax = 90;
-
-export const getCreatorAccountResponseUsageCategoryWeightsAutonomyMax = 10000;
-
-export const getCreatorAccountResponseUsageCategoryWeightsBrainTextMax = 10000;
-
-export const getCreatorAccountResponseUsageCategoryWeightsMemoryContextMax = 10000;
-
-export const getCreatorAccountResponseUsageCategoryWeightsVisionMax = 10000;
-
-export const getCreatorAccountResponseUsageCategoryWeightsImagesMax = 10000;
-
-
 
 export const GetCreatorAccountResponse = zod.object({
   "plan": zod.enum(['free', 'creator']),
@@ -2934,16 +2920,7 @@ export const GetCreatorAccountResponse = zod.object({
   "reportedCost": zod.string().nullable()
 })
 }),
-  "totalUnits": zod.number().int().min(getCreatorAccountResponseUsageTotalUnitsMin),
-  "monthlyHardCeilingUnits": zod.number().int().min(1).nullable(),
-  "autonomyReservePercent": zod.number().int().min(getCreatorAccountResponseUsageAutonomyReservePercentMin).max(getCreatorAccountResponseUsageAutonomyReservePercentMax),
-  "categoryWeights": zod.object({
-  "autonomy": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsAutonomyMax),
-  "brain_text": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsBrainTextMax),
-  "memory_context": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsMemoryContextMax),
-  "vision": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsVisionMax),
-  "images": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsImagesMax)
-})
+  "totalUnits": zod.number().int().min(getCreatorAccountResponseUsageTotalUnitsMin)
 })
 })
 
@@ -2951,8 +2928,9 @@ export const GetCreatorAccountResponse = zod.object({
 /**
  * @summary Configure an internal weighted usage ceiling and autonomy reserve
  */
+export const configureCreatorAiBudgetBodyMonthlyHardCeilingUnitsMax = 500;
 
-export const configureCreatorAiBudgetBodyAutonomyReservePercentMin = 0;
+export const configureCreatorAiBudgetBodyAutonomyReservePercentMin = 20;
 export const configureCreatorAiBudgetBodyAutonomyReservePercentMax = 90;
 
 export const configureCreatorAiBudgetBodyCategoryWeightsAutonomyMax = 10000;
@@ -2968,7 +2946,7 @@ export const configureCreatorAiBudgetBodyCategoryWeightsImagesMax = 10000;
 
 
 export const ConfigureCreatorAiBudgetBody = zod.object({
-  "monthlyHardCeilingUnits": zod.number().int().min(1).nullable(),
+  "monthlyHardCeilingUnits": zod.number().int().min(1).max(configureCreatorAiBudgetBodyMonthlyHardCeilingUnitsMax),
   "autonomyReservePercent": zod.number().int().min(configureCreatorAiBudgetBodyAutonomyReservePercentMin).max(configureCreatorAiBudgetBodyAutonomyReservePercentMax),
   "categoryWeights": zod.object({
   "autonomy": zod.number().int().min(1).max(configureCreatorAiBudgetBodyCategoryWeightsAutonomyMax),
@@ -3033,20 +3011,6 @@ export const configureCreatorAiBudgetResponseUsageCategoriesImagesCompletionToke
 export const configureCreatorAiBudgetResponseUsageTotalUnitsMin = 0;
 
 
-export const configureCreatorAiBudgetResponseUsageAutonomyReservePercentMin = 0;
-export const configureCreatorAiBudgetResponseUsageAutonomyReservePercentMax = 90;
-
-export const configureCreatorAiBudgetResponseUsageCategoryWeightsAutonomyMax = 10000;
-
-export const configureCreatorAiBudgetResponseUsageCategoryWeightsBrainTextMax = 10000;
-
-export const configureCreatorAiBudgetResponseUsageCategoryWeightsMemoryContextMax = 10000;
-
-export const configureCreatorAiBudgetResponseUsageCategoryWeightsVisionMax = 10000;
-
-export const configureCreatorAiBudgetResponseUsageCategoryWeightsImagesMax = 10000;
-
-
 
 export const ConfigureCreatorAiBudgetResponse = zod.object({
   "plan": zod.enum(['free', 'creator']),
@@ -3096,16 +3060,7 @@ export const ConfigureCreatorAiBudgetResponse = zod.object({
   "reportedCost": zod.string().nullable()
 })
 }),
-  "totalUnits": zod.number().int().min(configureCreatorAiBudgetResponseUsageTotalUnitsMin),
-  "monthlyHardCeilingUnits": zod.number().int().min(1).nullable(),
-  "autonomyReservePercent": zod.number().int().min(configureCreatorAiBudgetResponseUsageAutonomyReservePercentMin).max(configureCreatorAiBudgetResponseUsageAutonomyReservePercentMax),
-  "categoryWeights": zod.object({
-  "autonomy": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsAutonomyMax),
-  "brain_text": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsBrainTextMax),
-  "memory_context": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsMemoryContextMax),
-  "vision": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsVisionMax),
-  "images": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsImagesMax)
-})
+  "totalUnits": zod.number().int().min(configureCreatorAiBudgetResponseUsageTotalUnitsMin)
 })
 })
 

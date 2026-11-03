@@ -3,7 +3,7 @@ import {
   db, echoCreatorEntitlementsTable, echoUniversesTable,
   type CreatorPlan, type EchoCreatorEntitlement,
 } from "@workspace/db";
-import { DEFAULT_AI_CATEGORY_WEIGHTS } from "./ai-usage";
+import { DEFAULT_AI_CATEGORY_WEIGHTS, DEFAULT_MONTHLY_HARD_CEILING_UNITS } from "./ai-usage";
 
 export class StructuralLimitError extends Error {
   constructor(readonly code: "UNIVERSE_LIMIT_REACHED" | "CHARACTER_LIMIT_REACHED") { super(code); }
@@ -137,7 +137,7 @@ export async function creatorEntitlements(ownerId: string) {
     .where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, "primary"))).limit(1);
   if (!primary) return {
     ownerId, plan: "free" as const, addonCharacters: 0, addonUniverses: 0,
-    monthlyHardCeilingUnits: null, autonomyReservePercent: 20,
+    monthlyHardCeilingUnits: DEFAULT_MONTHLY_HARD_CEILING_UNITS, autonomyReservePercent: 20,
     categoryWeights: DEFAULT_AI_CATEGORY_WEIGHTS,
     createdAt: new Date(0), updatedAt: new Date(0),
   } satisfies EchoCreatorEntitlement;

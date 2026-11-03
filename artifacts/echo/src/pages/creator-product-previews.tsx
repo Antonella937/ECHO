@@ -118,7 +118,7 @@ export function CreatorAccountPreview() {
             </div>;
           })}
           <p className="epc-subtle-note">{account
-            ? `Unidades ponderadas; pesos configurables. ${usage?.monthlyHardCeilingUnits == null ? 'El techo mensual sigue sin calibrar.' : `Techo interno: ${usage.monthlyHardCeilingUnits} unidades.`} Autonomy conserva una reserva del ${usage?.autonomyReservePercent ?? 20}%.`
+            ? 'El consumo se controla de forma interna; los límites visibles de IA se definirán más adelante.'
             : 'No se muestran límites numéricos de IA hasta calibrarlos con costos reales.'}</p>
         </article>
       </section>

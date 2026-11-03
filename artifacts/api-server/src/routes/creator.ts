@@ -3,7 +3,13 @@ import { z } from "zod";
 import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { configureAiBudget, creatorUsageSummary } from "../lib/ai-usage";
+import {
+  configureAiBudget,
+  creatorUsageSummary,
+  DEFAULT_MONTHLY_HARD_CEILING_UNITS,
+  MIN_AUTONOMY_RESERVE_PERCENT,
+  MAX_AUTONOMY_RESERVE_PERCENT,
+} from "../lib/ai-usage";
 import {
   createAdditionalUniverse, creatorEntitlements, listUniverses, StructuralLimitError,
 } from "../lib/universeRepository";
@@ -13,8 +19,8 @@ import { SaveUniverseBody } from "@workspace/api-zod";
 const router: IRouter = Router();
 const categories = ["autonomy", "brain_text", "memory_context", "vision", "images"] as const;
 const budgetSchema = z.object({
-  monthlyHardCeilingUnits: z.number().int().min(1).max(1_000_000),
-  autonomyReservePercent: z.number().int().min(0).max(90),
+  monthlyHardCeilingUnits: z.number().int().min(1).max(DEFAULT_MONTHLY_HARD_CEILING_UNITS),
+  autonomyReservePercent: z.number().int().min(MIN_AUTONOMY_RESERVE_PERCENT).max(MAX_AUTONOMY_RESERVE_PERCENT),
   categoryWeights: z.object({
     autonomy: z.number().int().min(1).max(10000),
     brain_text: z.number().int().min(1).max(10000),

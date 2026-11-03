@@ -382,7 +382,7 @@ components:
         reportedCost: { type: ["string", "null"] }
     CreatorAiUsage:
       type: object
-      required: [month, categories, totalUnits, monthlyHardCeilingUnits, autonomyReservePercent, categoryWeights]
+      required: [month, categories, totalUnits]
       properties:
         month: { type: string, pattern: "^\\d{4}-\\d{2}$" }
         categories:
@@ -395,9 +395,6 @@ components:
             vision: { $ref: "#/components/schemas/AiUsageCategorySummary" }
             images: { $ref: "#/components/schemas/AiUsageCategorySummary" }
         totalUnits: { type: integer, minimum: 0 }
-        monthlyHardCeilingUnits: { type: ["integer", "null"], minimum: 1 }
-        autonomyReservePercent: { type: integer, minimum: 0, maximum: 90 }
-        categoryWeights: { $ref: "#/components/schemas/AiUsageCategoryWeight" }
     CreatorAccount:
       type: object
       required: [plan, billingStatus, maxUniverses, maxCharacters, addonUniverses, addonCharacters, universeCount, characterCount, usage]
@@ -437,8 +434,8 @@ components:
       type: object
       required: [monthlyHardCeilingUnits, autonomyReservePercent, categoryWeights]
       properties:
-        monthlyHardCeilingUnits: { type: ["integer", "null"], minimum: 1 }
-        autonomyReservePercent: { type: integer, minimum: 0, maximum: 90 }
+        monthlyHardCeilingUnits: { type: integer, minimum: 1, maximum: 500 }
+        autonomyReservePercent: { type: integer, minimum: 20, maximum: 90 }
         categoryWeights: { $ref: "#/components/schemas/AiUsageCategoryWeight" }
     AutonomyCharacterControl:
       type: object

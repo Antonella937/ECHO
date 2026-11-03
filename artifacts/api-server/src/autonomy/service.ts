@@ -85,6 +85,11 @@ function result(input: {
   };
 }
 
+function isAutonomyBudgetProtected(error: unknown): error is EngineError {
+  return error instanceof EngineError &&
+    (error.code === "AUTONOMY_BUDGET_PROTECTED" || error.code === "AI_MONTHLY_HARD_CEILING");
+}
+
 /** Owner-authenticated, explicit dry run. There is deliberately no executor or scheduler. */
 export async function runAutonomyDryRun(
   ownerId: string,
@@ -211,6 +216,18 @@ export async function runAutonomyDryRun(
       createdAt: now,
     });
   } catch (error) {
+    if (isAutonomyBudgetProtected(error)) {
+      await dependencies.repository.complete(ownerId, runId, {
+        status: "rate_limited",
+        sourceRevision: snapshot.revision,
+        lastErrorCode: error.code,
+      }, universeId).catch(() => undefined);
+      return result({
+        runId, characterId: character.id, status: "rate_limited", liveEligible: false,
+        reason: "Autonomía pausada para proteger el presupuesto mensual. No se realizó ninguna acción.",
+        preview: null, createdAt: now,
+      });
+    }
     await dependencies.repository.complete(ownerId, runId, {
       status: "provider_failed",
       sourceRevision: snapshot.revision,
@@ -326,6 +343,14 @@ export async function runAutonomyLiveCycle(
       ? error.code
       : error instanceof Error && /^[A-Z0-9_]{1,80}$/.test(error.message)
         ? error.message : "LIVE_CYCLE_FAILED";
+    if (isAutonomyBudgetProtected(error)) {
+      await dependencies.repository.complete(ownerId, runId, {
+        status: "rate_limited",
+        sourceRevision: snapshot.revision,
+        lastErrorCode: code,
+      }, universeId).catch(() => undefined);
+      return { status: "rate_limited", reasonCode: code, characterId: character.id, runId, model: null };
+    }
     await dependencies.repository.complete(ownerId, runId, {
       status: error instanceof EngineError ? "provider_failed" : "live_failed",
       sourceRevision: snapshot.revision, lastErrorCode: code,

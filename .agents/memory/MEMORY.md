@@ -4,3 +4,4 @@
 - [Calendar semantics](calendar-semantics.md) — local routine dates must remain strings; generated date coercion is appropriate for timestamps, not calendar days.
 - [Carousel context](carousel-context.md) — future character reactions must consider individual photos/videos and the complete ordered post, not just its cover.
 - [Wouter onboarding routes](wouter-onboarding.md) — keep stateful onboarding routes stable across parent rerenders during async saves.
+- [Usage budget boundaries](echo-usage-budget.md) — AI ceilings are internal safety controls, not customer-facing plan quotas; structural add-ons never add AI budget.

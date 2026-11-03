@@ -21,7 +21,7 @@ import { buildCharacterContext } from "../src/ai-engine/context";
 import { previewDecision } from "../src/ai-engine/engine";
 import { postMedia } from "../../echo/src/domain/post-media";
 import type { AutonomyRepository } from "../src/autonomy/service";
-import type { TextProvider } from "../src/ai-engine/contracts";
+import { EngineError, type TextProvider } from "../src/ai-engine/contracts";
 import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "../src/autonomy/constants";
 import {
   claimAutonomyWorkerLease,
@@ -615,6 +615,49 @@ test("dry run uses owner-scoped data, is idempotent, and does not mutate social 
     runAutonomyDryRun("owner-b", input, { repository, provider, now: NOW, random: () => 0 }),
     /UNIVERSE_NOT_FOUND/,
   );
+  assert.equal(providerCalls, 1);
+});
+
+test("dry run safely degrades to no action when the Autonomy budget reserve is reached", async () => {
+  const { state, mar } = fixture();
+  const completed: Array<{ status: string; sourceRevision?: number; lastErrorCode?: string | null }> = [];
+  let providerCalls = 0;
+  const repository: AutonomyRepository = {
+    read: async () => ({ state, revision: 7 }),
+    readControls: async () => ({
+      globalKillSwitchEngaged: true,
+      liveExecutionEnabled: false,
+      characters: new Map([[mar.id, {
+        enabled: false, maxActionsPerDay: 2, minCooldownMinutes: 360,
+      }]]),
+    }),
+    getExecutedHistory: async () => [],
+    reserve: async () => ({ kind: "created", runId: "synthetic-budget-run" }),
+    complete: async (_ownerId, _runId, result) => { completed.push(result); },
+  };
+  const provider: TextProvider = {
+    name: "synthetic-budget-protected",
+    complete: async () => {
+      providerCalls += 1;
+      throw new EngineError("AUTONOMY_BUDGET_PROTECTED", 429);
+    },
+  };
+  const result = await runAutonomyDryRun("synthetic-budget-owner", {
+    characterId: mar.id,
+    idempotencyKey: "00000000-0000-4000-8000-000000000002",
+    universeId: "studio",
+  }, { repository, provider, now: NOW, random: () => 0 });
+
+  assert.equal(result.status, "rate_limited");
+  assert.equal(result.preview, null);
+  assert.equal(result.liveExecutionEnabled, false);
+  assert.equal(result.socialActionsExecuted, false);
+  assert.match(result.reason ?? "", /proteger el presupuesto mensual/);
+  assert.deepEqual(completed, [{
+    status: "rate_limited",
+    sourceRevision: 7,
+    lastErrorCode: "AUTONOMY_BUDGET_PROTECTED",
+  }]);
   assert.equal(providerCalls, 1);
 });
 

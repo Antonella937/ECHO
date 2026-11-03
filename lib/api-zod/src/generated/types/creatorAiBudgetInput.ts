@@ -10,11 +10,11 @@ import type { AiUsageCategoryWeight } from './aiUsageCategoryWeight';
 export interface CreatorAiBudgetInput {
   /**
      * @minimum 1
-     * @nullable
+     * @maximum 500
      */
-  monthlyHardCeilingUnits: number | null;
+  monthlyHardCeilingUnits: number;
   /**
-     * @minimum 0
+     * @minimum 20
      * @maximum 90
      */
   autonomyReservePercent: number;

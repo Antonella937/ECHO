@@ -71,17 +71,6 @@ export interface CreatorAiUsage {
   categories: CreatorAiUsageCategories;
   /** @minimum 0 */
   totalUnits: number;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  monthlyHardCeilingUnits: number | null;
-  /**
-     * @minimum 0
-     * @maximum 90
-     */
-  autonomyReservePercent: number;
-  categoryWeights: AiUsageCategoryWeight;
 }
 
 export type CreatorAccountPlan = typeof CreatorAccountPlan[keyof typeof CreatorAccountPlan];
@@ -917,11 +906,11 @@ export interface CreatorUniverseCreated {
 export interface CreatorAiBudgetInput {
   /**
      * @minimum 1
-     * @nullable
+     * @maximum 500
      */
-  monthlyHardCeilingUnits: number | null;
+  monthlyHardCeilingUnits: number;
   /**
-     * @minimum 0
+     * @minimum 20
      * @maximum 90
      */
   autonomyReservePercent: number;
