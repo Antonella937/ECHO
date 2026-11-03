@@ -1,4 +1,5 @@
 import type {
+  CharacterDecisionInput,
   Character,
   Comment,
   Message,
@@ -8,11 +9,12 @@ import type {
   SocialState,
 } from "@workspace/api-zod";
 
-export type AutonomySituation = "post" | "comment" | "dm";
+export type AutonomySituation = CharacterDecisionInput["situation"];
 export type ExecutedAutonomyAction = {
   status: string;
   action: string | null;
   situation: string | null;
+  targetId?: string | null;
   createdAt: Date;
 };
 
@@ -21,6 +23,8 @@ export type Opportunity = {
   postId?: string;
   commentId?: string;
   recipientId?: string;
+  storyId?: string;
+  messageId?: string;
   reasonCode:
     | "OPPORTUNITY_SELECTED"
     | "SILENCE_SELECTED"
@@ -215,6 +219,38 @@ export function chooseAutonomyOpportunity(input: {
 
   const comment = commentTarget(state, character, now);
   const recipients = availableTargets(state, character);
+  const relationIds = new Set((config?.relationships ?? []).filter(item => item.targetId !== "owner").map(item => item.targetId));
+  const relevantAuthor = (authorId: string, tagged = false) =>
+    authorId !== character.id && (relationIds.has(authorId) || !!state.follows[character.id]?.includes(authorId) || tagged);
+  const recentTargetUsed = (situation: AutonomySituation, targetId: string) =>
+    history.some(event => event.situation === situation && event.targetId === targetId);
+  const recent30d = (value: Date | string) => {
+    const time = asTime(value);
+    return time !== null && time <= now.getTime() && now.getTime() - time < 30 * DAY_MS;
+  };
+  const targetPost = [...state.posts].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+    .find(post => recent30d(post.createdAt) && relevantAuthor(post.authorId, !!post.taggedAccountIds?.includes(character.id)) &&
+      !!post.caption?.trim() && !post.likes.includes(character.id) && !recentTargetUsed("like_post", post.id));
+  const targetComment = [...state.comments].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+    .find(item => {
+      const parent = state.posts.find(post => post.id === item.postId);
+      return !!parent && item.authorId !== character.id && !!item.text?.trim() && recent30d(item.createdAt) &&
+        (relevantAuthor(parent.authorId, !!parent.taggedAccountIds?.includes(character.id)) || relationIds.has(item.authorId)) &&
+        !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
+    });
+  const targetStory = [...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+    .find(item => recent24h(item.createdAt) && item.authorId !== character.id && !!item.caption?.trim() &&
+      item.seenBy.includes(character.id) &&
+      (relationIds.has(item.authorId) || !!state.follows[character.id]?.includes(item.authorId) || !!item.mentionedAccountIds?.includes(character.id)) &&
+      !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
+  const targetMessage = [...state.messages].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+    .find(item => item.recipientId === character.id && item.senderId !== character.id &&
+      !item.hiddenForIds?.includes(character.id) && !!item.text?.trim() && recent30d(item.createdAt) &&
+      !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("dm_reaction", item.id));
+  function recent24h(value: Date | string) {
+    const time = asTime(value);
+    return time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS;
+  }
   const recentDate = (value: Date | string) => {
     const time = asTime(value);
     return time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS;
@@ -225,12 +261,21 @@ export function chooseAutonomyOpportunity(input: {
     history.filter((item) => item.situation === "comment").length;
   const dmCount = state.messages.filter((item) => item.senderId === character.id && recentDate(item.createdAt)).length +
     history.filter((item) => item.situation === "dm").length;
+  const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency) }] : []),
     ...(comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
     ...(recipients.length && dmCount < 1
       ? [{ situation: "dm" as const, weight: frequencyWeight(social?.initiatesDMs) }]
       : []),
+    ...(targetPost && actionCount("like_post") < 3
+      ? [{ situation: "like_post" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
+    ...(targetComment && actionCount("like_comment") < 3
+      ? [{ situation: "like_comment" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
+    ...(targetStory && actionCount("story_reaction") < 2
+      ? [{ situation: "story_reaction" as const, weight: frequencyWeight(social?.storiesFrequency) }] : []),
+    ...(targetMessage && actionCount("dm_reaction") < 2
+      ? [{ situation: "dm_reaction" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
   ];
   if (weights.length === 0) {
     return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "No text action is currently eligible under the anti-repetition caps.", localHour: local.hour, timezone };
@@ -258,7 +303,26 @@ export function chooseAutonomyOpportunity(input: {
     })[0];
     return { situation: "dm", recipientId: recipient.id, reasonCode: "OPPORTUNITY_SELECTED", reason: "A configured relationship or real conversation provides a valid recipient.", localHour: local.hour, timezone };
   }
-  return { situation: "post", reasonCode: "OPPORTUNITY_SELECTED", reason: "The current social pace permits considering a text post.", localHour: local.hour, timezone };
+  if (selected.situation === "like_post" && targetPost) {
+    return { situation: "like_post", postId: targetPost.id, reasonCode: "OPPORTUNITY_SELECTED",
+      reason: "A recent post from a relevant account has text context and has not been liked by this character.", localHour: local.hour, timezone };
+  }
+  if (selected.situation === "like_comment" && targetComment) {
+    return { situation: "like_comment", postId: targetComment.postId, commentId: targetComment.id,
+      reasonCode: "OPPORTUNITY_SELECTED", reason: "A relevant comment is available for a non-repeating like.", localHour: local.hour, timezone };
+  }
+  if (selected.situation === "story_reaction" && targetStory) {
+    return { situation: "story_reaction", storyId: targetStory.id, reasonCode: "OPPORTUNITY_SELECTED",
+      reason: "A recently viewed, unexpired story has a caption and can receive a text-only reaction.", localHour: local.hour, timezone };
+  }
+  if (selected.situation === "dm_reaction" && targetMessage) {
+    return { situation: "dm_reaction", messageId: targetMessage.id, reasonCode: "OPPORTUNITY_SELECTED",
+      reason: "A recent, visible message has text context and has not been reacted to by this character.", localHour: local.hour, timezone };
+  }
+  if (selected.situation === "post") {
+    return { situation: "post", reasonCode: "OPPORTUNITY_SELECTED", reason: "The current social pace permits considering a text post.", localHour: local.hour, timezone };
+  }
+  return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "The selected opportunity no longer has a valid target.", localHour: local.hour, timezone };
 }
 
 export function liveEligibility(input: {

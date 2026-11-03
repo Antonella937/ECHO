@@ -29,4 +29,14 @@ export interface CharacterDecisionInput {
      * @maxLength 120
      */
   recipientId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  storyId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  messageId?: string;
 }

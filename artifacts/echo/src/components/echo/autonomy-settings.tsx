@@ -122,7 +122,12 @@ export function AutonomySettingsSection() {
         <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4" aria-live="polite" data-testid="autonomy-dry-run-result">
           <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-semibold">
-              {labels[latest.status]} · {latest.preview?.decision.action === "draft" ? "propuesta" : latest.preview ? "no actuar" : "sin llamada al modelo"}
+              {labels[latest.status]} · {latest.preview
+                ? latest.preview.decision.action === "draft" ? "borrador de texto"
+                  : latest.preview.decision.action === "like" ? "me gusta propuesto"
+                    : latest.preview.decision.action === "react" ? `reacción propuesta ${latest.preview.decision.reaction ?? ""}`
+                      : "no actuar"
+                : "sin llamada al modelo"}
             </div>
             <span className={cn("rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground")}>
               Solo preview
@@ -140,7 +145,7 @@ export function AutonomySettingsSection() {
             </>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Sin publicaciones, comentarios ni mensajes enviados. Ejecución en vivo: desactivada.
+            No se publicó, envió, gustó ni reaccionó nada. Ejecución en vivo: desactivada.
           </p>
         </div>
       )}

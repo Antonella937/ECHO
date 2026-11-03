@@ -28,6 +28,7 @@ export interface AutonomyRepository {
     status: string;
     action?: string | null;
     situation?: string | null;
+    targetId?: string | null;
     sourceRevision?: number;
     contextHash?: string | null;
     model?: string | null;
@@ -39,6 +40,7 @@ function result(input: {
   characterId: string;
   status: AutonomyDryRunResult["status"];
   liveEligible: boolean;
+  targetId?: string | null;
   reason: string;
   preview: AutonomyDryRunResult["preview"];
   createdAt: Date;
@@ -52,6 +54,7 @@ function result(input: {
     liveEligible: input.liveEligible,
     socialActionsExecuted: false,
     reason: input.reason.slice(0, 300),
+    targetId: input.targetId ?? null,
     preview: input.preview,
     createdAt: input.createdAt,
   };
@@ -148,15 +151,18 @@ export async function runAutonomyDryRun(
       ...(opportunity.postId ? { postId: opportunity.postId } : {}),
       ...(opportunity.commentId ? { commentId: opportunity.commentId } : {}),
       ...(opportunity.recipientId ? { recipientId: opportunity.recipientId } : {}),
+      ...(opportunity.storyId ? { storyId: opportunity.storyId } : {}),
+      ...(opportunity.messageId ? { messageId: opportunity.messageId } : {}),
     };
     const preview = await previewForOwner(ownerId, decisionInput, {
       read: dependencies.repository.read,
       provider: dependencies.provider,
     });
     await dependencies.repository.complete(ownerId, runId, {
-      status: preview.decision.action === "draft" ? "previewed" : "no_action",
+      status: preview.decision.action === "none" ? "no_action" : "previewed",
       action: preview.decision.action,
       situation: preview.decision.situation,
+      targetId: preview.targetId ?? null,
       sourceRevision: preview.sourceRevision,
       contextHash: preview.contextAudit.contextHash,
       model: preview.model,
@@ -167,6 +173,7 @@ export async function runAutonomyDryRun(
       characterId: character.id,
       status: "previewed",
       liveEligible: eligible,
+      targetId: preview.targetId ?? null,
       reason: controls.globalKillSwitchEngaged
         ? "Preview only; the owner kill switch is engaged and live execution is disabled."
         : !characterControl.enabled

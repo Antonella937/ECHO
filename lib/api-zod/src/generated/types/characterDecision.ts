@@ -28,6 +28,11 @@ export interface CharacterDecision {
      * @maximum 10080
      */
   suggestedDelayMinutes: number;
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  reaction?: string | null;
   /** @maxItems 8 */
   contextSections: CharacterDecisionContextSectionsItem[];
 }

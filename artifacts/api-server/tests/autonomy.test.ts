@@ -14,6 +14,7 @@ import { defaultCharacterConfig } from "../../echo/src/domain/character-core";
 import { chooseAutonomyOpportunity, liveEligibility } from "../src/autonomy/policy";
 import { runAutonomyDryRun } from "../src/autonomy/service";
 import { buildCharacterContext } from "../src/ai-engine/context";
+import { previewDecision } from "../src/ai-engine/engine";
 import type { AutonomyRepository } from "../src/autonomy/service";
 import type { TextProvider } from "../src/ai-engine/contracts";
 import {
@@ -48,11 +49,240 @@ function fixture() {
   return { state, mar };
 }
 
+function addNoahRelationship(mar: ReturnType<typeof fixture>["mar"], noahId: string) {
+  mar.configuration!.relationships = [{
+    id: "friendship", targetId: noahId, preset: "friend", customLabel: "",
+    description: "Configured friend", closeness: 70, trust: 60, attraction: null, tension: null,
+  }];
+  mar.configuration!.social.postsFrequency = "rare";
+  mar.configuration!.social.initiatesDMs = "rare";
+}
+
+function selectLateCandidate() {
+  const values = [0, 0.95];
+  return () => values.shift() ?? 0.95;
+}
+
 test("planner chooses silence before spending a model call", () => {
   const { state, mar } = fixture();
   const result = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0.99 });
   assert.equal(result.situation, null);
   assert.equal(result.reasonCode, "SILENCE_SELECTED");
+});
+
+test("planner considers non-repeating post/comment likes and text-based story/DM reactions", () => {
+  const postFixture = fixture();
+  const noah = postFixture.state.characters.find((character) => character.id === "noah")!;
+  addNoahRelationship(postFixture.mar, noah.id);
+  postFixture.state.posts.push({
+    id: "likeable-post", authorId: noah.id, caption: "Ensayo hasta tarde", location: "",
+    createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [], savedBy: [], commentsEnabled: true,
+  } as (typeof postFixture.state.posts)[number]);
+  const likePost = chooseAutonomyOpportunity({
+    state: postFixture.state, character: postFixture.mar, history: [], now: NOW, random: selectLateCandidate(),
+  });
+  assert.equal(likePost.situation, "like_post");
+  assert.equal(likePost.postId, "likeable-post");
+
+  const commentFixture = fixture();
+  const commentNoah = commentFixture.state.characters.find((character) => character.id === "noah")!;
+  addNoahRelationship(commentFixture.mar, commentNoah.id);
+  commentFixture.state.posts.push({
+    id: "comment-post", authorId: commentNoah.id, caption: "Ensayo", location: "",
+    createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [commentFixture.mar.id], savedBy: [], commentsEnabled: true,
+  } as (typeof commentFixture.state.posts)[number]);
+  commentFixture.state.comments.push({
+    id: "likeable-comment", postId: "comment-post", authorId: commentNoah.id, text: "¿A qué hora?",
+    createdAt: new Date(NOW.getTime() - 30 * 60_000), parentId: null, replyToAuthorId: null, likes: [], origin: "user",
+  });
+  const likeComment = chooseAutonomyOpportunity({
+    state: commentFixture.state, character: commentFixture.mar, history: [], now: NOW, random: selectLateCandidate(),
+  });
+  assert.equal(likeComment.situation, "like_comment");
+  assert.equal(likeComment.commentId, "likeable-comment");
+
+  const storyFixture = fixture();
+  const storyNoah = storyFixture.state.characters.find((character) => character.id === "noah")!;
+  addNoahRelationship(storyFixture.mar, storyNoah.id);
+  storyFixture.state.stories.push({
+    id: "reactable-story", authorId: storyNoah.id, image: "asset:test", caption: "Prueba de sonido",
+    createdAt: new Date(NOW.getTime() - 30 * 60_000), seenBy: [storyFixture.mar.id], reactions: [], origin: "user",
+  });
+  const storyReaction = chooseAutonomyOpportunity({
+    state: storyFixture.state, character: storyFixture.mar, history: [], now: NOW, random: selectLateCandidate(),
+  });
+  assert.equal(storyReaction.situation, "story_reaction");
+  assert.equal(storyReaction.storyId, "reactable-story");
+  const storyContext = JSON.parse(buildCharacterContext(storyFixture.state, {
+    characterId: storyFixture.mar.id, situation: "story_reaction", storyId: storyReaction.storyId!,
+  }, NOW).serialized) as {
+    target: { story: { caption: string; mediaNotAnalyzed: boolean } };
+    personality: unknown;
+    relationships: Array<{ target: { id: string } }>;
+    recentSocial: { stories: Array<{ id: string }> };
+  };
+  assert.equal(storyContext.target.story.caption, "Prueba de sonido");
+  assert.equal(storyContext.target.story.mediaNotAnalyzed, true);
+  assert.deepEqual(storyContext.personality, storyFixture.mar.configuration!.personality);
+  assert.equal(storyContext.relationships[0].target.id, storyNoah.id);
+  assert.ok(storyContext.recentSocial.stories.some(item => item.id === "reactable-story"));
+
+  const dmFixture = fixture();
+  const dmNoah = dmFixture.state.characters.find((character) => character.id === "noah")!;
+  addNoahRelationship(dmFixture.mar, dmNoah.id);
+  dmFixture.state.messages.push({
+    id: "reactable-message", threadId: "thread-1", senderId: dmNoah.id, recipientId: dmFixture.mar.id,
+    text: "Llegué al ensayo", createdAt: new Date(NOW.getTime() - 30 * 60_000), storyId: null, postId: null,
+    readBy: [dmFixture.mar.id], reactions: [], origin: "user",
+  });
+  const dmReaction = chooseAutonomyOpportunity({
+    state: dmFixture.state, character: dmFixture.mar, history: [], now: NOW, random: selectLateCandidate(),
+  });
+  assert.equal(dmReaction.situation, "dm_reaction");
+  assert.equal(dmReaction.messageId, "reactable-message");
+  const dmContext = JSON.parse(buildCharacterContext(dmFixture.state, {
+    characterId: dmFixture.mar.id, situation: "dm_reaction", messageId: dmReaction.messageId!,
+  }, NOW).serialized) as { target: { message: { text: string } }; recentSocial: { messages: Array<{ id: string }> } };
+  assert.equal(dmContext.target.message.text, "Llegué al ensayo");
+  assert.ok(dmContext.recentSocial.messages.some(item => item.id === "reactable-message"));
+});
+
+test("per-type caps and executed target history prevent repetitive likes", () => {
+  const { state, mar } = fixture();
+  const noah = state.characters.find((character) => character.id === "noah")!;
+  state.follows[mar.id] = [noah.id];
+  mar.configuration!.social.postsFrequency = "rare";
+  state.posts.push({
+    id: "likeable-post", authorId: noah.id, caption: "Ensayo", location: "",
+    createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [], savedBy: [], commentsEnabled: true,
+  } as (typeof state.posts)[number]);
+  const lastAction = (targetId: string) => ({
+    status: "executed", action: "like", situation: "like_post", targetId,
+    createdAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
+  });
+  const sameTarget = chooseAutonomyOpportunity({
+    state, character: mar, history: [lastAction("likeable-post")], now: NOW, random: selectLateCandidate(),
+    minCooldownMinutes: 60, maxActionsPerDay: 10,
+  });
+  assert.notEqual(sameTarget.situation, "like_post");
+
+  const capped = chooseAutonomyOpportunity({
+    state, character: mar,
+    history: [lastAction("p1"), lastAction("p2"), lastAction("p3")],
+    now: NOW, random: selectLateCandidate(), minCooldownMinutes: 60, maxActionsPerDay: 10,
+  });
+  assert.notEqual(capped.situation, "like_post");
+
+  const storyState = fixture();
+  const storyNoah = storyState.state.characters.find((character) => character.id === "noah")!;
+  storyState.state.follows[storyState.mar.id] = [storyNoah.id];
+  storyState.state.stories.push({
+    id: "story-under-cap", authorId: storyNoah.id, image: "asset:test", caption: "Prueba",
+    createdAt: new Date(NOW.getTime() - 30 * 60_000), seenBy: [storyState.mar.id], reactions: [], origin: "user",
+  });
+  const recentExecuted = (situation: string, targetId: string) => ({
+    status: "executed", action: "react", situation, targetId,
+    createdAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
+  });
+  const storyCapped = chooseAutonomyOpportunity({
+    state: storyState.state, character: storyState.mar,
+    history: [recentExecuted("story_reaction", "old-story-1"), recentExecuted("story_reaction", "old-story-2")],
+    now: NOW, random: selectLateCandidate(), minCooldownMinutes: 60, maxActionsPerDay: 10,
+  });
+  assert.notEqual(storyCapped.situation, "story_reaction");
+
+  const messageState = fixture();
+  const messageNoah = messageState.state.characters.find((character) => character.id === "noah")!;
+  messageState.state.messages.push({
+    id: "message-under-cap", threadId: "thread", senderId: messageNoah.id, recipientId: messageState.mar.id,
+    text: "¿Venís?", createdAt: new Date(NOW.getTime() - 30 * 60_000),
+    storyId: null, postId: null, readBy: [messageState.mar.id], reactions: [], origin: "user",
+  });
+  const dmCapped = chooseAutonomyOpportunity({
+    state: messageState.state, character: messageState.mar,
+    history: [recentExecuted("dm_reaction", "old-message-1"), recentExecuted("dm_reaction", "old-message-2")],
+    now: NOW, random: selectLateCandidate(), minCooldownMinutes: 60, maxActionsPerDay: 10,
+  });
+  assert.notEqual(dmCapped.situation, "dm_reaction");
+});
+
+test("synthetic AI previews accept only correct non-text likes/reactions and never execute them", async () => {
+  const { state, mar } = fixture();
+  const noah = state.characters.find((character) => character.id === "noah")!;
+  state.posts.push({
+    id: "target-post", authorId: noah.id, caption: "Ensayo", location: "",
+    createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [], savedBy: [], commentsEnabled: true,
+  } as (typeof state.posts)[number]);
+  state.stories.push({
+    id: "target-story", authorId: noah.id, image: "asset:test", caption: "Prueba de sonido",
+    createdAt: new Date(NOW.getTime() - 30 * 60_000), seenBy: [mar.id], reactions: [], origin: "user",
+  });
+  state.comments.push({
+    id: "target-comment", postId: "target-post", authorId: noah.id, text: "Llegamos tarde al ensayo",
+    createdAt: new Date(NOW.getTime() - 30 * 60_000), parentId: null, replyToAuthorId: null, likes: [], origin: "user",
+  });
+  state.messages.push({
+    id: "target-message", threadId: "target-thread", senderId: noah.id, recipientId: mar.id,
+    text: "Te guardé café", createdAt: new Date(NOW.getTime() - 20 * 60_000),
+    storyId: null, postId: null, readBy: [mar.id], reactions: [], origin: "user",
+  });
+  const decision = (action: string, situation: string, reaction: string | null = null, text: string | null = null) => ({
+    action, situation, reaction, text, reason: "Contexto social disponible.", suggestedDelayMinutes: 0,
+    contextSections: ["identity"],
+  });
+  const fake = (value: unknown): TextProvider => ({
+    name: "synthetic-only",
+    complete: async () => ({ text: JSON.stringify(value), model: "synthetic:test" }),
+  });
+  const like = await previewDecision(fake(decision("like", "like_post")), state, {
+    characterId: mar.id, situation: "like_post", postId: "target-post",
+  }, 1, NOW);
+  assert.equal(like.decision.action, "like");
+  assert.equal(like.targetId, "target-post");
+  assert.equal(like.executed, false);
+
+  const commentLike = await previewDecision(fake(decision("like", "like_comment")), state, {
+    characterId: mar.id, situation: "like_comment", postId: "target-post", commentId: "target-comment",
+  }, 1, NOW);
+  assert.equal(commentLike.decision.action, "like");
+  assert.equal(commentLike.targetId, "target-comment");
+
+  const reaction = await previewDecision(fake(decision("react", "story_reaction", "😂")), state, {
+    characterId: mar.id, situation: "story_reaction", storyId: "target-story",
+  }, 1, NOW);
+  assert.equal(reaction.decision.reaction, "😂");
+  assert.equal(reaction.targetId, "target-story");
+  assert.equal(reaction.executed, false);
+
+  const dmReaction = await previewDecision(fake(decision("react", "dm_reaction", "❤")), state, {
+    characterId: mar.id, situation: "dm_reaction", messageId: "target-message",
+  }, 1, NOW);
+  assert.equal(dmReaction.decision.reaction, "❤");
+  assert.equal(dmReaction.targetId, "target-message");
+
+  await assert.rejects(
+    previewDecision(fake(decision("draft", "like_post", null, "Me gusta")), state, {
+      characterId: mar.id, situation: "like_post", postId: "target-post",
+    }, 1, NOW),
+    (error: unknown) => error instanceof Error && "diagnostic" in error &&
+      error.diagnostic === "ACTION_NOT_ALLOWED_FOR_SITUATION",
+  );
+  await assert.rejects(
+    previewDecision(fake(decision("react", "story_reaction", "💣")), state, {
+      characterId: mar.id, situation: "story_reaction", storyId: "target-story",
+    }, 1, NOW),
+    (error: unknown) => error instanceof Error && "diagnostic" in error && error.diagnostic === "REACTION_NOT_ALLOWED",
+  );
+  await assert.rejects(
+    previewDecision(fake(decision("react", "story_reaction", "😂", "Mandando reacción")), state, {
+      characterId: mar.id, situation: "story_reaction", storyId: "target-story",
+    }, 1, NOW),
+    (error: unknown) => error instanceof Error && "diagnostic" in error && error.diagnostic === "NON_TEXT_ACTION_HAS_TEXT",
+  );
+  assert.equal(state.posts[0].likes.includes(mar.id), false);
+  assert.equal(state.comments[0].likes.includes(mar.id), false);
+  assert.equal(state.stories[0].reactions?.length, 0);
+  assert.equal(state.messages[0].reactions?.length, 0);
 });
 
 test("routine and current state can suppress action during sleep", () => {
@@ -118,7 +348,9 @@ test("comment and DM candidates require real targets and an explicit relationshi
     createdAt: new Date(NOW.getTime() - 60 * 60_000), parentId: null, replyToAuthorId: null,
     likes: [], origin: "user",
   });
-  const reply = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0.5 });
+  const reply = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: (() => {
+    const values = [0, 0.45]; return () => values.shift() ?? 0.45;
+  })() });
   assert.equal(reply.situation, "comment");
   assert.equal(reply.postId, "unanswered-post");
   assert.equal(reply.commentId, "replyable-comment");
@@ -128,7 +360,7 @@ test("comment and DM candidates require real targets and an explicit relationshi
   const context = JSON.parse(built.serialized) as { target: { replyTo: { text: string } } };
   assert.equal(context.target.replyTo.text, "¿Ensayo esta semana?");
   const dm = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: (() => {
-    const values = [0, 0.99]; return () => values.shift() ?? 0.99;
+    const values = [0, 0.7]; return () => values.shift() ?? 0.7;
   })() });
   assert.equal(dm.situation, "dm");
   assert.equal(dm.recipientId, noah.id);

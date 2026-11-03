@@ -13,4 +13,8 @@ export const CharacterDecisionSituation = {
   post: 'post',
   comment: 'comment',
   dm: 'dm',
+  like_post: 'like_post',
+  like_comment: 'like_comment',
+  story_reaction: 'story_reaction',
+  dm_reaction: 'dm_reaction',
 } as const;

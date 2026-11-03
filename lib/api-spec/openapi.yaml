@@ -302,6 +302,7 @@ components:
         liveEligible: { type: boolean }
         socialActionsExecuted: { type: boolean, enum: [false] }
         reason: { type: string, maxLength: 300 }
+        targetId: { type: [string, "null"] }
         preview:
           oneOf:
             - $ref: "#/components/schemas/CharacterDecisionPreview"
@@ -436,20 +437,23 @@ components:
       required: [characterId, situation]
       properties:
         characterId: { type: string, minLength: 1, maxLength: 120 }
-        situation: { type: string, enum: [post, comment, dm] }
+        situation: { type: string, enum: [post, comment, dm, like_post, like_comment, story_reaction, dm_reaction] }
         postId: { type: string, minLength: 1, maxLength: 120 }
         commentId: { type: string, minLength: 1, maxLength: 120 }
         recipientId: { type: string, minLength: 1, maxLength: 120 }
+        storyId: { type: string, minLength: 1, maxLength: 120 }
+        messageId: { type: string, minLength: 1, maxLength: 120 }
     CharacterDecision:
       type: object
       additionalProperties: false
       required: [action, situation, text, reason, suggestedDelayMinutes, contextSections]
       properties:
-        action: { type: string, enum: [none, draft] }
-        situation: { type: string, enum: [post, comment, dm] }
+        action: { type: string, enum: [none, draft, like, react] }
+        situation: { type: string, enum: [post, comment, dm, like_post, like_comment, story_reaction, dm_reaction] }
         text: { type: [string, "null"], maxLength: 2000 }
         reason: { type: string, minLength: 1, maxLength: 400, description: Brief explanation, not hidden reasoning }
         suggestedDelayMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        reaction: { type: [string, "null"], maxLength: 32 }
         contextSections:
           type: array
           maxItems: 8
@@ -471,6 +475,7 @@ components:
         contextAudit: { $ref: "#/components/schemas/CharacterContextAudit" }
         usage: { $ref: "#/components/schemas/EngineUsage" }
         attempts: { type: array, items: { $ref: "#/components/schemas/EngineAttempt" } }
+        targetId: { type: [string, "null"] }
     EngineUsage:
       type: object
       required: [promptTokens, completionTokens, cost]

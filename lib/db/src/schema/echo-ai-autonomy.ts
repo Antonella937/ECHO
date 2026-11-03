@@ -42,6 +42,7 @@ export const echoAutonomyRunsTable = pgTable("echo_ai_autonomy_runs", {
   status: text("status").notNull(),
   action: text("action"),
   situation: text("situation"),
+  targetId: text("target_id"),
   sourceRevision: integer("source_revision").notNull(),
   contextHash: text("context_hash"),
   model: text("model"),

@@ -20,6 +20,8 @@ export interface AutonomyDryRunResult {
   socialActionsExecuted: false;
   /** @maxLength 300 */
   reason: string;
+  /** @nullable */
+  targetId?: string | null;
   preview: CharacterDecisionPreview | null;
   createdAt: Date;
 }

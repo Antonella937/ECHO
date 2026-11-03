@@ -12,4 +12,6 @@ export type CharacterDecisionAction = typeof CharacterDecisionAction[keyof typeo
 export const CharacterDecisionAction = {
   none: 'none',
   draft: 'draft',
+  like: 'like',
+  react: 'react',
 } as const;

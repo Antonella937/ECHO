@@ -80,6 +80,8 @@ export type CharacterDecisionAction = typeof CharacterDecisionAction[keyof typeo
 export const CharacterDecisionAction = {
   none: 'none',
   draft: 'draft',
+  like: 'like',
+  react: 'react',
 } as const;
 
 export type CharacterDecisionSituation = typeof CharacterDecisionSituation[keyof typeof CharacterDecisionSituation];
@@ -89,6 +91,10 @@ export const CharacterDecisionSituation = {
   post: 'post',
   comment: 'comment',
   dm: 'dm',
+  like_post: 'like_post',
+  like_comment: 'like_comment',
+  story_reaction: 'story_reaction',
+  dm_reaction: 'dm_reaction',
 } as const;
 
 export type CharacterDecisionContextSectionsItem = typeof CharacterDecisionContextSectionsItem[keyof typeof CharacterDecisionContextSectionsItem];
@@ -124,6 +130,11 @@ export interface CharacterDecision {
      * @maximum 10080
      */
   suggestedDelayMinutes: number;
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  reaction?: string | null;
   /** @maxItems 8 */
   contextSections: CharacterDecisionContextSectionsItem[];
 }
@@ -218,6 +229,8 @@ export interface CharacterDecisionPreview {
   contextAudit: CharacterContextAudit;
   usage: EngineUsage;
   attempts: EngineAttempt[];
+  /** @nullable */
+  targetId?: string | null;
 }
 
 export interface AutonomyDryRunResult {
@@ -231,6 +244,8 @@ export interface AutonomyDryRunResult {
   socialActionsExecuted: false;
   /** @maxLength 300 */
   reason: string;
+  /** @nullable */
+  targetId?: string | null;
   preview: CharacterDecisionPreview | null;
   createdAt: string;
 }
@@ -1037,6 +1052,10 @@ export const CharacterDecisionInputSituation = {
   post: 'post',
   comment: 'comment',
   dm: 'dm',
+  like_post: 'like_post',
+  like_comment: 'like_comment',
+  story_reaction: 'story_reaction',
+  dm_reaction: 'dm_reaction',
 } as const;
 
 export interface CharacterDecisionInput {
@@ -1061,6 +1080,16 @@ export interface CharacterDecisionInput {
      * @maxLength 120
      */
   recipientId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  storyId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  messageId?: string;
 }
 
 export type UploadUrlInputContentType = typeof UploadUrlInputContentType[keyof typeof UploadUrlInputContentType];

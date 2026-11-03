@@ -19,14 +19,20 @@ export const previewCharacterDecisionBodyCommentIdMax = 120;
 
 export const previewCharacterDecisionBodyRecipientIdMax = 120;
 
+export const previewCharacterDecisionBodyStoryIdMax = 120;
+
+export const previewCharacterDecisionBodyMessageIdMax = 120;
+
 
 
 export const PreviewCharacterDecisionBody = zod.object({
   "characterId": zod.string().min(1).max(previewCharacterDecisionBodyCharacterIdMax),
-  "situation": zod.enum(['post', 'comment', 'dm']),
+  "situation": zod.enum(['post', 'comment', 'dm', 'like_post', 'like_comment', 'story_reaction', 'dm_reaction']),
   "postId": zod.string().min(1).max(previewCharacterDecisionBodyPostIdMax).optional(),
   "commentId": zod.string().min(1).max(previewCharacterDecisionBodyCommentIdMax).optional(),
-  "recipientId": zod.string().min(1).max(previewCharacterDecisionBodyRecipientIdMax).optional()
+  "recipientId": zod.string().min(1).max(previewCharacterDecisionBodyRecipientIdMax).optional(),
+  "storyId": zod.string().min(1).max(previewCharacterDecisionBodyStoryIdMax).optional(),
+  "messageId": zod.string().min(1).max(previewCharacterDecisionBodyMessageIdMax).optional()
 })
 
 export const previewCharacterDecisionResponseSourceRevisionMin = 0;
@@ -37,6 +43,8 @@ export const previewCharacterDecisionResponseDecisionReasonMax = 400;
 
 export const previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMin = 0;
 export const previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMax = 10080;
+
+export const previewCharacterDecisionResponseDecisionReactionMax = 32;
 
 export const previewCharacterDecisionResponseDecisionContextSectionsMax = 8;
 
@@ -68,11 +76,12 @@ export const PreviewCharacterDecisionResponse = zod.object({
   "provider": zod.string(),
   "model": zod.string(),
   "decision": zod.object({
-  "action": zod.enum(['none', 'draft']),
-  "situation": zod.enum(['post', 'comment', 'dm']),
+  "action": zod.enum(['none', 'draft', 'like', 'react']),
+  "situation": zod.enum(['post', 'comment', 'dm', 'like_post', 'like_comment', 'story_reaction', 'dm_reaction']),
   "text": zod.string().max(previewCharacterDecisionResponseDecisionTextMax).nullable(),
   "reason": zod.string().min(1).max(previewCharacterDecisionResponseDecisionReasonMax).describe('Brief explanation'),
   "suggestedDelayMinutes": zod.number().int().min(previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMin).max(previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMax),
+  "reaction": zod.string().max(previewCharacterDecisionResponseDecisionReactionMax).nullish(),
   "contextSections": zod.array(zod.enum(['identity', 'personality', 'relationships', 'routine', 'social', 'memory', 'currentState', 'recentSocial'])).max(previewCharacterDecisionResponseDecisionContextSectionsMax)
 }),
   "availableContextSections": zod.array(zod.string()),
@@ -105,7 +114,8 @@ export const PreviewCharacterDecisionResponse = zod.object({
   "completionTokens": zod.number().int().min(previewCharacterDecisionResponseAttemptsItemUsageCompletionTokensMin).nullable(),
   "cost": zod.number().min(previewCharacterDecisionResponseAttemptsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
 })
-}))
+})),
+  "targetId": zod.string().nullish()
 })
 
 
@@ -191,6 +201,8 @@ export const runAutonomyDryRunResponsePreviewOneDecisionReasonMax = 400;
 export const runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMin = 0;
 export const runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMax = 10080;
 
+export const runAutonomyDryRunResponsePreviewOneDecisionReactionMax = 32;
+
 export const runAutonomyDryRunResponsePreviewOneDecisionContextSectionsMax = 8;
 
 export const runAutonomyDryRunResponsePreviewOneContextAuditSourceRevisionMin = 0;
@@ -222,6 +234,7 @@ export const RunAutonomyDryRunResponse = zod.object({
   "liveEligible": zod.boolean(),
   "socialActionsExecuted": zod.literal(false),
   "reason": zod.string().max(runAutonomyDryRunResponseReasonMax),
+  "targetId": zod.string().nullish(),
   "preview": zod.union([zod.object({
   "mode": zod.enum(['preview']),
   "executed": zod.literal(false),
@@ -230,11 +243,12 @@ export const RunAutonomyDryRunResponse = zod.object({
   "provider": zod.string(),
   "model": zod.string(),
   "decision": zod.object({
-  "action": zod.enum(['none', 'draft']),
-  "situation": zod.enum(['post', 'comment', 'dm']),
+  "action": zod.enum(['none', 'draft', 'like', 'react']),
+  "situation": zod.enum(['post', 'comment', 'dm', 'like_post', 'like_comment', 'story_reaction', 'dm_reaction']),
   "text": zod.string().max(runAutonomyDryRunResponsePreviewOneDecisionTextMax).nullable(),
   "reason": zod.string().min(1).max(runAutonomyDryRunResponsePreviewOneDecisionReasonMax).describe('Brief explanation'),
   "suggestedDelayMinutes": zod.number().int().min(runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMin).max(runAutonomyDryRunResponsePreviewOneDecisionSuggestedDelayMinutesMax),
+  "reaction": zod.string().max(runAutonomyDryRunResponsePreviewOneDecisionReactionMax).nullish(),
   "contextSections": zod.array(zod.enum(['identity', 'personality', 'relationships', 'routine', 'social', 'memory', 'currentState', 'recentSocial'])).max(runAutonomyDryRunResponsePreviewOneDecisionContextSectionsMax)
 }),
   "availableContextSections": zod.array(zod.string()),
@@ -267,7 +281,8 @@ export const RunAutonomyDryRunResponse = zod.object({
   "completionTokens": zod.number().int().min(runAutonomyDryRunResponsePreviewOneAttemptsItemUsageCompletionTokensMin).nullable(),
   "cost": zod.number().min(runAutonomyDryRunResponsePreviewOneAttemptsItemUsageCostMin).nullable().describe('Provider-reported USD; null means not reported')
 })
-}))
+})),
+  "targetId": zod.string().nullish()
 }),zod.null()]),
   "createdAt": zod.coerce.date()
 })

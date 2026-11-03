@@ -48,6 +48,7 @@ export async function getExecutedActionHistory(ownerId: string, characterId: str
     status: echoAutonomyRunsTable.status,
     action: echoAutonomyRunsTable.action,
     situation: echoAutonomyRunsTable.situation,
+    targetId: echoAutonomyRunsTable.targetId,
     createdAt: echoAutonomyRunsTable.createdAt,
   }).from(echoAutonomyRunsTable).where(and(
     eq(echoAutonomyRunsTable.ownerId, ownerId),
@@ -133,6 +134,7 @@ export async function completeDryRun(
     status: string;
     action?: string | null;
     situation?: string | null;
+    targetId?: string | null;
     sourceRevision?: number;
     contextHash?: string | null;
     model?: string | null;
@@ -142,6 +144,7 @@ export async function completeDryRun(
     status: result.status,
     action: result.action ?? null,
     situation: result.situation ?? null,
+    targetId: result.targetId ?? null,
     sourceRevision: result.sourceRevision,
     contextHash: result.contextHash ?? null,
     model: result.model ?? null,

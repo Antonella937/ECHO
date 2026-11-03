@@ -10,13 +10,62 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   if (!actor) throw new EngineError('CHARACTER_NOT_FOUND', 404);
   const post = input.postId ? state.posts.find(p => p.id === input.postId) : undefined;
   const comment = input.commentId ? state.comments.find(c => c.id === input.commentId) : undefined;
+  const story = input.storyId ? state.stories.find(s => s.id === input.storyId) : undefined;
+  const message = input.messageId ? state.messages.find(m => m.id === input.messageId) : undefined;
   const recipient = input.recipientId ? state.characters.find(c => c.id === input.recipientId && !c.archived) : undefined;
-  if (input.situation === 'comment'
-    ? !post || post.commentsEnabled === false || (!!input.commentId && (!comment || comment.postId !== post.id || comment.authorId === actor.id))
-    : !!input.postId || !!input.commentId)
-    throw new EngineError('INVALID_POST_TARGET');
-  if (input.situation === 'dm' ? !recipient || recipient.id === actor.id : !!input.recipientId)
-    throw new EngineError('INVALID_DM_TARGET');
+  const has = (key: keyof Pick<CharacterDecisionInput, 'postId' | 'commentId' | 'recipientId' | 'storyId' | 'messageId'>) => Boolean(input[key]);
+  const targetFields = ['postId', 'commentId', 'recipientId', 'storyId', 'messageId'] as const;
+  const rejectUnexpected = (...allowed: typeof targetFields[number][]) => {
+    if (targetFields.some(key => has(key) && !allowed.includes(key))) throw new EngineError('INVALID_SOCIAL_TARGET');
+  };
+  switch (input.situation) {
+    case 'post':
+      rejectUnexpected();
+      break;
+    case 'comment':
+      rejectUnexpected('postId', 'commentId');
+      if (!post || post.commentsEnabled === false ||
+        (!!input.commentId && (!comment || comment.postId !== post.id || comment.authorId === actor.id))) {
+        throw new EngineError('INVALID_POST_TARGET');
+      }
+      break;
+    case 'dm':
+      rejectUnexpected('recipientId');
+      if (!recipient || recipient.id === actor.id) throw new EngineError('INVALID_DM_TARGET');
+      break;
+    case 'like_post':
+      rejectUnexpected('postId');
+      if (!post || post.authorId === actor.id || post.likes.includes(actor.id)) throw new EngineError('INVALID_LIKE_TARGET');
+      break;
+    case 'like_comment':
+      rejectUnexpected('postId', 'commentId');
+      if (!post || !comment || comment.postId !== post.id || comment.authorId === actor.id || comment.likes.includes(actor.id)) {
+        throw new EngineError('INVALID_LIKE_TARGET');
+      }
+      break;
+    case 'story_reaction': {
+      rejectUnexpected('storyId');
+      const createdAt = story ? new Date(story.createdAt).getTime() : NaN;
+      if (!story || story.authorId === actor.id || !story.caption.trim() ||
+        !story.seenBy.includes(actor.id) || story.reactions?.some(reaction => reaction.actorId === actor.id) ||
+        !Number.isFinite(createdAt) || createdAt > now.getTime() || now.getTime() - createdAt >= 24 * 60 * 60_000) {
+        throw new EngineError('INVALID_STORY_TARGET');
+      }
+      break;
+    }
+    case 'dm_reaction':
+      rejectUnexpected('messageId');
+      if (!message || message.senderId === actor.id || message.recipientId !== actor.id ||
+        message.hiddenForIds?.includes(actor.id) || !message.text.trim() ||
+        message.reactions?.some(reaction => reaction.actorId === actor.id)) {
+        throw new EngineError('INVALID_DM_REACTION_TARGET');
+      }
+      break;
+  }
+  if (input.situation === 'dm_reaction' && message &&
+    (message.senderId === actor.id || message.recipientId !== actor.id)) {
+    throw new EngineError('INVALID_DM_REACTION_TARGET');
+  }
   const c = actor.configuration;
   const warnings: string[] = [];
   let truncated = false;
@@ -44,6 +93,9 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const postText = (p: SocialState['posts'][number]) => ({
     id: p.id, author: identityOf(p.authorId), caption: p.caption, location: p.location,
     createdAt: p.createdAt, commentsEnabled: p.commentsEnabled !== false,
+    likesCount: p.likes?.length ?? 0,
+    commentsCount: state.comments.filter(item => item.postId === p.id).length,
+    taggedAccounts: (p.taggedAccountIds ?? []).map(identityOf),
     // Metadata only. A model must never pretend to see or hear these.
     media: (p.media ?? [{ id: `${p.id}:legacy`, type: 'image' }]).map((m, i) => ({ id: m.id, position: i + 1, type: m.type, contentNotAnalyzed: true })),
   });
@@ -51,9 +103,12 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, n).reverse();
   const relevantPosts = latest(state.posts.filter(p => p.authorId === actor.id || p.taggedAccountIds?.includes(actor.id) || p.id === post?.id), 6);
   const relevantIds = new Set(relevantPosts.map(p => p.id));
-  const messages = input.situation === 'dm' ? latest(state.messages.filter(m =>
+  const dmTargetId = input.situation === 'dm'
+    ? recipient!.id
+    : input.situation === 'dm_reaction' && message ? message.senderId : undefined;
+  const messages = dmTargetId ? latest(state.messages.filter(m =>
     !m.hiddenForIds?.includes(actor.id) &&
-    ((m.senderId === actor.id && m.recipientId === recipient!.id) || (m.recipientId === actor.id && m.senderId === recipient!.id))), 10) : [];
+    ((m.senderId === actor.id && m.recipientId === dmTargetId) || (m.recipientId === actor.id && m.senderId === dmTargetId))), 10) : [];
   const data = {
     identity: { id: actor.id, name: actor.name, handle: actor.handle, bio: actor.bio, occupation: actor.occupation, location: actor.location,
       accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null },
@@ -68,20 +123,31 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     recentSocial: {
       posts: relevantPosts.map(postText),
       comments: latest(state.comments.filter(m => m.authorId === actor.id || relevantIds.has(m.postId)), 10).map(m =>
-        ({ id: m.id, postId: m.postId, author: identityOf(m.authorId), text: m.text, parentId: m.parentId, createdAt: m.createdAt })),
-      stories: latest(state.stories.filter(s => s.authorId === actor.id || s.mentionedAccountIds?.includes(actor.id)), 4).map(s =>
-        ({ id: s.id, author: identityOf(s.authorId), caption: s.caption, createdAt: s.createdAt, mediaNotAnalyzed: true })),
+        ({ id: m.id, postId: m.postId, author: identityOf(m.authorId), text: m.text, parentId: m.parentId,
+          likesCount: m.likes.length, createdAt: m.createdAt })),
+      stories: latest(state.stories.filter(s => s.authorId === actor.id || s.mentionedAccountIds?.includes(actor.id) || s.id === story?.id), 4).map(s =>
+        ({ id: s.id, author: identityOf(s.authorId), caption: s.caption, createdAt: s.createdAt,
+          reactions: (s.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
+          mediaNotAnalyzed: true })),
       messages: messages.map(m => ({ id: m.id, from: identityOf(m.senderId), to: identityOf(m.recipientId), text: m.text,
         createdAt: m.createdAt, quoteMessageId: m.quoteMessageId ?? null,
+        reactions: (m.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
         attachments: m.attachments?.map(a => ({ type: a.type, contentNotAnalyzed: true })) ?? [] })),
     },
   };
   if (!c) warnings.push('CHARACTER_CONFIGURATION_MISSING: only real profile and available social context supplied');
   const availableSections = sections.filter(key => data[key] !== null);
-  const context = bounded({ now: now.toISOString(), situation: input.situation,
-    target: post
-      ? { post: postText(post), replyTo: comment ? { author: identityOf(comment.authorId), text: comment.text, parentId: comment.parentId } : null }
-      : recipient ? identityOf(recipient.id) : null,
+  const target = post
+    ? { post: postText(post), replyTo: comment ? { author: identityOf(comment.authorId), text: comment.text, parentId: comment.parentId } : null }
+    : story ? { story: { id: story.id, author: identityOf(story.authorId), caption: story.caption, createdAt: story.createdAt,
+      reactions: (story.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
+      mediaNotAnalyzed: true } }
+      : message ? { message: { id: message.id, from: identityOf(message.senderId), text: message.text,
+        createdAt: message.createdAt,
+        reactions: (message.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
+        attachmentsNotAnalyzed: (message.attachments ?? []).map(a => a.type) } }
+        : recipient ? identityOf(recipient.id) : null;
+  const context = bounded({ now: now.toISOString(), situation: input.situation, target,
     ...data });
   const serialized = JSON.stringify(context);
   if (serialized.length > 60000) throw new EngineError('CONTEXT_BUDGET_EXCEEDED');
@@ -114,7 +180,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       contextHash: createHash('sha256').update(serialized).digest('hex'),
       sections: auditSections,
       recentCounts: Object.fromEntries(Object.entries(actual.recentSocial).map(([key, value]) => [key, value.length])),
-      privateDmScope: input.situation === 'dm' ? 'actor_and_recipient_only' as const : 'none' as const,
+      privateDmScope: input.situation === 'dm' || input.situation === 'dm_reaction' ? 'actor_and_recipient_only' as const : 'none' as const,
     },
   };
 }

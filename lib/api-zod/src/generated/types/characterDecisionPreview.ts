@@ -25,4 +25,6 @@ export interface CharacterDecisionPreview {
   contextAudit: CharacterContextAudit;
   usage: EngineUsage;
   attempts: EngineAttempt[];
+  /** @nullable */
+  targetId?: string | null;
 }
