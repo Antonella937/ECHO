@@ -207,6 +207,18 @@ function projectPost(value: PlainRecord): PlainRecord | null {
   return projected;
 }
 
+function projectFeedAuthor(value: PlainRecord): PlainRecord {
+  const projected: PlainRecord = {};
+  const displayName = stringField(value, "name");
+  const handle = stringField(value, "handle");
+  const avatar = stringField(value, "avatar");
+  if (displayName !== undefined) projected.displayName = displayName;
+  if (handle !== undefined) projected.handle = handle;
+  if (avatar !== undefined) projected.avatar = avatar;
+  if (typeof value.verified === "boolean") projected.verified = value.verified;
+  return projected;
+}
+
 function projectStory(value: PlainRecord, highlighted: boolean): PlainRecord | null {
   const id = stringField(value, "id");
   const authorId = stringField(value, "authorId");
@@ -412,7 +424,11 @@ export function createSocialReadRouter(options: SocialReadRouterOptions = {}): I
         universeId: echoUniversesTable.universeId,
         state: echoUniversesTable.state,
       }).from(echoUniversesTable);
-      const items: Array<SocialReadItem & { identity: CharacterIdentity; post: PlainRecord }> = [];
+      const items: Array<SocialReadItem & {
+        identity: CharacterIdentity;
+        author: PlainRecord;
+        post: PlainRecord;
+      }> = [];
       const visibility = new Map<string, Promise<boolean>>();
       for (const universe of universes) {
         // Preserve the selected universe as the owner's own feed boundary.
@@ -450,6 +466,7 @@ export function createSocialReadRouter(options: SocialReadRouterOptions = {}): I
               itemId: post.id as string,
               createdAt: post.createdAt as string,
               identity,
+              author: projectFeedAuthor(character),
               post,
             });
           }
@@ -458,7 +475,7 @@ export function createSocialReadRouter(options: SocialReadRouterOptions = {}): I
 
       const page = paginate(items, parsed.data.limit, cursor ?? undefined);
       res.json({
-        items: page.items.map(({ identity, post }) => ({ identity, post })),
+        items: page.items.map(({ identity, author, post }) => ({ identity, author, post })),
         nextCursor: page.nextCursor,
       });
     } catch {

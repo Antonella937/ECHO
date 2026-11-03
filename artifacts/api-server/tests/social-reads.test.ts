@@ -172,6 +172,13 @@ async function seedFixture(): Promise<void> {
     id: postId, authorId: characterId, caption: "OTHER_OWNER_PUBLIC_POST",
     location: "", image: "/objects/other-post", createdAt: new Date(NOW - 180_000).toISOString(),
   }]));
+  await seedUniverse(otherOwner, "sparse", seedState(
+    { id: "sparse-character" },
+    [{
+      id: "sparse-post", authorId: "sparse-character", caption: "SPARSE_AUTHOR_POST",
+      location: "", image: "", createdAt: new Date(NOW - 240_000).toISOString(),
+    }],
+  ));
 
   await seedUniverse(viewerOwner, "primary", {
     version: 1,
@@ -375,7 +382,11 @@ test("aggregate feed includes visible public, own-active-universe and accepted p
   const acceptedResponse = await get(viewerOwner, feed("accepted-viewer"));
   assert.equal(acceptedResponse.status, 200);
   const acceptedBody = await acceptedResponse.json() as {
-    items: Array<{ identity: CharacterIdentity; post: Record<string, unknown> }>;
+    items: Array<{
+      identity: CharacterIdentity;
+      author: Record<string, unknown>;
+      post: Record<string, unknown>;
+    }>;
     totalCount?: unknown;
   };
   const captions = acceptedBody.items.map((item) => item.post.caption);
@@ -385,14 +396,51 @@ test("aggregate feed includes visible public, own-active-universe and accepted p
   assert.ok(captions.includes("VIEWER_OWN_POST"));
   assert.equal("totalCount" in acceptedBody, false);
   assert.equal(acceptedBody.items.some((item) => "comments" in item.post || "displayMetrics" in item.post), false);
+  const repeatedIdItems = acceptedBody.items.filter((item) => item.post.id === postId);
+  assert.deepEqual(
+    repeatedIdItems.map((item) =>
+      `${item.identity.ownerId}/${item.identity.universeId}/${item.identity.characterId}/${item.post.id}`,
+    ).sort(),
+    [
+      `${targetOwner}/primary/${characterId}/${postId}`,
+      `${targetOwner}/studio/${characterId}/${postId}`,
+      `${otherOwner}/primary/${characterId}/${postId}`,
+    ].sort(),
+  );
+  const studioItem = repeatedIdItems.find((item) => item.identity.ownerId === targetOwner && item.identity.universeId === "studio");
+  const otherOwnerItem = repeatedIdItems.find((item) => item.identity.ownerId === otherOwner);
+  const privatePrimaryItem = repeatedIdItems.find((item) => item.identity.ownerId === targetOwner && item.identity.universeId === "primary");
+  assert.equal(studioItem?.author.displayName, "Public Character");
+  assert.equal(studioItem?.author.handle, "public-character");
+  assert.equal(studioItem?.author.avatar, "/objects/public-avatar");
+  assert.equal(studioItem?.author.verified, false);
+  assert.equal(otherOwnerItem?.author.displayName, "Other Owner");
+  assert.equal(privatePrimaryItem?.author.displayName, "Private Character");
+  for (const item of repeatedIdItems) {
+    assert.deepEqual(Object.keys(item.identity).sort(), ["characterId", "ownerId", "universeId"]);
+    assert.deepEqual(Object.keys(item.author).sort(), ["avatar", "displayName", "handle", "verified"]);
+    for (const hidden of [
+      "bio", "occupation", "accountType", "displayMetrics",
+      "providerRef", "identity", "configuration", "likes", "savedBy", "comments",
+    ]) {
+      assert.equal(hidden in item.author, false, `author must not expose ${hidden}`);
+      assert.equal(hidden in item.post, false, `post must not expose ${hidden}`);
+    }
+  }
+  const sparseAuthorItem = acceptedBody.items.find((item) =>
+    item.identity.ownerId === otherOwner &&
+    item.identity.universeId === "sparse" &&
+    item.post.id === "sparse-post",
+  );
+  assert.deepEqual(sparseAuthorItem?.author, {}, "missing presentation fields must be omitted, not synthesized");
 
   const pendingBody = await (await get(viewerOwner, feed("pending-viewer"))).json() as {
-    items: Array<{ identity: CharacterIdentity; post: Record<string, unknown> }>;
+    items: Array<{ identity: CharacterIdentity; author: Record<string, unknown>; post: Record<string, unknown> }>;
   };
   assert.equal(pendingBody.items.some((item) =>
     item.identity.ownerId === targetOwner &&
     item.identity.universeId === "primary" &&
-    item.post.caption === "PRIVATE_POST_NEWEST",
+    (item.post.caption === "PRIVATE_POST_NEWEST" || item.author.handle === "private-character"),
   ), false);
   assert.ok(pendingBody.items.some((item) => item.post.caption === "PUBLIC_STUDIO_POST"));
 
@@ -408,11 +456,20 @@ test("feed pagination and mediaOnly filtering avoid duplicate or unauthorized pa
   const route = "/social/feed?viewerUniverseId=primary&viewerCharacterId=accepted-viewer";
   const firstResponse = await get(viewerOwner, `${route}&limit=2`);
   assert.equal(firstResponse.status, 200);
-  const first = await firstResponse.json() as { items: Array<{ identity: CharacterIdentity; post: { id: string } }>; nextCursor: string | null };
+  const first = await firstResponse.json() as {
+    items: Array<{ identity: CharacterIdentity; author: Record<string, unknown>; post: { id: string; authorId: string } }>;
+    nextCursor: string | null;
+  };
   assert.equal(first.items.length, 2);
   assert.ok(first.nextCursor);
   const second = await get(viewerOwner, `${route}&limit=2&cursor=${encodeURIComponent(first.nextCursor!)}`);
-  const secondBody = await second.json() as { items: Array<{ identity: CharacterIdentity; post: { id: string } }> };
+  const secondBody = await second.json() as {
+    items: Array<{ identity: CharacterIdentity; author: Record<string, unknown>; post: { id: string; authorId: string } }>;
+  };
+  for (const item of [...first.items, ...secondBody.items]) {
+    assert.equal(item.identity.characterId, item.post.authorId);
+    if ("displayName" in item.author) assert.equal(typeof item.author.displayName, "string");
+  }
   const keys = [...first.items, ...secondBody.items].map((item) =>
     `${item.identity.ownerId}/${item.identity.universeId}/${item.identity.characterId}/${item.post.id}`,
   );

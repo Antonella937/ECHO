@@ -20,6 +20,12 @@ const context = createSocialFeedContext(auth, 'studio', universe)!;
 const validPage = {
   items: [{
     identity: { ownerId: 'owner-b', universeId: 'primary', characterId: 'same-character-id' },
+    author: {
+      displayName: 'Remote Author',
+      handle: 'remote-author',
+      avatar: '/objects/remote-avatar',
+      verified: true,
+    },
     post: {
       id: 'same-post-id',
       authorId: 'same-character-id',
@@ -96,6 +102,12 @@ test('successful response is validated and strips fields outside the allowlisted
   assert.equal(calledInit?.cache, 'no-store');
   assert.equal(result.items.length, 1);
   assert.deepEqual(result.items[0]?.identity, validPage.items[0]?.identity);
+  assert.deepEqual(result.items[0]?.author, {
+    displayName: 'Remote Author',
+    handle: 'remote-author',
+    avatar: '/objects/remote-avatar',
+    verified: true,
+  });
   assert.equal(result.items[0]?.post.caption, 'Read-only post');
   assert.equal('likes' in (result.items[0]?.post ?? {}), false);
   assert.equal('savedBy' in (result.items[0]?.post ?? {}), false);
@@ -130,6 +142,7 @@ test('invalid response shape or mismatched author identity is rejected', async (
   const fetcher: typeof fetch = async () => new Response(JSON.stringify({
     items: [{
       identity: { ownerId: 'owner-b', universeId: 'primary', characterId: 'char-a' },
+      author: { displayName: 'Author', handle: 'author', avatar: '/objects/avatar', verified: false },
       post: {
         id: 'post-a',
         authorId: 'char-b',

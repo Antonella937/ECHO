@@ -40,6 +40,13 @@ const identitySchema = z.object({
   characterId: z.string().min(1),
 });
 
+const authorSchema = z.object({
+  displayName: z.string().optional(),
+  handle: z.string().optional(),
+  avatar: z.string().optional(),
+  verified: z.boolean().optional(),
+});
+
 const postSchema = z.object({
   id: z.string().min(1),
   authorId: z.string().min(1),
@@ -54,6 +61,7 @@ const postSchema = z.object({
 
 const feedItemSchema = z.object({
   identity: identitySchema,
+  author: authorSchema,
   post: postSchema,
 }).superRefine(({ identity, post }, context) => {
   if (identity.characterId !== post.authorId) {
