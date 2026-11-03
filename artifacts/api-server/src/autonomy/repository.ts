@@ -1,11 +1,12 @@
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, sql } from "drizzle-orm";
 import {
   db,
+  echoAutonomyWorkerLeasesTable,
   echoAutonomyCharactersTable,
   echoAutonomyOwnersTable,
   echoAutonomyRunsTable,
 } from "@workspace/db";
-import { DEFAULT_CHARACTER_CONTROL } from "./constants";
+import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "./constants";
 
 export { DEFAULT_CHARACTER_CONTROL } from "./constants";
 
@@ -16,7 +17,7 @@ export async function readOwnerControls(ownerId: string) {
     .where(eq(echoAutonomyCharactersTable.ownerId, ownerId));
   return {
     globalKillSwitchEngaged: owner?.killSwitchEngaged ?? true,
-    liveExecutionEnabled: false as const,
+    liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
       maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),
@@ -58,6 +59,41 @@ export async function getExecutedActionHistory(ownerId: string, characterId: str
   )).orderBy(desc(echoAutonomyRunsTable.createdAt));
 }
 
+export async function listLiveOptInTargets() {
+  const rows = await db.select({
+    ownerId: echoAutonomyCharactersTable.ownerId,
+    characterId: echoAutonomyCharactersTable.characterId,
+  }).from(echoAutonomyCharactersTable).innerJoin(
+    echoAutonomyOwnersTable,
+    eq(echoAutonomyOwnersTable.ownerId, echoAutonomyCharactersTable.ownerId),
+  ).where(and(
+    eq(echoAutonomyCharactersTable.enabled, true),
+    eq(echoAutonomyOwnersTable.killSwitchEngaged, false),
+  ));
+  return rows;
+}
+
+export async function claimAutonomyWorkerLease(token: string, now = new Date(), ttlMs = 5 * 60_000) {
+  const rows = await db.insert(echoAutonomyWorkerLeasesTable).values({
+    name: "autonomy-live-worker",
+    token,
+    expiresAt: new Date(now.getTime() + ttlMs),
+    updatedAt: now,
+  }).onConflictDoUpdate({
+    target: echoAutonomyWorkerLeasesTable.name,
+    set: { token, expiresAt: new Date(now.getTime() + ttlMs), updatedAt: now },
+    setWhere: lt(echoAutonomyWorkerLeasesTable.expiresAt, now),
+  }).returning({ token: echoAutonomyWorkerLeasesTable.token });
+  return rows.length === 1 && rows[0]?.token === token;
+}
+
+export async function releaseAutonomyWorkerLease(token: string) {
+  await db.delete(echoAutonomyWorkerLeasesTable).where(and(
+    eq(echoAutonomyWorkerLeasesTable.name, "autonomy-live-worker"),
+    eq(echoAutonomyWorkerLeasesTable.token, token),
+  ));
+}
+
 type Reservation =
   | { kind: "created"; runId: string }
   | { kind: "duplicate"; runId: string; status: string; characterId: string }
@@ -72,7 +108,8 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
       id: echoAutonomyRunsTable.id,
       status: echoAutonomyRunsTable.status,
       characterId: echoAutonomyRunsTable.characterId,
-      createdAt: echoAutonomyRunsTable.createdAt,
+      updatedAt: echoAutonomyRunsTable.updatedAt,
+      attemptCount: echoAutonomyRunsTable.attemptCount,
     }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
       eq(echoAutonomyRunsTable.idempotencyKey, idempotencyKey),
@@ -81,11 +118,26 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
       if (existing.characterId !== characterId) {
         return { kind: "idempotency_conflict", runId: String(existing.id), characterId: existing.characterId };
       }
-      if (existing.status === "running" && Date.now() - existing.createdAt.getTime() >= 120_000) {
-        await tx.update(echoAutonomyRunsTable).set({
+      if (existing.status === "running" && Date.now() - existing.updatedAt.getTime() >= 120_000 &&
+        existing.attemptCount < 3) {
+        const [reclaimed] = await tx.update(echoAutonomyRunsTable).set({
           status: "running", sourceRevision, updatedAt: new Date(),
-        }).where(eq(echoAutonomyRunsTable.id, existing.id));
-        return { kind: "created", runId: String(existing.id) };
+          attemptCount: existing.attemptCount + 1, lastErrorCode: null,
+        }).where(and(
+          eq(echoAutonomyRunsTable.id, existing.id),
+          eq(echoAutonomyRunsTable.status, "running"),
+          lt(echoAutonomyRunsTable.updatedAt, new Date(Date.now() - 120_000)),
+        )).returning({ id: echoAutonomyRunsTable.id });
+        if (reclaimed) return { kind: "created", runId: String(existing.id) };
+      }
+      if (existing.status === "running" && Date.now() - existing.updatedAt.getTime() >= 120_000) {
+        await tx.update(echoAutonomyRunsTable).set({
+          status: "stale_failed", lastErrorCode: "LEASE_EXPIRED", finishedAt: new Date(), updatedAt: new Date(),
+        }).where(and(
+          eq(echoAutonomyRunsTable.id, existing.id),
+          eq(echoAutonomyRunsTable.status, "running"),
+        ));
+        return { kind: "duplicate", runId: String(existing.id), status: "stale_failed", characterId: existing.characterId };
       }
       return { kind: "duplicate", runId: String(existing.id), status: existing.status, characterId: existing.characterId };
     }
@@ -122,6 +174,7 @@ export async function reserveDryRun(ownerId: string, characterId: string, idempo
       idempotencyKey,
       status: "running",
       sourceRevision,
+      attemptCount: 1,
     }).returning({ id: echoAutonomyRunsTable.id });
     return { kind: "created", runId: String(created.id) };
   });
@@ -138,6 +191,7 @@ export async function completeDryRun(
     sourceRevision?: number;
     contextHash?: string | null;
     model?: string | null;
+    lastErrorCode?: string | null;
   },
 ) {
   await db.update(echoAutonomyRunsTable).set({
@@ -148,6 +202,8 @@ export async function completeDryRun(
     sourceRevision: result.sourceRevision,
     contextHash: result.contextHash ?? null,
     model: result.model ?? null,
+    lastErrorCode: result.lastErrorCode ?? null,
+    finishedAt: result.status === "running" ? null : new Date(),
     updatedAt: new Date(),
   }).where(and(
     eq(echoAutonomyRunsTable.ownerId, ownerId),

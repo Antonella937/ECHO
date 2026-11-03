@@ -46,12 +46,23 @@ export const echoAutonomyRunsTable = pgTable("echo_ai_autonomy_runs", {
   sourceRevision: integer("source_revision").notNull(),
   contextHash: text("context_hash"),
   model: text("model"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastErrorCode: text("last_error_code"),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("echo_ai_autonomy_runs_owner_idem_idx").on(table.ownerId, table.idempotencyKey),
   index("echo_ai_autonomy_runs_owner_character_time_idx").on(table.ownerId, table.characterId, table.createdAt),
 ]);
+
+/** Singleton lease prevents two API instances from running the same background tick. */
+export const echoAutonomyWorkerLeasesTable = pgTable("echo_ai_autonomy_worker_leases", {
+  name: text("name").primaryKey(),
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type EchoAutonomyOwner = typeof echoAutonomyOwnersTable.$inferSelect;
 export type EchoAutonomyCharacter = typeof echoAutonomyCharactersTable.$inferSelect;

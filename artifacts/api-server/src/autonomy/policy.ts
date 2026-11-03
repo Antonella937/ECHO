@@ -101,10 +101,10 @@ function asTime(value: Date | string | null | undefined): number | null {
 
 function recentActorActivity(state: SocialState, characterId: string, now: Date): number[] {
   return [
-    ...state.posts.filter((item: Post) => item.authorId === characterId).map((item) => asTime(item.createdAt)),
-    ...state.comments.filter((item: Comment) => item.authorId === characterId).map((item) => asTime(item.createdAt)),
-    ...state.stories.filter((item: Story) => item.authorId === characterId).map((item) => asTime(item.createdAt)),
-    ...state.messages.filter((item: Message) => item.senderId === characterId).map((item) => asTime(item.createdAt)),
+    ...state.posts.filter((item: Post) => item.authorId === characterId && item.origin !== "autonomy").map((item) => asTime(item.createdAt)),
+    ...state.comments.filter((item: Comment) => item.authorId === characterId && item.origin !== "autonomy").map((item) => asTime(item.createdAt)),
+    ...state.stories.filter((item: Story) => item.authorId === characterId && item.origin !== "autonomy").map((item) => asTime(item.createdAt)),
+    ...state.messages.filter((item: Message) => item.senderId === characterId && item.origin !== "autonomy").map((item) => asTime(item.createdAt)),
   ].filter((time): time is number => time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS);
 }
 

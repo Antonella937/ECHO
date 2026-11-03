@@ -1,5 +1,10 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startAutonomyBackgroundWorker } from "./autonomy/runtime";
+
+// The worker is wired into the API process but remains dormant while the
+// source-level live execution switch is false.
+const autonomyWorker = startAutonomyBackgroundWorker();
 
 const rawPort = process.env["PORT"];
 
@@ -23,3 +28,6 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 });
+
+process.on("SIGTERM", () => autonomyWorker.stop());
+process.on("SIGINT", () => autonomyWorker.stop());
