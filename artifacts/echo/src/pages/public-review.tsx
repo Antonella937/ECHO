@@ -5,10 +5,15 @@ import './public-surface.css';
 
 const publicScreens = [
   { href: '/creator-preview/landing', label: 'Landing', detail: 'Entrada pública de ECHO Creator' },
-  { href: '/creator-preview/pricing', label: 'Planes', detail: 'Free y Creator beta' },
+  { href: '/creator-preview/pricing', label: 'Planes', detail: 'Free y Creator' },
   { href: '/creator-preview/faq', label: 'FAQ', detail: 'Preguntas frecuentes' },
   { href: '/creator-preview/sign-in', label: 'Login', detail: 'Vista visual, sin iniciar sesión' },
   { href: '/creator-preview/sign-up', label: 'Registro', detail: 'Vista visual, sin crear cuenta' },
+  { href: '/creator-preview/account', label: 'Mi plan', detail: 'Cuenta, capacidad y uso ilustrativo' },
+  { href: '/creator-preview/universes', label: 'Universos y personajes', detail: 'Cupos y gestión conceptual' },
+  { href: '/creator-preview/store', label: 'Creator y extras', detail: 'Más capacidad y expansiones' },
+  { href: '/creator-preview/privacy', label: 'Privacidad social', detail: 'Perfiles, solicitudes y bloqueos' },
+  { href: '/creator-preview/limit', label: 'Límite alcanzado', detail: 'Estado conceptual de Free' },
 ];
 
 export function PublicReviewHub() {

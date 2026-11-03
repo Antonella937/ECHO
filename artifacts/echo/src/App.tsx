@@ -36,6 +36,13 @@ import LandingPage from '@/pages/landing';
 import PricingPage from '@/pages/pricing';
 import FaqPage from '@/pages/faq';
 import { AuthScreenPreview, PublicReviewHub } from '@/pages/public-review';
+import {
+  CreatorAccountPreview,
+  CreatorLimitPreview,
+  CreatorPrivacyPreview,
+  CreatorStorePreview,
+  CreatorUniversePreview,
+} from '@/pages/creator-product-previews';
 import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding';
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
@@ -343,6 +350,11 @@ function ClerkRoutes() {
           <Route path="/creator-preview/faq" component={() => <FaqPage previewMode />} />
           <Route path="/creator-preview/sign-in" component={() => <AuthScreenPreview kind="sign-in" />} />
           <Route path="/creator-preview/sign-up" component={() => <AuthScreenPreview kind="sign-up" />} />
+          <Route path="/creator-preview/account" component={CreatorAccountPreview} />
+          <Route path="/creator-preview/universes" component={CreatorUniversePreview} />
+          <Route path="/creator-preview/store" component={CreatorStorePreview} />
+          <Route path="/creator-preview/privacy" component={CreatorPrivacyPreview} />
+          <Route path="/creator-preview/limit" component={CreatorLimitPreview} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/pricing" component={() => <PricingPage />} />
