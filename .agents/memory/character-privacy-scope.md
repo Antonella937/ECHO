@@ -9,11 +9,11 @@ Cross-owner access has two independent gates: the target universe must have owne
 
 **How to apply:** check universe consent before character visibility on social read routes. Do not describe the system as fully private or beta-safe until every cross-owner surface is covered.
 
-The rollout is staged: social feed/profile/post/Story reads use the universe gate first; follow/request behavior and `/storage/objects/*` media are separate steps and must not be assumed covered by the read gate.
+Universe consent applies independently to social reads, follow/request operations and lists, and media delivery. A readable association of a file in another universe must never authorize the requested origin.
 
-**Why:** the user explicitly deferred follows/requests and media to later privacy steps.
+**Why:** the user requires isolated universes by default and explicitly prohibited shared-object authorization bypasses.
 
-**How to apply:** preserve those deferred paths until their authorized step, and make any exception in shared helpers explicit so enabling read enforcement does not silently change them.
+**How to apply:** authorize the exact owner + universe + character + content association before delivering cross-owner media. Treat each surface's test evidence separately; passing read-route tests does not validate follows or media.
 
 Cross-owner social reads must authorize a full target identity (owner + universe + character), derive the viewer owner only from the Clerk session, and return allowlisted profile/content projections rather than serialized character or social state.
 

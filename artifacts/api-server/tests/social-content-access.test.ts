@@ -379,6 +379,50 @@ test("expired Story media is hidden unless retained in a highlight", async () =>
   assert.equal((await getMedia(strangerOwner, objectPaths.expiredStory)).status, 404);
 });
 
+test("sharing OFF denies public and accepted-follow media before opening bytes", async () => {
+  await db.update(echoUniversesTable).set({ sharingEnabled: false })
+    .where(eq(echoUniversesTable.ownerId, contentOwner));
+  const accepted = { universeId: "primary", characterId: "accepted-viewer" };
+  for (const path of [
+    objectPaths.publicPost, objectPaths.publicAvatar, objectPaths.publicStory,
+    objectPaths.privatePost, objectPaths.privateAvatar, objectPaths.privateStory,
+    objectPaths.highlightedStory,
+  ]) {
+    const response = await getMedia(followerOwner, path, accepted);
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "Image not found" });
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+  }
+  assert.equal(downloadCount, 0);
+  assert.equal((await getMedia(contentOwner, objectPaths.privatePost)).status, 200);
+});
+
+test("one object reused across universes requires its exact source association", async () => {
+  await db.update(echoUniversesTable).set({ sharingEnabled: false }).where(and(
+    eq(echoUniversesTable.ownerId, contentOwner),
+    eq(echoUniversesTable.universeId, "primary"),
+  ));
+  const accepted = { universeId: "primary", characterId: "accepted-viewer" };
+  const primary: SourceAssociation = {
+    universeId: "primary", characterId: "same-id", sourceType: "post", contentId: "same-post",
+  };
+  const studio: SourceAssociation = { ...primary, universeId: "studio" };
+  const denied = await getMedia(followerOwner, objectPaths.sharedAcrossUniverses, accepted, primary);
+  assert.equal(denied.status, 404);
+  assert.equal((await getMedia(strangerOwner, objectPaths.sharedAcrossUniverses, undefined, null)).status, 404);
+  for (const source of [
+    { ...studio, contentId: "missing" },
+    { ...studio, characterId: "unrelated" },
+    { ...studio, sourceType: "avatar" as const, contentId: "same-id" },
+    { ...studio, universeId: "missing" },
+  ]) {
+    assert.equal((await getMedia(strangerOwner, objectPaths.sharedAcrossUniverses, undefined, source)).status, 404);
+  }
+  assert.equal(downloadCount, 0);
+  assert.equal((await getMedia(strangerOwner, objectPaths.sharedAcrossUniverses, undefined, studio)).status, 200);
+  assert.equal(downloadCount, 1);
+});
+
 test("legacy and relational follows deduplicate by full identity and legacy IDs never infer cross-owner edges", async () => {
   const before = await db.select().from(echoCharacterFollowsTable).where(eq(
     echoCharacterFollowsTable.sourceOwnerId,
@@ -419,7 +463,7 @@ test("anonymous, nonexistent, malformed and unauthorized direct media requests d
   assert.equal(await missing.text(), await denied.text());
 
   const malformed = await fetch(
-    `${objectUrl(objectPaths.privatePost)}?viewerUniverseId=primary`,
+    `${objectUrl(objectPaths.privatePost)}&viewerUniverseId=primary`,
     { headers: authHeaders(followerOwner) },
   );
   assert.equal(malformed.status, 400);

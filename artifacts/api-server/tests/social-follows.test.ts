@@ -335,6 +335,105 @@ test("requests reject spoofed, self, missing, cross-owner and malformed identiti
   assert.equal(await activeFollows(eq(echoCharacterFollowsTable.sourceOwnerId, ownerA)), 0);
 });
 
+test("sharing OFF blocks historical follows, request transitions and lists without writing privacy defaults", async () => {
+  await seedUniverse(ownerA, "primary", ["source"]);
+  await seedUniverse(ownerB, "primary", ["target", "accept-target", "reject-target", "cancel-target"]);
+  const body = makeBody("primary", "source", ownerB, "primary", "target");
+  const identity = {
+    sourceOwnerId: ownerA, sourceUniverseId: "primary", sourceCharacterId: "source",
+    targetOwnerId: ownerB, targetUniverseId: "primary",
+  };
+  await db.insert(echoCharacterFollowsTable).values({ ...identity, targetCharacterId: "target" });
+  const requests = await db.insert(echoCharacterFollowRequestsTable).values([
+    { ...identity, targetCharacterId: "accept-target", status: "pending" },
+    { ...identity, targetCharacterId: "reject-target", status: "pending" },
+    { ...identity, targetCharacterId: "cancel-target", status: "pending" },
+  ]).returning();
+  assert.equal((await sendFollow(ownerA, body)).status, 404);
+  assert.equal((await sendFollow(ownerA, body, "DELETE")).status, 404);
+  for (const [index, action] of (["accept", "reject", "cancel"] as const).entries()) {
+    const actor = action === "cancel" ? ownerA : ownerB;
+    assert.equal((await transition(actor, requests[index].id, action)).status, 404);
+  }
+  for (const owner of [ownerA, ownerB]) {
+    const response = await listRequests(owner, "?direction=all&status=all");
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).requests, []);
+  }
+  assert.equal(await activeFollows(eq(echoCharacterFollowsTable.sourceOwnerId, ownerA)), 1);
+  const stored = await db.select().from(echoCharacterFollowRequestsTable)
+    .where(eq(echoCharacterFollowRequestsTable.sourceOwnerId, ownerA));
+  assert.equal(stored.length, 3);
+  assert.ok(stored.every((row) => row.status === "pending"));
+  assert.equal((await db.select().from(echoCharacterPrivacyTable)
+    .where(inArray(echoCharacterPrivacyTable.ownerId, [ownerA, ownerB]))).length, 0);
+});
+
+test("same-owner different universes cannot follow, transition or list historical requests", async () => {
+  await seedUniverse(ownerA, "primary", ["same-id"], {}, true);
+  await seedUniverse(ownerA, "studio", ["same-id"], {}, true);
+  const body = makeBody("primary", "same-id", ownerA, "studio", "same-id");
+  const identity = {
+    sourceOwnerId: ownerA, sourceUniverseId: "primary", sourceCharacterId: "same-id",
+    targetOwnerId: ownerA, targetUniverseId: "studio", targetCharacterId: "same-id",
+  };
+  await db.insert(echoCharacterFollowsTable).values(identity);
+  const [request] = await db.insert(echoCharacterFollowRequestsTable)
+    .values({ ...identity, status: "pending" }).returning();
+  assert.equal((await sendFollow(ownerA, body)).status, 404);
+  assert.equal((await sendFollow(ownerA, body, "DELETE")).status, 404);
+  assert.equal((await transition(ownerA, request.id, "accept", "studio")).status, 404);
+  assert.equal((await transition(ownerA, request.id, "cancel", "primary")).status, 404);
+  for (const universeId of ["primary", "studio"]) {
+    assert.deepEqual((await (await listRequests(ownerA, "?direction=all&status=all", universeId)).json()).requests, []);
+  }
+  assert.equal(await activeFollows(eq(echoCharacterFollowsTable.sourceOwnerId, ownerA)), 1);
+  const [stored] = await db.select().from(echoCharacterFollowRequestsTable)
+    .where(eq(echoCharacterFollowRequestsTable.id, request.id));
+  assert.equal(stored.status, "pending");
+  assert.equal((await db.select().from(echoCharacterPrivacyTable)
+    .where(eq(echoCharacterPrivacyTable.ownerId, ownerA))).length, 0);
+});
+
+test("request authorization precedes the 100-result cap", async () => {
+  await seedUniverse(ownerA, "primary", ["source"]);
+  const deniedTargets = Array.from({ length: 105 }, (_, index) => `off-${index}`);
+  await seedUniverse(ownerB, "primary", deniedTargets);
+  await seedUniverse(ownerB, "studio", ["allowed"], {}, true);
+  const identity = {
+    sourceOwnerId: ownerA, sourceUniverseId: "primary", sourceCharacterId: "source",
+    targetOwnerId: ownerB,
+  };
+  await db.insert(echoCharacterFollowRequestsTable).values([
+    ...deniedTargets.map((targetCharacterId) => ({
+      ...identity, targetUniverseId: "primary", targetCharacterId,
+      status: "pending" as const, createdAt: new Date(),
+    })),
+    {
+      ...identity, targetUniverseId: "studio", targetCharacterId: "allowed",
+      status: "pending" as const, createdAt: new Date(Date.now() - 86_400_000),
+    },
+  ]);
+  const response = await listRequests(ownerA, "?direction=outgoing");
+  assert.equal(response.status, 200);
+  const { requests } = await response.json();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].targetUniverseId, "studio");
+  assert.equal(requests[0].targetCharacterId, "allowed");
+});
+
+test("same-universe social follows remain functional with sharing OFF", async () => {
+  await seedUniverse(ownerA, "primary", ["source", "public-target", "private-target"]);
+  await setCharacterVisibility(ownerA, "primary", "private-target", "private");
+  assert.deepEqual(await (await sendFollow(ownerA,
+    makeBody("primary", "source", ownerA, "primary", "public-target"))).json(), { status: "following" });
+  const pending = await (await sendFollow(ownerA,
+    makeBody("primary", "source", ownerA, "primary", "private-target"))).json();
+  assert.equal(pending.status, "pending");
+  assert.deepEqual(await (await transition(ownerA, pending.requestId, "accept")).json(), { status: "accepted" });
+  assert.equal(await activeFollows(eq(echoCharacterFollowsTable.sourceOwnerId, ownerA)), 2);
+});
+
 test("deleting a character removes only its relational edges and preserves legacy follows", async () => {
   const legacy = { "legacy-character": ["legacy-target"] };
   await seedUniverse(ownerA, "primary", ["nela", "same-id"], legacy);
