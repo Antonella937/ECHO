@@ -1,13 +1,13 @@
 import { ArrowRight, Check, Image as ImageIcon, Type } from 'lucide-react';
 import { Link } from 'wouter';
-import { PublicFooter, PublicHeader } from './landing';
+import { PublicFooter, PublicHeader, publicPreviewHref } from './landing';
 import './public-surface.css';
 
-export default function PricingPage() {
+export default function PricingPage({ previewMode = false }: { previewMode?: boolean } = {}) {
   return (
     <main className="echo-public">
       <div className="ep-wrap">
-        <PublicHeader />
+        <PublicHeader previewMode={previewMode} />
         <section className="ep-page-intro">
           <span className="ep-eyebrow">Planes ECHO Creator</span>
           <h1 className="ep-serif">Dos formas de<br /><em style={{ color: 'var(--ep-rose)' }}>empezar.</em></h1>
@@ -25,7 +25,7 @@ export default function PricingPage() {
               <li><ImageIcon size={15} /> Imágenes con límites diarios</li>
               <li><Check size={15} /> Selección de tu primer personaje en onboarding</li>
             </ul>
-            <Link href="/sign-up" className="ep-button ep-button-quiet" data-testid="link-free-signup">Empezar con Free <ArrowRight size={15} /></Link>
+            <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button ep-button-quiet" data-testid="link-free-signup">Empezar con Free <ArrowRight size={15} /></Link>
           </article>
           <article className="ep-price-card is-featured">
             <span className="ep-price-tag">Beta · selección preparada</span>
@@ -38,7 +38,7 @@ export default function PricingPage() {
               <li><Check size={15} /> Sin cobros activos ni checkout</li>
               <li><Check size={15} /> Voz, video y música aún no disponibles</li>
             </ul>
-            <Link href="/sign-up" className="ep-button" data-testid="link-creator-signup">Elegir Creator en beta <ArrowRight size={15} /></Link>
+            <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-creator-signup">Elegir Creator en beta <ArrowRight size={15} /></Link>
           </article>
         </section>
         <section className="ep-plan-footnote" aria-label="Nota sobre disponibilidad"><strong>Sobre la beta.</strong> Texto e imágenes tienen límites diarios en Free; los números no se publican aquí. Creator está preparado como selección beta, sin cuotas ni capacidades específicas anunciadas. Voz, video y música quedan fuera de beta por ahora.</section>
@@ -50,7 +50,7 @@ export default function PricingPage() {
             <div className="ep-capability-row" role="row"><span role="cell">Voz, video y música</span><span className="ep-coming" role="cell">Próximamente</span><span className="ep-coming" role="cell">Fuera de beta</span></div>
           </div>
         </section>
-        <PublicFooter />
+        <PublicFooter previewMode={previewMode} />
       </div>
     </main>
   );

@@ -2,45 +2,54 @@ import { ArrowDown, ArrowRight, LockKeyhole, MessageCircle, Sparkles, UsersRound
 import { Link } from 'wouter';
 import './public-surface.css';
 
-function PublicHeader() {
+export function publicPreviewHref(path: string, previewMode = false) {
+  if (!previewMode) return path;
+  return `/creator-preview${path === '/' ? '/landing' : path}`;
+}
+
+function PublicHeader({ previewMode = false }: { previewMode?: boolean }) {
   return (
     <header className="ep-nav">
-      <Link href="/" className="ep-brand" aria-label="ECHO, inicio" data-testid="link-echo-home">
+      <Link href={publicPreviewHref('/', previewMode)} className="ep-brand" aria-label="ECHO, inicio" data-testid="link-echo-home">
         <span className="ep-mark" aria-hidden="true">e</span><span>ECHO</span>
       </Link>
       <nav className="ep-navlinks" aria-label="Navegación principal">
-        <Link href="/pricing" data-testid="link-pricing">Planes</Link>
-        <Link href="/faq" data-testid="link-faq">Preguntas</Link>
-        <Link href="/sign-in" className="ep-button ep-button-quiet" data-testid="link-sign-in">Iniciar sesión</Link>
+        <Link href={publicPreviewHref('/pricing', previewMode)} data-testid="link-pricing">Planes</Link>
+        <Link href={publicPreviewHref('/faq', previewMode)} data-testid="link-faq">Preguntas</Link>
+        <Link href={publicPreviewHref('/sign-in', previewMode)} className="ep-button ep-button-quiet" data-testid="link-sign-in">Iniciar sesión</Link>
       </nav>
     </header>
   );
 }
 
-function PublicFooter() {
+function PublicFooter({ previewMode = false }: { previewMode?: boolean }) {
   return (
     <footer className="ep-footer">
       <div className="ep-footer-inner">
         <span>© ECHO · Un espacio privado para tus personajes</span>
-        <div className="ep-footer-links"><Link href="/pricing">Planes</Link><Link href="/faq">Preguntas frecuentes</Link><Link href="/sign-in">Iniciar sesión</Link></div>
+        <div className="ep-footer-links">
+          <Link href={publicPreviewHref('/pricing', previewMode)}>Planes</Link>
+          <Link href={publicPreviewHref('/faq', previewMode)}>Preguntas frecuentes</Link>
+          <Link href={publicPreviewHref('/sign-in', previewMode)}>Iniciar sesión</Link>
+        </div>
       </div>
     </footer>
   );
 }
 
-export default function LandingPage() {
+export default function LandingPage({ previewMode = false }: { previewMode?: boolean } = {}) {
   return (
     <main className="echo-public">
       <div className="ep-wrap">
-        <PublicHeader />
+        <PublicHeader previewMode={previewMode} />
         <section className="ep-hero" aria-labelledby="landing-heading">
           <div className="ep-hero-copy">
             <span className="ep-eyebrow">Tu universo, a puerta cerrada</span>
             <h1 id="landing-heading" className="ep-serif">Un lugar propio<br />para <em>imaginar.</em></h1>
             <p>ECHO es una red social privada para crear personajes, darles una identidad y explorar su mundo desde un mismo espacio.</p>
             <div className="ep-hero-actions">
-              <Link href="/sign-up" className="ep-button" data-testid="link-create-account">Crear mi espacio <ArrowRight size={16} /></Link>
-              <Link href="/pricing" className="ep-text-link" data-testid="link-explore-plans">Conocer los planes <ArrowRight size={15} /></Link>
+              <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-create-account">Crear mi espacio <ArrowRight size={16} /></Link>
+              <Link href={publicPreviewHref('/pricing', previewMode)} className="ep-text-link" data-testid="link-explore-plans">Conocer los planes <ArrowRight size={15} /></Link>
             </div>
             <div className="ep-private-note"><LockKeyhole size={14} /> Un universo privado asociado a tu cuenta</div>
           </div>
@@ -78,17 +87,17 @@ export default function LandingPage() {
           </div>
           <div className="ep-beta-strip">
             <div><h3>Una primera versión honesta</h3><p>Los planes no tienen cobros activos. Creator es una selección beta preparada, sin checkout ni cuotas inventadas.</p></div>
-            <Link href="/pricing" className="ep-text-link" data-testid="link-see-plan-details">Ver qué incluye cada plan <ArrowRight size={15} /></Link>
+            <Link href={publicPreviewHref('/pricing', previewMode)} className="ep-text-link" data-testid="link-see-plan-details">Ver qué incluye cada plan <ArrowRight size={15} /></Link>
           </div>
         </section>
 
         <section className="ep-section" style={{ paddingTop: 8 }}>
           <div className="ep-beta-strip">
             <div><span className="ep-eyebrow">Cuando estés listo</span><h3 style={{ marginTop: 12 }}>Tu universo empieza con un nombre.</h3><p>Elige un plan beta y crea tu primera identidad en unos pocos pasos.</p></div>
-            <Link href="/sign-up" className="ep-button" data-testid="link-start-now">Empezar <ArrowDown size={15} /></Link>
+            <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-start-now">Empezar <ArrowDown size={15} /></Link>
           </div>
         </section>
-        <PublicFooter />
+        <PublicFooter previewMode={previewMode} />
       </div>
     </main>
   );

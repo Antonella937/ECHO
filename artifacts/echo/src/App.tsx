@@ -35,6 +35,7 @@ import CharacterEditorPage from '@/pages/character-editor';
 import LandingPage from '@/pages/landing';
 import PricingPage from '@/pages/pricing';
 import FaqPage from '@/pages/faq';
+import { AuthScreenPreview, PublicReviewHub } from '@/pages/public-review';
 import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding';
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
@@ -336,10 +337,16 @@ function ClerkRoutes() {
       <QueryClientProvider client={queryClient}>
         <ClerkQueryCacheInvalidator />
         <Switch>
+          <Route path="/creator-preview" component={PublicReviewHub} />
+          <Route path="/creator-preview/landing" component={() => <LandingPage previewMode />} />
+          <Route path="/creator-preview/pricing" component={() => <PricingPage previewMode />} />
+          <Route path="/creator-preview/faq" component={() => <FaqPage previewMode />} />
+          <Route path="/creator-preview/sign-in" component={() => <AuthScreenPreview kind="sign-in" />} />
+          <Route path="/creator-preview/sign-up" component={() => <AuthScreenPreview kind="sign-up" />} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
-          <Route path="/pricing" component={PricingPage} />
-          <Route path="/faq" component={FaqPage} />
+          <Route path="/pricing" component={() => <PricingPage />} />
+          <Route path="/faq" component={() => <FaqPage />} />
           <Route component={AuthenticatedExperience} />
         </Switch>
       </QueryClientProvider>

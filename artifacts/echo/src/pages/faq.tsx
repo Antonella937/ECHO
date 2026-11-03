@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'wouter';
-import { PublicFooter, PublicHeader } from './landing';
+import { PublicFooter, PublicHeader, publicPreviewHref } from './landing';
 import './public-surface.css';
 
 const items = [
@@ -34,11 +34,11 @@ const items = [
   },
 ];
 
-export default function FaqPage() {
+export default function FaqPage({ previewMode = false }: { previewMode?: boolean } = {}) {
   return (
     <main className="echo-public">
       <div className="ep-wrap">
-        <PublicHeader />
+        <PublicHeader previewMode={previewMode} />
         <section className="ep-page-intro">
           <span className="ep-eyebrow">Preguntas claras</span>
           <h1 className="ep-serif">Antes de<br /><em style={{ color: 'var(--ep-rose)' }}>empezar.</em></h1>
@@ -53,10 +53,10 @@ export default function FaqPage() {
           ))}
           <div className="ep-faq-cta">
             <div><h3>¿Listo para abrir tu espacio?</h3><p>Elige tu plan durante el onboarding. No hay cobros activos.</p></div>
-            <Link href="/sign-up" className="ep-button" data-testid="link-faq-signup">Crear una cuenta <ArrowRight size={15} /></Link>
+            <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-faq-signup">Crear una cuenta <ArrowRight size={15} /></Link>
           </div>
         </section>
-        <PublicFooter />
+        <PublicFooter previewMode={previewMode} />
       </div>
     </main>
   );
