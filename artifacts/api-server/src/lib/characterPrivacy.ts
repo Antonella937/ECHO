@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { readableUniverseFilter } from "./socialContentAccess";
 import {
   db,
   echoCharacterPrivacyTable,
@@ -49,6 +50,7 @@ async function lockOwnedCharacter(
     .where(and(
       eq(echoUniversesTable.ownerId, ownerId),
       eq(echoUniversesTable.universeId, universeId),
+      readableUniverseFilter(),
     ))
     .for("update")
     .limit(1);

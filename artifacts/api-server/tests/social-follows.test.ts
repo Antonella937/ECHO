@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { manageUniverse } from "../src/lib/universeManagement";
 import { after, afterEach, before, test } from "node:test";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
@@ -146,6 +147,48 @@ after(async () => {
   server?.closeAllConnections();
   if (server?.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
   await cleanup();
+});
+
+test("archived source or destination blocks follows, all transitions and request lists without writes", async () => {
+  await seedUniverse(ownerA, "primary", ["source"]);
+  await seedUniverse(ownerA, "studio", ["source"]);
+  await seedUniverse(ownerB, "primary", ["target", "private-target", "unseen"], {}, true);
+  await seedUniverse(ownerB, "studio", ["target"]);
+  assert.equal((await sendFollow(ownerA, makeBody("primary", "source", ownerB, "primary", "target"))).status, 200);
+  await setCharacterVisibility(ownerB, "primary", "private-target", "private");
+  const pending = await (await sendFollow(ownerA, makeBody("primary", "source", ownerB, "primary", "private-target"))).json();
+  const privacyBefore = await db.select().from(echoCharacterPrivacyTable).where(inArray(echoCharacterPrivacyTable.ownerId, owners));
+  const requestsBefore = await db.select().from(echoCharacterFollowRequestsTable).where(eq(echoCharacterFollowRequestsTable.id, pending.requestId));
+  for (const owner of [ownerA, ownerB]) {
+    await manageUniverse(owner, "primary", { action: "archive", expectedRevision: 1 });
+    for (const method of ["POST", "DELETE"]) assert.equal((await sendFollow(ownerA,
+      makeBody("primary", "source", ownerB, "primary", "target"), method)).status, 404);
+    assert.equal((await sendFollow(ownerA, makeBody("primary", "source", ownerB, "primary", "unseen"))).status, 404);
+    for (const action of ["accept", "reject", "cancel"] as const) assert.equal((await transition(
+      action === "cancel" ? ownerA : ownerB, pending.requestId, action)).status, 404);
+    for (const actor of [ownerA, ownerB]) {
+      const response = await listRequests(actor, "status=all");
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+      assert.deepEqual((await response.json()).requests, []);
+    }
+    assert.deepEqual(await db.select().from(echoCharacterPrivacyTable).where(inArray(echoCharacterPrivacyTable.ownerId, owners)), privacyBefore);
+    assert.deepEqual(await db.select().from(echoCharacterFollowRequestsTable).where(eq(echoCharacterFollowRequestsTable.id, pending.requestId)), requestsBefore);
+    assert.equal(await activeFollows(eq(echoCharacterFollowsTable.sourceOwnerId, ownerA)), 1);
+    await manageUniverse(owner, "primary", { action: "restore", expectedRevision: 2 });
+    assert.equal((await (await listRequests(ownerA)).json()).requests.length, 1);
+  }
+  assert.equal((await transition(ownerB, pending.requestId, "accept")).status, 200);
+  assert.equal(await activeFollows(eq(echoCharacterFollowsTable.sourceOwnerId, ownerA)), 2);
+});
+
+test("archived same-owner universe stays isolated while repeated IDs in active studio work", async () => {
+  await seedUniverse(ownerA, "primary", ["source", "target"]);
+  await seedUniverse(ownerA, "studio", ["source", "target"]);
+  await manageUniverse(ownerA, "primary", { action: "archive", expectedRevision: 1 });
+  assert.equal((await sendFollow(ownerA, makeBody("primary", "source", ownerA, "primary", "target"))).status, 404);
+  assert.equal((await sendFollow(ownerA, makeBody("studio", "source", ownerA, "studio", "target"))).status, 200);
+  await manageUniverse(ownerA, "primary", { action: "restore", expectedRevision: 2 });
+  assert.equal((await sendFollow(ownerA, makeBody("primary", "source", ownerA, "primary", "target"))).status, 200);
 });
 
 test("public follows are direct, idempotent, and distinguish repeated character IDs by universe", async () => {

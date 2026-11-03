@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import {
   db,
   echoCharacterFollowsTable,
@@ -25,6 +25,11 @@ export type SocialMediaSource = {
 };
 
 type PlainRecord = Record<string, unknown>;
+
+/** Content availability, independent of character privacy or sharing consent. */
+export function readableUniverseFilter() {
+  return and(isNull(echoUniversesTable.archivedAt), isNull(echoUniversesTable.deletedAt));
+}
 
 function record(value: unknown): PlainRecord | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -79,6 +84,7 @@ export async function readAcceptedCharacterFollows(
     .where(and(
       eq(echoUniversesTable.ownerId, ownerId),
       eq(echoUniversesTable.universeId, universeId),
+      readableUniverseFilter(),
     ))
     .limit(1);
   if (!universe) return [];
@@ -109,6 +115,23 @@ export async function readAcceptedCharacterFollows(
     ),
   ));
   for (const row of relationalRows) {
+    // Retained historical edges never override current endpoint availability.
+    const endpoints = await Promise.all([
+      { ownerId: row.sourceOwnerId, universeId: row.sourceUniverseId },
+      { ownerId: row.targetOwnerId, universeId: row.targetUniverseId },
+    ].map(async identity => {
+      const [available] = await db.select({ sharingEnabled: echoUniversesTable.sharingEnabled })
+        .from(echoUniversesTable).where(and(
+          eq(echoUniversesTable.ownerId, identity.ownerId),
+          eq(echoUniversesTable.universeId, identity.universeId),
+          readableUniverseFilter(),
+        )).limit(1);
+      return available;
+    }));
+    if (!endpoints[0] || !endpoints[1]) continue;
+    if (row.sourceOwnerId === row.targetOwnerId
+      ? row.sourceUniverseId !== row.targetUniverseId
+      : !endpoints[1].sharingEnabled) continue;
     const value = edge(
       row.sourceOwnerId,
       row.sourceUniverseId,
@@ -141,6 +164,16 @@ export async function canReadSocialCharacter(
   target: CharacterIdentity,
   viewer?: SocialContentViewer,
 ): Promise<boolean> {
+  // Validate the selected viewer even for public content and owner reads.
+  if (viewer) {
+    const [selected] = await db.select({ state: echoUniversesTable.state })
+      .from(echoUniversesTable).where(and(
+        eq(echoUniversesTable.ownerId, authenticatedOwnerId),
+        eq(echoUniversesTable.universeId, viewer.universeId),
+        readableUniverseFilter(),
+      )).limit(1);
+    if (!selected || !hasIdentity(selected.state, viewer.characterId)) return false;
+  }
   if (!authenticatedOwnerId) return false;
   const [targetUniverse] = await db.select({
     state: echoUniversesTable.state,
@@ -150,6 +183,7 @@ export async function canReadSocialCharacter(
     .where(and(
       eq(echoUniversesTable.ownerId, target.ownerId),
       eq(echoUniversesTable.universeId, target.universeId),
+      readableUniverseFilter(),
     ))
     .limit(1);
   const targetCharacter = targetUniverse
@@ -186,6 +220,7 @@ export async function canReadSocialCharacter(
     .where(and(
       eq(echoUniversesTable.ownerId, authenticatedOwnerId),
       eq(echoUniversesTable.universeId, viewer.universeId),
+      readableUniverseFilter(),
     ))
     .limit(1);
   if (!viewerUniverse || !hasIdentity(viewerUniverse.state, viewer.characterId)) return false;
@@ -217,11 +252,12 @@ function matchesMediaSource(
   stateValue: unknown,
   objectPath: string,
   source: SocialMediaSource,
+  ownerRead = false,
 ): boolean {
   const state = record(stateValue);
   if (!state) return false;
   const character = stateCharacters(state).find((item) => item.id === source.characterId);
-  if (!character || character.archived === true) return false;
+  if (!character || (!ownerRead && character.archived === true)) return false;
 
   if (source.contentType === "avatar") {
     return source.contentId === source.characterId && character.avatar === objectPath;
@@ -241,7 +277,7 @@ function matchesMediaSource(
   return Boolean(
     story &&
     story.image === objectPath &&
-    storyIsStillVisible(state, story, Date.now()),
+    (ownerRead || storyIsStillVisible(state, story, Date.now())),
   );
 }
 
@@ -258,7 +294,20 @@ export async function canReadSocialMedia(
   viewer?: SocialContentViewer,
 ): Promise<boolean> {
   if (!authenticatedOwnerId) return false;
-  if (authenticatedOwnerId === mediaOwnerId) return true;
+  if (authenticatedOwnerId === mediaOwnerId && !source) {
+    // Legacy owner URLs omit source identity. An archived association must not
+    // be bypassed by dropping query parameters, including shared objects.
+    const universes = await db.select({
+      state: echoUniversesTable.state,
+      archivedAt: echoUniversesTable.archivedAt,
+      deletedAt: echoUniversesTable.deletedAt,
+      universeId: echoUniversesTable.universeId,
+    }).from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, mediaOwnerId));
+    if (viewer && !universes.some(universe => universe.universeId === viewer.universeId &&
+      !universe.archivedAt && !universe.deletedAt && hasIdentity(universe.state, viewer.characterId))) return false;
+    return !universes.some(universe =>
+      (universe.archivedAt || universe.deletedAt) && containsObjectPath(universe.state, objectPath));
+  }
   if (!source) return false;
 
   const [universe] = await db.select({ state: echoUniversesTable.state })
@@ -266,12 +315,21 @@ export async function canReadSocialMedia(
     .where(and(
       eq(echoUniversesTable.ownerId, mediaOwnerId),
       eq(echoUniversesTable.universeId, source.universeId),
+      readableUniverseFilter(),
     ))
     .limit(1);
-  if (!universe || !matchesMediaSource(universe.state, objectPath, source)) return false;
+  if (!universe || !matchesMediaSource(universe.state, objectPath, source, authenticatedOwnerId === mediaOwnerId)) return false;
   return canReadSocialCharacter(
     authenticatedOwnerId,
     { ownerId: mediaOwnerId, universeId: source.universeId, characterId: source.characterId },
     viewer,
   );
+}
+
+/** Include attachments nested in messages/configuration, not only feed media. */
+function containsObjectPath(value: unknown, objectPath: string): boolean {
+  if (typeof value === "string") return value === objectPath;
+  if (Array.isArray(value)) return value.some(item => containsObjectPath(item, objectPath));
+  const object = record(value);
+  return object ? Object.values(object).some(item => containsObjectPath(item, objectPath)) : false;
 }

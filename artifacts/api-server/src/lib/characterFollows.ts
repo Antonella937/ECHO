@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { readableUniverseFilter } from "./socialContentAccess";
 import {
   db,
   echoCharacterFollowRequestsTable,
@@ -101,6 +102,7 @@ async function lockAndValidateCharacters(
       .where(and(
         eq(echoUniversesTable.ownerId, universe.ownerId),
         eq(echoUniversesTable.universeId, universe.universeId),
+        readableUniverseFilter(),
       ))
       .for("update")
       .limit(1);
@@ -376,6 +378,7 @@ export async function listOwnFollowRequests(
       }).from(echoUniversesTable).where(and(
         eq(echoUniversesTable.ownerId, ownerId),
         eq(echoUniversesTable.universeId, id),
+        readableUniverseFilter(),
       )).limit(1).then(([row]) => row ?? null);
       universeCache.set(key, cached);
     }

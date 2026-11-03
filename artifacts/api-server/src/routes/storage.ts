@@ -142,6 +142,12 @@ export function createStorageRouter(options: StorageRouterOptions = {}): IRouter
   },
 );
 
+  router.use("/storage/objects", (_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store");
+    res.vary("Authorization");
+    res.vary("Cookie");
+    next();
+  });
   router.get(
   "/storage/objects/*objectPath",
   authenticate,

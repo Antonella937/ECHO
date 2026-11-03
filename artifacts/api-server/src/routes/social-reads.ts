@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db, echoUniversesTable } from "@workspace/db";
+import { readableUniverseFilter } from "../lib/socialContentAccess";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -338,6 +339,7 @@ async function loadUniverse(ownerId: string, universeId: string): Promise<Loaded
   }).from(echoUniversesTable).where(and(
     eq(echoUniversesTable.ownerId, ownerId),
     eq(echoUniversesTable.universeId, universeId),
+    readableUniverseFilter(),
   )).limit(1);
   return row ?? null;
 }
@@ -392,6 +394,12 @@ function safeLogFailure(req: Parameters<RequestHandler>[0]): void {
 export function createSocialReadRouter(options: SocialReadRouterOptions = {}): IRouter {
   const router: IRouter = Router();
   const authenticate = options.authenticate ?? requireAuth;
+  router.use("/social", (_req, res, next) => {
+    setPrivateNoStore(res);
+    res.vary("Authorization");
+    res.vary("Cookie");
+    next();
+  });
 
   router.get("/social/feed", authenticate, async (req, res): Promise<void> => {
     setPrivateNoStore(res);
@@ -423,7 +431,7 @@ export function createSocialReadRouter(options: SocialReadRouterOptions = {}): I
         ownerId: echoUniversesTable.ownerId,
         universeId: echoUniversesTable.universeId,
         state: echoUniversesTable.state,
-      }).from(echoUniversesTable);
+      }).from(echoUniversesTable).where(readableUniverseFilter());
       const items: Array<SocialReadItem & {
         identity: CharacterIdentity;
         author: PlainRecord;

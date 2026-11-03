@@ -49,6 +49,12 @@ function sendServiceError(res: Parameters<RequestHandler>[1], error: string): vo
 export function createSocialFollowsRouter(options: SocialFollowsRouterOptions = {}): IRouter {
   const router: IRouter = Router();
   const authenticate = options.authenticate ?? requireAuth;
+  router.use("/social", (_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store");
+    res.vary("Authorization");
+    res.vary("Cookie");
+    next();
+  });
 
   router.get("/social/follow-requests", authenticate, async (req, res): Promise<void> => {
     const parsed = requestListQuerySchema.safeParse(req.query);

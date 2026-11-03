@@ -15,6 +15,7 @@ import {
 } from "@workspace/db";
 import { createStorageRouter } from "../src/routes/storage";
 import { readAcceptedCharacterFollows } from "../src/lib/socialContentAccess";
+import { manageUniverse } from "../src/lib/universeManagement";
 
 const owners = [
   `social-content-test-${crypto.randomUUID()}`,
@@ -304,6 +305,77 @@ after(async () => {
   server?.closeAllConnections();
   if (server?.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
   await cleanup();
+});
+
+test("archive revokes owner, follower and raw media URLs before bytes; restore preserves all content", async () => {
+  const scope = and(eq(echoUniversesTable.ownerId, contentOwner), eq(echoUniversesTable.universeId, "primary"));
+  const [before] = await db.select().from(echoUniversesTable).where(scope);
+  await manageUniverse(contentOwner, "primary", { action: "archive", expectedRevision: 1 });
+  const count = downloadCount;
+  const paths = [objectPaths.privatePost, objectPaths.privateCarouselItem, objectPaths.privateStory,
+    objectPaths.expiredStory, objectPaths.highlightedStory, objectPaths.privateAvatar];
+  for (const path of paths) {
+    for (const identity of [contentOwner, followerOwner, strangerOwner]) {
+      const response = await getMedia(identity, path, identity === followerOwner
+        ? { universeId: "primary", characterId: "accepted-viewer" } : undefined);
+      assert.equal(response.status, 404);
+      assert.deepEqual(await response.json(), { error: "Image not found" });
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+    }
+    assert.equal((await getMedia(contentOwner, path, undefined, null)).status, 404);
+  }
+  const conditional = await fetch(objectUrl(objectPaths.privatePost), {
+    headers: { "x-test-owner": contentOwner, range: "bytes=0-1", "if-none-match": '"old-cache"' },
+  });
+  assert.equal(conditional.status, 404);
+  assert.equal(downloadCount, count);
+  assert.equal((await getMedia(contentOwner, objectPaths.publicPost)).status, 200);
+  assert.equal((await getMedia(contentOwner, objectPaths.unattached)).status, 200);
+  await manageUniverse(contentOwner, "primary", { action: "restore", expectedRevision: 2 });
+  for (const path of paths) assert.equal((await getMedia(contentOwner, path)).status, 200);
+  assert.equal((await getMedia(followerOwner, objectPaths.privatePost,
+    { universeId: "primary", characterId: "accepted-viewer" })).status, 200);
+  const [after] = await db.select().from(echoUniversesTable).where(scope);
+  assert.deepEqual(after.state, before.state);
+  assert.equal(after.sharingEnabled, before.sharingEnabled);
+});
+
+test("shared object cannot bypass archived source via owner shortcut or omitted identity", async () => {
+  await manageUniverse(contentOwner, "primary", { action: "archive", expectedRevision: 1 });
+  for (const identity of [contentOwner, strangerOwner]) {
+    assert.equal((await getMedia(identity, objectPaths.sharedAcrossUniverses, undefined,
+      { universeId: "primary", characterId: "same-id", sourceType: "post", contentId: "same-post" })).status, 404);
+    assert.equal((await getMedia(identity, objectPaths.sharedAcrossUniverses, undefined,
+      { universeId: "studio", characterId: "same-id", sourceType: "post", contentId: "same-post" })).status, 200);
+  }
+  assert.equal((await getMedia(contentOwner, objectPaths.sharedAcrossUniverses, undefined, null)).status, 404);
+  await manageUniverse(contentOwner, "primary", { action: "restore", expectedRevision: 2 });
+  assert.equal((await getMedia(contentOwner, objectPaths.sharedAcrossUniverses, undefined, null)).status, 200);
+});
+
+test("archived viewer cannot use public media or accepted edges; restored viewer can", async () => {
+  await manageUniverse(followerOwner, "primary", { action: "archive", expectedRevision: 1 });
+  const viewer = { universeId: "primary", characterId: "accepted-viewer" };
+  assert.equal((await getMedia(followerOwner, objectPaths.publicPost, viewer)).status, 404);
+  assert.equal((await getMedia(followerOwner, objectPaths.privatePost, viewer)).status, 404);
+  assert.deepEqual(await readAcceptedCharacterFollows(followerOwner, "primary"), []);
+  await manageUniverse(followerOwner, "primary", { action: "restore", expectedRevision: 2 });
+  assert.equal((await getMedia(followerOwner, objectPaths.privatePost, viewer)).status, 200);
+  await manageUniverse(contentOwner, "primary", { action: "archive", expectedRevision: 1 });
+  const edges = await readAcceptedCharacterFollows(followerOwner, "primary");
+  assert.ok(edges.every(edge => edge.target.ownerId !== contentOwner));
+});
+
+test("raw owner URL cannot expose a nested message attachment from an archived universe", async () => {
+  const scope = and(eq(echoUniversesTable.ownerId, contentOwner), eq(echoUniversesTable.universeId, "primary"));
+  const [before] = await db.select().from(echoUniversesTable).where(scope);
+  await db.update(echoUniversesTable).set({
+    state: { ...before.state, messages: [{ attachment: { url: objectPaths.unattached } }] },
+  }).where(scope);
+  await manageUniverse(contentOwner, "primary", { action: "archive", expectedRevision: 1 });
+  assert.equal((await getMedia(contentOwner, objectPaths.unattached)).status, 404);
+  await manageUniverse(contentOwner, "primary", { action: "restore", expectedRevision: 2 });
+  assert.equal((await getMedia(contentOwner, objectPaths.unattached)).status, 200);
 });
 
 test("private media is readable by its owner and public media by any authenticated owner", async () => {

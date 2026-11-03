@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { manageUniverse } from "../src/lib/universeManagement";
 import { after, afterEach, before, beforeEach, test } from "node:test";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
@@ -257,6 +258,70 @@ after(async () => {
   server?.closeAllConnections();
   if (server?.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
   await cleanup();
+});
+
+test("archived public/private targets disappear from all social URLs and paginated feed, then restore", async () => {
+  for (const universeId of ["primary", "studio"]) {
+    const scope = and(eq(echoUniversesTable.ownerId, targetOwner), eq(echoUniversesTable.universeId, universeId));
+    const [before] = await db.select().from(echoUniversesTable).where(scope);
+    const story = (before.state.stories as Array<{ id: string }>)[0];
+    const paths = ["", "/posts", `/posts/${postId}`, "/stories", `/stories/${story.id}`];
+    for (const suffix of paths) assert.equal((await get(targetOwner,
+      targetPath(targetOwner, universeId, characterId, suffix))).status, 200);
+    await manageUniverse(targetOwner, universeId, { action: "archive", expectedRevision: 1 });
+    for (const owner of [targetOwner, viewerOwner, otherOwner]) {
+      for (const suffix of paths) {
+        const response = await get(owner, targetPath(targetOwner, universeId, characterId, suffix) +
+          (owner === viewerOwner ? viewerQuery() : ""));
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), { error: "SOCIAL_CONTENT_NOT_FOUND" });
+        assert.equal(response.headers.get("cache-control"), "private, no-store");
+      }
+    }
+    let cursor: string | null = null;
+    do {
+      const feed = await get(viewerOwner, "/social/feed" + viewerQuery() +
+        "&limit=1" + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""));
+      assert.equal(feed.status, 200);
+      const body = await feed.json();
+      assert.ok(body.items.every((item: { identity: CharacterIdentity }) =>
+        item.identity.ownerId !== targetOwner || item.identity.universeId !== universeId));
+      cursor = body.nextCursor;
+    } while (cursor);
+    await manageUniverse(targetOwner, universeId, { action: "restore", expectedRevision: 2 });
+    const [restored] = await db.select().from(echoUniversesTable).where(scope);
+    assert.deepEqual(restored.state, before.state);
+    assert.equal(restored.sharingEnabled, before.sharingEnabled);
+    for (const suffix of paths) assert.equal((await get(targetOwner,
+      targetPath(targetOwner, universeId, characterId, suffix))).status, 200);
+    assert.equal((await get(viewerOwner, targetPath(targetOwner, universeId) + viewerQuery())).status, 200);
+  }
+});
+
+test("archived selected viewer has no direct or aggregate access even to public targets", async () => {
+  await manageUniverse(viewerOwner, "primary", { action: "archive", expectedRevision: 1 });
+  assert.equal((await get(viewerOwner, "/social/feed" + viewerQuery())).status, 404);
+  for (const universe of ["primary", "studio"]) {
+    assert.equal((await get(viewerOwner, targetPath(targetOwner, universe) + viewerQuery())).status, 404);
+  }
+  await manageUniverse(viewerOwner, "primary", { action: "restore", expectedRevision: 2 });
+  assert.equal((await get(viewerOwner, "/social/feed" + viewerQuery())).status, 200);
+  assert.equal((await get(viewerOwner, targetPath(targetOwner, "studio") + viewerQuery())).status, 200);
+});
+
+test("restoration never enables sharing or bypasses private pending/stranger rules", async () => {
+  const scope = and(eq(echoUniversesTable.ownerId, targetOwner), eq(echoUniversesTable.universeId, "primary"));
+  await manageUniverse(targetOwner, "primary", { action: "archive", expectedRevision: 1 });
+  await manageUniverse(targetOwner, "primary", { action: "restore", expectedRevision: 2 });
+  assert.equal((await get(viewerOwner, targetPath(targetOwner, "primary") + viewerQuery())).status, 200);
+  assert.equal((await get(viewerOwner, targetPath(targetOwner, "primary") + viewerQuery("pending-viewer"))).status, 404);
+  assert.equal((await get(otherOwner, targetPath(targetOwner, "primary"))).status, 404);
+  await db.update(echoUniversesTable).set({ sharingEnabled: false }).where(scope);
+  await manageUniverse(targetOwner, "primary", { action: "archive", expectedRevision: 3 });
+  await manageUniverse(targetOwner, "primary", { action: "restore", expectedRevision: 4 });
+  assert.equal((await get(targetOwner, targetPath(targetOwner, "primary"))).status, 200);
+  assert.equal((await get(viewerOwner, targetPath(targetOwner, "primary") + viewerQuery())).status, 404);
+  assert.equal((await db.select().from(echoUniversesTable).where(scope))[0].sharingEnabled, false);
 });
 
 test("profile read enforces public/private visibility and returns only an explicit safe projection", async () => {
