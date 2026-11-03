@@ -368,6 +368,7 @@ components:
         appearance: { $ref: "#/components/schemas/Appearance" }
         highlights: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/StoryHighlight" } }
         accountCatalogVersion: { type: integer, minimum: 0 }
+        creatorSetup: { $ref: "#/components/schemas/CreatorSetup" }
         version: { type: integer }
         currentCharacterId: { type: string }
         characters:
@@ -393,6 +394,13 @@ components:
         notifications:
           type: array
           items: { $ref: "#/components/schemas/Notification" }
+    CreatorSetup:
+      type: object
+      required: [plan, universeName, completedAt]
+      properties:
+        plan: { type: string, enum: [free, creator] }
+        universeName: { type: string, minLength: 1, maxLength: 60 }
+        completedAt: { type: string, format: date-time }
     Character:
       type: object
       required: [id, handle, name, occupation, bio, location, avatar, providerRef, identity]

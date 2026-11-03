@@ -8,6 +8,7 @@
 import type { Appearance } from './appearance';
 import type { Character } from './character';
 import type { Comment } from './comment';
+import type { CreatorSetup } from './creatorSetup';
 import type { Message } from './message';
 import type { Notification } from './notification';
 import type { Post } from './post';
@@ -21,6 +22,7 @@ export interface SocialState {
   highlights?: StoryHighlight[];
   /** @minimum 0 */
   accountCatalogVersion?: number;
+  creatorSetup?: CreatorSetup;
   version: number;
   currentCharacterId: string;
   characters: Character[];

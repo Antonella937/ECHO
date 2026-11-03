@@ -13,7 +13,11 @@ export function AccountActions({ account, dirty }: { account: Character; dirty: 
   const [mode, setMode] = useState<null | 'duplicate' | 'delete'>(null);
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const block = account.id === 'nela' ? 'Nela es la identidad principal y está protegida.' : deletionBlockReason(state, account.id);
+  const block = account.id === 'nela'
+    ? state.creatorSetup
+      ? `${account.name} es la identidad principal y está protegida.`
+      : 'Nela es la identidad principal y está protegida.'
+    : deletionBlockReason(state, account.id);
   const run = (fn: () => void) => { setError(null); try { fn(); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo completar.'); } };
 
   return (

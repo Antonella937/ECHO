@@ -17,6 +17,8 @@ export function useTargets(selfId?: string) {
 
 export function RelationshipsSection({ config, set, selfId }: SectionProps & { selfId?: string }) {
   const targets = useTargets(selfId);
+  const { state } = useSocial();
+  const mainName = state.creatorSetup ? state.characters.find((character) => character.id === 'nela')?.name ?? 'la identidad principal' : 'Nela';
   const rels = config.relationships;
   const upAll = (relationships: Rel[]) => set((c) => ({ ...c, relationships }));
   const up = (id: string, patch: Partial<Rel>) => set((c) => ({ ...c, relationships: c.relationships.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
@@ -31,7 +33,7 @@ export function RelationshipsSection({ config, set, selfId }: SectionProps & { s
 
   return (
     <div data-testid="section-character-relationships">
-      <Note>“{OWNER_LABEL}” sos vos, quien maneja este universo. Es distinto de Nela, que es un personaje más.</Note>
+      <Note>“{OWNER_LABEL}” sos vos, quien maneja este universo. Es distinto de {mainName}, que es un personaje más.</Note>
       {rels.length === 0 && <p className="mt-4 rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Sin vínculos definidos.</p>}
       {rels.map((r) => (
         <div key={r.id} className="mt-4 rounded-2xl border border-border bg-card/40 p-3" data-testid={`card-relationship-${r.id}`}>

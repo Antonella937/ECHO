@@ -141,6 +141,8 @@ export interface Notification {
 export interface SocialState {
   appearance?: Appearance;
   highlights?: StoryHighlight[];
+  /** Beta product selection saved with a newly-created private universe. */
+  creatorSetup?: import('@workspace/api-client-react').CreatorSetup;
   version: number;
   currentCharacterId: CharacterId;
   characters: Character[];

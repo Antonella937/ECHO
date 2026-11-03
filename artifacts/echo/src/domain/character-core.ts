@@ -99,7 +99,10 @@ export function deriveRoutineContext(config: CharacterConfig, now = new Date()):
 }
 
 export function deletionBlockReason(state: SocialState, id: string): string | null {
-  if (id === 'nela') return 'Nela es la identidad principal y no se puede eliminar.';
+  if (id === 'nela') {
+    const mainName = state.creatorSetup ? state.characters.find((character) => character.id === id)?.name ?? 'La identidad principal' : 'Nela';
+    return `${mainName} es la identidad principal y no se puede eliminar.`;
+  }
   if (!state.characters.some(c => c.id === id)) return 'Esta cuenta ya no existe.';
   const history = state.posts.some(p => p.authorId === id || p.likes.includes(id) || p.savedBy.includes(id)) ||
     state.stories.some(s => s.authorId === id || s.seenBy.includes(id)) ||

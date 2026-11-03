@@ -104,7 +104,11 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
   return { ...state, characters: state.characters.map(c => c.id === id ? { ...c, ...patch } : c) };
 }
 export function archiveAccount(state: SocialState, id: string, archived: boolean): SocialState {
-  if (id === 'nela') throw Error('La identidad principal no se puede archivar.');
+  if (id === 'nela') {
+    if (!state.creatorSetup) throw Error('La identidad principal no se puede archivar.');
+    const mainName = state.creatorSetup ? state.characters.find((character) => character.id === id)?.name ?? 'La identidad principal' : 'Nela';
+    throw Error(`${mainName} es la identidad principal y no se puede archivar.`);
+  }
   if (!state.characters.some(c => c.id === id)) throw Error('La cuenta ya no existe.');
   return {
     ...state, currentCharacterId: archived && state.currentCharacterId === id ? 'nela' : state.currentCharacterId,

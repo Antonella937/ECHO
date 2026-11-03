@@ -1,11 +1,17 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { esES } from '@clerk/localizations';
 import { shadcn } from '@clerk/themes';
+import {
+  getGetUniverseQueryKey,
+  useGetUniverse,
+  useSaveUniverse,
+  type UniverseEnvelope,
+} from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -26,6 +32,13 @@ import SavedPage from '@/pages/saved';
 import SettingsPage from '@/pages/settings';
 import NotFound from '@/pages/not-found';
 import CharacterEditorPage from '@/pages/character-editor';
+import LandingPage from '@/pages/landing';
+import PricingPage from '@/pages/pricing';
+import FaqPage from '@/pages/faq';
+import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding';
+import { createStarterUniverse } from '@/store/create-starter-universe';
+import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
+import { loadLegacyState, loadRecovery } from '@/store/persistence';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -112,32 +125,6 @@ function ProtectedRouter() {
   );
 }
 
-function LandingPage() {
-  return (
-    <main className="grain grid min-h-[100dvh] place-items-center bg-background px-6 text-foreground">
-      <section className="w-full max-w-md py-14 text-center">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-primary/25 bg-accent/60 text-primary">
-          <span className="wordmark text-2xl">E</span>
-        </div>
-        <p className="mt-6 text-[11px] uppercase tracking-[0.24em] text-primary">Un universo privado</p>
-        <h1 className="mt-3 font-display text-5xl font-light tracking-wide">ECHO</h1>
-        <p className="mx-auto mt-4 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
-          Las fotos, conversaciones y personajes de Nela, guardados de forma privada y disponibles cuando inicias sesión.
-        </p>
-        <div className="mx-auto mt-8 grid max-w-xs gap-3">
-          <Link href="/sign-up" className="grid h-12 place-items-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground">
-            Crear una cuenta
-          </Link>
-          <Link href="/sign-in" className="grid h-12 place-items-center rounded-2xl border border-border bg-card text-sm font-semibold hover:bg-secondary">
-            Ya tengo una cuenta
-          </Link>
-        </div>
-        <p className="mt-6 text-xs text-muted-foreground/75">Un espacio personal. Nela es tu identidad principal.</p>
-      </section>
-    </main>
-  );
-}
-
 function SignInPage() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
@@ -172,8 +159,123 @@ function SignUpPage() {
 
 function AuthenticatedExperience() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const universeQuery = useGetUniverse({
+    query: {
+      enabled: isLoaded && Boolean(isSignedIn && user?.id),
+      queryKey: getGetUniverseQueryKey(),
+    },
+  });
+  const saveUniverseMutation = useSaveUniverse();
+  const [legacyCheck, setLegacyCheck] = useState<{
+    ownerId: string;
+    status: 'checking' | 'present' | 'empty' | 'error';
+  } | null>(null);
+  const [legacyCheckAttempt, setLegacyCheckAttempt] = useState(0);
+  const [onboardingResult, setOnboardingResult] = useState<UniverseEnvelope | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !user?.id || universeQuery.data?.state !== null) {
+      setLegacyCheck(null);
+      return;
+    }
+    let current = true;
+    setLegacyCheck({ ownerId: user.id, status: 'checking' });
+    Promise.all([loadLegacyState(), loadRecovery(user.id)])
+      .then(([legacy, recovery]) => {
+        if (current) setLegacyCheck({
+          ownerId: user.id,
+          status: legacy || recovery ? 'present' : 'empty',
+        });
+      })
+      .catch(() => {
+        if (current) setLegacyCheck({ ownerId: user.id, status: 'error' });
+      });
+    return () => { current = false; };
+  }, [isLoaded, isSignedIn, user?.id, universeQuery.data?.state, legacyCheckAttempt]);
+
   if (!isLoaded) return <AppSkeleton />;
   if (!isSignedIn || !user) return <LandingPage />;
+  if (universeQuery.isError) {
+    return (
+      <main className="echo-public ep-onboarding">
+        <section className="ep-onboarding-main">
+          <div className="ep-complete" role="alert" data-testid="status-universe-load-error">
+            <span className="ep-eyebrow">No se pudo cargar tu espacio</span>
+            <h1>Tu universo sigue protegido.</h1>
+            <p>Vuelve a intentarlo antes de continuar. No se creó ni se reemplazó ningún dato.</p>
+            <button type="button" className="ep-button" onClick={() => void universeQuery.refetch()} data-testid="button-retry-universe">
+              Reintentar
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+  if (universeQuery.isLoading || !universeQuery.data) return <AppSkeleton />;
+
+  const isNewOwner = universeQuery.data.state === null;
+  const hasCheckedLegacy = legacyCheck?.ownerId === user.id && legacyCheck.status !== 'checking';
+  const hasLegacyData = legacyCheck?.ownerId === user.id && legacyCheck.status === 'present';
+  const shouldOnboard = shouldShowCreatorOnboarding(universeQuery.data.state !== null, hasLegacyData);
+  if (isNewOwner && !hasCheckedLegacy) return <AppSkeleton />;
+  if (isNewOwner && legacyCheck?.ownerId === user.id && legacyCheck.status === 'error') {
+    return (
+      <main className="echo-public ep-onboarding">
+        <section className="ep-onboarding-main">
+          <div className="ep-complete" role="alert" data-testid="status-local-data-check-error">
+            <span className="ep-eyebrow">Comprobación incompleta</span>
+            <h1>No vamos a empezar todavía.</h1>
+            <p>No pudimos comprobar si este navegador conserva datos anteriores. Reintenta para protegerlos antes de crear un universo nuevo.</p>
+            <button type="button" className="ep-button" onClick={() => setLegacyCheckAttempt(attempt => attempt + 1)} data-testid="button-retry-local-check">
+              Volver a comprobar
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (isNewOwner && shouldOnboard && legacyCheck?.ownerId === user.id && legacyCheck.status === 'empty') {
+    const completeOnboarding = async (input: CreatorOnboardingInput) => {
+      const state = createStarterUniverse(input);
+      const saved = await saveUniverseMutation.mutateAsync({
+        data: { state, expectedRevision: universeQuery.data.revision },
+      });
+      setOnboardingResult(saved);
+    };
+    return (
+      <Switch>
+        <Route path="/" component={() => (
+          <OnboardingPage
+            saving={saveUniverseMutation.isPending}
+            error={null}
+            onComplete={completeOnboarding}
+            onEnter={() => {
+              if (!onboardingResult) return;
+              queryClient.setQueryData(getGetUniverseQueryKey(), onboardingResult);
+              setLocation('/');
+            }}
+          />
+        )} />
+        <Route path="/onboarding" component={() => (
+          <OnboardingPage
+            saving={saveUniverseMutation.isPending}
+            error={null}
+            onComplete={completeOnboarding}
+            onEnter={() => {
+              if (!onboardingResult) return;
+              queryClient.setQueryData(getGetUniverseQueryKey(), onboardingResult);
+              setLocation('/');
+            }}
+          />
+        )} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
   return (
     <SocialStoreProvider key={user.id} userId={user.id} fallback={<AppSkeleton />}>
       <AppearanceSync />
@@ -236,6 +338,8 @@ function ClerkRoutes() {
         <Switch>
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/pricing" component={PricingPage} />
+          <Route path="/faq" component={FaqPage} />
           <Route component={AuthenticatedExperience} />
         </Switch>
       </QueryClientProvider>

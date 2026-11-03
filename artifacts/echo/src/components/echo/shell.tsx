@@ -105,7 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <p className="mt-auto px-1 text-[11px] leading-relaxed text-muted-foreground/70">
-          Universo privado de Nela. Los personajes y sus respuestas todavía son simulados.
+          {state.creatorSetup ? `Universo privado: ${state.creatorSetup.universeName}.` : 'Universo privado de Nela.'} Los personajes y sus respuestas todavía son simulados.
         </p>
       </aside>
 

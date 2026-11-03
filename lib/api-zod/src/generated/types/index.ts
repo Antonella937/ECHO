@@ -65,6 +65,8 @@ export * from './characterProviderRef';
 export * from './characterRelationship';
 export * from './characterRelationshipPreset';
 export * from './comment';
+export * from './creatorSetup';
+export * from './creatorSetupPlan';
 export * from './engineAttempt';
 export * from './engineAttemptOutcome';
 export * from './engineUsage';

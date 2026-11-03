@@ -785,6 +785,8 @@ export const getUniverseResponseStateOneHighlightsMax = 200;
 
 export const getUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
+export const getUniverseResponseStateOneCreatorSetupUniverseNameMax = 60;
+
 export const getUniverseResponseStateOneCharactersItemConfigurationBasicNameMax = 100;
 
 export const getUniverseResponseStateOneCharactersItemConfigurationBasicAgeMin = 0;
@@ -989,6 +991,11 @@ export const GetUniverseResponse = zod.object({
   "storyIds": zod.array(zod.string()).min(1).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax)
 })).max(getUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(getUniverseResponseStateOneAccountCatalogVersionMin).optional(),
+  "creatorSetup": zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "universeName": zod.string().min(1).max(getUniverseResponseStateOneCreatorSetupUniverseNameMax),
+  "completedAt": zod.coerce.date()
+}).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
@@ -1267,6 +1274,8 @@ export const saveUniverseBodyStateHighlightsMax = 200;
 
 export const saveUniverseBodyStateAccountCatalogVersionMin = 0;
 
+export const saveUniverseBodyStateCreatorSetupUniverseNameMax = 60;
+
 export const saveUniverseBodyStateCharactersItemConfigurationBasicNameMax = 100;
 
 export const saveUniverseBodyStateCharactersItemConfigurationBasicAgeMin = 0;
@@ -1471,6 +1480,11 @@ export const SaveUniverseBody = zod.object({
   "storyIds": zod.array(zod.string()).min(1).max(saveUniverseBodyStateHighlightsItemStoryIdsMax)
 })).max(saveUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseBodyStateAccountCatalogVersionMin).optional(),
+  "creatorSetup": zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "universeName": zod.string().min(1).max(saveUniverseBodyStateCreatorSetupUniverseNameMax),
+  "completedAt": zod.coerce.date()
+}).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
@@ -1745,6 +1759,8 @@ export const saveUniverseResponseStateOneHighlightsMax = 200;
 
 export const saveUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
+export const saveUniverseResponseStateOneCreatorSetupUniverseNameMax = 60;
+
 export const saveUniverseResponseStateOneCharactersItemConfigurationBasicNameMax = 100;
 
 export const saveUniverseResponseStateOneCharactersItemConfigurationBasicAgeMin = 0;
@@ -1949,6 +1965,11 @@ export const SaveUniverseResponse = zod.object({
   "storyIds": zod.array(zod.string()).min(1).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax)
 })).max(saveUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseResponseStateOneAccountCatalogVersionMin).optional(),
+  "creatorSetup": zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "universeName": zod.string().min(1).max(saveUniverseResponseStateOneCreatorSetupUniverseNameMax),
+  "completedAt": zod.coerce.date()
+}).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({
@@ -2263,6 +2284,8 @@ export const verifyUniverseResponseOneStateOneHighlightsMax = 200;
 
 export const verifyUniverseResponseOneStateOneAccountCatalogVersionMin = 0;
 
+export const verifyUniverseResponseOneStateOneCreatorSetupUniverseNameMax = 60;
+
 export const verifyUniverseResponseOneStateOneCharactersItemConfigurationBasicNameMax = 100;
 
 export const verifyUniverseResponseOneStateOneCharactersItemConfigurationBasicAgeMin = 0;
@@ -2469,6 +2492,11 @@ export const VerifyUniverseResponse = zod.object({
   "storyIds": zod.array(zod.string()).min(1).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax)
 })).max(verifyUniverseResponseOneStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(verifyUniverseResponseOneStateOneAccountCatalogVersionMin).optional(),
+  "creatorSetup": zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "universeName": zod.string().min(1).max(verifyUniverseResponseOneStateOneCreatorSetupUniverseNameMax),
+  "completedAt": zod.coerce.date()
+}).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
   "characters": zod.array(zod.object({

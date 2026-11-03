@@ -294,6 +294,24 @@ export interface StoryHighlight {
   storyIds: string[];
 }
 
+export type CreatorSetupPlan = typeof CreatorSetupPlan[keyof typeof CreatorSetupPlan];
+
+
+export const CreatorSetupPlan = {
+  free: 'free',
+  creator: 'creator',
+} as const;
+
+export interface CreatorSetup {
+  plan: CreatorSetupPlan;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     */
+  universeName: string;
+  completedAt: string;
+}
+
 export type CharacterConfigurationVersion = typeof CharacterConfigurationVersion[keyof typeof CharacterConfigurationVersion];
 
 
@@ -1005,6 +1023,7 @@ export interface SocialState {
   highlights?: StoryHighlight[];
   /** @minimum 0 */
   accountCatalogVersion?: number;
+  creatorSetup?: CreatorSetup;
   version: number;
   currentCharacterId: string;
   characters: Character[];
