@@ -2,7 +2,7 @@ import test from "node:test";
 import { after } from "node:test";
 import assert from "node:assert/strict";
 import { and, eq, inArray } from "drizzle-orm";
-import { SaveUniverseBody, type CharacterDecision } from "@workspace/api-zod";
+import { SaveUniverseBody, type CharacterDecision, type SocialState } from "@workspace/api-zod";
 import {
   db,
   pool,
@@ -57,18 +57,24 @@ after(async () => {
 });
 
 function fixture() {
-  const state = createSeedState();
+  const sourceState = createSeedState();
+  const sourceMar = sourceState.characters.find((character) => character.id === "mar")!;
+  sourceMar.configuration = defaultCharacterConfig(sourceMar);
+  const normalized = SaveUniverseBody.safeParse({ state: sourceState, expectedRevision: 1 });
+  if (!normalized.success) throw new Error("SYNTHETIC_FIXTURE_INVALID");
+  const state: SocialState = normalized.data.state;
   state.posts = [];
   state.comments = [];
   state.stories = [];
   state.messages = [];
   const mar = state.characters.find((character) => character.id === "mar")!;
-  mar.configuration = defaultCharacterConfig(mar);
-  mar.configuration.social.activity = "high";
-  mar.configuration.social.sociability = "high";
-  mar.configuration.social.spontaneity = "high";
-  mar.configuration.social.allowSilence = false;
-  mar.configuration.currentState.lastActivityAt = null;
+  const configuration = mar.configuration;
+  if (!configuration) throw new Error("SYNTHETIC_CHARACTER_CONFIGURATION_MISSING");
+  configuration.social.activity = "high";
+  configuration.social.sociability = "high";
+  configuration.social.spontaneity = "high";
+  configuration.social.allowSilence = false;
+  configuration.currentState.lastActivityAt = null;
   return { state, mar };
 }
 
@@ -82,7 +88,7 @@ const postDecision = (text = "Ensayo y café.") => ({
   contextSections: ["identity"],
 }) satisfies CharacterDecision;
 
-async function insertSyntheticUniverse(ownerId: string, state: ReturnType<typeof createSeedState>, now: Date, revision = 1) {
+async function insertSyntheticUniverse(ownerId: string, state: SocialState, now: Date, revision = 1) {
   await db.insert(echoUniversesTable).values({
     ownerId,
     revision,
@@ -121,7 +127,7 @@ async function insertAutonomyRun(input: {
 
 async function setupExecutorOwner(input: {
   ownerId: string;
-  state?: ReturnType<typeof createSeedState>;
+  state?: SocialState;
   now?: Date;
   killSwitchEngaged?: boolean;
   characterEnabled?: boolean;
@@ -208,7 +214,7 @@ test("planner considers non-repeating post/comment likes and text-based story/DM
   postFixture.state.posts.push({
     id: "likeable-post", authorId: noah.id, caption: "Ensayo hasta tarde", location: "",
     createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [], savedBy: [], commentsEnabled: true,
-  } as (typeof postFixture.state.posts)[number]);
+  } as unknown as (typeof postFixture.state.posts)[number]);
   const likePost = chooseAutonomyOpportunity({
     state: postFixture.state, character: postFixture.mar, history: [], now: NOW, random: selectLateCandidate(),
   });
@@ -221,7 +227,7 @@ test("planner considers non-repeating post/comment likes and text-based story/DM
   commentFixture.state.posts.push({
     id: "comment-post", authorId: commentNoah.id, caption: "Ensayo", location: "",
     createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [commentFixture.mar.id], savedBy: [], commentsEnabled: true,
-  } as (typeof commentFixture.state.posts)[number]);
+  } as unknown as (typeof commentFixture.state.posts)[number]);
   commentFixture.state.comments.push({
     id: "likeable-comment", postId: "comment-post", authorId: commentNoah.id, text: "¿A qué hora?",
     createdAt: new Date(NOW.getTime() - 30 * 60_000), parentId: null, replyToAuthorId: null, likes: [], origin: "user",
@@ -286,7 +292,7 @@ test("per-type caps and executed target history prevent repetitive likes", () =>
   state.posts.push({
     id: "likeable-post", authorId: noah.id, caption: "Ensayo", location: "",
     createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [], savedBy: [], commentsEnabled: true,
-  } as (typeof state.posts)[number]);
+  } as unknown as (typeof state.posts)[number]);
   const lastAction = (targetId: string) => ({
     status: "executed", action: "like", situation: "like_post", targetId,
     createdAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
@@ -503,7 +509,7 @@ test("a missed routine window is not replayed as catch-up activity", () => {
   mar.configuration!.routine.entries = [{
     id: "past-once", title: "Earlier event", activity: "work", weekdays: [],
     start: "08:00", end: "09:00", location: "", recurrence: "once",
-    date: "2026-11-02", flexibility: "flexible",
+    date: "2026-11-02", flexibility: "medium",
   }];
   const result = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0 });
   assert.notEqual(result.reasonCode, "SLEEP_ROUTINE");
@@ -667,6 +673,41 @@ test("live executor commits one synthetic post and treats a retry as a duplicate
   assert.equal(run.status, "executed");
   assert.equal((await db.select().from(echoUniversesTable)
     .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1))[0]?.revision, 2);
+});
+
+test("executor rejects a decision after the universe revision changes without applying it", async () => {
+  const ownerId = syntheticOwnerId();
+  const now = new Date();
+  const { state, mar, runId } = await setupExecutorOwner({ ownerId, now });
+  const decisionMadeAgainstRevision = 1;
+  const concurrentState: SocialState = structuredClone(state);
+  concurrentState.characters.find((character) => character.id === mar.id)!.bio = "Concurrent synthetic edit";
+  await db.update(echoUniversesTable).set({
+    state: concurrentState as unknown as Record<string, unknown>,
+    revision: 2,
+    updatedAt: now,
+  }).where(eq(echoUniversesTable.ownerId, ownerId));
+
+  const stale = await executeAutonomyDecision({
+    ownerId, runId, characterId: mar.id, sourceRevision: decisionMadeAgainstRevision,
+    opportunity: postOpportunity, decision: postDecision(), liveEnabled: true, now,
+  });
+  assert.deepEqual(stale, { status: "stale_revision", reasonCode: "UNIVERSE_REVISION_CHANGED" });
+
+  const [universe] = await db.select().from(echoUniversesTable)
+    .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1);
+  assert.equal(universe.revision, 2);
+  const parsed = SaveUniverseBody.safeParse({ state: universe.state, expectedRevision: universe.revision });
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.equal(parsed.data.state.characters.find((character) => character.id === mar.id)?.bio, "Concurrent synthetic edit");
+    assert.equal(parsed.data.state.posts.length, 0);
+  }
+  const [run] = await db.select().from(echoAutonomyRunsTable)
+    .where(eq(echoAutonomyRunsTable.id, Number(runId))).limit(1);
+  assert.equal(run.status, "stale_revision");
+  assert.equal(run.lastErrorCode, "UNIVERSE_REVISION_CHANGED");
+  assert.equal(run.finishedAt instanceof Date, true);
 });
 
 test("executor defaults, kill switch, opt-in, and owner scoping block synthetic writes", async () => {
