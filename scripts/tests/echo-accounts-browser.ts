@@ -4,6 +4,7 @@
  */
 import { chromium, expect, type Page } from '@playwright/test';
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
 import { mkdir, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { runUxChecks } from './echo-ux-checks';
@@ -13,7 +14,10 @@ import { runSocialChecks } from './echo-social-checks';
 
 const serverRequire = createRequire(new URL('../../artifacts/api-server/package.json', import.meta.url));
 const { clerkClient } = serverRequire('@clerk/express');
-const { db, pool, echoUniversesTable, echoMediaTable } = serverRequire('@workspace/db');
+const {
+  db, pool, echoUniversesTable, echoMediaTable,
+  echoAutonomyRunsTable, echoAutonomyOwnersTable, echoAutonomyCharactersTable,
+} = serverRequire('@workspace/db');
 const { eq, inArray } = serverRequire('drizzle-orm');
 const { ObjectStorageService } = await import('../../artifacts/api-server/src/lib/objectStorage');
 const base = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:80';
@@ -62,7 +66,103 @@ try {
   const owner = await createUser(), page = await signedIn(owner);
   const initial = await state(page);
   assert.equal(initial.currentCharacterId, 'nela');
-  if (process.env.ECHO_AUTH_ONLY === '1') {
+  if (process.env.ECHO_AUTONOMY_BLOCKER_AUDIT === '1') {
+    const envelope = async () => {
+      const response = await page.context().request.get(`${base}/api/universe`, { headers: { 'cache-control': 'no-store' } });
+      assert.equal(response.status(), 200);
+      return response.json();
+    };
+    const baseline = await envelope();
+    const settingsResponse = await page.context().request.get(`${base}/api/autonomy/settings`);
+    assert.equal(settingsResponse.status(), 200);
+    const settings = await settingsResponse.json();
+    assert.equal(settings.liveExecutionEnabled, false);
+    assert.ok(settings.characters.every((character: any) => character.enabled === false));
+    assert.ok(settings.globalKillSwitchEngaged);
+    assert.equal(baseline.state.messages.length, 0, 'the default disposable universe has no DM reaction target');
+
+    const now = Date.now();
+    const eligible = ['nela', 'mar', 'noah'].map((characterId) => {
+      const follows = new Set(baseline.state.follows[characterId] ?? []);
+      const recent30d = (value: string) => {
+        const time = new Date(value).getTime();
+        return Number.isFinite(time) && time <= now && now - time < 30 * 24 * 60 * 60_000;
+      };
+      const posts = baseline.state.posts.filter((post: any) =>
+        post.authorId !== characterId && follows.has(post.authorId) && !!post.caption?.trim() &&
+        !post.likes.includes(characterId) && recent30d(post.createdAt),
+      );
+      const comments = baseline.state.comments.filter((comment: any) => {
+        const parent = baseline.state.posts.find((post: any) => post.id === comment.postId);
+        return !!parent && comment.authorId !== characterId && !!comment.text?.trim() &&
+          (follows.has(parent.authorId) || !!parent.taggedAccountIds?.includes(characterId)) &&
+          !comment.likes.includes(characterId) && recent30d(comment.createdAt);
+      });
+      const stories = baseline.state.stories.filter((story: any) => {
+        const age = now - new Date(story.createdAt).getTime();
+        return story.authorId !== characterId && story.caption.trim() && story.seenBy.includes(characterId) &&
+          (follows.has(story.authorId) || !!story.mentionedAccountIds?.includes(characterId)) &&
+          age >= 0 && age < 24 * 60 * 60_000;
+      });
+      return { characterId, postTargets: posts.length, commentTargets: comments.length, storyTargets: stories.length };
+    });
+
+    const attempts: any[] = [];
+    for (const characterId of ['nela', 'mar', 'noah']) {
+      const response = await page.context().request.post(`${base}/api/autonomy/dry-run`, {
+        data: { characterId, idempotencyKey: randomUUID() },
+      });
+      assert.equal(response.status(), 200, `authenticated dry-run route failed for ${characterId}`);
+      const result = await response.json();
+      assert.equal(result.mode, 'dry_run');
+      assert.equal(result.liveExecutionEnabled, false);
+      assert.equal(result.socialActionsExecuted, false);
+      const after = await envelope();
+      assert.deepEqual(after, baseline, `dry-run changed the disposable social universe for ${characterId}`);
+      attempts.push({
+        characterId,
+        status: result.status,
+        reasonCode: result.reasonCode,
+        providerCalled: Boolean(result.preview),
+        ...(result.preview ? {
+          model: result.preview.model,
+          provider: result.preview.provider,
+          validatorAccepted: true,
+          decision: {
+            action: result.preview.decision.action,
+            situation: result.preview.decision.situation,
+            reaction: result.preview.decision.reaction ?? null,
+          },
+          cost: result.preview.usage.cost,
+          fallbacks: result.preview.attempts.map((attempt: any) => ({
+            model: attempt.model, outcome: attempt.outcome, code: attempt.code,
+          })),
+        } : {}),
+      });
+      if (result.preview) {
+        assert.ok(String(result.preview.model).endsWith(':free'), 'a non-free model response must be rejected');
+        assert.ok(result.preview.usage.cost == null || result.preview.usage.cost <= 0, 'a nonzero-cost response must be rejected');
+        assert.ok(result.preview.attempts.every((attempt: any) => String(attempt.model).endsWith(':free')));
+      }
+      if (characterId !== 'noah') await new Promise((resolve) => setTimeout(resolve, 5200));
+    }
+    console.log(JSON.stringify({
+      audit: 'authenticated-disposable-owner-dry-run-blocker-check',
+      ownerIsDisposable: true,
+      targetAvailability: {
+        postLikeCandidates: eligible.reduce((sum, row) => sum + row.postTargets, 0),
+        commentLikeCandidates: eligible.reduce((sum, row) => sum + row.commentTargets, 0),
+        storyReactionCandidates: eligible.reduce((sum, row) => sum + row.storyTargets, 0),
+        dmReactionCandidates: baseline.state.messages.filter((message: any) =>
+          message.recipientId === 'mar' && message.senderId !== 'mar' && message.text?.trim(),
+        ).length,
+      },
+      attempts,
+      universeUnchanged: true,
+      liveExecutionEnabled: false,
+      characterOptInsEnabled: false,
+    }));
+  } else if (process.env.ECHO_AUTH_ONLY === '1') {
     const secondOwner = await createUser();
     const secondPage = await signedIn(secondOwner);
     const firstStateBefore = await state(page);
@@ -221,6 +321,9 @@ try {
   await browser.close();
   // Never touch any owner except the random users created in this run.
   for (const owner of created) {
+    await db.delete(echoAutonomyRunsTable).where(eq(echoAutonomyRunsTable.ownerId, owner));
+    await db.delete(echoAutonomyCharactersTable).where(eq(echoAutonomyCharactersTable.ownerId, owner));
+    await db.delete(echoAutonomyOwnersTable).where(eq(echoAutonomyOwnersTable.ownerId, owner));
     const files = await db.select().from(echoMediaTable).where(eq(echoMediaTable.ownerId, owner));
     const storage = new ObjectStorageService();
     for (const media of files) {
