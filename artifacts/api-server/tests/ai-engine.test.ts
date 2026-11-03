@@ -119,7 +119,7 @@ test('diagnostica cada inconsistencia semántica sin conservar la salida del mod
     } };
     await assert.rejects(previewDecision(fake, item.state ?? s, input, 1), (error: unknown) => {
       assert.ok(error instanceof EngineError);
-      assert.equal(error.code, 'UNSAFE_OR_INCONSISTENT_DECISION');
+      assert.equal(error.code, 'UNSAFE_OR_INCONSISTENT_DECISION', `case=${item.diagnostic}`);
       assert.equal(error.diagnostic, item.diagnostic);
       assert.equal(JSON.stringify(error).includes('never-log-this'), false);
       return true;

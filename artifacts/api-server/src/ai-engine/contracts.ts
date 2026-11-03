@@ -55,6 +55,8 @@ export const decisionSchema: Record<string, unknown> = {
     text: { anyOf: [{ type: 'string', maxLength: 2000 }, { type: 'null' }] },
     reason: { type: 'string', minLength: 1, maxLength: 400 },
     suggestedDelayMinutes: { type: 'integer', minimum: 0, maximum: 10080 },
-    contextSections: { type: 'array', maxItems: 8, uniqueItems: true, items: { type: 'string', enum: sections } },
+    // Uniqueness is enforced by the semantic validator so duplicates receive
+    // a specific safe diagnostic rather than a generic schema rejection.
+    contextSections: { type: 'array', maxItems: 8, items: { type: 'string', enum: sections } },
   },
 };
