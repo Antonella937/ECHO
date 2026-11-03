@@ -13,7 +13,7 @@ import { SaveUniverseBody } from "@workspace/api-zod";
 const router: IRouter = Router();
 const categories = ["autonomy", "brain_text", "memory_context", "vision", "images"] as const;
 const budgetSchema = z.object({
-  monthlyHardCeilingUnits: z.number().int().min(1).nullable(),
+  monthlyHardCeilingUnits: z.number().int().min(1).max(1_000_000),
   autonomyReservePercent: z.number().int().min(0).max(90),
   categoryWeights: z.object({
     autonomy: z.number().int().min(1).max(10000),

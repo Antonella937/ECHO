@@ -37,15 +37,20 @@ export async function readUniverse(ownerId: string, universeId = "primary") {
 /** Atomic compare-and-swap plus owner-wide capacity checks under an entitlement row lock. */
 export async function writeUniverse(ownerId: string, state: Record<string, unknown>, expectedRevision: number, universeId = "primary") {
   return db.transaction(async (tx) => {
-    const existingRows = await tx.select().from(echoUniversesTable)
+    const initialRows = await tx.select().from(echoUniversesTable)
       .where(eq(echoUniversesTable.ownerId, ownerId));
-    const current = existingRows.find(row => row.universeId === universeId);
+    const initialCurrent = initialRows.find(row => row.universeId === universeId);
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
-    const existingPlan = current?.state?.creatorSetup as { plan?: unknown } | undefined;
+    const existingPlan = initialCurrent?.state?.creatorSetup as { plan?: unknown } | undefined;
     const entitlements = await lockEntitlement(
       tx, ownerId,
       asPlan(existingPlan?.plan ?? creatorSetup?.plan),
     );
+    // Read again after taking the owner entitlement lock so concurrent creates
+    // cannot both make a decision from the same stale universe count.
+    const existingRows = await tx.select().from(echoUniversesTable)
+      .where(eq(echoUniversesTable.ownerId, ownerId));
+    const current = existingRows.find(row => row.universeId === universeId);
     const caps = planCaps(entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
     const isNewUniverse = !current;
     if (isNewUniverse && (expectedRevision !== 0 || existingRows.length >= caps.maxUniverses))
@@ -83,9 +88,10 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
 
 export async function createAdditionalUniverse(ownerId: string, name: string, state: Record<string, unknown>) {
   return db.transaction(async (tx) => {
-    const rows = await tx.select().from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
     const entitlements = await lockEntitlement(tx, ownerId, asPlan(creatorSetup?.plan));
+    // Serialize capacity checks by owner before reading the current counts.
+    const rows = await tx.select().from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
     const caps = planCaps(entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
     if (rows.length >= caps.maxUniverses) throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
     const characterCount = rows.reduce((total, row) => {

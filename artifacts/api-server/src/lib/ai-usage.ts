@@ -9,6 +9,8 @@ import {
   type CreatorPlan,
 } from "@workspace/db";
 
+export const DEFAULT_MONTHLY_HARD_CEILING_UNITS = 500;
+
 export const AI_USAGE_CATEGORIES: AiUsageCategory[] = [
   "autonomy", "brain_text", "memory_context", "vision", "images",
 ];
