@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
@@ -15,7 +15,9 @@ import {
 } from "../lib/universeRepository";
 import { universeAccountError } from "../lib/universeValidation";
 import { SaveUniverseBody } from "@workspace/api-zod";
+import { UniverseManagementError, manageUniverse } from "../lib/universeManagement";
 
+export function createCreatorRouter(authenticate: RequestHandler = requireAuth): IRouter {
 const router: IRouter = Router();
 const categories = ["autonomy", "brain_text", "memory_context", "vision", "images"] as const;
 const budgetSchema = z.object({
@@ -34,7 +36,7 @@ const createUniverseSchema = z.object({
   state: z.unknown(),
 }).strict();
 
-router.use("/creator", requireAuth);
+router.use("/creator", authenticate);
 
 router.get("/creator/account", async (req, res): Promise<void> => {
   const ownerId = req.userId!;
@@ -84,7 +86,27 @@ router.get("/creator/universes", async (req, res): Promise<void> => {
     revision: universe.revision,
     characterCount: Array.isArray(universe.state.characters) ? universe.state.characters.length : 0,
     current: universe.universeId === currentId,
+    archived: Boolean(universe.archivedAt),
+    description: (universe.state.creatorSetup as { universeDescription?: string } | undefined)?.universeDescription ?? "",
   })));
+});
+
+router.put("/creator/universes/:universeId/management", async (req, res): Promise<void> => {
+  const input = z.object({
+    action: z.enum(["edit", "archive", "restore", "delete"]),
+    expectedRevision: z.number().int().positive(),
+    name: z.string().trim().min(1).max(60).optional(),
+    description: z.string().max(500).optional(),
+    confirmationText: z.string().max(80).optional(),
+  }).strict().safeParse(req.body);
+  if (!input.success || typeof req.params.universeId !== "string" || req.params.universeId.length > 80) {
+    res.status(400).json({ error: "INVALID_UNIVERSE_OPERATION" }); return;
+  }
+  try { res.json(await manageUniverse(req.userId!, req.params.universeId, input.data)); }
+  catch (error) {
+    if (error instanceof UniverseManagementError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
 });
 
 router.post("/creator/universes", async (req, res): Promise<void> => {
@@ -126,4 +148,6 @@ router.post("/creator/universes", async (req, res): Promise<void> => {
   }
 });
 
-export default router;
+return router;
+}
+export default createCreatorRouter();

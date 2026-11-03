@@ -14,4 +14,6 @@ export interface CreatorUniverseSummary {
   /** @minimum 0 */
   characterCount: number;
   current: boolean;
+  description?: string;
+  archived?: boolean;
 }

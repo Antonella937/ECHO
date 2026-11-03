@@ -299,7 +299,7 @@ export async function executeAutonomyDecision(input: {
         eq(echoUniversesTable.universeId, universeId),
       ),
     ).for("update").limit(1);
-    if (!universe || universe.revision !== input.sourceRevision) {
+    if (!universe || universe.archivedAt || universe.deletedAt || universe.revision !== input.sourceRevision) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "stale_revision", lastErrorCode: "UNIVERSE_REVISION_CHANGED", finishedAt: now, updatedAt: now,
       }).where(and(

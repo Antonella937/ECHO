@@ -1226,6 +1226,12 @@ test("opt-in target query returns only enabled characters whose owner kill switc
   const eligibleOwner = syntheticOwnerId();
   const killedOwner = syntheticOwnerId();
   const optedOutOwner = syntheticOwnerId();
+  // Worker eligibility now also requires an existing, non-archived universe.
+  await db.insert(echoUniversesTable).values(
+    [eligibleOwner, killedOwner, optedOutOwner].map(ownerId => ({
+      ownerId, universeId: "primary", state: { characters: [{ id: "mar" }] },
+    })),
+  );
   await updateOwnerKillSwitch(eligibleOwner, false);
   await updateCharacterControl(eligibleOwner, "mar", true);
   await updateOwnerKillSwitch(killedOwner, true);

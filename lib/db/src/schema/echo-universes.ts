@@ -6,6 +6,9 @@ export const echoUniversesTable = pgTable("echo_universes", {
   universeId: text("universe_id").notNull().default("primary"),
   /** Explicit owner consent for cross-owner social reads; internal visibility is independent. */
   sharingEnabled: boolean("sharing_enabled").notNull().default(false),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  /** Content-free tombstone prevents stale clients from recreating deleted universes. */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   revision: integer("revision").notNull().default(1),
   state: jsonb("state").$type<Record<string, unknown>>().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

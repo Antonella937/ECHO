@@ -1,10 +1,11 @@
-import { and, count, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import {
   db,
   echoAutonomyWorkerLeasesTable,
   echoAutonomyCharactersTable,
   echoAutonomyOwnersTable,
   echoAutonomyRunsTable,
+  echoUniversesTable,
 } from "@workspace/db";
 import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
 
@@ -75,9 +76,15 @@ export async function listLiveOptInTargets() {
   }).from(echoAutonomyCharactersTable).innerJoin(
     echoAutonomyOwnersTable,
     eq(echoAutonomyOwnersTable.ownerId, echoAutonomyCharactersTable.ownerId),
+  ).innerJoin(echoUniversesTable, and(
+    eq(echoUniversesTable.ownerId, echoAutonomyCharactersTable.ownerId),
+    eq(echoUniversesTable.universeId, echoAutonomyCharactersTable.universeId),
+  )
   ).where(and(
     eq(echoAutonomyCharactersTable.enabled, true),
     eq(echoAutonomyOwnersTable.killSwitchEngaged, false),
+    isNull(echoUniversesTable.archivedAt),
+    isNull(echoUniversesTable.deletedAt),
   ));
   return rows;
 }

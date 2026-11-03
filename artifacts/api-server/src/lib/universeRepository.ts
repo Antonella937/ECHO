@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import {
   db, echoCreatorEntitlementsTable, echoUniversesTable,
   type CreatorPlan, type EchoCreatorEntitlement,
@@ -32,6 +32,8 @@ export async function readUniverse(ownerId: string, universeId = "primary") {
   }).from(echoUniversesTable).where(and(
     eq(echoUniversesTable.ownerId, ownerId),
     eq(echoUniversesTable.universeId, universeId),
+    isNull(echoUniversesTable.archivedAt),
+    isNull(echoUniversesTable.deletedAt),
   )).limit(1);
   return row ?? { state: null, revision: 0 };
 }
@@ -53,12 +55,14 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
     const existingRows = await tx.select().from(echoUniversesTable)
       .where(eq(echoUniversesTable.ownerId, ownerId));
     const current = existingRows.find(row => row.universeId === universeId);
+    if (current?.archivedAt || current?.deletedAt) throw new Error("UNIVERSE_UNAVAILABLE");
+    const retainedRows = existingRows.filter(row => !row.deletedAt);
     const caps = planCaps(entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
     const isNewUniverse = !current;
-    if (isNewUniverse && (expectedRevision !== 0 || existingRows.length >= caps.maxUniverses))
+    if (isNewUniverse && (expectedRevision !== 0 || retainedRows.length >= caps.maxUniverses))
       throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
 
-    const previousCharacters = existingRows.reduce((total, row) => {
+    const previousCharacters = retainedRows.reduce((total, row) => {
       const value = row.state.characters;
       return total + (Array.isArray(value) ? value.length : 0);
     }, 0);
@@ -106,7 +110,7 @@ export async function createAdditionalUniverse(ownerId: string, name: string, st
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
     const entitlements = await lockEntitlement(tx, ownerId, asPlan(creatorSetup?.plan));
     // Serialize capacity checks by owner before reading the current counts.
-    const rows = await tx.select().from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
+    const rows = await tx.select().from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, ownerId), isNull(echoUniversesTable.deletedAt)));
     const caps = planCaps(entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
     if (rows.length >= caps.maxUniverses) throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
     const characterCount = rows.reduce((total, row) => {
@@ -141,8 +145,9 @@ export async function listUniverses(ownerId: string) {
     universeId: echoUniversesTable.universeId,
     state: echoUniversesTable.state,
     revision: echoUniversesTable.revision,
+    archivedAt: echoUniversesTable.archivedAt,
     updatedAt: echoUniversesTable.updatedAt,
-  }).from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
+  }).from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, ownerId), isNull(echoUniversesTable.deletedAt)));
 }
 
 export async function creatorEntitlements(ownerId: string) {

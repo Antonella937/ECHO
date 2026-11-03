@@ -48,7 +48,7 @@ import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding'
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
 import { loadLegacyState, loadRecovery } from '@/store/persistence';
-import { getActiveUniverseId } from '@/store/persistence';
+import { getActiveUniverseId, setActiveUniverseId } from '@/store/persistence';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -180,6 +180,14 @@ function AuthenticatedExperience() {
     },
   });
   const saveUniverseMutation = useSaveUniverse();
+  useEffect(() => {
+    const data = (universeQuery.error as { data?: { error?: string; ownerId?: string; fallbackUniverseId?: string } } | null)?.data;
+    if (user?.id && data?.ownerId === user.id && data?.error === 'UNIVERSE_UNAVAILABLE' && data.fallbackUniverseId &&
+      data.fallbackUniverseId !== activeUniverseId) {
+      setActiveUniverseId(user.id, data.fallbackUniverseId);
+      window.location.replace(import.meta.env.BASE_URL);
+    }
+  }, [user?.id, activeUniverseId, universeQuery.error]);
   const [legacyCheck, setLegacyCheck] = useState<{
     ownerId: string;
     status: 'checking' | 'present' | 'empty' | 'error';

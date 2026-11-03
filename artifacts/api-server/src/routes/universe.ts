@@ -6,7 +6,7 @@ import {
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse, writeUniverse, StructuralLimitError } from "../lib/universeRepository";
-import { db, echoMediaTable } from "@workspace/db";
+import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
@@ -18,6 +18,11 @@ router.use("/universe", requireAuth);
 
 router.get("/universe", async (req, res): Promise<void> => {
   const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const [meta] = await db.select().from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId)));
+  if (meta?.archivedAt || meta?.deletedAt) {
+    const available = await db.select().from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, req.userId!));
+    res.status(409).json({ error: "UNIVERSE_UNAVAILABLE", ownerId: req.userId!, fallbackUniverseId: available.find(row => !row.archivedAt && !row.deletedAt)?.universeId ?? null }); return;
+  }
   res.json(GetUniverseResponse.parse(await readUniverse(req.userId!, universeId)));
 });
 
@@ -58,6 +63,9 @@ router.put("/universe", async (req, res): Promise<void> => {
   let saved;
   try { saved = await writeUniverse(req.userId!, state, expectedRevision, universeId); }
   catch (error) {
+    if (error instanceof Error && error.message === "UNIVERSE_UNAVAILABLE") {
+      res.status(409).json({ error: error.message }); return;
+    }
     if (error instanceof StructuralLimitError) {
       res.status(409).json({ error: error.code });
       return;

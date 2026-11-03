@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Check, ChevronRight, Layers, Plus } from 'lucide-react';
-import { useCreateCreatorUniverse, useGetCreatorAccount, useListCreatorUniverses } from '@workspace/api-client-react';
+import { useCreateCreatorUniverse, useGetCreatorAccount, useListCreatorUniverses, useManageCreatorUniverse, type CreatorUniverseSummary, type UniverseManagementInput } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
 import { getActiveUniverseId, setActiveUniverseId } from '@/store/persistence';
 import { activateOwnedUniverse, newUniverseInput } from '@/lib/universe-navigation';
 import { Field, inputCls } from './field';
 import { Sheet } from './sheet';
+import { UniverseManagementForm } from './universe-management-form';
 
 export function UniverseSelector() {
   const { user, isSignedIn } = useUser();
@@ -15,6 +16,7 @@ export function UniverseSelector() {
   ownerRef.current = user?.id;
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [management, setManagement] = useState<{ universe: CreatorUniverseSummary; action: UniverseManagementInput['action'] } | null>(null);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,8 @@ export function UniverseSelector() {
     query: { enabled, queryKey: ['universe-selector-capacity', ownerId], staleTime: 0 },
   });
   const create = useCreateCreatorUniverse();
+  const manage = useManageCreatorUniverse();
+  const availableIds = (list.data ?? []).filter(item => !item.archived).map(item => item.universeId);
   const capacity = account.data;
   const hasCapacity = Boolean(capacity && capacity.universeCount < capacity.maxUniverses &&
     capacity.characterCount < capacity.maxCharacters);
@@ -62,7 +66,7 @@ export function UniverseSelector() {
     <>
       <button type="button" className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-left"
         data-testid="button-universe-selector"
-        onClick={() => { setCreating(false); setError(null); setName(''); setDisplayName(''); setUsername(''); setOpen(true); }}>
+        onClick={() => { setManagement(null); setCreating(false); setError(null); setName(''); setDisplayName(''); setUsername(''); setOpen(true); }}>
         <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">Universos</span>
@@ -70,8 +74,24 @@ export function UniverseSelector() {
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
-      <Sheet open={open} onClose={close} title={creating ? 'Crear universo' : 'Tus universos'} testId="sheet-universes">
-        {!creating ? (
+      <Sheet open={open} onClose={close} title={management ? 'Gestionar universo' : creating ? 'Crear universo' : 'Tus universos'} testId="sheet-universes">
+        {management ? <UniverseManagementForm key={`${management.universe.universeId}:${management.action}:${management.universe.revision}`}
+          universe={management.universe} action={management.action} busy={busy}
+          cancel={() => { setManagement(null); setError(null); }}
+          submit={data => void run(async () => {
+            await actions.retrySync();
+            if (ownerRef.current !== ownerId) throw new Error('La sesión cambió.');
+            const result = await manage.mutateAsync({ universeId: management.universe.universeId, data });
+            if (ownerRef.current !== ownerId) throw new Error('La sesión cambió.');
+            if (management.universe.universeId === activeId) {
+              const next = result.archived || result.deleted ? result.fallbackUniverseId : activeId;
+              if (!next) throw new Error('No hay otro universo disponible.');
+              await activate(next, [next], async () => {});
+              return;
+            }
+            setManagement(null);
+            await Promise.all([list.refetch(), account.refetch()]);
+          })} /> : !creating ? (
           <div className="space-y-3">
             {list.isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando universos…</p>}
             {list.isError && <div role="alert" className="text-sm text-destructive">
@@ -79,17 +99,37 @@ export function UniverseSelector() {
               <button type="button" className="ml-2 min-h-11 underline" onClick={() => void list.refetch()}>Reintentar</button>
             </div>}
             {list.data?.map(universe => (
-              <button type="button" key={universe.universeId} className={buttonCls}
-                disabled={busy || universe.universeId === activeId}
+              <div key={universe.universeId}>
+              <button type="button" className={buttonCls}
+                disabled={busy || universe.archived || universe.universeId === activeId}
                 aria-current={universe.universeId === activeId ? 'true' : undefined}
-                onClick={() => void run(() => activate(universe.universeId, list.data!.map(item => item.universeId)))}>
+                onClick={() => void run(() => activate(universe.universeId, availableIds))}>
                 <span className="min-w-0 flex-1">
                   <span className="block break-words font-semibold">{universe.name}</span>
-                  <span className="text-xs text-muted-foreground">{universe.characterCount} personajes{universe.universeId === activeId ? ' · Activo' : ''}</span>
+                  <span className="text-xs text-muted-foreground">{universe.characterCount} personajes{universe.archived ? ' · Archivado' : universe.universeId === activeId ? ' · Activo' : ''}</span>
+                  {universe.description && <span className="block break-words text-xs text-muted-foreground">{universe.description}</span>}
                 </span>
                 {universe.universeId === activeId && <Check className="h-4 w-4 shrink-0 text-primary" />}
               </button>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {(['edit', universe.archived ? 'restore' : 'archive', 'delete'] as const).map(action => <button key={action} type="button"
+                  className="tap min-h-11 rounded-xl bg-secondary px-3 text-xs disabled:opacity-50"
+                  disabled={busy || (!universe.archived && availableIds.length <= 1 && action !== 'edit')}
+                  aria-label={`${action === 'edit' ? 'Editar' : action === 'archive' ? 'Archivar' : action === 'restore' ? 'Restaurar' : 'Eliminar'} ${universe.name}`}
+                  onClick={() => void run(async () => {
+                    await actions.retrySync();
+                    const fresh = await list.refetch();
+                    if (ownerRef.current !== ownerId) throw new Error('La sesión cambió.');
+                    const current = fresh.data?.find(item => item.universeId === universe.universeId);
+                    if (!current) throw new Error('El universo ya no está disponible.');
+                    setManagement({ universe: current, action });
+                  })}>
+                  {action === 'edit' ? 'Editar' : action === 'archive' ? 'Archivar' : action === 'restore' ? 'Restaurar' : 'Eliminar'}
+                </button>)}
+              </div>
+              </div>
             ))}
+            {availableIds.length === 1 && <p className="text-xs text-muted-foreground">Conserva al menos un universo sin archivar. Crea o restaura otro para poder archivar o eliminar el último disponible.</p>}
             {list.isSuccess && list.data.length === 0 && <p className="text-sm text-muted-foreground">No hay universos disponibles.</p>}
             <button type="button" className={buttonCls} disabled={busy || !list.isSuccess || !hasCapacity}
               onClick={() => { setError(null); setCreating(true); }}>
@@ -133,7 +173,7 @@ export function UniverseSelector() {
             </div>
           </form>
         )}
-        {busy && <p role="status" className="mt-3 text-sm text-muted-foreground">Guardando y abriendo universo…</p>}
+        {busy && <p role="status" className="mt-3 text-sm text-muted-foreground">Guardando cambios…</p>}
         {error && <p role="alert" className="mt-3 break-words text-sm text-destructive">{error}</p>}
       </Sheet>
     </>

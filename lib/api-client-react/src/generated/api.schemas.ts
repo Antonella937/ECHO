@@ -106,6 +106,39 @@ export interface CreatorAccount {
   usage: CreatorAiUsage;
 }
 
+export type UniverseManagementInputAction = typeof UniverseManagementInputAction[keyof typeof UniverseManagementInputAction];
+
+
+export const UniverseManagementInputAction = {
+  edit: 'edit',
+  archive: 'archive',
+  restore: 'restore',
+  delete: 'delete',
+} as const;
+
+export interface UniverseManagementInput {
+  action: UniverseManagementInputAction;
+  /** @minimum 1 */
+  expectedRevision: number;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     */
+  name?: string;
+  /** @maxLength 500 */
+  description?: string;
+  /** @maxLength 80 */
+  confirmationText?: string;
+}
+
+export interface UniverseManagementResult {
+  revision: number;
+  archived: boolean;
+  deleted: boolean;
+  /** @nullable */
+  fallbackUniverseId?: string | null;
+}
+
 export interface CreatorUniverseSummary {
   universeId: string;
   name: string;
@@ -114,6 +147,8 @@ export interface CreatorUniverseSummary {
   /** @minimum 0 */
   characterCount: number;
   current: boolean;
+  description?: string;
+  archived?: boolean;
 }
 
 export type AppearanceTheme = typeof AppearanceTheme[keyof typeof AppearanceTheme];
@@ -155,6 +190,8 @@ export const CreatorSetupPlan = {
 } as const;
 
 export interface CreatorSetup {
+  /** @maxLength 500 */
+  universeDescription?: string;
   plan: CreatorSetupPlan;
   /**
      * @minLength 1

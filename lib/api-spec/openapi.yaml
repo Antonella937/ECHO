@@ -297,6 +297,31 @@ paths:
               schema: { $ref: "#/components/schemas/CreatorAccount" }
         "400": { description: Invalid budget configuration }
         "401": { description: Authentication required }
+  /creator/universes/{universeId}/management:
+    put:
+      operationId: manageCreatorUniverse
+      tags: [creator]
+      summary: Owner-only universe edit, archive, restore or confirmed deletion
+      parameters:
+        - name: universeId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 80 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UniverseManagementInput" }
+      responses:
+        "200":
+          description: Committed universe operation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UniverseManagementResult" }
+        "400": { description: Invalid input or confirmation }
+        "401": { description: Authentication required }
+        "404": { description: Universe unavailable }
+        "409": { description: Stale revision or last available universe }
   /creator/universes:
     get:
       operationId: listCreatorUniverses
@@ -408,6 +433,24 @@ components:
         universeCount: { type: integer, minimum: 0 }
         characterCount: { type: integer, minimum: 0 }
         usage: { $ref: "#/components/schemas/CreatorAiUsage" }
+    UniverseManagementInput:
+      type: object
+      additionalProperties: false
+      required: [action, expectedRevision]
+      properties:
+        action: { type: string, enum: [edit, archive, restore, delete] }
+        expectedRevision: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 60 }
+        description: { type: string, maxLength: 500 }
+        confirmationText: { type: string, maxLength: 80 }
+    UniverseManagementResult:
+      type: object
+      required: [revision, archived, deleted]
+      properties:
+        revision: { type: integer }
+        archived: { type: boolean }
+        deleted: { type: boolean }
+        fallbackUniverseId: { type: [string, "null"] }
     CreatorUniverseSummary:
       type: object
       required: [universeId, name, revision, characterCount, current]
@@ -417,6 +460,8 @@ components:
         revision: { type: integer, minimum: 0 }
         characterCount: { type: integer, minimum: 0 }
         current: { type: boolean }
+        description: { type: string }
+        archived: { type: boolean }
     CreatorUniverseInput:
       type: object
       required: [name, state]
@@ -565,6 +610,7 @@ components:
       type: object
       required: [plan, universeName, completedAt]
       properties:
+        universeDescription: { type: string, maxLength: 500 }
         plan: { type: string, enum: [free, creator] }
         universeName: { type: string, minLength: 1, maxLength: 60 }
         completedAt: { type: string, format: date-time }

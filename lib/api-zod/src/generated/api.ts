@@ -831,6 +831,8 @@ export const getUniverseResponseStateOneHighlightsMax = 200;
 
 export const getUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
+export const getUniverseResponseStateOneCreatorSetupUniverseDescriptionMax = 500;
+
 export const getUniverseResponseStateOneCreatorSetupUniverseNameMax = 60;
 
 export const getUniverseResponseStateOneCharactersItemConfigurationBasicNameMax = 100;
@@ -1038,6 +1040,7 @@ export const GetUniverseResponse = zod.object({
 })).max(getUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(getUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
+  "universeDescription": zod.string().max(getUniverseResponseStateOneCreatorSetupUniverseDescriptionMax).optional(),
   "plan": zod.enum(['free', 'creator']),
   "universeName": zod.string().min(1).max(getUniverseResponseStateOneCreatorSetupUniverseNameMax),
   "completedAt": zod.coerce.date()
@@ -1328,6 +1331,8 @@ export const saveUniverseBodyStateHighlightsMax = 200;
 
 export const saveUniverseBodyStateAccountCatalogVersionMin = 0;
 
+export const saveUniverseBodyStateCreatorSetupUniverseDescriptionMax = 500;
+
 export const saveUniverseBodyStateCreatorSetupUniverseNameMax = 60;
 
 export const saveUniverseBodyStateCharactersItemConfigurationBasicNameMax = 100;
@@ -1535,6 +1540,7 @@ export const SaveUniverseBody = zod.object({
 })).max(saveUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseBodyStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
+  "universeDescription": zod.string().max(saveUniverseBodyStateCreatorSetupUniverseDescriptionMax).optional(),
   "plan": zod.enum(['free', 'creator']),
   "universeName": zod.string().min(1).max(saveUniverseBodyStateCreatorSetupUniverseNameMax),
   "completedAt": zod.coerce.date()
@@ -1813,6 +1819,8 @@ export const saveUniverseResponseStateOneHighlightsMax = 200;
 
 export const saveUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
+export const saveUniverseResponseStateOneCreatorSetupUniverseDescriptionMax = 500;
+
 export const saveUniverseResponseStateOneCreatorSetupUniverseNameMax = 60;
 
 export const saveUniverseResponseStateOneCharactersItemConfigurationBasicNameMax = 100;
@@ -2020,6 +2028,7 @@ export const SaveUniverseResponse = zod.object({
 })).max(saveUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
+  "universeDescription": zod.string().max(saveUniverseResponseStateOneCreatorSetupUniverseDescriptionMax).optional(),
   "plan": zod.enum(['free', 'creator']),
   "universeName": zod.string().min(1).max(saveUniverseResponseStateOneCreatorSetupUniverseNameMax),
   "completedAt": zod.coerce.date()
@@ -2346,6 +2355,8 @@ export const verifyUniverseResponseOneStateOneHighlightsMax = 200;
 
 export const verifyUniverseResponseOneStateOneAccountCatalogVersionMin = 0;
 
+export const verifyUniverseResponseOneStateOneCreatorSetupUniverseDescriptionMax = 500;
+
 export const verifyUniverseResponseOneStateOneCreatorSetupUniverseNameMax = 60;
 
 export const verifyUniverseResponseOneStateOneCharactersItemConfigurationBasicNameMax = 100;
@@ -2555,6 +2566,7 @@ export const VerifyUniverseResponse = zod.object({
 })).max(verifyUniverseResponseOneStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(verifyUniverseResponseOneStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
+  "universeDescription": zod.string().max(verifyUniverseResponseOneStateOneCreatorSetupUniverseDescriptionMax).optional(),
   "plan": zod.enum(['free', 'creator']),
   "universeName": zod.string().min(1).max(verifyUniverseResponseOneStateOneCreatorSetupUniverseNameMax),
   "completedAt": zod.coerce.date()
@@ -3077,6 +3089,42 @@ export const ConfigureCreatorAiBudgetResponse = zod.object({
 
 
 /**
+ * @summary Owner-only universe edit, archive, restore or confirmed deletion
+ */
+export const manageCreatorUniversePathUniverseIdMax = 80;
+
+
+
+export const ManageCreatorUniverseParams = zod.object({
+  "universeId": zod.coerce.string().min(1).max(manageCreatorUniversePathUniverseIdMax)
+})
+
+
+export const manageCreatorUniverseBodyNameMax = 60;
+
+export const manageCreatorUniverseBodyDescriptionMax = 500;
+
+export const manageCreatorUniverseBodyConfirmationTextMax = 80;
+
+
+
+export const ManageCreatorUniverseBody = zod.object({
+  "action": zod.enum(['edit', 'archive', 'restore', 'delete']),
+  "expectedRevision": zod.number().int().min(1),
+  "name": zod.string().min(1).max(manageCreatorUniverseBodyNameMax).optional(),
+  "description": zod.string().max(manageCreatorUniverseBodyDescriptionMax).optional(),
+  "confirmationText": zod.string().max(manageCreatorUniverseBodyConfirmationTextMax).optional()
+})
+
+export const ManageCreatorUniverseResponse = zod.object({
+  "revision": zod.number().int(),
+  "archived": zod.boolean(),
+  "deleted": zod.boolean(),
+  "fallbackUniverseId": zod.string().nullish()
+})
+
+
+/**
  * @summary List the authenticated owner's universes and character counts
  */
 export const listCreatorUniversesQueryUniverseIdMax = 80;
@@ -3098,7 +3146,9 @@ export const ListCreatorUniversesResponseItem = zod.object({
   "name": zod.string(),
   "revision": zod.number().int().min(listCreatorUniversesResponseRevisionMin),
   "characterCount": zod.number().int().min(listCreatorUniversesResponseCharacterCountMin),
-  "current": zod.boolean()
+  "current": zod.boolean(),
+  "description": zod.string().optional(),
+  "archived": zod.boolean().optional()
 })
 export const ListCreatorUniversesResponse = zod.array(ListCreatorUniversesResponseItem)
 
@@ -3116,6 +3166,8 @@ export const createCreatorUniverseBodyStateHighlightsItemStoryIdsMax = 100;
 export const createCreatorUniverseBodyStateHighlightsMax = 200;
 
 export const createCreatorUniverseBodyStateAccountCatalogVersionMin = 0;
+
+export const createCreatorUniverseBodyStateCreatorSetupUniverseDescriptionMax = 500;
 
 export const createCreatorUniverseBodyStateCreatorSetupUniverseNameMax = 60;
 
@@ -3324,6 +3376,7 @@ export const CreateCreatorUniverseBody = zod.object({
 })).max(createCreatorUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(createCreatorUniverseBodyStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
+  "universeDescription": zod.string().max(createCreatorUniverseBodyStateCreatorSetupUniverseDescriptionMax).optional(),
   "plan": zod.enum(['free', 'creator']),
   "universeName": zod.string().min(1).max(createCreatorUniverseBodyStateCreatorSetupUniverseNameMax),
   "completedAt": zod.coerce.date()
@@ -3601,6 +3654,8 @@ export const createCreatorUniverseResponseStateHighlightsMax = 200;
 
 export const createCreatorUniverseResponseStateAccountCatalogVersionMin = 0;
 
+export const createCreatorUniverseResponseStateCreatorSetupUniverseDescriptionMax = 500;
+
 export const createCreatorUniverseResponseStateCreatorSetupUniverseNameMax = 60;
 
 export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicNameMax = 100;
@@ -3809,6 +3864,7 @@ export const CreateCreatorUniverseResponse = zod.object({
 })).max(createCreatorUniverseResponseStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(createCreatorUniverseResponseStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
+  "universeDescription": zod.string().max(createCreatorUniverseResponseStateCreatorSetupUniverseDescriptionMax).optional(),
   "plan": zod.enum(['free', 'creator']),
   "universeName": zod.string().min(1).max(createCreatorUniverseResponseStateCreatorSetupUniverseNameMax),
   "completedAt": zod.coerce.date()
