@@ -12,6 +12,8 @@
     "typecheck:brain-tests": "tsc -p tsconfig.brain-tests.json",
     "typecheck:vision-tests": "tsc -p tsconfig.vision-tests.json",
     "typecheck:privacy-tests": "tsc -p tsconfig.privacy-tests.json",
+    "typecheck:social-follows-tests": "tsc -p tsconfig.social-follows-tests.json",
+    "test:social-follows": "tsx --test tests/social-follows.test.ts",
     "test:vision": "tsx --test tests/vision.test.ts tests/vision-active-universe.test.ts"
   },
   "dependencies": {

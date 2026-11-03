@@ -7,6 +7,7 @@ import aiEngineRouter from "./ai-engine";
 import autonomyRouter from "./autonomy";
 import creatorRouter from "./creator";
 import { characterPrivacyRouter } from "./character-privacy";
+import { socialFollowsRouter } from "./social-follows";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(aiEngineRouter);
 router.use(autonomyRouter);
 router.use(creatorRouter);
 router.use(characterPrivacyRouter);
+router.use(socialFollowsRouter);
 
 export default router;

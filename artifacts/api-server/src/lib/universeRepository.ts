@@ -5,6 +5,7 @@ import {
 } from "@workspace/db";
 import { DEFAULT_AI_CATEGORY_WEIGHTS, DEFAULT_MONTHLY_HARD_CEILING_UNITS } from "./ai-usage";
 import { ensureCharacterPrivacyDefaultsInTransaction } from "./characterPrivacy";
+import { removeCharacterSocialRecordsForDeletedCharacters } from "./characterFollows";
 
 export class StructuralLimitError extends Error {
   constructor(readonly code: "UNIVERSE_LIMIT_REACHED" | "CHARACTER_LIMIT_REACHED") { super(code); }
@@ -85,6 +86,15 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
         .returning({ state: echoUniversesTable.state, revision: echoUniversesTable.revision });
     const saved = rows[0] ?? null;
     if (saved) {
+      if (current) {
+        await removeCharacterSocialRecordsForDeletedCharacters(
+          tx,
+          ownerId,
+          universeId,
+          current.state,
+          canonicalState,
+        );
+      }
       await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
     }
     return saved;
