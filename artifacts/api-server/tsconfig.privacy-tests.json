@@ -6,5 +6,9 @@
     "noEmit": true,
     "rootDir": "../.."
   },
-  "include": ["tests/character-privacy.test.ts"]
+  "include": [
+    "src/app.ts",
+    "tests/character-privacy.test.ts",
+    "tests/social-content-access.test.ts"
+  ]
 }

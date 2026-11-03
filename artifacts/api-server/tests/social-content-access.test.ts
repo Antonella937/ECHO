@@ -1,0 +1,373 @@
+import assert from "node:assert/strict";
+import { after, afterEach, before, beforeEach, test } from "node:test";
+import { createServer, type Server } from "node:http";
+import { once } from "node:events";
+import express, { type RequestHandler } from "express";
+import { and, eq, inArray, or } from "drizzle-orm";
+import {
+  db,
+  echoCharacterFollowRequestsTable,
+  echoCharacterFollowsTable,
+  echoCharacterPrivacyTable,
+  echoCreatorEntitlementsTable,
+  echoMediaTable,
+  echoUniversesTable,
+} from "@workspace/db";
+import { createStorageRouter } from "../src/routes/storage";
+import { readAcceptedCharacterFollows } from "../src/lib/socialContentAccess";
+
+const owners = [
+  `social-content-test-${crypto.randomUUID()}`,
+  `social-content-test-${crypto.randomUUID()}`,
+  `social-content-test-${crypto.randomUUID()}`,
+];
+const [contentOwner, followerOwner, strangerOwner] = owners;
+const objectPaths = {
+  privatePost: `/objects/uploads/${crypto.randomUUID()}`,
+  privateCarouselItem: `/objects/uploads/${crypto.randomUUID()}`,
+  privateStory: `/objects/uploads/${crypto.randomUUID()}`,
+  expiredStory: `/objects/uploads/${crypto.randomUUID()}`,
+  highlightedStory: `/objects/uploads/${crypto.randomUUID()}`,
+  privateAvatar: `/objects/uploads/${crypto.randomUUID()}`,
+  publicPost: `/objects/uploads/${crypto.randomUUID()}`,
+  publicCarouselItem: `/objects/uploads/${crypto.randomUUID()}`,
+  publicStory: `/objects/uploads/${crypto.randomUUID()}`,
+  publicAvatar: `/objects/uploads/${crypto.randomUUID()}`,
+  unattached: `/objects/uploads/${crypto.randomUUID()}`,
+};
+const allPaths = Object.values(objectPaths);
+
+let server: Server;
+let baseUrl = "";
+let downloadCount = 0;
+
+async function cleanup(): Promise<void> {
+  await db.delete(echoCharacterFollowRequestsTable).where(or(
+    inArray(echoCharacterFollowRequestsTable.sourceOwnerId, owners),
+    inArray(echoCharacterFollowRequestsTable.targetOwnerId, owners),
+  ));
+  await db.delete(echoCharacterFollowsTable).where(or(
+    inArray(echoCharacterFollowsTable.sourceOwnerId, owners),
+    inArray(echoCharacterFollowsTable.targetOwnerId, owners),
+  ));
+  await db.delete(echoCharacterPrivacyTable).where(inArray(echoCharacterPrivacyTable.ownerId, owners));
+  await db.delete(echoMediaTable).where(inArray(echoMediaTable.ownerId, owners));
+  await db.delete(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, owners));
+  await db.delete(echoCreatorEntitlementsTable).where(inArray(echoCreatorEntitlementsTable.ownerId, owners));
+}
+
+async function seedUniverse(
+  ownerId: string,
+  universeId: string,
+  state: Record<string, unknown>,
+): Promise<void> {
+  await db.insert(echoUniversesTable).values({
+    ownerId,
+    universeId,
+    revision: 1,
+    state,
+  });
+}
+
+async function seedFixture(): Promise<void> {
+  await cleanup();
+  await seedUniverse(contentOwner, "primary", {
+    characters: [
+      { id: "same-id", avatar: objectPaths.privateAvatar },
+      { id: "unrelated" },
+    ],
+    follows: {},
+    posts: [{
+      id: "same-post",
+      authorId: "same-id",
+      image: objectPaths.privatePost,
+      media: [{ url: objectPaths.privateCarouselItem, position: 1 }],
+    }],
+    stories: [
+      { id: "active-story", authorId: "same-id", image: objectPaths.privateStory, createdAt: new Date().toISOString() },
+      { id: "expired-story", authorId: "same-id", image: objectPaths.expiredStory, createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() },
+      { id: "highlighted-story", authorId: "same-id", image: objectPaths.highlightedStory, createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() },
+    ],
+    highlights: [{ id: "highlight", authorId: "same-id", storyIds: ["highlighted-story"] }],
+  });
+  await seedUniverse(contentOwner, "studio", {
+    characters: [{ id: "same-id", avatar: objectPaths.publicAvatar }],
+    follows: {},
+    posts: [{
+      id: "same-post",
+      authorId: "same-id",
+      image: objectPaths.publicPost,
+      media: [{ url: objectPaths.publicCarouselItem, position: 1 }],
+    }],
+    stories: [{
+      id: "public-story",
+      authorId: "same-id",
+      image: objectPaths.publicStory,
+      createdAt: new Date().toISOString(),
+    }],
+  });
+  await seedUniverse(followerOwner, "primary", {
+    characters: [
+      { id: "accepted-viewer" },
+      { id: "pending-viewer" },
+      { id: "rejected-viewer" },
+      { id: "cancelled-viewer" },
+      { id: "same-id" },
+      { id: "legacy-source" },
+      { id: "legacy-target" },
+    ],
+    // This legacy ID resolves only to followerOwner/primary/same-id, never
+    // to contentOwner/primary/same-id despite the collision.
+    follows: {
+      "pending-viewer": ["same-id"],
+      "legacy-source": ["legacy-target"],
+    },
+    posts: [],
+    stories: [],
+  });
+  await seedUniverse(followerOwner, "studio", {
+    characters: [{ id: "accepted-viewer" }],
+    follows: {},
+    posts: [],
+    stories: [],
+  });
+  await seedUniverse(strangerOwner, "primary", {
+    characters: [{ id: "stranger" }],
+    follows: {},
+    posts: [],
+    stories: [],
+  });
+
+  await db.insert(echoCharacterPrivacyTable).values({
+    ownerId: contentOwner,
+    universeId: "primary",
+    characterId: "same-id",
+    visibility: "private",
+  });
+  // New relational accepted follow; the legacy local edge below is duplicated
+  // in both sources to verify full-identity deduplication.
+  await db.insert(echoCharacterFollowsTable).values([
+    {
+      sourceOwnerId: followerOwner, sourceUniverseId: "primary", sourceCharacterId: "accepted-viewer",
+      targetOwnerId: contentOwner, targetUniverseId: "primary", targetCharacterId: "same-id",
+    },
+    {
+      sourceOwnerId: followerOwner, sourceUniverseId: "primary", sourceCharacterId: "legacy-source",
+      targetOwnerId: followerOwner, targetUniverseId: "primary", targetCharacterId: "legacy-target",
+    },
+  ]);
+  await db.insert(echoCharacterFollowRequestsTable).values([
+    {
+      sourceOwnerId: followerOwner, sourceUniverseId: "primary", sourceCharacterId: "pending-viewer",
+      targetOwnerId: contentOwner, targetUniverseId: "primary", targetCharacterId: "same-id", status: "pending",
+    },
+    {
+      sourceOwnerId: followerOwner, sourceUniverseId: "primary", sourceCharacterId: "rejected-viewer",
+      targetOwnerId: contentOwner, targetUniverseId: "primary", targetCharacterId: "same-id", status: "rejected",
+    },
+    {
+      sourceOwnerId: followerOwner, sourceUniverseId: "primary", sourceCharacterId: "cancelled-viewer",
+      targetOwnerId: contentOwner, targetUniverseId: "primary", targetCharacterId: "same-id", status: "cancelled",
+    },
+    {
+      sourceOwnerId: followerOwner, sourceUniverseId: "primary", sourceCharacterId: "accepted-viewer",
+      targetOwnerId: contentOwner, targetUniverseId: "primary", targetCharacterId: "same-id", status: "accepted",
+    },
+  ]);
+  await db.insert(echoMediaTable).values(allPaths.map((objectPath) => ({
+    objectPath,
+    ownerId: contentOwner,
+  })));
+}
+
+function authHeaders(ownerId?: string): HeadersInit {
+  return ownerId ? { "x-test-owner": ownerId } : {};
+}
+
+function objectUrl(objectPath: string, viewer?: { universeId: string; characterId: string }): string {
+  const objectKey = objectPath.replace(/^\/objects\//, "");
+  const url = new URL(`/storage/objects/${objectKey}`, baseUrl);
+  if (viewer) {
+    url.searchParams.set("viewerUniverseId", viewer.universeId);
+    url.searchParams.set("viewerCharacterId", viewer.characterId);
+  }
+  return url.toString();
+}
+
+async function getMedia(
+  ownerId: string | undefined,
+  objectPath: string,
+  viewer?: { universeId: string; characterId: string },
+): Promise<Response> {
+  return fetch(objectUrl(objectPath, viewer), { headers: authHeaders(ownerId) });
+}
+
+const syntheticAuth: RequestHandler = (req, res, next) => {
+  const ownerId = req.header("x-test-owner");
+  if (!ownerId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  req.userId = ownerId;
+  next();
+};
+
+before(async () => {
+  const app = express();
+  app.use(express.json());
+  const fakeStorage = {
+    getObjectEntityUploadURL: async () => "https://upload.invalid",
+    normalizeObjectEntityPath: (url: string) => url,
+    trySetObjectEntityAclPolicy: async (path: string) => path,
+    getObjectEntityFile: async () => ({}) as never,
+    canAccessObjectEntity: async () => true,
+    downloadObject: async () => {
+      downloadCount++;
+      return { status: 200, headers: new Headers({ "Content-Type": "image/jpeg" }), body: null };
+    },
+  } as unknown as NonNullable<Parameters<typeof createStorageRouter>[0]>["storage"];
+  app.use(createStorageRouter({ authenticate: syntheticAuth, storage: fakeStorage }));
+  server = createServer(app);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("TEST_SERVER_ADDRESS_UNAVAILABLE");
+  baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+beforeEach(async () => {
+  downloadCount = 0;
+  await seedFixture();
+});
+
+afterEach(cleanup);
+
+after(async () => {
+  server?.closeAllConnections();
+  if (server?.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
+  await cleanup();
+});
+
+test("private media is readable by its owner and public media by any authenticated owner", async () => {
+  for (const path of [
+    objectPaths.privatePost,
+    objectPaths.privateCarouselItem,
+    objectPaths.privateStory,
+    objectPaths.privateAvatar,
+  ]) {
+    assert.equal((await getMedia(contentOwner, path)).status, 200);
+  }
+  for (const path of [
+    objectPaths.publicPost,
+    objectPaths.publicCarouselItem,
+    objectPaths.publicStory,
+    objectPaths.publicAvatar,
+  ]) {
+    assert.equal((await getMedia(strangerOwner, path)).status, 200);
+  }
+  assert.equal(downloadCount, 8);
+});
+
+test("private media allows only the exact accepted follower; pending, rejected, cancelled and other universes are denied", async () => {
+  const privatePaths = [
+    objectPaths.privatePost,
+    objectPaths.privateCarouselItem,
+    objectPaths.privateStory,
+    objectPaths.privateAvatar,
+  ];
+  for (const path of privatePaths) {
+    assert.equal((await getMedia(followerOwner, path, {
+      universeId: "primary", characterId: "accepted-viewer",
+    })).status, 200);
+    for (const characterId of ["pending-viewer", "rejected-viewer", "cancelled-viewer"]) {
+      assert.equal((await getMedia(followerOwner, path, {
+        universeId: "primary", characterId,
+      })).status, 404);
+    }
+    assert.equal((await getMedia(followerOwner, path, {
+      universeId: "studio", characterId: "accepted-viewer",
+    })).status, 404);
+    assert.equal((await getMedia(strangerOwner, path)).status, 404);
+    assert.equal((await getMedia(followerOwner, path)).status, 404);
+  }
+  const denied = await getMedia(strangerOwner, objectPaths.privatePost);
+  const pending = await getMedia(followerOwner, objectPaths.privatePost, {
+    universeId: "primary", characterId: "pending-viewer",
+  });
+  assert.equal(await pending.text(), JSON.stringify({ error: "Image not found" }));
+  assert.equal(await denied.text(), JSON.stringify({ error: "Image not found" }));
+  assert.equal(downloadCount, privatePaths.length, "denials must happen before object bytes are opened");
+});
+
+test("post, Story and avatar media keep owner/universe identity; repeated IDs cannot cross visibility", async () => {
+  const acceptedViewer = { universeId: "primary", characterId: "accepted-viewer" };
+  assert.equal((await getMedia(followerOwner, objectPaths.privateStory, acceptedViewer)).status, 200);
+  assert.equal((await getMedia(followerOwner, objectPaths.privateAvatar, acceptedViewer)).status, 200);
+
+  // Same author and post IDs exist in primary/private and studio/public.
+  assert.equal((await getMedia(strangerOwner, objectPaths.privatePost)).status, 404);
+  assert.equal((await getMedia(strangerOwner, objectPaths.publicPost)).status, 200);
+  assert.equal((await getMedia(strangerOwner, objectPaths.privateCarouselItem)).status, 404);
+  assert.equal((await getMedia(strangerOwner, objectPaths.publicCarouselItem)).status, 200);
+  assert.equal((await getMedia(strangerOwner, objectPaths.publicStory)).status, 200);
+  assert.equal((await getMedia(strangerOwner, objectPaths.publicAvatar)).status, 200);
+  assert.equal((await getMedia(followerOwner, objectPaths.publicPost)).status, 200);
+});
+
+test("expired Story media is hidden unless retained in a highlight", async () => {
+  const viewer = { universeId: "primary", characterId: "accepted-viewer" };
+  assert.equal((await getMedia(followerOwner, objectPaths.expiredStory, viewer)).status, 404);
+  assert.equal((await getMedia(followerOwner, objectPaths.highlightedStory, viewer)).status, 200);
+  assert.equal((await getMedia(strangerOwner, objectPaths.expiredStory)).status, 404);
+});
+
+test("legacy and relational follows deduplicate by full identity and legacy IDs never infer cross-owner edges", async () => {
+  const before = await db.select().from(echoCharacterFollowsTable).where(eq(
+    echoCharacterFollowsTable.sourceOwnerId,
+    followerOwner,
+  ));
+  const edges = await readAcceptedCharacterFollows(followerOwner, "primary");
+  const duplicateLocal = edges.filter((candidate) =>
+    candidate.source.ownerId === followerOwner &&
+    candidate.source.universeId === "primary" &&
+    candidate.source.characterId === "legacy-source" &&
+    candidate.target.ownerId === followerOwner &&
+    candidate.target.universeId === "primary" &&
+    candidate.target.characterId === "legacy-target",
+  );
+  const inferredForeign = edges.filter((candidate) =>
+    candidate.source.characterId === "pending-viewer" &&
+    candidate.target.ownerId === contentOwner &&
+    candidate.target.universeId === "primary" &&
+    candidate.target.characterId === "same-id",
+  );
+  assert.equal(duplicateLocal.length, 1);
+  assert.equal(inferredForeign.length, 0);
+  const after = await db.select().from(echoCharacterFollowsTable).where(eq(
+    echoCharacterFollowsTable.sourceOwnerId,
+    followerOwner,
+  ));
+  assert.equal(after.length, before.length, "reading the merged graph must not rewrite existing relationships");
+});
+
+test("anonymous, nonexistent, malformed and unauthorized direct media requests do not disclose bytes or metadata", async () => {
+  const anonymous = await getMedia(undefined, objectPaths.publicPost);
+  assert.equal(anonymous.status, 401);
+
+  const missing = await getMedia(strangerOwner, `/objects/uploads/${crypto.randomUUID()}`);
+  assert.equal(missing.status, 404);
+  const denied = await getMedia(strangerOwner, objectPaths.privatePost);
+  assert.equal(denied.status, 404);
+  assert.equal(await missing.text(), await denied.text());
+
+  const malformed = await fetch(
+    `${objectUrl(objectPaths.privatePost)}?viewerUniverseId=primary`,
+    { headers: authHeaders(followerOwner) },
+  );
+  assert.equal(malformed.status, 400);
+  assert.equal(downloadCount, 0);
+
+  // An upload without a social reference remains private to its owner.
+  assert.equal((await getMedia(contentOwner, objectPaths.unattached)).status, 200);
+  assert.equal((await getMedia(strangerOwner, objectPaths.unattached)).status, 404);
+});
