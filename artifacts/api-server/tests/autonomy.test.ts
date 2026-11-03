@@ -1,38 +1,58 @@
 import test from "node:test";
 import { after } from "node:test";
 import assert from "node:assert/strict";
-import { inArray } from "drizzle-orm";
-import { SaveUniverseBody } from "@workspace/api-zod";
+import { and, eq, inArray } from "drizzle-orm";
+import { SaveUniverseBody, type CharacterDecision } from "@workspace/api-zod";
 import {
   db,
   pool,
   echoAutonomyCharactersTable,
   echoAutonomyOwnersTable,
   echoAutonomyRunsTable,
+  echoAutonomyWorkerLeasesTable,
+  echoUniversesTable,
 } from "@workspace/db";
 import { createSeedState } from "../../echo/src/store/seed";
 import { defaultCharacterConfig } from "../../echo/src/domain/character-core";
-import { applyAutonomyDecision } from "../src/autonomy/executor";
+import { applyAutonomyDecision, executeAutonomyDecision } from "../src/autonomy/executor";
 import { chooseAutonomyOpportunity, liveEligibility, type Opportunity } from "../src/autonomy/policy";
-import { runAutonomyDryRun } from "../src/autonomy/service";
+import { runAutonomyDryRun, runAutonomyLiveCycle } from "../src/autonomy/service";
 import { buildCharacterContext } from "../src/ai-engine/context";
 import { previewDecision } from "../src/ai-engine/engine";
 import { postMedia } from "../../echo/src/domain/post-media";
 import type { AutonomyRepository } from "../src/autonomy/service";
 import type { TextProvider } from "../src/ai-engine/contracts";
+import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "../src/autonomy/constants";
 import {
-  readOwnerControls,
-  reserveDryRun,
+  claimAutonomyWorkerLease,
+  completeDryRun,
+  releaseAutonomyWorkerLease,
+  listLiveOptInTargets,
   updateCharacterControl,
   updateOwnerKillSwitch,
+  readOwnerControls,
+  reserveDryRun,
 } from "../src/autonomy/repository";
+import {
+  AUTONOMY_WORKER_INTERVAL_MS,
+  runAutonomyWorkerTick,
+  startAutonomyWorker,
+} from "../src/autonomy/worker";
+import { startAutonomyBackgroundWorker } from "../src/autonomy/runtime";
 
 const NOW = new Date("2026-11-03T12:00:00.000Z");
 const dbOwners = [`autonomy-synthetic-${crypto.randomUUID()}`, `autonomy-synthetic-${crypto.randomUUID()}`];
+function syntheticOwnerId() {
+  const ownerId = `autonomy-synthetic-${crypto.randomUUID()}`;
+  dbOwners.push(ownerId);
+  return ownerId;
+}
+
 after(async () => {
   await db.delete(echoAutonomyRunsTable).where(inArray(echoAutonomyRunsTable.ownerId, dbOwners));
   await db.delete(echoAutonomyCharactersTable).where(inArray(echoAutonomyCharactersTable.ownerId, dbOwners));
   await db.delete(echoAutonomyOwnersTable).where(inArray(echoAutonomyOwnersTable.ownerId, dbOwners));
+  await db.delete(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, dbOwners));
   await pool.end();
 });
 
@@ -50,6 +70,83 @@ function fixture() {
   mar.configuration.social.allowSilence = false;
   mar.configuration.currentState.lastActivityAt = null;
   return { state, mar };
+}
+
+const postOpportunity = { situation: "post" } as Opportunity;
+const postDecision = (text = "Ensayo y café.") => ({
+  action: "draft",
+  situation: "post",
+  text,
+  reason: "Synthetic executor test.",
+  suggestedDelayMinutes: 0,
+  contextSections: ["identity"],
+}) satisfies CharacterDecision;
+
+async function insertSyntheticUniverse(ownerId: string, state: ReturnType<typeof createSeedState>, now: Date, revision = 1) {
+  await db.insert(echoUniversesTable).values({
+    ownerId,
+    revision,
+    state: state as unknown as Record<string, unknown>,
+    updatedAt: now,
+  });
+}
+
+async function insertAutonomyRun(input: {
+  ownerId: string;
+  characterId?: string;
+  key?: string;
+  status?: string;
+  action?: string | null;
+  situation?: string | null;
+  now?: Date;
+  updatedAt?: Date;
+  attemptCount?: number;
+  sourceRevision?: number;
+}) {
+  const now = input.now ?? new Date();
+  const [run] = await db.insert(echoAutonomyRunsTable).values({
+    ownerId: input.ownerId,
+    characterId: input.characterId ?? "mar",
+    idempotencyKey: input.key ?? crypto.randomUUID(),
+    status: input.status ?? "running",
+    action: input.action ?? null,
+    situation: input.situation ?? null,
+    sourceRevision: input.sourceRevision ?? 1,
+    attemptCount: input.attemptCount ?? 1,
+    createdAt: now,
+    updatedAt: input.updatedAt ?? now,
+  }).returning({ id: echoAutonomyRunsTable.id });
+  return String(run.id);
+}
+
+async function setupExecutorOwner(input: {
+  ownerId: string;
+  state?: ReturnType<typeof createSeedState>;
+  now?: Date;
+  killSwitchEngaged?: boolean;
+  characterEnabled?: boolean;
+  maxActionsPerDay?: number;
+  minCooldownMinutes?: number;
+}) {
+  const now = input.now ?? new Date();
+  const { state, mar } = fixture();
+  const universe = input.state ?? state;
+  await insertSyntheticUniverse(input.ownerId, universe, now);
+  await db.insert(echoAutonomyOwnersTable).values({
+    ownerId: input.ownerId,
+    killSwitchEngaged: input.killSwitchEngaged ?? false,
+    updatedAt: now,
+  });
+  await db.insert(echoAutonomyCharactersTable).values({
+    ownerId: input.ownerId,
+    characterId: mar.id,
+    enabled: input.characterEnabled ?? true,
+    maxActionsPerDay: input.maxActionsPerDay ?? 2,
+    minCooldownMinutes: input.minCooldownMinutes ?? 60,
+    updatedAt: now,
+  });
+  const runId = await insertAutonomyRun({ ownerId: input.ownerId, now });
+  return { state: universe, mar, runId };
 }
 
 function addNoahRelationship(mar: ReturnType<typeof fixture>["mar"], noahId: string) {
@@ -533,4 +630,383 @@ test("PostgreSQL controls and idempotency are isolated by owner and rate-capped"
 
   const otherOwner = await reserveDryRun(ownerB, "nela", key, 1);
   assert.equal(otherOwner.kind, "created");
+});
+
+test("live executor commits one synthetic post and treats a retry as a duplicate", async () => {
+  const ownerId = syntheticOwnerId();
+  const now = new Date();
+  const { mar, runId } = await setupExecutorOwner({ ownerId, now });
+  assert.equal(AUTONOMY_LIVE_EXECUTION_ENABLED, false);
+  assert.equal(DEFAULT_CHARACTER_CONTROL.enabled, false);
+
+  const input = {
+    ownerId, runId, characterId: mar.id, sourceRevision: 1,
+    opportunity: postOpportunity, decision: postDecision(), liveEnabled: true, now,
+  };
+  const first = await executeAutonomyDecision(input);
+  assert.equal(first.status, "executed");
+  if (first.status !== "executed") return;
+  assert.equal(first.revision, 2);
+
+  const [savedUniverse] = await db.select().from(echoUniversesTable)
+    .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1);
+  assert.equal(savedUniverse.revision, 2);
+  const saved = SaveUniverseBody.safeParse({ state: savedUniverse.state, expectedRevision: savedUniverse.revision });
+  assert.equal(saved.success, true);
+  if (saved.success) {
+    const posts = saved.data.state.posts.filter((post) => post.authorId === mar.id);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0]?.caption, "Ensayo y café.");
+    assert.equal(posts[0]?.image, "");
+  }
+
+  const retry = await executeAutonomyDecision(input);
+  assert.deepEqual(retry, { status: "duplicate", reasonCode: "ALREADY_EXECUTED" });
+  const [run] = await db.select().from(echoAutonomyRunsTable)
+    .where(eq(echoAutonomyRunsTable.id, Number(runId))).limit(1);
+  assert.equal(run.status, "executed");
+  assert.equal((await db.select().from(echoUniversesTable)
+    .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1))[0]?.revision, 2);
+});
+
+test("executor defaults, kill switch, opt-in, and owner scoping block synthetic writes", async () => {
+  assert.equal(AUTONOMY_LIVE_EXECUTION_ENABLED, false);
+  assert.equal(DEFAULT_CHARACTER_CONTROL.enabled, false);
+
+  const defaultOwner = syntheticOwnerId();
+  const defaultControls = await readOwnerControls(defaultOwner);
+  assert.equal(defaultControls.globalKillSwitchEngaged, true);
+  assert.equal(defaultControls.characters.get("mar"), undefined);
+  const defaultResult = await executeAutonomyDecision({
+    ownerId: defaultOwner, runId: "0", characterId: "mar", sourceRevision: 1,
+    opportunity: postOpportunity, decision: postDecision(), now: new Date(),
+  });
+  assert.equal(defaultResult.status, "disabled");
+  assert.equal(defaultResult.reasonCode, "LIVE_EXECUTION_DISABLED");
+
+  for (const scenario of [
+    { killSwitchEngaged: true, characterEnabled: true },
+    { killSwitchEngaged: false, characterEnabled: false },
+  ]) {
+    const ownerId = syntheticOwnerId();
+    const now = new Date();
+    const { runId } = await setupExecutorOwner({ ownerId, now, ...scenario });
+    const result = await executeAutonomyDecision({
+      ownerId, runId, characterId: "mar", sourceRevision: 1,
+      opportunity: postOpportunity, decision: postDecision(), liveEnabled: true, now,
+    });
+    assert.equal(result.status, "disabled");
+    assert.equal(result.reasonCode, "OPT_IN_OR_KILL_SWITCH");
+    const [universe] = await db.select().from(echoUniversesTable)
+      .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1);
+    assert.equal(universe.revision, 1);
+    const parsed = SaveUniverseBody.safeParse({ state: universe.state, expectedRevision: universe.revision });
+    assert.equal(parsed.success, true);
+    if (parsed.success) assert.equal(parsed.data.state.posts.length, 0);
+  }
+
+  const ownerA = syntheticOwnerId();
+  const ownerB = syntheticOwnerId();
+  const now = new Date();
+  await setupExecutorOwner({ ownerId: ownerA, now });
+  const { runId: foreignRunId } = await setupExecutorOwner({ ownerId: ownerB, now });
+  const foreignRun = await executeAutonomyDecision({
+    ownerId: ownerA, runId: foreignRunId, characterId: "mar", sourceRevision: 1,
+    opportunity: postOpportunity, decision: postDecision(), liveEnabled: true, now,
+  });
+  assert.deepEqual(foreignRun, { status: "blocked", reasonCode: "RUN_NOT_OWNED" });
+  const [unchanged] = await db.select().from(echoUniversesTable)
+    .where(eq(echoUniversesTable.ownerId, ownerA)).limit(1);
+  assert.equal(unchanged.revision, 1);
+});
+
+test("executor enforces character cooldown, daily cap, and action-type cap in its transaction", async () => {
+  const now = new Date();
+  const cooldownOwner = syntheticOwnerId();
+  const { state, mar } = fixture();
+  const oldDraft = applyAutonomyDecision(
+    state, mar.id, postOpportunity, postDecision(), new Date(now.getTime() - 30 * 60_000), () => "manual-post",
+  );
+  const cooldownState = {
+    ...oldDraft.state,
+    posts: oldDraft.state.posts.map((post) => ({ ...post, origin: "user" as const })),
+  };
+  const cooldownFixture = await setupExecutorOwner({
+    ownerId: cooldownOwner, now, state: cooldownState, minCooldownMinutes: 60, maxActionsPerDay: 2,
+  });
+  const cooldown = await executeAutonomyDecision({
+    ownerId: cooldownOwner, runId: cooldownFixture.runId, characterId: mar.id, sourceRevision: 1,
+    opportunity: postOpportunity, decision: postDecision(), liveEnabled: true, now,
+  });
+  assert.equal(cooldown.status, "rate_limited");
+  assert.equal(cooldown.reasonCode, "CHARACTER_COOLDOWN_OR_DAILY_CAP");
+
+  for (const scenario of [
+    { cap: 1, expected: "CHARACTER_COOLDOWN_OR_DAILY_CAP" },
+    { cap: 4, expected: "ACTION_TYPE_CAP" },
+  ]) {
+    const ownerId = syntheticOwnerId();
+    const fixtureForCap = await setupExecutorOwner({
+      ownerId, now, maxActionsPerDay: scenario.cap, minCooldownMinutes: 60,
+    });
+    await insertAutonomyRun({
+      ownerId, characterId: "mar", status: "executed", action: "draft", situation: "post",
+      now: new Date(now.getTime() - 2 * 60 * 60_000),
+    });
+    const capped = await executeAutonomyDecision({
+      ownerId, runId: fixtureForCap.runId, characterId: "mar", sourceRevision: 1,
+      opportunity: postOpportunity, decision: postDecision(), liveEnabled: true, now,
+    });
+    assert.equal(capped.status, "rate_limited");
+    assert.equal(capped.reasonCode, scenario.expected);
+    const [universe] = await db.select().from(echoUniversesTable)
+      .where(eq(echoUniversesTable.ownerId, ownerId)).limit(1);
+    assert.equal(universe.revision, 1);
+  }
+});
+
+test("opt-in target query returns only enabled characters whose owner kill switch is off", async () => {
+  const eligibleOwner = syntheticOwnerId();
+  const killedOwner = syntheticOwnerId();
+  const optedOutOwner = syntheticOwnerId();
+  await updateOwnerKillSwitch(eligibleOwner, false);
+  await updateCharacterControl(eligibleOwner, "mar", true);
+  await updateOwnerKillSwitch(killedOwner, true);
+  await updateCharacterControl(killedOwner, "mar", true);
+  await updateOwnerKillSwitch(optedOutOwner, false);
+  await updateCharacterControl(optedOutOwner, "mar", false);
+
+  const targets = await listLiveOptInTargets();
+  const ownTargets = targets.filter(({ ownerId }) =>
+    [eligibleOwner, killedOwner, optedOutOwner].includes(ownerId),
+  );
+  assert.deepEqual(ownTargets, [{ ownerId: eligibleOwner, characterId: "mar" }]);
+});
+
+test("worker tick gates disabled and busy states before target selection", async () => {
+  let listed = 0;
+  let processed = 0;
+  let claimed = 0;
+  const repository = {
+    listLiveOptInTargets: async () => { listed += 1; return [{ ownerId: "synthetic", characterId: "mar" }]; },
+    claimWorkerLease: async () => { claimed += 1; return false; },
+    releaseWorkerLease: async () => undefined,
+  };
+  const processCharacter = async () => { processed += 1; return { status: "executed" }; };
+
+  const disabled = await runAutonomyWorkerTick({ enabled: false, repository, processCharacter });
+  assert.equal(disabled.status, "disabled");
+  assert.equal(claimed, 0);
+  assert.equal(listed, 0);
+
+  const busy = await runAutonomyWorkerTick({ enabled: true, repository, processCharacter });
+  assert.equal(busy.status, "busy");
+  assert.equal(claimed, 1);
+  assert.equal(listed, 0);
+  assert.equal(processed, 0);
+});
+
+test("worker tick uses deterministic per-slot keys, continues after a target failure, and releases its lease", async () => {
+  const now = new Date("2026-11-03T12:00:00.000Z");
+  const targets = [
+    { ownerId: "synthetic-owner-a", characterId: "mar" },
+    { ownerId: "synthetic-owner-b", characterId: "noah" },
+    { ownerId: "synthetic-owner-c", characterId: "felix" },
+  ];
+  const seenKeys: string[] = [];
+  const released: string[] = [];
+  let claimCount = 0;
+  const repository = {
+    listLiveOptInTargets: async () => targets,
+    claimWorkerLease: async (token: string, _at: Date, ttl: number) => {
+      claimCount += 1;
+      assert.equal(token, "synthetic-worker-token");
+      assert.equal(ttl, 10 * 60_000);
+      return true;
+    },
+    releaseWorkerLease: async (token: string) => { released.push(token); },
+  };
+  const processCharacter = async (_ownerId: string, input: { characterId: string; idempotencyKey: string }) => {
+    seenKeys.push(`${input.characterId}:${input.idempotencyKey}`);
+    if (input.characterId === "mar") return { status: "executed" };
+    if (input.characterId === "noah") return { status: "no_action" };
+    throw new Error("SYNTHETIC_TARGET_FAILURE");
+  };
+  const first = await runAutonomyWorkerTick({
+    enabled: true, repository, processCharacter, now, tokenFactory: () => "synthetic-worker-token",
+  });
+  assert.deepEqual(first, { status: "completed", evaluated: 3, executed: 1, noAction: 1, failed: 1 });
+  const firstKeys = [...seenKeys];
+  assert.equal(firstKeys.length, 3);
+  assert.ok(firstKeys.every((entry) => /^.+:worker:\d+:[a-f0-9]{24}$/.test(entry)));
+  assert.deepEqual(released, ["synthetic-worker-token"]);
+
+  seenKeys.length = 0;
+  const second = await runAutonomyWorkerTick({
+    enabled: true, repository, processCharacter, now, tokenFactory: () => "synthetic-worker-token",
+  });
+  assert.equal(second.status, "completed");
+  assert.deepEqual(seenKeys, firstKeys);
+  assert.equal(claimCount, 2);
+  assert.deepEqual(released, ["synthetic-worker-token", "synthetic-worker-token"]);
+});
+
+test("background scheduler is wired but globally disabled; timer lifecycle is controllable in tests", () => {
+  assert.equal(AUTONOMY_LIVE_EXECUTION_ENABLED, false);
+  const actualStartup = startAutonomyBackgroundWorker();
+  assert.equal(actualStartup.started, false);
+  actualStartup.stop();
+
+  let scheduled = 0;
+  let cleared = 0;
+  let interval = 0;
+  const fakeTimer = { unref() {} } as unknown as ReturnType<typeof setInterval>;
+  const stopped = startAutonomyWorker({
+    enabled: false,
+    tick: async () => ({ status: "disabled", evaluated: 0, executed: 0, noAction: 0, failed: 0 }),
+    setIntervalFn: (() => { scheduled += 1; return fakeTimer; }) as typeof setInterval,
+    clearIntervalFn: (() => { cleared += 1; }) as typeof clearInterval,
+  });
+  assert.equal(stopped.started, false);
+  assert.equal(scheduled, 0);
+
+  const started = startAutonomyWorker({
+    enabled: true,
+    intervalMs: AUTONOMY_WORKER_INTERVAL_MS,
+    tick: async () => ({ status: "completed", evaluated: 0, executed: 0, noAction: 0, failed: 0 }),
+    setIntervalFn: ((_callback: (...args: unknown[]) => void, delay?: number) => {
+      scheduled += 1;
+      interval = delay ?? 0;
+      return fakeTimer;
+    }) as typeof setInterval,
+    clearIntervalFn: ((_timer: ReturnType<typeof setInterval>) => { cleared += 1; }) as typeof clearInterval,
+  });
+  assert.equal(started.started, true);
+  assert.equal(scheduled, 1);
+  assert.equal(interval, AUTONOMY_WORKER_INTERVAL_MS);
+  started.stop();
+  assert.equal(cleared, 1);
+});
+
+test("PostgreSQL worker lease is exclusive, token-owned, and restores the prior singleton row", async () => {
+  const name = "autonomy-live-worker";
+  const [previous] = await db.select().from(echoAutonomyWorkerLeasesTable)
+    .where(eq(echoAutonomyWorkerLeasesTable.name, name)).limit(1);
+  const now = new Date();
+  const expired = new Date(now.getTime() - 1_000);
+  const firstToken = `synthetic-lease-${crypto.randomUUID()}`;
+  const secondToken = `synthetic-lease-${crypto.randomUUID()}`;
+  try {
+    await db.insert(echoAutonomyWorkerLeasesTable).values({
+      name, token: "synthetic-expired-lease", expiresAt: expired, updatedAt: expired,
+    }).onConflictDoUpdate({
+      target: echoAutonomyWorkerLeasesTable.name,
+      set: { token: "synthetic-expired-lease", expiresAt: expired, updatedAt: expired },
+    });
+    assert.equal(await claimAutonomyWorkerLease(firstToken, now, 60_000), true);
+    assert.equal(await claimAutonomyWorkerLease(secondToken, now, 60_000), false);
+    await releaseAutonomyWorkerLease(secondToken);
+    const [stillOwned] = await db.select().from(echoAutonomyWorkerLeasesTable)
+      .where(eq(echoAutonomyWorkerLeasesTable.name, name)).limit(1);
+    assert.equal(stillOwned.token, firstToken);
+    await releaseAutonomyWorkerLease(firstToken);
+    assert.equal((await db.select().from(echoAutonomyWorkerLeasesTable)
+      .where(eq(echoAutonomyWorkerLeasesTable.name, name)).limit(1)).length, 0);
+  } finally {
+    if (previous) {
+      await db.insert(echoAutonomyWorkerLeasesTable).values(previous).onConflictDoUpdate({
+        target: echoAutonomyWorkerLeasesTable.name,
+        set: { token: previous.token, expiresAt: previous.expiresAt, updatedAt: previous.updatedAt },
+      });
+    } else {
+      await db.delete(echoAutonomyWorkerLeasesTable)
+        .where(eq(echoAutonomyWorkerLeasesTable.name, name));
+    }
+  }
+});
+
+test("live cycle recovers stuck runs only after the current threshold and attempt limit, without social execution", async () => {
+  assert.equal(AUTONOMY_LIVE_EXECUTION_ENABLED, false);
+  const ownerId = syntheticOwnerId();
+  const { state, mar } = fixture();
+  const now = new Date();
+  const provider: TextProvider = {
+    name: "synthetic-no-call",
+    complete: async () => { throw new Error("PROVIDER_MUST_NOT_BE_CALLED"); },
+  };
+  let providerCalls = 0;
+  let executorCalls = 0;
+  const repository = {
+    read: async () => ({ state, revision: 1 }),
+    readControls: async () => ({
+      globalKillSwitchEngaged: false,
+      liveExecutionEnabled: true,
+      characters: new Map([[mar.id, { enabled: true, maxActionsPerDay: 1, minCooldownMinutes: 60 }]]),
+    }),
+    getExecutedHistory: async () => [{
+      status: "executed", action: "draft", situation: "post",
+      createdAt: new Date(now.getTime() - 60_000),
+    }],
+    reserve: reserveDryRun,
+    complete: completeDryRun,
+    executeDecision: async () => {
+      executorCalls += 1;
+      return { status: "executed", action: "draft", situation: "post", targetId: "must-not-exist", revision: 2 } as const;
+    },
+  };
+  const run = async (key: string) => runAutonomyLiveCycle(ownerId, {
+    characterId: mar.id, idempotencyKey: key,
+  }, {
+    repository,
+    provider: {
+      ...provider,
+      complete: async () => { providerCalls += 1; throw new Error("PROVIDER_MUST_NOT_BE_CALLED"); },
+    },
+    liveExecutionEnabled: true,
+    now,
+    random: () => 0,
+  });
+  const inspectRun = async (idempotencyKey: string) => {
+    const [row] = await db.select().from(echoAutonomyRunsTable).where(and(
+      eq(echoAutonomyRunsTable.ownerId, ownerId),
+      eq(echoAutonomyRunsTable.idempotencyKey, idempotencyKey),
+    )).limit(1);
+    return row;
+  };
+
+  const recentKey = crypto.randomUUID();
+  await insertAutonomyRun({
+    ownerId, key: recentKey, status: "running", attemptCount: 1,
+    now, updatedAt: new Date(Date.now() - 110_000),
+  });
+  const recent = await run(recentKey);
+  assert.equal(recent.status, "in_progress");
+  assert.equal((await inspectRun(recentKey)).attemptCount, 1);
+
+  const staleKey = crypto.randomUUID();
+  await insertAutonomyRun({
+    ownerId, key: staleKey, status: "running", attemptCount: 1,
+    now, updatedAt: new Date(Date.now() - 130_000),
+  });
+  const reclaimed = await run(staleKey);
+  assert.equal(reclaimed.status, "cooldown");
+  const reclaimedRow = await inspectRun(staleKey);
+  assert.equal(reclaimedRow.attemptCount, 2);
+  assert.equal(reclaimedRow.status, "cooldown");
+  assert.equal(reclaimedRow.finishedAt instanceof Date, true);
+
+  const exhaustedKey = crypto.randomUUID();
+  await insertAutonomyRun({
+    ownerId, key: exhaustedKey, status: "running", attemptCount: 3,
+    now, updatedAt: new Date(Date.now() - 130_000),
+  });
+  const exhausted = await run(exhaustedKey);
+  assert.equal(exhausted.status, "duplicate");
+  const exhaustedRow = await inspectRun(exhaustedKey);
+  assert.equal(exhaustedRow.status, "stale_failed");
+  assert.equal(exhaustedRow.lastErrorCode, "LEASE_EXPIRED");
+  assert.equal(exhaustedRow.finishedAt instanceof Date, true);
+  assert.equal(providerCalls, 0);
+  assert.equal(executorCalls, 0);
+  assert.equal(state.posts.length, 0);
 });
