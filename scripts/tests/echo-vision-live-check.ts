@@ -454,7 +454,7 @@ try {
       recordedDryRuns: completedRuns.length },
     syntheticVisionContextReads,
     socialUniverseUnchanged: true,
-    liveExecutionEnabled: settings.liveExecutionEnabled,
+    liveExecutionEnabled: autonomy.liveExecutionEnabled,
   };
 } catch (error) {
   report = { ...report, result: "FAIL", error: safeError(error) };
