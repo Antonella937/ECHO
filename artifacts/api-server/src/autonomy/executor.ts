@@ -22,7 +22,6 @@ import type { Opportunity } from "./policy";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ALLOWED_REACTIONS = new Set(["❤", "😂", "😮", "😢", "🔥", "👏"]);
-const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 
 export type LiveExecutionOutcome =
   | { status: "executed"; action: string; situation: string; targetId: string | null; revision: number }
@@ -85,7 +84,7 @@ export function applyAutonomyDecision(
   if (decision.action === "draft" && decision.situation === "post") {
     if (!text) throw new SocialExecutionError("EMPTY_POST_TEXT");
     const post: Post = {
-      id: idFactory(), authorId: characterId, image: TRANSPARENT_PIXEL, caption: text, location: "",
+      id: idFactory(), authorId: characterId, image: "", caption: text, location: "",
       createdAt: now, likes: [], savedBy: [], origin: "autonomy", illustrative: false, commentsEnabled: true,
     };
     return { state: { ...state, posts: [...state.posts, post] }, changed: true, targetId: post.id };
@@ -397,7 +396,7 @@ export async function executeAutonomyDecision(input: {
     }
 
     const [saved] = await tx.update(echoUniversesTable).set({
-      state: mutation.state as Record<string, unknown>,
+      state: mutation.state as unknown as Record<string, unknown>,
       revision: sql`${echoUniversesTable.revision} + 1`,
       updatedAt: now,
     }).where(and(

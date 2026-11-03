@@ -2,9 +2,12 @@ import type { Post, PostMedia } from './types';
 
 export const MAX_POST_MEDIA = 10;
 
-/** Legacy posts are projected, never rewritten. Order + stable ids address each item. */
+/** Legacy posts are projected, never rewritten. Empty image means a text-only post. */
 export function postMedia(post: Pick<Post, 'id' | 'image' | 'media'>): PostMedia[] {
-  return post.media?.length ? post.media : [{ id: `${post.id}:legacy`, type: 'image', url: post.image }];
+  if (post.media?.length) return post.media;
+  return typeof post.image === 'string' && post.image.trim()
+    ? [{ id: `${post.id}:legacy`, type: 'image', url: post.image }]
+    : [];
 }
 
 export function validatePostMedia(media: PostMedia[]): void {

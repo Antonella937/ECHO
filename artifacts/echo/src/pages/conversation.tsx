@@ -12,6 +12,7 @@ import { resolveMedia, timeAgo } from '@/lib/media';
 import { formatDuration, kindOf, uploadAttachment, validateAttachments, MAX_RECORDING_MS } from '@/lib/dm-attachments';
 import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { cn } from '@/lib/utils';
+import { postMedia } from '@/domain/post-media';
 import type { Message, MessageAttachment } from '@/domain/types';
 
 const REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
@@ -281,7 +282,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
       )}
       {post && (
         <Link href={`/p/${post.id}`} className="mb-1 block w-48 overflow-hidden rounded-2xl border border-border bg-card" data-testid={`link-shared-post-${m.id}`}>
-          <img src={resolveMedia(post.image)} alt="" className="aspect-[4/5] w-full object-cover" />
+          {postMedia(post).length > 0 && <img src={resolveMedia(post.image)} alt="" className="aspect-[4/5] w-full object-cover" />}
           <p className="truncate px-3 py-2 text-xs text-muted-foreground">{post.caption}</p>
         </Link>
       )}

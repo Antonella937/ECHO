@@ -2,6 +2,7 @@ import test from "node:test";
 import { after } from "node:test";
 import assert from "node:assert/strict";
 import { inArray } from "drizzle-orm";
+import { SaveUniverseBody } from "@workspace/api-zod";
 import {
   db,
   pool,
@@ -11,10 +12,12 @@ import {
 } from "@workspace/db";
 import { createSeedState } from "../../echo/src/store/seed";
 import { defaultCharacterConfig } from "../../echo/src/domain/character-core";
-import { chooseAutonomyOpportunity, liveEligibility } from "../src/autonomy/policy";
+import { applyAutonomyDecision } from "../src/autonomy/executor";
+import { chooseAutonomyOpportunity, liveEligibility, type Opportunity } from "../src/autonomy/policy";
 import { runAutonomyDryRun } from "../src/autonomy/service";
 import { buildCharacterContext } from "../src/ai-engine/context";
 import { previewDecision } from "../src/ai-engine/engine";
+import { postMedia } from "../../echo/src/domain/post-media";
 import type { AutonomyRepository } from "../src/autonomy/service";
 import type { TextProvider } from "../src/ai-engine/contracts";
 import {
@@ -68,6 +71,37 @@ test("planner chooses silence before spending a model call", () => {
   const result = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0.99 });
   assert.equal(result.situation, null);
   assert.equal(result.reasonCode, "SILENCE_SELECTED");
+});
+
+test("autonomous text posts have no fake media while photo and video projections stay intact", () => {
+  const { state, mar } = fixture();
+  const created = applyAutonomyDecision(
+    state,
+    mar.id,
+    { situation: "post" } as Opportunity,
+    {
+      action: "draft", situation: "post", text: "Ensayo y café.",
+      reason: "Post breve después del ensayo.", suggestedDelayMinutes: 0, contextSections: ["identity"],
+    },
+    NOW,
+    () => "synthetic-text-post",
+  );
+  const textPost = created.state.posts[0]!;
+  assert.equal(created.changed, true);
+  assert.equal(textPost.image, "");
+  assert.deepEqual(postMedia(textPost), []);
+  assert.equal(SaveUniverseBody.safeParse({ state: created.state, expectedRevision: 1 }).success, true);
+  assert.equal(state.posts.length, 0);
+
+  const legacyPhoto = { id: "legacy-photo", image: "asset://photo" } as Parameters<typeof postMedia>[0];
+  assert.deepEqual(postMedia(legacyPhoto), [
+    { id: "legacy-photo:legacy", type: "image", url: "asset://photo" },
+  ]);
+  const videoCarousel = {
+    id: "video-carousel", image: "",
+    media: [{ id: "clip-1", type: "video" as const, url: "asset://video" }],
+  } as Parameters<typeof postMedia>[0];
+  assert.deepEqual(postMedia(videoCarousel), videoCarousel.media);
 });
 
 test("planner considers non-repeating post/comment likes and text-based story/DM reactions", () => {

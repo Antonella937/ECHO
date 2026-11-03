@@ -34,6 +34,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const commentCount = state.comments.filter((c) => c.postId === post.id).length;
   const likers = post.likes.map(character).filter(Boolean);
   const tagged = (post.taggedAccountIds ?? []).map(character).filter(Boolean);
+  const media = postMedia(post);
   const firstLiker = likers.find((c) => c && c.id !== me.id) ?? likers[0];
 
   const onImageTap = () => {
@@ -63,20 +64,22 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </button>
       </header>
 
-      <div className="relative px-0 sm:px-3">
-        <PostMediaView
-          postId={post.id}
-          media={postMedia(post)}
-          alt={post.caption || `Foto de ${author.name}`}
-          eager={eager}
-          onTap={onImageTap}
-          overlay={burst > 0 && (
-            <span key={burst} className="heart-pop pointer-events-none absolute inset-0 grid place-items-center">
-              <Heart className="h-24 w-24 fill-primary text-primary drop-shadow-lg" strokeWidth={1} />
-            </span>
-          )}
-        />
-      </div>
+      {media.length > 0 && (
+        <div className="relative px-0 sm:px-3">
+          <PostMediaView
+            postId={post.id}
+            media={media}
+            alt={post.caption || `Foto de ${author.name}`}
+            eager={eager}
+            onTap={onImageTap}
+            overlay={burst > 0 && (
+              <span key={burst} className="heart-pop pointer-events-none absolute inset-0 grid place-items-center">
+                <Heart className="h-24 w-24 fill-primary text-primary drop-shadow-lg" strokeWidth={1} />
+              </span>
+            )}
+          />
+        </div>
+      )}
 
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={liked ? 'Quitar me gusta' : 'Me gusta'} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
