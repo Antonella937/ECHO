@@ -9,6 +9,7 @@
   "include": [
     "src/app.ts",
     "tests/character-privacy.test.ts",
+    "tests/universe-sharing.test.ts",
     "tests/social-content-access.test.ts",
     "tests/social-reads.test.ts"
   ]

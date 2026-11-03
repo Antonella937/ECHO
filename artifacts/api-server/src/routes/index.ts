@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import universeRouter from "./universe";
+import universeSharingRouter from "./universe-sharing";
 import storageRouter from "./storage";
 import charactersRouter from "./characters";
 import aiEngineRouter from "./ai-engine";
@@ -14,6 +15,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(universeRouter);
+router.use(universeSharingRouter);
 router.use(storageRouter);
 router.use(charactersRouter);
 router.use(aiEngineRouter);
