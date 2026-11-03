@@ -53,7 +53,14 @@ try {
   const context = await browser.newContext({ viewport: { width: 402, height: 874 } });
   const page = await context.newPage();
   const ticket = await clerkClient.signInTokens.createSignInToken({ userId: ownerId, expiresInSeconds: 120 });
-  await page.goto(`${base}/sign-in`);
+  await page.goto(base);
+  await expect(page.getByTestId('link-create-account')).toBeVisible();
+  await page.getByTestId('link-create-account').click();
+  await expect(page).toHaveURL(/\/sign-up$/);
+  await page.waitForFunction(() => (window as any).Clerk?.loaded, { timeout: 30000 });
+  await expect(page.getByRole('heading', { name: 'Crea tu espacio privado' })).toBeVisible();
+  await page.getByRole('link', { name: 'Iniciar sesión' }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
   await page.waitForFunction(() => (window as any).Clerk?.loaded, { timeout: 30000 });
   await page.evaluate(async (signInTicket) => {
     const clerk = (window as any).Clerk;
@@ -117,6 +124,33 @@ try {
   assert.equal(reloaded.characters.length, 1, 'commercial starter should not receive demo accounts on reload');
   assert.deepEqual(reloaded.posts, []);
   assert.equal(reloaded.creatorSetup.plan, 'free');
+
+  // A separate authenticated session for the same owner must return directly
+  // to the saved universe rather than showing first-run onboarding again.
+  const returningContext = await browser.newContext({ viewport: { width: 402, height: 874 } });
+  const returningPage = await returningContext.newPage();
+  const returningTicket = await clerkClient.signInTokens.createSignInToken({
+    userId: ownerId,
+    expiresInSeconds: 120,
+  });
+  await returningPage.goto(`${base}/sign-in`);
+  await returningPage.waitForFunction(() => (window as any).Clerk?.loaded, { timeout: 30000 });
+  await returningPage.evaluate(async (signInTicket) => {
+    const clerk = (window as any).Clerk;
+    const attempt = await clerk.client.signIn.create({ strategy: 'ticket', ticket: signInTicket });
+    if (attempt.status !== 'complete') throw Error(`Returning test sign-in status: ${attempt.status}`);
+    await clerk.setActive({ session: attempt.createdSessionId });
+  }, returningTicket.token);
+  await returningPage.goto(base);
+  await expect(returningPage.getByTestId('nav-mobile')).toBeVisible({ timeout: 30000 });
+  await expect(returningPage.getByRole('heading', { name: 'Hagamos espacio para tu mundo.' })).toHaveCount(0);
+  const returnedState = await returningPage.evaluate(async () => (
+    await (await fetch('/api/universe', { cache: 'no-store' })).json()
+  ).state);
+  assert.equal(returnedState.creatorSetup.universeName, universeName);
+  assert.equal(returnedState.characters[0].name, displayName);
+  await returningContext.close();
+
   console.log('PASS: disposable Clerk owner completed onboarding, saved/reloaded one private empty universe and entered the existing mobile shell.');
 } finally {
   await browser.close();

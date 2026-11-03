@@ -255,7 +255,7 @@ function AuthenticatedExperience() {
     };
     return (
       <Switch>
-        <Route path="/" component={() => (
+        <Route path="/">
           <OnboardingPage
             saving={saveUniverseMutation.isPending}
             error={null}
@@ -266,8 +266,8 @@ function AuthenticatedExperience() {
               setLocation('/');
             }}
           />
-        )} />
-        <Route path="/onboarding" component={() => (
+        </Route>
+        <Route path="/onboarding">
           <OnboardingPage
             saving={saveUniverseMutation.isPending}
             error={null}
@@ -278,7 +278,7 @@ function AuthenticatedExperience() {
               setLocation('/');
             }}
           />
-        )} />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     );
