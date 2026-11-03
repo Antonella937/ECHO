@@ -199,7 +199,7 @@ test("HTTP Vision route propagates universeId for posts and Stories and rejects 
         calls.push({
           ownerId: id,
           universeId,
-          marker: state.characters.find((character) => character.id === "mar")?.configuration?.personality.description ?? "",
+          marker: state.posts.find((post) => post.id === entityId)?.location ?? "",
           entityId,
         });
         return { entityType: "post", entityId, summary: null, items: [], skippedVideoCount: 0 };
@@ -208,7 +208,7 @@ test("HTTP Vision route propagates universeId for posts and Stories and rejects 
         calls.push({
           ownerId: id,
           universeId,
-          marker: state.characters.find((character) => character.id === "mar")?.configuration?.personality.description ?? "",
+          marker: state.posts.find((post) => post.id === postId)?.location ?? "",
           entityId,
         });
         return { entityType: "story", entityId, items: [] };
@@ -239,25 +239,25 @@ test("HTTP Vision route propagates universeId for posts and Stories and rejects 
   assert.deepEqual(calls.at(-1), {
     ownerId: owners.alpha,
     universeId: "studio",
-    marker: "PERSONALITY_ALPHA_STUDIO",
+    marker: "Lugar studio",
     entityId: postId,
   });
 
   const fallbackPost = await postVision(owners.alpha, { postId });
   assert.equal(fallbackPost.status, 200);
   assert.equal(calls.at(-1)?.universeId, "primary");
-  assert.equal(calls.at(-1)?.marker, "PERSONALITY_ALPHA_PRIMARY");
+  assert.equal(calls.at(-1)?.marker, "Lugar primary");
 
   const selectedStory = await postVision(owners.alpha, { storyId, universeId: "studio" });
   assert.equal(selectedStory.status, 200);
   assert.equal(calls.at(-1)?.universeId, "studio");
-  assert.equal(calls.at(-1)?.marker, "PERSONALITY_ALPHA_STUDIO");
+  assert.equal(calls.at(-1)?.marker, "Lugar studio");
   assert.equal(calls.at(-1)?.entityId, storyId);
 
   const betaPost = await postVision(owners.beta, { postId, universeId: "primary" });
   assert.equal(betaPost.status, 200);
   assert.equal(calls.at(-1)?.ownerId, owners.beta);
-  assert.equal(calls.at(-1)?.marker, "PERSONALITY_BETA_PRIMARY");
+  assert.equal(calls.at(-1)?.marker, "Lugar beta");
 
   const callsBeforeReject = calls.length;
   const foreignUniverse = await postVision(owners.beta, { postId, universeId: "studio" });
