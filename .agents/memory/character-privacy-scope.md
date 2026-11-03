@@ -14,3 +14,9 @@ Cross-owner social reads must authorize a full target identity (owner + universe
 **Why:** IDs repeat across owners and universes, and full state includes private configuration, interaction details, and counts that should not leak through public profile/feed surfaces.
 
 **How to apply:** require a viewer character scoped to the authenticated owner for private-follow access; filter inaccessible content before pagination and omit internal configuration, messages, reactions, and counts from cross-owner read responses.
+
+Until cross-owner mutation APIs exist, posts from other owners must remain read-only in the client; posts in the owner's active universe retain their existing interactions.
+
+**Why:** local social actions resolve only character/post IDs, which can collide across owners and universes.
+
+**How to apply:** keep full owner + universe + character + post identity for remote feed entries; never pass remote IDs into local-only mutation handlers or invent omitted counts.
