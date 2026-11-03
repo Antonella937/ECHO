@@ -349,7 +349,7 @@ test("synthetic AI previews accept only correct non-text likes/reactions and nev
   state.posts.push({
     id: "target-post", authorId: noah.id, caption: "Ensayo", location: "",
     createdAt: new Date(NOW.getTime() - 60 * 60_000), likes: [], savedBy: [], commentsEnabled: true,
-  } as (typeof state.posts)[number]);
+  } as unknown as (typeof state.posts)[number]);
   state.stories.push({
     id: "target-story", authorId: noah.id, image: "asset:test", caption: "Prueba de sonido",
     createdAt: new Date(NOW.getTime() - 30 * 60_000), seenBy: [mar.id], reactions: [], origin: "user",
@@ -905,7 +905,7 @@ test("background scheduler is wired but globally disabled; timer lifecycle is co
   const stopped = startAutonomyWorker({
     enabled: false,
     tick: async () => ({ status: "disabled", evaluated: 0, executed: 0, noAction: 0, failed: 0 }),
-    setIntervalFn: (() => { scheduled += 1; return fakeTimer; }) as typeof setInterval,
+    setIntervalFn: (() => { scheduled += 1; return fakeTimer; }) as unknown as typeof setInterval,
     clearIntervalFn: (() => { cleared += 1; }) as typeof clearInterval,
   });
   assert.equal(stopped.started, false);
