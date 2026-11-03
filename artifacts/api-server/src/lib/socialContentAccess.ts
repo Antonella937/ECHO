@@ -17,9 +17,11 @@ export type SocialContentViewer = {
   characterId: string;
 };
 
-type CharacterReadOptions = {
-  /** Media is intentionally deferred to privacy step 2B. */
-  requireUniverseSharing?: boolean;
+export type SocialMediaSource = {
+  universeId: string;
+  characterId: string;
+  contentType: "post" | "story" | "avatar";
+  contentId: string;
 };
 
 type PlainRecord = Record<string, unknown>;
@@ -138,7 +140,6 @@ export async function canReadSocialCharacter(
   authenticatedOwnerId: string,
   target: CharacterIdentity,
   viewer?: SocialContentViewer,
-  options: CharacterReadOptions = {},
 ): Promise<boolean> {
   if (!authenticatedOwnerId) return false;
   const [targetUniverse] = await db.select({
@@ -160,7 +161,7 @@ export async function canReadSocialCharacter(
     // selected universe must not cross this universe boundary.
     return !viewer || viewer.universeId === target.universeId;
   }
-  if (options.requireUniverseSharing !== false && !targetUniverse.sharingEnabled) return false;
+  if (!targetUniverse.sharingEnabled) return false;
   if (targetCharacter.archived === true) return false;
 
   const [privacy] = await db.select({ visibility: echoCharacterPrivacyTable.visibility })
@@ -212,47 +213,36 @@ export function storyIsStillVisible(state: PlainRecord, story: PlainRecord, nowM
   });
 }
 
-function mediaAssociatedCharacters(
+function matchesMediaSource(
   stateValue: unknown,
   objectPath: string,
-  nowMs: number,
-): string[] {
+  source: SocialMediaSource,
+): boolean {
   const state = record(stateValue);
-  if (!state) return [];
-  const ids = new Set<string>();
-  for (const character of stateCharacters(state)) {
-    const id = stringValue(character.id);
-    if (id && !character.archived && character.avatar === objectPath) ids.add(id);
-  }
+  if (!state) return false;
+  const character = stateCharacters(state).find((item) => item.id === source.characterId);
+  if (!character || character.archived === true) return false;
 
-  const posts = state.posts;
-  if (Array.isArray(posts)) {
-    for (const value of posts) {
-      const post = record(value);
-      const authorId = stringValue(post?.authorId);
-      if (!post || !authorId) continue;
-      const directMatch = post.image === objectPath;
-      const media = Array.isArray(post.media) && post.media.some((item) => record(item)?.url === objectPath);
-      if (directMatch || media) ids.add(authorId);
-    }
+  if (source.contentType === "avatar") {
+    return source.contentId === source.characterId && character.avatar === objectPath;
   }
-
-  const stories = state.stories;
-  if (Array.isArray(stories)) {
-    for (const value of stories) {
-      const story = record(value);
-      const authorId = stringValue(story?.authorId);
-      if (
-        story &&
-        authorId &&
-        story.image === objectPath &&
-        storyIsStillVisible(state, story, nowMs)
-      ) {
-        ids.add(authorId);
-      }
-    }
+  if (source.contentType === "post") {
+    const posts = Array.isArray(state.posts) ? state.posts : [];
+    const post = posts.map(record).find((item) =>
+      item?.id === source.contentId && item.authorId === source.characterId);
+    return Boolean(post && (
+      post.image === objectPath ||
+      (Array.isArray(post.media) && post.media.some((item) => record(item)?.url === objectPath))
+    ));
   }
-  return [...ids];
+  const stories = Array.isArray(state.stories) ? state.stories : [];
+  const story = stories.map(record).find((item) =>
+    item?.id === source.contentId && item.authorId === source.characterId);
+  return Boolean(
+    story &&
+    story.image === objectPath &&
+    storyIsStillVisible(state, story, Date.now()),
+  );
 }
 
 /**
@@ -264,25 +254,24 @@ export async function canReadSocialMedia(
   authenticatedOwnerId: string,
   mediaOwnerId: string,
   objectPath: string,
+  source?: SocialMediaSource,
   viewer?: SocialContentViewer,
 ): Promise<boolean> {
   if (!authenticatedOwnerId) return false;
   if (authenticatedOwnerId === mediaOwnerId) return true;
+  if (!source) return false;
 
-  const universes = await db.select({
-    universeId: echoUniversesTable.universeId,
-    state: echoUniversesTable.state,
-  }).from(echoUniversesTable)
-    .where(eq(echoUniversesTable.ownerId, mediaOwnerId));
-  for (const universe of universes) {
-    for (const characterId of mediaAssociatedCharacters(universe.state, objectPath, Date.now())) {
-      if (await canReadSocialCharacter(
-        authenticatedOwnerId,
-        { ownerId: mediaOwnerId, universeId: universe.universeId, characterId },
-        viewer,
-        { requireUniverseSharing: false },
-      )) return true;
-    }
-  }
-  return false;
+  const [universe] = await db.select({ state: echoUniversesTable.state })
+    .from(echoUniversesTable)
+    .where(and(
+      eq(echoUniversesTable.ownerId, mediaOwnerId),
+      eq(echoUniversesTable.universeId, source.universeId),
+    ))
+    .limit(1);
+  if (!universe || !matchesMediaSource(universe.state, objectPath, source)) return false;
+  return canReadSocialCharacter(
+    authenticatedOwnerId,
+    { ownerId: mediaOwnerId, universeId: source.universeId, characterId: source.characterId },
+    viewer,
+  );
 }

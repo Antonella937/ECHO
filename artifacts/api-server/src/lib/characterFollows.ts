@@ -37,6 +37,10 @@ export type FollowServiceResult<T> =
   | { ok: false; error: FollowServiceError };
 
 type UniverseIdentity = Pick<CharacterIdentity, "ownerId" | "universeId">;
+type LockedUniverse = {
+  state: unknown;
+  sharingEnabled: boolean;
+};
 
 function universeKey(value: UniverseIdentity): string {
   return JSON.stringify([value.ownerId, value.universeId]);
@@ -79,18 +83,21 @@ function targetIdentity(input: FollowTargetInput): CharacterIdentity {
 async function lockAndValidateCharacters(
   tx: FollowTransaction,
   identities: CharacterIdentity[],
-): Promise<boolean> {
+): Promise<Map<string, LockedUniverse> | null> {
   const universes = [...new Map(identities.map((identity) => [
     universeKey(identity),
     { ownerId: identity.ownerId, universeId: identity.universeId },
   ])).values()].sort((a, b) =>
     a.ownerId.localeCompare(b.ownerId) || a.universeId.localeCompare(b.universeId),
   );
-  const states = new Map<string, unknown>();
+  const states = new Map<string, LockedUniverse>();
 
   // Stable lock order prevents reciprocal follow operations from deadlocking.
   for (const universe of universes) {
-    const [row] = await tx.select({ state: echoUniversesTable.state })
+    const [row] = await tx.select({
+      state: echoUniversesTable.state,
+      sharingEnabled: echoUniversesTable.sharingEnabled,
+    })
       .from(echoUniversesTable)
       .where(and(
         eq(echoUniversesTable.ownerId, universe.ownerId),
@@ -98,23 +105,34 @@ async function lockAndValidateCharacters(
       ))
       .for("update")
       .limit(1);
-    if (!row) return false;
-    states.set(universeKey(universe), row.state);
+    if (!row) return null;
+    states.set(universeKey(universe), row);
   }
 
   for (const identity of identities) {
-    const state = states.get(universeKey(identity));
-    if (!characterIds(state).includes(identity.characterId)) return false;
+    const universe = states.get(universeKey(identity));
+    if (!universe || !characterIds(universe.state).includes(identity.characterId)) return null;
   }
   for (const universe of universes) {
     await ensureCharacterPrivacyDefaultsInTransaction(
       tx,
       universe.ownerId,
       universe.universeId,
-      states.get(universeKey(universe)),
+      states.get(universeKey(universe))?.state,
     );
   }
-  return true;
+  return states;
+}
+
+function relationAllowed(
+  source: CharacterIdentity,
+  target: CharacterIdentity,
+  universes: Map<string, LockedUniverse>,
+): boolean {
+  if (source.ownerId === target.ownerId) {
+    return source.universeId === target.universeId;
+  }
+  return universes.get(universeKey(target))?.sharingEnabled === true;
 }
 
 function pairFilter(
@@ -169,7 +187,11 @@ export async function followCharacter(
   }
 
   return db.transaction(async (tx) => {
-    if (!await lockAndValidateCharacters(tx, [source, target])) {
+    const universes = await lockAndValidateCharacters(tx, [source, target]);
+    if (!universes) {
+      return { ok: false, error: "CHARACTER_NOT_FOUND" };
+    }
+    if (!relationAllowed(source, target, universes)) {
       return { ok: false, error: "CHARACTER_NOT_FOUND" };
     }
     const [active] = await tx.select({ sourceCharacterId: echoCharacterFollowsTable.sourceCharacterId })
@@ -247,7 +269,11 @@ export async function unfollowCharacter(
     return { ok: false, error: "SELF_FOLLOW_NOT_ALLOWED" };
   }
   return db.transaction(async (tx) => {
-    if (!await lockAndValidateCharacters(tx, [source, target])) {
+    const universes = await lockAndValidateCharacters(tx, [source, target]);
+    if (!universes) {
+      return { ok: false, error: "CHARACTER_NOT_FOUND" };
+    }
+    if (!relationAllowed(source, target, universes)) {
       return { ok: false, error: "CHARACTER_NOT_FOUND" };
     }
     const removed = await tx.delete(echoCharacterFollowsTable)
@@ -313,21 +339,27 @@ export async function removeCharacterSocialRecordsForDeletedCharacters(
 
 export async function listOwnFollowRequests(
   authenticatedOwnerId: string,
+  universeId: string,
   direction: "incoming" | "outgoing" | "all",
   status: CharacterFollowRequestStatus | "all",
 ) {
+  const sourceInUniverse = and(
+    eq(echoCharacterFollowRequestsTable.sourceOwnerId, authenticatedOwnerId),
+    eq(echoCharacterFollowRequestsTable.sourceUniverseId, universeId),
+  );
+  const targetInUniverse = and(
+    eq(echoCharacterFollowRequestsTable.targetOwnerId, authenticatedOwnerId),
+    eq(echoCharacterFollowRequestsTable.targetUniverseId, universeId),
+  );
   const directionFilter = direction === "incoming"
-    ? eq(echoCharacterFollowRequestsTable.targetOwnerId, authenticatedOwnerId)
+    ? targetInUniverse
     : direction === "outgoing"
-      ? eq(echoCharacterFollowRequestsTable.sourceOwnerId, authenticatedOwnerId)
-      : or(
-        eq(echoCharacterFollowRequestsTable.sourceOwnerId, authenticatedOwnerId),
-        eq(echoCharacterFollowRequestsTable.targetOwnerId, authenticatedOwnerId),
-      );
+      ? sourceInUniverse
+      : or(sourceInUniverse, targetInUniverse);
   const statusFilter = status === "all"
     ? undefined
     : eq(echoCharacterFollowRequestsTable.status, status);
-  return db.select({
+  const rows = await db.select({
     requestId: echoCharacterFollowRequestsTable.id,
     sourceOwnerId: echoCharacterFollowRequestsTable.sourceOwnerId,
     sourceUniverseId: echoCharacterFollowRequestsTable.sourceUniverseId,
@@ -342,12 +374,57 @@ export async function listOwnFollowRequests(
     .where(statusFilter ? and(directionFilter, statusFilter) : directionFilter)
     .orderBy(desc(echoCharacterFollowRequestsTable.createdAt))
     .limit(100);
+
+  const universeCache = new Map<string, Promise<LockedUniverse | null>>();
+  const readUniverse = (ownerId: string, id: string): Promise<LockedUniverse | null> => {
+    const key = universeKey({ ownerId, universeId: id });
+    let cached = universeCache.get(key);
+    if (!cached) {
+      cached = db.select({
+        state: echoUniversesTable.state,
+        sharingEnabled: echoUniversesTable.sharingEnabled,
+      }).from(echoUniversesTable).where(and(
+        eq(echoUniversesTable.ownerId, ownerId),
+        eq(echoUniversesTable.universeId, id),
+      )).limit(1).then(([row]) => row ?? null);
+      universeCache.set(key, cached);
+    }
+    return cached;
+  };
+  const visible = [];
+  for (const row of rows) {
+    const source = {
+      ownerId: row.sourceOwnerId,
+      universeId: row.sourceUniverseId,
+      characterId: row.sourceCharacterId,
+    };
+    const target = {
+      ownerId: row.targetOwnerId,
+      universeId: row.targetUniverseId,
+      characterId: row.targetCharacterId,
+    };
+    const sourceUniverse = await readUniverse(source.ownerId, source.universeId);
+    const targetUniverse = await readUniverse(target.ownerId, target.universeId);
+    if (!sourceUniverse || !targetUniverse ||
+      !characterIds(sourceUniverse.state).includes(source.characterId) ||
+      !characterIds(targetUniverse.state).includes(target.characterId)) continue;
+
+    if (source.ownerId === target.ownerId) {
+      if (source.universeId !== target.universeId || source.universeId !== universeId) continue;
+    } else if (!targetUniverse.sharingEnabled) {
+      // Historical requests remain stored but cannot reveal an opted-out target.
+      continue;
+    }
+    visible.push(row);
+  }
+  return visible;
 }
 
 export async function transitionFollowRequest(
   authenticatedOwnerId: string,
   requestId: string,
   action: "accept" | "reject" | "cancel",
+  universeId: string,
 ): Promise<FollowServiceResult<{ status: CharacterFollowRequestStatus }>> {
   return db.transaction(async (tx) => {
     const [initial] = await tx.select().from(echoCharacterFollowRequestsTable)
@@ -356,6 +433,10 @@ export async function transitionFollowRequest(
     if (!initial) return { ok: false, error: "CHARACTER_NOT_FOUND" };
     const actorOwnerId = action === "cancel" ? initial.sourceOwnerId : initial.targetOwnerId;
     if (actorOwnerId !== authenticatedOwnerId) {
+      return { ok: false, error: "CHARACTER_NOT_FOUND" };
+    }
+    const actorUniverseId = action === "cancel" ? initial.sourceUniverseId : initial.targetUniverseId;
+    if (actorUniverseId !== universeId) {
       return { ok: false, error: "CHARACTER_NOT_FOUND" };
     }
 
@@ -369,7 +450,11 @@ export async function transitionFollowRequest(
       universeId: initial.targetUniverseId,
       characterId: initial.targetCharacterId,
     };
-    if (!await lockAndValidateCharacters(tx, [source, target])) {
+    const universes = await lockAndValidateCharacters(tx, [source, target]);
+    if (!universes) {
+      return { ok: false, error: "CHARACTER_NOT_FOUND" };
+    }
+    if (!relationAllowed(source, target, universes)) {
       return { ok: false, error: "CHARACTER_NOT_FOUND" };
     }
     const [request] = await tx.select().from(echoCharacterFollowRequestsTable)
@@ -379,6 +464,10 @@ export async function transitionFollowRequest(
     if (!request) return { ok: false, error: "CHARACTER_NOT_FOUND" };
     const expectedOwner = action === "cancel" ? request.sourceOwnerId : request.targetOwnerId;
     if (expectedOwner !== authenticatedOwnerId) {
+      return { ok: false, error: "CHARACTER_NOT_FOUND" };
+    }
+    const expectedUniverseId = action === "cancel" ? request.sourceUniverseId : request.targetUniverseId;
+    if (expectedUniverseId !== universeId) {
       return { ok: false, error: "CHARACTER_NOT_FOUND" };
     }
 

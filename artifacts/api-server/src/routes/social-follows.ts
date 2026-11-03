@@ -19,8 +19,13 @@ const followInputSchema = z.object({
 }).strict();
 
 const requestListQuerySchema = z.object({
+  universeId: z.string().trim().min(1).max(120).default("primary"),
   direction: z.enum(["incoming", "outgoing", "all"]).default("all"),
   status: z.enum(["pending", "accepted", "rejected", "cancelled", "all"]).default("pending"),
+}).strict();
+
+const transitionQuerySchema = z.object({
+  universeId: z.string().trim().min(1).max(120).default("primary"),
 }).strict();
 
 const requestIdSchema = z.string().uuid();
@@ -53,6 +58,7 @@ export function createSocialFollowsRouter(options: SocialFollowsRouterOptions = 
     }
     const requests = await listOwnFollowRequests(
       req.userId!,
+      parsed.data.universeId,
       parsed.data.direction,
       parsed.data.status,
     );
@@ -96,7 +102,17 @@ export function createSocialFollowsRouter(options: SocialFollowsRouterOptions = 
         res.status(400).json({ error: "INVALID_REQUEST_ID" });
         return;
       }
-      const result = await transitionFollowRequest(req.userId!, parsed.data, action);
+      const parsedQuery = transitionQuerySchema.safeParse(req.query);
+      if (!parsedQuery.success) {
+        res.status(400).json({ error: "INVALID_REQUEST_UNIVERSE" });
+        return;
+      }
+      const result = await transitionFollowRequest(
+        req.userId!,
+        parsed.data,
+        action,
+        parsedQuery.data.universeId,
+      );
       if (!result.ok) {
         sendServiceError(res, result.error);
         return;

@@ -35,9 +35,21 @@ type StorageRouterOptions = {
 const viewerQuerySchema = z.object({
   viewerUniverseId: z.string().trim().min(1).max(120).optional(),
   viewerCharacterId: z.string().trim().min(1).max(120).optional(),
+  sourceUniverseId: z.string().trim().min(1).max(120).optional(),
+  sourceCharacterId: z.string().trim().min(1).max(120).optional(),
+  sourceContentType: z.enum(["post", "story", "avatar"]).optional(),
+  sourceContentId: z.string().trim().min(1).max(160).optional(),
 }).strict().refine((value) =>
   Boolean(value.viewerUniverseId) === Boolean(value.viewerCharacterId),
-);
+).refine((value) => {
+  const sourceParts = [
+    value.sourceUniverseId,
+    value.sourceCharacterId,
+    value.sourceContentType,
+    value.sourceContentId,
+  ];
+  return sourceParts.every(Boolean) || sourceParts.every((part) => !part);
+});
 
 /** Uploads remain owner-only; only media attached to readable social content can be shared. */
 export function createStorageRouter(options: StorageRouterOptions = {}): IRouter {
@@ -134,6 +146,7 @@ export function createStorageRouter(options: StorageRouterOptions = {}): IRouter
   "/storage/objects/*objectPath",
   authenticate,
   async (req, res): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
     const rawPath = req.params.objectPath;
     const objectPath = `/objects/${Array.isArray(rawPath) ? rawPath.join("/") : rawPath}`;
     const parsedViewer = viewerQuerySchema.safeParse(req.query);
@@ -145,6 +158,14 @@ export function createStorageRouter(options: StorageRouterOptions = {}): IRouter
       ? {
         universeId: parsedViewer.data.viewerUniverseId,
         characterId: parsedViewer.data.viewerCharacterId!,
+      }
+      : undefined;
+    const source = parsedViewer.data.sourceUniverseId
+      ? {
+        universeId: parsedViewer.data.sourceUniverseId,
+        characterId: parsedViewer.data.sourceCharacterId!,
+        contentType: parsedViewer.data.sourceContentType!,
+        contentId: parsedViewer.data.sourceContentId!,
       }
       : undefined;
     const [media] = await db
@@ -161,6 +182,7 @@ export function createStorageRouter(options: StorageRouterOptions = {}): IRouter
       req.userId!,
       media.ownerId,
       objectPath,
+      source,
       viewer,
     );
     if (!authorized) {

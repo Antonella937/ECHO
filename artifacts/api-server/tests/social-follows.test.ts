@@ -62,11 +62,13 @@ async function seedUniverse(
   universeId: string,
   characterIds: string[],
   legacyFollows: Record<string, string[]> = {},
+  sharingEnabled = false,
 ): Promise<void> {
   await db.insert(echoUniversesTable).values({
     ownerId,
     universeId,
     revision: 1,
+    sharingEnabled,
     state: {
       creatorSetup: { plan: "free" },
       characters: characterIds.map((id) => ({ id })),
@@ -142,8 +144,8 @@ after(async () => {
 test("public follows are direct, idempotent, and distinguish repeated character IDs by universe", async () => {
   await seedUniverse(ownerA, "primary", ["nela", "same-id"]);
   await seedUniverse(ownerA, "studio", ["nela", "same-id"]);
-  await seedUniverse(ownerB, "primary", ["target"]);
-  await seedUniverse(ownerB, "studio", ["target"]);
+  await seedUniverse(ownerB, "primary", ["target"], {}, true);
+  await seedUniverse(ownerB, "studio", ["target"], {}, true);
 
   const primaryBody = makeBody("primary", "same-id", ownerB, "primary", "target");
   const [first, duplicate] = await Promise.all([
@@ -192,7 +194,7 @@ test("public follows are direct, idempotent, and distinguish repeated character 
 test("private follow requests are deduplicated, owner-visible, and accept atomically", async () => {
   const legacy = { "legacy-follower": ["legacy-following"] };
   await seedUniverse(ownerA, "primary", ["nela", "source"], legacy);
-  await seedUniverse(ownerB, "studio", ["nela", "private-target"]);
+  await seedUniverse(ownerB, "studio", ["nela", "private-target"], {}, true);
   await seedUniverse(ownerC, "primary", ["nela"]);
   await setCharacterVisibility(ownerB, "studio", "private-target", "private");
   const body = makeBody("primary", "source", ownerB, "studio", "private-target");
@@ -244,7 +246,7 @@ test("private follow requests are deduplicated, owner-visible, and accept atomic
 
 test("reject and cancel are authorized, idempotent terminal transitions", async () => {
   await seedUniverse(ownerA, "primary", ["nela", "source"]);
-  await seedUniverse(ownerB, "primary", ["nela", "reject-target", "cancel-target"]);
+  await seedUniverse(ownerB, "primary", ["nela", "reject-target", "cancel-target"], {}, true);
   await setCharacterVisibility(ownerB, "primary", "reject-target", "private");
   await setCharacterVisibility(ownerB, "primary", "cancel-target", "private");
   const rejectedResponse = await sendFollow(
@@ -274,7 +276,7 @@ test("reject and cancel are authorized, idempotent terminal transitions", async 
 
 test("visibility changes affect new follows while existing accepted follows remain active", async () => {
   await seedUniverse(ownerA, "primary", ["nela", "source"]);
-  await seedUniverse(ownerB, "primary", ["nela", "changing-target"]);
+  await seedUniverse(ownerB, "primary", ["nela", "changing-target"], {}, true);
   await setCharacterVisibility(ownerB, "primary", "changing-target", "private");
   const body = makeBody("primary", "source", ownerB, "primary", "changing-target");
 
@@ -302,7 +304,7 @@ test("visibility changes affect new follows while existing accepted follows rema
 test("requests reject spoofed, self, missing, cross-owner and malformed identities safely", async () => {
   await seedUniverse(ownerA, "primary", ["nela", "owned"]);
   await seedUniverse(ownerA, "studio", ["nela", "studio-only"]);
-  await seedUniverse(ownerB, "primary", ["nela", "target"]);
+  await seedUniverse(ownerB, "primary", ["nela", "target"], {}, true);
 
   assert.equal((await listRequests(undefined)).status, 401);
   assert.equal((await sendFollow(undefined, makeBody("primary", "owned", ownerB, "primary", "target"))).status, 401);
@@ -330,7 +332,7 @@ test("deleting a character removes only its relational edges and preserves legac
   const legacy = { "legacy-character": ["legacy-target"] };
   await seedUniverse(ownerA, "primary", ["nela", "same-id"], legacy);
   await seedUniverse(ownerA, "studio", ["nela", "same-id"]);
-  await seedUniverse(ownerB, "primary", ["nela", "public-target", "private-target"]);
+  await seedUniverse(ownerB, "primary", ["nela", "public-target", "private-target"], {}, true);
   await setCharacterVisibility(ownerB, "primary", "private-target", "private");
 
   const primaryBody = makeBody("primary", "same-id", ownerB, "primary", "public-target");
