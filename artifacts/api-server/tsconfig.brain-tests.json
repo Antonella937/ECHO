@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "noEmit": true,
+    "rootDir": "../.."
+  },
+  "include": ["tests/ai-engine-active-universe.test.ts"]
+}

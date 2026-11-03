@@ -13,6 +13,8 @@ import * as zod from 'zod';
  */
 export const previewCharacterDecisionBodyCharacterIdMax = 120;
 
+export const previewCharacterDecisionBodyUniverseIdMax = 120;
+
 export const previewCharacterDecisionBodyPostIdMax = 120;
 
 export const previewCharacterDecisionBodyCommentIdMax = 120;
@@ -28,6 +30,7 @@ export const previewCharacterDecisionBodyMessageIdMax = 120;
 export const PreviewCharacterDecisionBody = zod.object({
   "characterId": zod.string().min(1).max(previewCharacterDecisionBodyCharacterIdMax),
   "situation": zod.enum(['post', 'comment', 'dm', 'like_post', 'like_comment', 'story_reaction', 'dm_reaction']),
+  "universeId": zod.string().min(1).max(previewCharacterDecisionBodyUniverseIdMax).optional().describe('Owner-selected universe for this preview; defaults to primary.'),
   "postId": zod.string().min(1).max(previewCharacterDecisionBodyPostIdMax).optional(),
   "commentId": zod.string().min(1).max(previewCharacterDecisionBodyCommentIdMax).optional(),
   "recipientId": zod.string().min(1).max(previewCharacterDecisionBodyRecipientIdMax).optional(),

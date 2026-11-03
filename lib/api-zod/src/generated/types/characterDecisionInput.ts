@@ -15,6 +15,12 @@ export interface CharacterDecisionInput {
   characterId: string;
   situation: CharacterDecisionInputSituation;
   /**
+     * Owner-selected universe for this preview; defaults to primary.
+     * @minLength 1
+     * @maxLength 120
+     */
+  universeId?: string;
+  /**
      * @minLength 1
      * @maxLength 120
      */

@@ -67,7 +67,7 @@ router.post('/ai-engine/preview', requireAuth, async (req, res): Promise<void> =
   gates.set(owner, { running: true, until: now + 5000 });
   try {
     res.json(await previewForOwner(owner, input.data, {
-      read: readUniverse,
+      read: (ownerId, universeId) => readUniverse(ownerId, universeId ?? 'primary'),
       provider: new MeteredTextProvider(owner, "brain_text", provider),
       vision: (ownerId, state, decisionInput) => visionService.ensureForDecision(ownerId, state, decisionInput),
     }));
