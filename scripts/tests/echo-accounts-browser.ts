@@ -17,6 +17,12 @@ const { db, pool, echoUniversesTable, echoMediaTable } = serverRequire('@workspa
 const { eq, inArray } = serverRequire('drizzle-orm');
 const { ObjectStorageService } = await import('../../artifacts/api-server/src/lib/objectStorage');
 const base = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:80';
+if (process.env.NODE_ENV === 'production'
+  || !process.env.CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_')
+  || !process.env.CLERK_SECRET_KEY?.startsWith('sk_test_')
+  || (process.env.REPLIT_DEV_DOMAIN && !process.env.REPLIT_DEV_DOMAIN.endsWith('.replit.dev'))) {
+  throw Error('ECHO_BROWSER_TEST_REQUIRES_CLERK_DEVELOPMENT_ENVIRONMENT');
+}
 const chromiumPath = (await readdir('/nix/store')).find(p => p.includes('playwright-chromium-cjk'));
 if (!chromiumPath) throw Error('Chromium is required for this browser test.');
 const browser = await chromium.launch({ executablePath: `/nix/store/${chromiumPath}/chrome-linux/chrome`, args: ['--no-sandbox'] });
@@ -56,7 +62,60 @@ try {
   const owner = await createUser(), page = await signedIn(owner);
   const initial = await state(page);
   assert.equal(initial.currentCharacterId, 'nela');
-  if (process.env.ECHO_SOCIAL_ONLY === '1') {
+  if (process.env.ECHO_AUTH_ONLY === '1') {
+    const secondOwner = await createUser();
+    const secondPage = await signedIn(secondOwner);
+    const firstStateBefore = await state(page);
+    const secondStateBefore = await state(secondPage);
+    const universeRowsBefore = await db.select({
+      ownerId: echoUniversesTable.ownerId,
+      revision: echoUniversesTable.revision,
+      state: echoUniversesTable.state,
+    }).from(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, [owner, secondOwner]));
+    assert.equal(universeRowsBefore.length, 2, 'both disposable owners must have separate persisted universes');
+    assert.notEqual(owner, secondOwner);
+    assert.deepEqual(universeRowsBefore.find((row: any) => row.ownerId === owner)?.state, firstStateBefore);
+    assert.deepEqual(universeRowsBefore.find((row: any) => row.ownerId === secondOwner)?.state, secondStateBefore);
+
+    const getSettings = async (testPage: Page) => {
+      const response = await testPage.context().request.get(`${base}/api/autonomy/settings`);
+      assert.equal(response.status(), 200, 'authenticated owner settings request must succeed');
+      return response.json();
+    };
+    const firstSettings = await getSettings(page);
+    const secondSettings = await getSettings(secondPage);
+    for (const [settings, universeState] of [[firstSettings, firstStateBefore], [secondSettings, secondStateBefore]] as const) {
+      assert.equal(settings.liveExecutionEnabled, false);
+      assert.equal(settings.characters.length, universeState.characters.length);
+      assert.deepEqual(
+        settings.characters.map((character: any) => character.characterId).sort(),
+        universeState.characters.filter((character: any) => !character.archived).map((character: any) => character.id).sort(),
+      );
+      assert.ok(settings.characters.every((character: any) => character.enabled === false));
+    }
+
+    const anonymous = await browser.newContext();
+    try {
+      assert.equal((await anonymous.request.get(`${base}/api/autonomy/settings`)).status(), 401);
+      assert.equal((await anonymous.request.get(`${base}/api/universe`)).status(), 401);
+    } finally {
+      await anonymous.close();
+    }
+    assert.deepEqual(await state(page), firstStateBefore);
+    assert.deepEqual(await state(secondPage), secondStateBefore);
+    const universeRowsAfter = await db.select({
+      ownerId: echoUniversesTable.ownerId,
+      revision: echoUniversesTable.revision,
+      state: echoUniversesTable.state,
+    }).from(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, [owner, secondOwner]));
+    const sortRows = (rows: any[]) => rows.sort((left, right) => left.ownerId.localeCompare(right.ownerId));
+    assert.deepEqual(
+      sortRows(universeRowsAfter),
+      sortRows(universeRowsBefore),
+      'read-only authentication checks must not mutate either universe',
+    );
+    console.log('PASS: real Clerk development sign-in, owner-scoped universe/settings reads, anonymous 401s, isolated disposable owners, no social actions or universe changes.');
+  } else if (process.env.ECHO_SOCIAL_ONLY === '1') {
     await runSocialChecks(page, state, base);
   } else if (process.env.ECHO_CAROUSEL_ONLY === '1') {
     await runCarouselChecks(page, state, base, out, () => signedIn(owner), async () => signedIn(await createUser()));

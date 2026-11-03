@@ -6,6 +6,7 @@
   "scripts": {
     "test:echo-carousel": "tsx --test ../artifacts/echo/tests/post-media.test.ts",
     "test:echo-carousel-browser": "ECHO_CAROUSEL_ONLY=1 tsx tests/echo-accounts-browser.ts",
+    "test:echo-auth": "ECHO_AUTH_ONLY=1 tsx tests/echo-accounts-browser.ts",
     "test:echo-character-browser": "ECHO_CHARACTERS_ONLY=1 tsx tests/echo-accounts-browser.ts",
     "test:echo-characters": "tsx --test ../artifacts/echo/tests/character-core.test.ts",
     "test:echo-ux": "ECHO_UX_ONLY=1 tsx tests/echo-accounts-browser.ts",
