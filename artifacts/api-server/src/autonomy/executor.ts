@@ -17,7 +17,7 @@ import {
   echoAutonomyRunsTable,
   echoUniversesTable,
 } from "@workspace/db";
-import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "./constants";
+import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
 import type { Opportunity } from "./policy";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -259,7 +259,7 @@ export async function executeAutonomyDecision(input: {
   liveEnabled?: boolean;
   now?: Date;
 }): Promise<LiveExecutionOutcome> {
-  if (!(input.liveEnabled ?? AUTONOMY_LIVE_EXECUTION_ENABLED)) return { status: "disabled", reasonCode: "LIVE_EXECUTION_DISABLED" };
+  if (!(input.liveEnabled ?? isAutonomyLiveExecutionEnabled())) return { status: "disabled", reasonCode: "LIVE_EXECUTION_DISABLED" };
   if (!input.ownerId) return { status: "disabled", reasonCode: "OWNER_REQUIRED" };
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {

@@ -21,8 +21,6 @@ const {
 const { eq, inArray } = serverRequire('drizzle-orm');
 const { ObjectStorageService } = await import('../../artifacts/api-server/src/lib/objectStorage');
 const { defaultCharacterConfig } = await import('../../artifacts/echo/src/domain/character-core');
-const { executeAutonomyDecision } = await import('../../artifacts/api-server/src/autonomy/executor');
-const { reserveDryRun } = await import('../../artifacts/api-server/src/autonomy/repository');
 const base = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:80';
 if (process.env.NODE_ENV === 'production'
   || !process.env.CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_')
@@ -160,7 +158,7 @@ try {
   assert.equal(initial.currentCharacterId, 'nela');
   if (autonomyLiveOneshot) {
     const reports: any[] = [];
-    let actionExecuted = false;
+    let liveActionCount = 0;
     const maximumPreviewAttempts = 3;
     for (let index = 0; index < maximumPreviewAttempts; index++) {
       const testOwner = index === 0 ? owner : await createUser(true);
@@ -181,165 +179,134 @@ try {
       assert.ok(safeSettings.globalKillSwitchEngaged);
       assert.ok(safeSettings.characters.every((character: any) => character.enabled === false));
 
-      const previewResponse = await testPage.context().request.post(`${base}/api/autonomy/test-preview`, {
+      const idempotencyKey = randomUUID();
+      const liveResponse = await testPage.context().request.post(`${base}/api/autonomy/test-live-one-shot`, {
         data: {
           characterId: fixture.characterId,
           situation: 'like_comment',
           targetId: fixture.targetId,
-          idempotencyKey: randomUUID(),
+          idempotencyKey,
         },
       });
-      const previewResult = await previewResponse.json();
-      if (!previewResult.providerCalled || previewResponse.status() !== 200 ||
-        !previewResult.validatorAccepted || !previewResult.preview) {
+      const liveResult = await liveResponse.json();
+      const afterTest = await universeEnvelope(testPage, base);
+      const finalSettings = await (await testPage.context().request.get(`${base}/api/autonomy/settings`)).json();
+      const attemptRecord = {
+        attempt: index + 1,
+        status: liveResult.status ?? null,
+        providerCalled: liveResult.providerCalled ?? false,
+        model: liveResult.preview?.model ?? null,
+        provider: liveResult.preview?.provider ?? null,
+        validatorAccepted: liveResult.validatorAccepted ?? null,
+        decision: liveResult.preview?.decision ? {
+          action: liveResult.preview.decision.action,
+          situation: liveResult.preview.decision.situation,
+          text: liveResult.preview.decision.text ?? null,
+          reaction: liveResult.preview.decision.reaction ?? null,
+        } : null,
+        cost: liveResult.preview?.usage?.cost ?? null,
+        fallbacks: liveResult.preview?.attempts?.map((attempt: any) => ({
+          model: attempt.model, outcome: attempt.outcome, code: attempt.code, cost: attempt.usage?.cost ?? null,
+        })) ?? liveResult.attempts ?? [],
+        error: liveResult.error ?? null,
+      };
+      reports.push(attemptRecord);
+      if (liveResult.status === 'no_action') {
+        assert.equal(liveResult.executed, false);
+        assert.equal(liveResult.socialActionsExecuted, false);
+        assert.deepEqual(afterTest, baseline, 'a no-op live test preview must not mutate its fixture');
+        assert.equal(finalSettings.liveExecutionEnabled, false);
+        assert.ok(finalSettings.globalKillSwitchEngaged);
+        assert.ok(finalSettings.characters.every((character: any) => character.enabled === false));
+        continue;
+      }
+      if (liveResponse.status() !== 200 || liveResult.status !== 'executed') {
         console.log(JSON.stringify({
-          liveTest: 'blocked-before-execution',
+          liveTest: 'blocked-or-failed',
           scenario: 'like_comment',
           attempt: index + 1,
-          providerCalled: previewResult.providerCalled ?? false,
-          validatorAccepted: previewResult.validatorAccepted ?? null,
-          error: previewResult.error ?? `HTTP_${previewResponse.status()}`,
-          attempts: previewResult.attempts ?? [],
-          liveActionExecuted: false,
+          providerCalled: liveResult.providerCalled ?? false,
+          validatorAccepted: liveResult.validatorAccepted ?? null,
+          error: liveResult.error ?? `HTTP_${liveResponse.status()}`,
+          response: liveResult,
           reports,
         }));
-        throw new Error(`LIVE_TEST_PREVIEW_BLOCKED:${previewResult.error ?? previewResponse.status()}`);
+        throw new Error(`LIVE_TEST_BLOCKED_OR_FAILED:${liveResult.error ?? liveResponse.status()}`);
       }
-      const preview = previewResult.preview;
-      const previewRecord = {
-        attempt: index + 1,
-        target: fixture.targetLabel,
-        targetId: fixture.targetId,
-        provider: preview.provider,
-        model: preview.model,
-        validatorAccepted: previewResult.validatorAccepted,
-        decision: {
-          action: preview.decision.action,
-          situation: preview.decision.situation,
-          text: preview.decision.text ?? null,
-          reaction: preview.decision.reaction ?? null,
-        },
-        cost: preview.usage.cost ?? null,
-        fallbacks: preview.attempts.map((attempt: any) => ({
-          model: attempt.model, outcome: attempt.outcome, code: attempt.code, cost: attempt.usage?.cost ?? null,
-        })),
-        sourceRevision: preview.sourceRevision,
-        executed: previewResult.executed,
-        socialActionsExecuted: previewResult.socialActionsExecuted,
-      };
-      reports.push(previewRecord);
+      const preview = liveResult.preview;
+      const run = liveResult.run;
+      assert.equal(liveResult.executed, true);
+      assert.equal(liveResult.socialActionsExecuted, true);
+      assert.equal(liveResult.globalLiveFlagDuringExecutor, true);
+      assert.equal(liveResult.globalLiveFlagAfter, false);
+      assert.equal(liveResult.controlsRestored, true);
+      assert.equal(liveResult.schedulerInvoked, false);
+      assert.equal(liveResult.characterId, fixture.characterId);
+      assert.equal(liveResult.universe.targetId, fixture.targetId);
+      assert.equal(liveResult.universe.exactlyOneAction, true);
+      assert.equal(run.idempotencyKey, idempotencyKey);
+      assert.equal(run.firstReservation, 'created');
+      assert.equal(run.retryWhileRunning, 'duplicate');
+      assert.equal(run.retryAfterExecution, 'duplicate');
+      assert.equal(run.retryStatus, 'executed');
+      assert.equal(run.retryRunId, run.runId);
+      assert.equal(liveResult.executor.status, 'executed');
       assert.ok(String(preview.model).endsWith(':free'));
       assert.ok(String(preview.provider).toLowerCase().includes('openrouter'));
       assert.ok(preview.attempts.every((attempt: any) => attempt.model.endsWith(':free')));
       assert.ok(preview.usage.cost == null || preview.usage.cost <= 0);
-      assert.equal(previewResult.executed, false);
-      assert.equal(previewResult.socialActionsExecuted, false);
+      assert.equal(preview.decision.action, 'like');
       assert.equal(preview.decision.situation, 'like_comment');
-      const afterPreview = await universeEnvelope(testPage, base);
-      assert.deepEqual(afterPreview, baseline, 'preview must not alter the disposable universe');
-      assert.deepEqual(await (await testPage.context().request.get(`${base}/api/autonomy/settings`)).json(), safeSettings);
+      assert.equal(liveResult.universe.sourceRevision, baseline.revision);
+      assert.equal(liveResult.universe.afterRevision, baseline.revision + 1);
+      assert.equal(liveResult.universe.actorLikeCount, 1);
+      assert.equal(afterTest.revision, baseline.revision + 1);
+      const beforeComment = baseline.state.comments.find((comment: any) => comment.id === fixture.targetId);
+      const afterComment = afterTest.state.comments.find((comment: any) => comment.id === fixture.targetId);
+      assert.deepEqual(afterComment.likes, [...beforeComment.likes, fixture.characterId]);
+      assert.equal(afterComment.likes.filter((id: string) => id === fixture.characterId).length, 1);
+      assert.deepEqual(afterTest.state.posts, baseline.state.posts);
+      assert.deepEqual(afterTest.state.stories, baseline.state.stories);
+      assert.deepEqual(afterTest.state.messages, baseline.state.messages);
+      assert.equal(afterTest.state.notifications.length, baseline.state.notifications.length + 1);
+      assert.equal(finalSettings.liveExecutionEnabled, false);
+      assert.ok(finalSettings.globalKillSwitchEngaged);
+      assert.ok(finalSettings.characters.every((character: any) => character.enabled === false));
 
-      if (preview.decision.action === 'none') continue;
-      assert.equal(preview.decision.action, 'like', 'live one-shot is restricted to a reversible comment like');
-
-      const idempotencyKey = randomUUID();
-      const reservation = await reserveDryRun(testOwner, fixture.characterId, idempotencyKey, preview.sourceRevision);
-      assert.equal(reservation.kind, 'created', 'failed to reserve a unique live run');
-      if (reservation.kind !== 'created') throw new Error(`LIVE_RUN_RESERVATION_FAILED:${reservation.kind}`);
-      const settingPut = async (setting: Record<string, unknown>) => {
-        const response = await testPage.context().request.put(`${base}/api/autonomy/settings`, { data: setting });
-        assert.equal(response.status(), 200, 'failed to update the disposable test owner controls');
-        return response.json();
-      };
-
-      let outcome: any;
-      let duplicateOutcome: any;
-      let afterExecution: any;
-      let afterRetry: any;
-      let storedRun: any;
-      try {
-        await settingPut({ characterId: fixture.characterId, enabled: true });
-        await settingPut({ globalKillSwitchEngaged: false });
-        const liveSettings = await (await testPage.context().request.get(`${base}/api/autonomy/settings`)).json();
-        assert.equal(liveSettings.liveExecutionEnabled, false, 'global live flag must remain disabled');
-        assert.equal(liveSettings.globalKillSwitchEngaged, false);
-        assert.equal(liveSettings.characters.filter((character: any) => character.enabled).length, 1);
-        assert.equal(liveSettings.characters.find((character: any) => character.characterId === fixture.characterId)?.enabled, true);
-
-        const executorInput = {
-          ownerId: testOwner,
-          runId: reservation.runId,
-          characterId: fixture.characterId,
-          sourceRevision: preview.sourceRevision,
-          opportunity: {
-            situation: 'like_comment',
-            postId: 'test-preview-parent-post',
-            commentId: fixture.targetId,
-            reasonCode: 'OPPORTUNITY_SELECTED',
-            reason: 'isolated one-shot validation',
-            localHour: 12,
-            timezone: 'UTC',
-          },
-          decision: preview.decision,
-          contextHash: preview.contextAudit.contextHash,
-          model: preview.model,
-          liveEnabled: true,
-        };
-        outcome = await executeAutonomyDecision(executorInput as any);
-        assert.equal(outcome.status, 'executed', `one-shot executor did not execute: ${outcome.reasonCode}`);
-        afterExecution = await universeEnvelope(testPage, base);
-        assert.equal(afterExecution.revision, baseline.revision + 1);
-        const beforeComment = baseline.state.comments.find((comment: any) => comment.id === fixture.targetId);
-        const afterComment = afterExecution.state.comments.find((comment: any) => comment.id === fixture.targetId);
-        assert.deepEqual(afterComment.likes, [...beforeComment.likes, fixture.characterId]);
-        assert.equal(afterComment.likes.filter((id: string) => id === fixture.characterId).length, 1);
-        assert.deepEqual(afterExecution.state.posts, baseline.state.posts);
-        assert.deepEqual(afterExecution.state.stories, baseline.state.stories);
-        assert.deepEqual(afterExecution.state.messages, baseline.state.messages);
-        assert.equal(afterExecution.state.notifications.length, baseline.state.notifications.length + 1);
-
-        duplicateOutcome = await executeAutonomyDecision(executorInput as any);
-        assert.equal(duplicateOutcome.status, 'duplicate');
-        assert.equal(duplicateOutcome.reasonCode, 'ALREADY_EXECUTED');
-        afterRetry = await universeEnvelope(testPage, base);
-        assert.deepEqual(afterRetry, afterExecution, 'idempotent retry must not write a second action');
-
-        const [run] = await db.select().from(echoAutonomyRunsTable)
-          .where(eq(echoAutonomyRunsTable.id, Number(reservation.runId))).limit(1);
-        storedRun = run;
-        assert.equal(storedRun?.status, 'executed');
-        assert.equal(storedRun?.action, 'like');
-        assert.equal(storedRun?.situation, 'like_comment');
-        assert.equal(storedRun?.targetId, fixture.targetId);
-        actionExecuted = true;
-        console.log(JSON.stringify({
-          liveTest: 'completed',
-          owner: 'disposable-authenticated-clerk-development-account',
-          characterId: fixture.characterId,
-          socialAction: { type: 'like_comment', targetId: fixture.targetId, persistedOnce: true },
-          preview: previewRecord,
-          run: { runId: reservation.runId, idempotencyKey, storedStatus: storedRun.status },
-          executor: outcome,
-          idempotentRetry: duplicateOutcome,
-          revisionBefore: baseline.revision,
-          revisionAfterAction: afterExecution.revision,
-          revisionAfterRetry: afterRetry.revision,
-          temporaryOptInUsed: true,
-          globalLiveFlagRemainedFalse: true,
-          schedulerInvoked: false,
-          liveSocialActionsExecuted: 1,
-        }));
-      } finally {
-        await settingPut({ characterId: fixture.characterId, enabled: false });
-        await settingPut({ globalKillSwitchEngaged: true });
-        const restoredSettings = await (await testPage.context().request.get(`${base}/api/autonomy/settings`)).json();
-        assert.equal(restoredSettings.liveExecutionEnabled, false);
-        assert.ok(restoredSettings.globalKillSwitchEngaged);
-        assert.ok(restoredSettings.characters.every((character: any) => character.enabled === false));
-      }
+      const [storedRun] = await db.select().from(echoAutonomyRunsTable)
+        .where(eq(echoAutonomyRunsTable.id, Number(run.runId))).limit(1);
+      assert.equal(storedRun?.ownerId, testOwner);
+      assert.equal(storedRun?.characterId, fixture.characterId);
+      assert.equal(storedRun?.idempotencyKey, idempotencyKey);
+      assert.equal(storedRun?.status, 'executed');
+      assert.equal(storedRun?.targetId, fixture.targetId);
+      liveActionCount++;
+      reports.push({
+        attempt: index + 1,
+        target: fixture.targetLabel,
+        preview: attemptRecord,
+        run,
+        executor: liveResult.executor,
+        universe: liveResult.universe,
+        controlsRestored: liveResult.controlsRestored,
+      });
+      console.log(JSON.stringify({
+        liveTest: 'completed',
+        owner: 'disposable-authenticated-clerk-development-account',
+        characterId: fixture.characterId,
+        socialAction: { type: 'like_comment', targetId: fixture.targetId, persistedOnce: true },
+        attempt: attemptRecord,
+        run,
+        executor: liveResult.executor,
+        universe: liveResult.universe,
+        controlsRestored: liveResult.controlsRestored,
+        globalLiveFlagAfter: liveResult.globalLiveFlagAfter,
+        schedulerInvoked: liveResult.schedulerInvoked,
+        liveSocialActionsExecuted: liveActionCount,
+      }));
       break;
     }
-    if (!actionExecuted) {
+    if (liveActionCount !== 1) {
       console.log(JSON.stringify({
         liveTest: 'no-action-executed',
         liveSocialActionsExecuted: 0,

@@ -6,7 +6,7 @@ import {
   echoAutonomyOwnersTable,
   echoAutonomyRunsTable,
 } from "@workspace/db";
-import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "./constants";
+import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
 
 export { DEFAULT_CHARACTER_CONTROL } from "./constants";
 
@@ -17,7 +17,7 @@ export async function readOwnerControls(ownerId: string) {
     .where(eq(echoAutonomyCharactersTable.ownerId, ownerId));
   return {
     globalKillSwitchEngaged: owner?.killSwitchEngaged ?? true,
-    liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
+    liveExecutionEnabled: isAutonomyLiveExecutionEnabled(),
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
       maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),

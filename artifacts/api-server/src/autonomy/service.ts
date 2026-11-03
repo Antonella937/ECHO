@@ -8,7 +8,11 @@ import { EngineError } from "../ai-engine/contracts";
 import { previewForOwner } from "../ai-engine/service";
 import type { TextProvider } from "../ai-engine/contracts";
 import { chooseAutonomyOpportunity, liveEligibility, type ExecutedAutonomyAction } from "./policy";
-import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "./constants";
+import {
+  AUTONOMY_LIVE_EXECUTION_ENABLED,
+  DEFAULT_CHARACTER_CONTROL,
+  isAutonomyLiveExecutionEnabled,
+} from "./constants";
 import type { LiveExecutionOutcome } from "./executor";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -221,7 +225,7 @@ export async function runAutonomyLiveCycle(
     random?: () => number;
   },
 ): Promise<{ status: string; reasonCode: string; characterId: string; runId: string | null; model: string | null }> {
-  const liveEnabled = dependencies.liveExecutionEnabled ?? AUTONOMY_LIVE_EXECUTION_ENABLED;
+  const liveEnabled = dependencies.liveExecutionEnabled ?? isAutonomyLiveExecutionEnabled();
   if (!liveEnabled) {
     return { status: "disabled", reasonCode: "LIVE_EXECUTION_DISABLED", characterId: input.characterId, runId: null, model: null };
   }
