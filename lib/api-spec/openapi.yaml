@@ -501,7 +501,7 @@ components:
         fields: { type: array, items: { type: string }, description: Included field paths only; never private field values }
     CharacterContextAudit:
       type: object
-      required: [source, contextHash, characterId, sourceRevision, sections, recentCounts, privateDmScope]
+      required: [source, contextHash, characterId, sourceRevision, sections, recentCounts, privateDmScope, visionMediaIncluded, visionPostSummariesIncluded]
       properties:
         source: { type: string, enum: [persisted_owner_universe, provided_snapshot] }
         contextHash: { type: string, description: SHA-256 of the exact bounded text context, including evaluation time }
@@ -512,6 +512,8 @@ components:
           type: object
           additionalProperties: { type: integer, minimum: 0 }
         privateDmScope: { type: string, enum: [none, actor_and_recipient_only] }
+        visionMediaIncluded: { type: integer, minimum: 0, description: Count of persisted per-item vision analyses included; no image bytes or URLs }
+        visionPostSummariesIncluded: { type: integer, minimum: 0, description: Count of persisted ordered post summaries included }
     CharacterConfiguration:
       type: object
       required: [version, basic, personality, voice, relationships, routine, social, memory, currentState, assistance]

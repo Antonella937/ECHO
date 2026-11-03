@@ -1,11 +1,16 @@
 import type { CharacterDecisionInput, SocialState } from '@workspace/api-zod';
 import { createHash } from 'node:crypto';
 import { EngineError, sections } from './contracts';
+import type { VisionContext, VisionEntityType } from '../vision/contracts';
+
+const noVision: VisionContext = { analyses: {}, postSummaries: {} };
+const visionKey = (entityType: VisionEntityType, entityId: string, mediaId: string) =>
+  `${entityType}:${entityId}:${mediaId}`;
 
 /** Builds text-only context from an already owner-scoped persisted snapshot.
  * Never includes file URLs/bytes, provider IDs, credentials or unrelated DMs.
  */
-export function buildCharacterContext(state: SocialState, input: CharacterDecisionInput, now = new Date()) {
+export function buildCharacterContext(state: SocialState, input: CharacterDecisionInput, now = new Date(), vision: VisionContext = noVision) {
   const actor = state.characters.find(c => c.id === input.characterId && !c.archived);
   if (!actor) throw new EngineError('CHARACTER_NOT_FOUND', 404);
   const post = input.postId ? state.posts.find(p => p.id === input.postId) : undefined;
@@ -96,8 +101,12 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     likesCount: p.likes?.length ?? 0,
     commentsCount: state.comments.filter(item => item.postId === p.id).length,
     taggedAccounts: (p.taggedAccountIds ?? []).map(identityOf),
-    // Metadata only. A model must never pretend to see or hear these.
-    media: (p.media ?? [{ id: `${p.id}:legacy`, type: 'image' }]).map((m, i) => ({ id: m.id, position: i + 1, type: m.type, contentNotAnalyzed: true })),
+    media: (p.media?.length ? p.media : (p.image ? [{ id: `${p.id}:legacy`, type: 'image' as const }] : []))
+      .map((m, i) => {
+        const mediaVision = vision.analyses[visionKey('post', p.id, m.id)];
+        return { id: m.id, position: i + 1, type: m.type, visionAnalysis: mediaVision ?? null, contentNotAnalyzed: !mediaVision };
+      }),
+    visionSummary: vision.postSummaries[p.id] ?? null,
   });
   const latest = <T extends { createdAt: Date }>(items: T[], n: number) =>
     [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, n).reverse();
@@ -128,7 +137,8 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       stories: latest(state.stories.filter(s => s.authorId === actor.id || s.mentionedAccountIds?.includes(actor.id) || s.id === story?.id), 4).map(s =>
         ({ id: s.id, author: identityOf(s.authorId), caption: s.caption, createdAt: s.createdAt,
           reactions: (s.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
-          mediaNotAnalyzed: true })),
+          visionAnalysis: vision.analyses[visionKey('story', s.id, `story:${s.id}`)] ?? null,
+          mediaNotAnalyzed: !vision.analyses[visionKey('story', s.id, `story:${s.id}`)] })),
       messages: messages.map(m => ({ id: m.id, from: identityOf(m.senderId), to: identityOf(m.recipientId), text: m.text,
         createdAt: m.createdAt, quoteMessageId: m.quoteMessageId ?? null,
         reactions: (m.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
@@ -141,7 +151,8 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     ? { post: postText(post), replyTo: comment ? { author: identityOf(comment.authorId), text: comment.text, parentId: comment.parentId } : null }
     : story ? { story: { id: story.id, author: identityOf(story.authorId), caption: story.caption, createdAt: story.createdAt,
       reactions: (story.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
-      mediaNotAnalyzed: true } }
+      visionAnalysis: vision.analyses[visionKey('story', story.id, `story:${story.id}`)] ?? null,
+      mediaNotAnalyzed: !vision.analyses[visionKey('story', story.id, `story:${story.id}`)] } }
       : message ? { message: { id: message.id, from: identityOf(message.senderId), text: message.text,
         createdAt: message.createdAt,
         reactions: (message.reactions ?? []).map(reaction => ({ author: identityOf(reaction.actorId), value: reaction.value })),
@@ -181,6 +192,8 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       sections: auditSections,
       recentCounts: Object.fromEntries(Object.entries(actual.recentSocial).map(([key, value]) => [key, value.length])),
       privateDmScope: input.situation === 'dm' || input.situation === 'dm_reaction' ? 'actor_and_recipient_only' as const : 'none' as const,
+      visionMediaIncluded: Object.keys(vision.analyses).length,
+      visionPostSummariesIncluded: Object.keys(vision.postSummaries).length,
     },
   };
 }
