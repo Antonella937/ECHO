@@ -8,7 +8,6 @@ import {
   type CharacterFollowRequestStatus,
   type CharacterVisibility,
 } from "@workspace/db";
-import { ensureCharacterPrivacyDefaultsInTransaction } from "./characterPrivacy";
 
 type FollowTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -112,14 +111,6 @@ async function lockAndValidateCharacters(
   for (const identity of identities) {
     const universe = states.get(universeKey(identity));
     if (!universe || !characterIds(universe.state).includes(identity.characterId)) return null;
-  }
-  for (const universe of universes) {
-    await ensureCharacterPrivacyDefaultsInTransaction(
-      tx,
-      universe.ownerId,
-      universe.universeId,
-      states.get(universeKey(universe))?.state,
-    );
   }
   return states;
 }
@@ -372,8 +363,7 @@ export async function listOwnFollowRequests(
     updatedAt: echoCharacterFollowRequestsTable.updatedAt,
   }).from(echoCharacterFollowRequestsTable)
     .where(statusFilter ? and(directionFilter, statusFilter) : directionFilter)
-    .orderBy(desc(echoCharacterFollowRequestsTable.createdAt))
-    .limit(100);
+    .orderBy(desc(echoCharacterFollowRequestsTable.createdAt));
 
   const universeCache = new Map<string, Promise<LockedUniverse | null>>();
   const readUniverse = (ownerId: string, id: string): Promise<LockedUniverse | null> => {
@@ -417,7 +407,9 @@ export async function listOwnFollowRequests(
     }
     visible.push(row);
   }
-  return visible;
+  // Apply the established response cap only after authorization filtering so
+  // denied historical rows cannot crowd authorized requests out of the page.
+  return visible.slice(0, 100);
 }
 
 export async function transitionFollowRequest(

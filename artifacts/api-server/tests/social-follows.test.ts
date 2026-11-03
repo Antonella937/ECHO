@@ -92,16 +92,23 @@ async function sendFollow(ownerId: string | undefined, body: FollowBody, method 
 async function listRequests(
   ownerId: string | undefined,
   query = "",
+  universeId = "primary",
 ) {
-  return fetch(`${baseUrl}/social/follow-requests${query}`, { headers: authHeaders(ownerId) });
+  const url = new URL("/social/follow-requests", baseUrl);
+  url.searchParams.set("universeId", universeId);
+  new URLSearchParams(query).forEach((value, key) => url.searchParams.set(key, value));
+  return fetch(url, { headers: authHeaders(ownerId) });
 }
 
 async function transition(
   ownerId: string | undefined,
   requestId: string,
   action: "accept" | "reject" | "cancel",
+  universeId = "primary",
 ) {
-  return fetch(`${baseUrl}/social/follow-requests/${requestId}/${action}`, {
+  const url = new URL(`/social/follow-requests/${requestId}/${action}`, baseUrl);
+  url.searchParams.set("universeId", universeId);
+  return fetch(url, {
     method: "POST",
     headers: authHeaders(ownerId),
   });
@@ -222,13 +229,13 @@ test("private follow requests are deduplicated, owner-visible, and accept atomic
   ));
   assert.equal(requestRows.length, 1);
   const requestId = requestRows[0].id;
-  assert.equal(((await (await listRequests(ownerB, "?direction=incoming")).json()).requests as unknown[]).length, 1);
+  assert.equal(((await (await listRequests(ownerB, "?direction=incoming", "studio")).json()).requests as unknown[]).length, 1);
   assert.equal(((await (await listRequests(ownerA, "?direction=outgoing")).json()).requests as unknown[]).length, 1);
   assert.equal(((await (await listRequests(ownerC)).json()).requests as unknown[]).length, 0);
   assert.equal((await transition(ownerA, requestId, "accept")).status, 404);
 
-  assert.deepEqual(await (await transition(ownerB, requestId, "accept")).json(), { status: "accepted" });
-  assert.deepEqual(await (await transition(ownerB, requestId, "accept")).json(), { status: "accepted" });
+  assert.deepEqual(await (await transition(ownerB, requestId, "accept", "studio")).json(), { status: "accepted" });
+  assert.deepEqual(await (await transition(ownerB, requestId, "accept", "studio")).json(), { status: "accepted" });
   assert.equal(await activeFollows(and(
     eq(echoCharacterFollowsTable.sourceOwnerId, ownerA),
     eq(echoCharacterFollowsTable.targetOwnerId, ownerB),
