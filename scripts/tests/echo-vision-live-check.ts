@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { readdir } from "node:fs/promises";
 import { deflateSync } from "node:zlib";
 import assert from "node:assert/strict";
+import { createSeedState } from "../../artifacts/echo/src/store/seed";
 
 const serverRequire = createRequire(new URL("../../artifacts/api-server/package.json", import.meta.url));
 const { clerkClient } = serverRequire("@clerk/express");
@@ -113,7 +114,6 @@ async function signIn(ownerId: string): Promise<Page> {
   });
   assert.equal(universe.status(), 200, "disposable owner must read its private universe");
   const body = await universe.json();
-  assert.ok(body.state?.characters?.some((character: any) => character.id === "nela"));
   return page;
 }
 
@@ -123,6 +123,19 @@ async function envelope(page: Page) {
   });
   assert.equal(response.status(), 200);
   return response.json();
+}
+
+async function ensureDisposableUniverse(page: Page) {
+  let current = await envelope(page);
+  if (!current.state) {
+    const initialized = await page.context().request.put(`${base}/api/universe`, {
+      data: { state: createSeedState(), expectedRevision: current.revision },
+    });
+    assert.equal(initialized.status(), 200, "must initialize only the disposable test universe");
+    current = await envelope(page);
+  }
+  assert.ok(current.state?.characters?.some((character: any) => character.id === "nela"));
+  return current;
 }
 
 async function uploadPrivateImage(page: Page, name: string, bytes: Buffer): Promise<string> {
@@ -193,7 +206,8 @@ try {
   const otherOwnerPage = await signIn(otherOwnerId);
   ownerPages.set(otherOwnerId, otherOwnerPage);
 
-  const initial = await envelope(ownerPage);
+  const initial = await ensureDisposableUniverse(ownerPage);
+  await ensureDisposableUniverse(otherOwnerPage);
   const source = initial.state.posts.find((post: any) => post.authorId === "nela") ?? initial.state.posts[0];
   assert.ok(source, "disposable universe must contain a post template");
   const firstPath = await uploadPrivateImage(ownerPage, "vision-blue-red-circle.png", geometricPng("circle"));
