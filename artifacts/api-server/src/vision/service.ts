@@ -273,10 +273,11 @@ export class VisionService {
     const summary = buildVisionPostSummary(post.id, post.caption ?? "", results,
       allImageItems.length - imageItems.length, videoItems.length);
     await db.insert(echoVisionPostSummariesTable).values({
-      ownerId, postId: post.id, contentHash: overallHash, summary, updatedAt: new Date(),
+      ownerId, postId: post.id, contentHash: overallHash,
+      summary: summary as unknown as Record<string, unknown>, updatedAt: new Date(),
     }).onConflictDoUpdate({
       target: [echoVisionPostSummariesTable.ownerId, echoVisionPostSummariesTable.postId, echoVisionPostSummariesTable.contentHash],
-      set: { summary, updatedAt: new Date() },
+      set: { summary: summary as unknown as Record<string, unknown>, updatedAt: new Date() },
     });
 
     return {
@@ -325,10 +326,10 @@ export class VisionService {
   async loadContext(ownerId: string, state: SocialState, input: CharacterDecisionInput): Promise<VisionContext> {
     const relevantPosts = state.posts.filter((post) =>
       post.authorId === input.characterId || post.taggedAccountIds?.includes(input.characterId) || post.id === input.postId)
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 6);
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 6);
     const relevantStories = state.stories.filter((story) =>
       story.authorId === input.characterId || story.mentionedAccountIds?.includes(input.characterId) || story.id === input.storyId)
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 4);
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 4);
     const postIds = relevantPosts.map((post) => post.id);
     const storyIds = relevantStories.map((story) => story.id);
     const entityFilters = [
