@@ -5,7 +5,7 @@ import {
 } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
-import { readUniverse, writeUniverse } from "../lib/universeRepository";
+import { readUniverse, writeUniverse, StructuralLimitError } from "../lib/universeRepository";
 import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -17,7 +17,8 @@ const router: IRouter = Router();
 router.use("/universe", requireAuth);
 
 router.get("/universe", async (req, res): Promise<void> => {
-  res.json(GetUniverseResponse.parse(await readUniverse(req.userId!)));
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  res.json(GetUniverseResponse.parse(await readUniverse(req.userId!, universeId)));
 });
 
 router.put("/universe", async (req, res): Promise<void> => {
@@ -28,6 +29,7 @@ router.put("/universe", async (req, res): Promise<void> => {
   }
 
   const { state, expectedRevision } = parsed.data;
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
   const accountError = universeAccountError(state);
   if (accountError) { res.status(400).json({ error: accountError }); return; }
   const characterIds = new Set(state.characters.map((character) => character.id));
@@ -53,7 +55,15 @@ router.put("/universe", async (req, res): Promise<void> => {
       return;
     }
   }
-  const saved = await writeUniverse(req.userId!, state, expectedRevision);
+  let saved;
+  try { saved = await writeUniverse(req.userId!, state, expectedRevision, universeId); }
+  catch (error) {
+    if (error instanceof StructuralLimitError) {
+      res.status(409).json({ error: error.code });
+      return;
+    }
+    throw error;
+  }
   if (!saved) {
     res.status(409).json({ error: "El universo cambió en otro dispositivo. Tus cambios siguen conservados." });
     return;
@@ -66,7 +76,8 @@ router.put("/universe", async (req, res): Promise<void> => {
 // is readable by the current owner before migration can be marked complete.
 router.get("/universe/verify", async (req, res): Promise<void> => {
   // The /universe prefix middleware above also protects this route.
-  const envelope = await readUniverse(req.userId!);
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const envelope = await readUniverse(req.userId!, universeId);
   if (!envelope.state) { res.status(404).json({ error: "Universe not found" }); return; }
   const parsed = SaveUniverseBody.shape.state.safeParse(envelope.state);
   if (!parsed.success) { res.status(422).json({ error: "Invalid saved universe" }); return; }

@@ -774,6 +774,14 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Load the authenticated user's universe
  */
+export const getUniverseQueryUniverseIdMax = 80;
+
+
+
+export const GetUniverseQueryParams = zod.object({
+  "universeId": zod.coerce.string().min(1).max(getUniverseQueryUniverseIdMax).optional()
+})
+
 export const getUniverseResponseRevisionMin = 0;
 
 export const getUniverseResponseStateOneAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
@@ -1263,6 +1271,14 @@ export const GetUniverseResponse = zod.object({
 /**
  * @summary Save the authenticated user's universe
  */
+export const saveUniverseQueryUniverseIdMax = 80;
+
+
+
+export const SaveUniverseQueryParams = zod.object({
+  "universeId": zod.coerce.string().min(1).max(saveUniverseQueryUniverseIdMax).optional()
+})
+
 export const saveUniverseBodyExpectedRevisionMin = 0;
 
 export const saveUniverseBodyStateAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
@@ -2273,6 +2289,14 @@ export const ClaimUploadResponse = zod.object({
 /**
  * @summary Re-read the saved universe and verify every private image is readable
  */
+export const verifyUniverseQueryUniverseIdMax = 80;
+
+
+
+export const VerifyUniverseQueryParams = zod.object({
+  "universeId": zod.coerce.string().min(1).max(verifyUniverseQueryUniverseIdMax).optional()
+})
+
 export const verifyUniverseResponseOneRevisionMin = 0;
 
 export const verifyUniverseResponseOneStateOneAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
@@ -2761,6 +2785,1303 @@ export const VerifyUniverseResponse = zod.object({
 }).and(zod.object({
   "verifiedFiles": zod.number().int().min(verifyUniverseResponseTwoVerifiedFilesMin)
 }))
+
+
+/**
+ * @summary Load owner-scoped plan, structural capacity and monthly AI usage
+ */
+
+
+export const getCreatorAccountResponseAddonUniversesMin = 0;
+
+export const getCreatorAccountResponseAddonCharactersMin = 0;
+
+export const getCreatorAccountResponseUniverseCountMin = 0;
+
+export const getCreatorAccountResponseCharacterCountMin = 0;
+
+export const getCreatorAccountResponseUsageMonthRegExp = new RegExp('^\\d{4}-\\d{2}$');
+export const getCreatorAccountResponseUsageCategoriesAutonomyCallsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesAutonomyUnitsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesAutonomyPromptTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesAutonomyCompletionTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesBrainTextCallsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesBrainTextUnitsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesBrainTextPromptTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesBrainTextCompletionTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesMemoryContextCallsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesMemoryContextUnitsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesMemoryContextPromptTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesMemoryContextCompletionTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesVisionCallsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesVisionUnitsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesVisionPromptTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesVisionCompletionTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesImagesCallsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesImagesUnitsMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesImagesPromptTokensMin = 0;
+
+export const getCreatorAccountResponseUsageCategoriesImagesCompletionTokensMin = 0;
+
+export const getCreatorAccountResponseUsageTotalUnitsMin = 0;
+
+
+export const getCreatorAccountResponseUsageAutonomyReservePercentMin = 0;
+export const getCreatorAccountResponseUsageAutonomyReservePercentMax = 90;
+
+export const getCreatorAccountResponseUsageCategoryWeightsAutonomyMax = 10000;
+
+export const getCreatorAccountResponseUsageCategoryWeightsBrainTextMax = 10000;
+
+export const getCreatorAccountResponseUsageCategoryWeightsMemoryContextMax = 10000;
+
+export const getCreatorAccountResponseUsageCategoryWeightsVisionMax = 10000;
+
+export const getCreatorAccountResponseUsageCategoryWeightsImagesMax = 10000;
+
+
+
+export const GetCreatorAccountResponse = zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "billingStatus": zod.enum(['not_connected']),
+  "maxUniverses": zod.number().int().min(1),
+  "maxCharacters": zod.number().int().min(1),
+  "addonUniverses": zod.number().int().min(getCreatorAccountResponseAddonUniversesMin),
+  "addonCharacters": zod.number().int().min(getCreatorAccountResponseAddonCharactersMin),
+  "universeCount": zod.number().int().min(getCreatorAccountResponseUniverseCountMin),
+  "characterCount": zod.number().int().min(getCreatorAccountResponseCharacterCountMin),
+  "usage": zod.object({
+  "month": zod.string().regex(getCreatorAccountResponseUsageMonthRegExp),
+  "categories": zod.object({
+  "autonomy": zod.object({
+  "calls": zod.number().int().min(getCreatorAccountResponseUsageCategoriesAutonomyCallsMin),
+  "units": zod.number().int().min(getCreatorAccountResponseUsageCategoriesAutonomyUnitsMin),
+  "promptTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesAutonomyPromptTokensMin),
+  "completionTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesAutonomyCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "brain_text": zod.object({
+  "calls": zod.number().int().min(getCreatorAccountResponseUsageCategoriesBrainTextCallsMin),
+  "units": zod.number().int().min(getCreatorAccountResponseUsageCategoriesBrainTextUnitsMin),
+  "promptTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesBrainTextPromptTokensMin),
+  "completionTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesBrainTextCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "memory_context": zod.object({
+  "calls": zod.number().int().min(getCreatorAccountResponseUsageCategoriesMemoryContextCallsMin),
+  "units": zod.number().int().min(getCreatorAccountResponseUsageCategoriesMemoryContextUnitsMin),
+  "promptTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesMemoryContextPromptTokensMin),
+  "completionTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesMemoryContextCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "vision": zod.object({
+  "calls": zod.number().int().min(getCreatorAccountResponseUsageCategoriesVisionCallsMin),
+  "units": zod.number().int().min(getCreatorAccountResponseUsageCategoriesVisionUnitsMin),
+  "promptTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesVisionPromptTokensMin),
+  "completionTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesVisionCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "images": zod.object({
+  "calls": zod.number().int().min(getCreatorAccountResponseUsageCategoriesImagesCallsMin),
+  "units": zod.number().int().min(getCreatorAccountResponseUsageCategoriesImagesUnitsMin),
+  "promptTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesImagesPromptTokensMin),
+  "completionTokens": zod.number().int().min(getCreatorAccountResponseUsageCategoriesImagesCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+})
+}),
+  "totalUnits": zod.number().int().min(getCreatorAccountResponseUsageTotalUnitsMin),
+  "monthlyHardCeilingUnits": zod.number().int().min(1).nullable(),
+  "autonomyReservePercent": zod.number().int().min(getCreatorAccountResponseUsageAutonomyReservePercentMin).max(getCreatorAccountResponseUsageAutonomyReservePercentMax),
+  "categoryWeights": zod.object({
+  "autonomy": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsAutonomyMax),
+  "brain_text": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsBrainTextMax),
+  "memory_context": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsMemoryContextMax),
+  "vision": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsVisionMax),
+  "images": zod.number().int().min(1).max(getCreatorAccountResponseUsageCategoryWeightsImagesMax)
+})
+})
+})
+
+
+/**
+ * @summary Configure an internal weighted usage ceiling and autonomy reserve
+ */
+
+export const configureCreatorAiBudgetBodyAutonomyReservePercentMin = 0;
+export const configureCreatorAiBudgetBodyAutonomyReservePercentMax = 90;
+
+export const configureCreatorAiBudgetBodyCategoryWeightsAutonomyMax = 10000;
+
+export const configureCreatorAiBudgetBodyCategoryWeightsBrainTextMax = 10000;
+
+export const configureCreatorAiBudgetBodyCategoryWeightsMemoryContextMax = 10000;
+
+export const configureCreatorAiBudgetBodyCategoryWeightsVisionMax = 10000;
+
+export const configureCreatorAiBudgetBodyCategoryWeightsImagesMax = 10000;
+
+
+
+export const ConfigureCreatorAiBudgetBody = zod.object({
+  "monthlyHardCeilingUnits": zod.number().int().min(1).nullable(),
+  "autonomyReservePercent": zod.number().int().min(configureCreatorAiBudgetBodyAutonomyReservePercentMin).max(configureCreatorAiBudgetBodyAutonomyReservePercentMax),
+  "categoryWeights": zod.object({
+  "autonomy": zod.number().int().min(1).max(configureCreatorAiBudgetBodyCategoryWeightsAutonomyMax),
+  "brain_text": zod.number().int().min(1).max(configureCreatorAiBudgetBodyCategoryWeightsBrainTextMax),
+  "memory_context": zod.number().int().min(1).max(configureCreatorAiBudgetBodyCategoryWeightsMemoryContextMax),
+  "vision": zod.number().int().min(1).max(configureCreatorAiBudgetBodyCategoryWeightsVisionMax),
+  "images": zod.number().int().min(1).max(configureCreatorAiBudgetBodyCategoryWeightsImagesMax)
+})
+})
+
+
+
+export const configureCreatorAiBudgetResponseAddonUniversesMin = 0;
+
+export const configureCreatorAiBudgetResponseAddonCharactersMin = 0;
+
+export const configureCreatorAiBudgetResponseUniverseCountMin = 0;
+
+export const configureCreatorAiBudgetResponseCharacterCountMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageMonthRegExp = new RegExp('^\\d{4}-\\d{2}$');
+export const configureCreatorAiBudgetResponseUsageCategoriesAutonomyCallsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesAutonomyUnitsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesAutonomyPromptTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesAutonomyCompletionTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesBrainTextCallsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesBrainTextUnitsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesBrainTextPromptTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesBrainTextCompletionTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesMemoryContextCallsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesMemoryContextUnitsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesMemoryContextPromptTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesMemoryContextCompletionTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesVisionCallsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesVisionUnitsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesVisionPromptTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesVisionCompletionTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesImagesCallsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesImagesUnitsMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesImagesPromptTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageCategoriesImagesCompletionTokensMin = 0;
+
+export const configureCreatorAiBudgetResponseUsageTotalUnitsMin = 0;
+
+
+export const configureCreatorAiBudgetResponseUsageAutonomyReservePercentMin = 0;
+export const configureCreatorAiBudgetResponseUsageAutonomyReservePercentMax = 90;
+
+export const configureCreatorAiBudgetResponseUsageCategoryWeightsAutonomyMax = 10000;
+
+export const configureCreatorAiBudgetResponseUsageCategoryWeightsBrainTextMax = 10000;
+
+export const configureCreatorAiBudgetResponseUsageCategoryWeightsMemoryContextMax = 10000;
+
+export const configureCreatorAiBudgetResponseUsageCategoryWeightsVisionMax = 10000;
+
+export const configureCreatorAiBudgetResponseUsageCategoryWeightsImagesMax = 10000;
+
+
+
+export const ConfigureCreatorAiBudgetResponse = zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "billingStatus": zod.enum(['not_connected']),
+  "maxUniverses": zod.number().int().min(1),
+  "maxCharacters": zod.number().int().min(1),
+  "addonUniverses": zod.number().int().min(configureCreatorAiBudgetResponseAddonUniversesMin),
+  "addonCharacters": zod.number().int().min(configureCreatorAiBudgetResponseAddonCharactersMin),
+  "universeCount": zod.number().int().min(configureCreatorAiBudgetResponseUniverseCountMin),
+  "characterCount": zod.number().int().min(configureCreatorAiBudgetResponseCharacterCountMin),
+  "usage": zod.object({
+  "month": zod.string().regex(configureCreatorAiBudgetResponseUsageMonthRegExp),
+  "categories": zod.object({
+  "autonomy": zod.object({
+  "calls": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesAutonomyCallsMin),
+  "units": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesAutonomyUnitsMin),
+  "promptTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesAutonomyPromptTokensMin),
+  "completionTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesAutonomyCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "brain_text": zod.object({
+  "calls": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesBrainTextCallsMin),
+  "units": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesBrainTextUnitsMin),
+  "promptTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesBrainTextPromptTokensMin),
+  "completionTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesBrainTextCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "memory_context": zod.object({
+  "calls": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesMemoryContextCallsMin),
+  "units": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesMemoryContextUnitsMin),
+  "promptTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesMemoryContextPromptTokensMin),
+  "completionTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesMemoryContextCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "vision": zod.object({
+  "calls": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesVisionCallsMin),
+  "units": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesVisionUnitsMin),
+  "promptTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesVisionPromptTokensMin),
+  "completionTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesVisionCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+}),
+  "images": zod.object({
+  "calls": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesImagesCallsMin),
+  "units": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesImagesUnitsMin),
+  "promptTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesImagesPromptTokensMin),
+  "completionTokens": zod.number().int().min(configureCreatorAiBudgetResponseUsageCategoriesImagesCompletionTokensMin),
+  "reportedCost": zod.string().nullable()
+})
+}),
+  "totalUnits": zod.number().int().min(configureCreatorAiBudgetResponseUsageTotalUnitsMin),
+  "monthlyHardCeilingUnits": zod.number().int().min(1).nullable(),
+  "autonomyReservePercent": zod.number().int().min(configureCreatorAiBudgetResponseUsageAutonomyReservePercentMin).max(configureCreatorAiBudgetResponseUsageAutonomyReservePercentMax),
+  "categoryWeights": zod.object({
+  "autonomy": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsAutonomyMax),
+  "brain_text": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsBrainTextMax),
+  "memory_context": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsMemoryContextMax),
+  "vision": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsVisionMax),
+  "images": zod.number().int().min(1).max(configureCreatorAiBudgetResponseUsageCategoryWeightsImagesMax)
+})
+})
+})
+
+
+/**
+ * @summary List the authenticated owner's universes and character counts
+ */
+export const listCreatorUniversesQueryUniverseIdMax = 80;
+
+
+
+export const ListCreatorUniversesQueryParams = zod.object({
+  "universeId": zod.coerce.string().min(1).max(listCreatorUniversesQueryUniverseIdMax).optional()
+})
+
+export const listCreatorUniversesResponseRevisionMin = 0;
+
+export const listCreatorUniversesResponseCharacterCountMin = 0;
+
+
+
+export const ListCreatorUniversesResponseItem = zod.object({
+  "universeId": zod.string(),
+  "name": zod.string(),
+  "revision": zod.number().int().min(listCreatorUniversesResponseRevisionMin),
+  "characterCount": zod.number().int().min(listCreatorUniversesResponseCharacterCountMin),
+  "current": zod.boolean()
+})
+export const ListCreatorUniversesResponse = zod.array(ListCreatorUniversesResponseItem)
+
+
+/**
+ * @summary Create another owner-scoped universe within structural capacity
+ */
+export const createCreatorUniverseBodyNameMax = 60;
+
+export const createCreatorUniverseBodyStateAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const createCreatorUniverseBodyStateHighlightsItemTitleMax = 40;
+
+export const createCreatorUniverseBodyStateHighlightsItemStoryIdsMax = 100;
+
+export const createCreatorUniverseBodyStateHighlightsMax = 200;
+
+export const createCreatorUniverseBodyStateAccountCatalogVersionMin = 0;
+
+export const createCreatorUniverseBodyStateCreatorSetupUniverseNameMax = 60;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicNameMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicAgeMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicAgeMax = 150;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicPronounsMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicInterestsItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicInterestsMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicLikesItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicLikesMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicDislikesItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicDislikesMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationBasicNotesMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityDescriptionMax = 24000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityTraitsItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityTraitsMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityTemperamentMax = 2000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityValuesItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityValuesMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityHumorMax = 2000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityExpressivenessMax = 2000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityEmotionalStyleMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityCommonTopicsItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityCommonTopicsMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityBoundariesItemMax = 1000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityBoundariesMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceSpeakingStyleMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceVocabularyMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceEmojiStyleMax = 2000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceCaptionStyleMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceCommentStyleMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoicePostsAboutItemMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoicePostsAboutMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceAvoidsPostingItemMax = 500;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationVoiceAvoidsPostingMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemCustomLabelMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemDescriptionMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTrustMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTrustMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemAttractionMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemAttractionMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTensionMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTensionMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsMax = 300;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineTimezoneMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineFlexibilityNotesMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemTitleMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemWeekdaysItemMax = 7;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemWeekdaysMax = 7;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemStartRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemEndRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemLocationMax = 500;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialSilenceNotesMax = 4000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialPostsPerWeekMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialPostsPerWeekMax = 100;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialStoriesPerWeekMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialStoriesPerWeekMax = 300;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialMinReplyMinutesMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialMinReplyMinutesMax = 10080;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialMaxReplyMinutesMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationSocialMaxReplyMinutesMax = 10080;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryPermanentItemTextMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryPermanentMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRelationshipsItemTextMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRelationshipsMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentItemTextMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentLimitMin = 10;
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentLimitMax = 200;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentSummaryMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateLocationMax = 500;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateActivityMax = 1000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateMoodMax = 500;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateCompanionsMax = 50;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateNextEventMax = 1000;
+
+export const createCreatorUniverseBodyStateCharactersItemConfigurationAssistanceDescriptionMax = 8000;
+
+export const createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowersMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowersMax = 1000000000000;
+
+export const createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowingMin = 0;
+export const createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowingMax = 1000000000000;
+
+export const createCreatorUniverseBodyStatePostsItemTaggedAccountIdsMax = 50;
+
+export const createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMin = 0;
+export const createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMax = 1000000000000;
+
+export const createCreatorUniverseBodyStatePostsItemDisplayMetricsCommentsMin = 0;
+export const createCreatorUniverseBodyStatePostsItemDisplayMetricsCommentsMax = 1000000000000;
+
+export const createCreatorUniverseBodyStatePostsItemDisplayMetricsViewsMin = 0;
+export const createCreatorUniverseBodyStatePostsItemDisplayMetricsViewsMax = 1000000000000;
+
+export const createCreatorUniverseBodyStatePostsItemMediaItemIdMax = 120;
+
+
+
+
+export const createCreatorUniverseBodyStatePostsItemMediaItemDurationSecondsMin = 0;
+
+export const createCreatorUniverseBodyStatePostsItemMediaMax = 10;
+
+export const createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax = 50;
+
+export const createCreatorUniverseBodyStateStoriesItemReactionsItemValueMax = 32;
+
+export const createCreatorUniverseBodyStateStoriesItemMusicTitleMax = 160;
+
+export const createCreatorUniverseBodyStateStoriesItemMusicArtistMax = 160;
+
+export const createCreatorUniverseBodyStateStoriesItemMusicProviderRefMax = 300;
+
+export const createCreatorUniverseBodyStateMessagesItemHiddenForIdsMax = 2;
+
+
+export const createCreatorUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin = 0;
+
+export const createCreatorUniverseBodyStateMessagesItemAttachmentsMax = 5;
+
+export const createCreatorUniverseBodyStateMessagesItemReactionsItemValueMax = 32;
+
+
+
+export const CreateCreatorUniverseBody = zod.object({
+  "name": zod.string().min(1).max(createCreatorUniverseBodyNameMax),
+  "state": zod.object({
+  "appearance": zod.object({
+  "theme": zod.enum(['dark', 'light', 'system']),
+  "accent": zod.string().regex(createCreatorUniverseBodyStateAppearanceAccentRegExp)
+}).optional(),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "title": zod.string().min(1).max(createCreatorUniverseBodyStateHighlightsItemTitleMax),
+  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseBodyStateHighlightsItemStoryIdsMax)
+})).max(createCreatorUniverseBodyStateHighlightsMax).optional(),
+  "accountCatalogVersion": zod.number().int().min(createCreatorUniverseBodyStateAccountCatalogVersionMin).optional(),
+  "creatorSetup": zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "universeName": zod.string().min(1).max(createCreatorUniverseBodyStateCreatorSetupUniverseNameMax),
+  "completedAt": zod.coerce.date()
+}).optional(),
+  "version": zod.number().int(),
+  "currentCharacterId": zod.string(),
+  "characters": zod.array(zod.object({
+  "configuration": zod.object({
+  "version": zod.literal(1),
+  "basic": zod.object({
+  "name": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicNameMax),
+  "age": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationBasicAgeMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicAgeMax).nullable(),
+  "pronouns": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicPronounsMax),
+  "interests": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicInterestsItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicInterestsMax),
+  "likes": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicLikesItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicLikesMax),
+  "dislikes": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicDislikesItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicDislikesMax),
+  "notes": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationBasicNotesMax)
+}),
+  "personality": zod.object({
+  "description": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityDescriptionMax),
+  "traits": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityTraitsItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityTraitsMax),
+  "temperament": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityTemperamentMax),
+  "values": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityValuesItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityValuesMax),
+  "humor": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityHumorMax),
+  "sociability": zod.enum(['low', 'medium', 'high']),
+  "expressiveness": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityExpressivenessMax),
+  "emotionalStyle": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityEmotionalStyleMax),
+  "commonTopics": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityCommonTopicsItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityCommonTopicsMax),
+  "boundaries": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityBoundariesItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationPersonalityBoundariesMax)
+}),
+  "voice": zod.object({
+  "speakingStyle": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceSpeakingStyleMax),
+  "messageLength": zod.enum(['short', 'balanced', 'long']),
+  "vocabulary": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceVocabularyMax),
+  "emojiStyle": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceEmojiStyleMax),
+  "captionStyle": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceCaptionStyleMax),
+  "commentStyle": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceCommentStyleMax),
+  "disclosure": zod.enum(['private', 'balanced', 'open']),
+  "postsAbout": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoicePostsAboutItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationVoicePostsAboutMax),
+  "avoidsPosting": zod.array(zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceAvoidsPostingItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceAvoidsPostingMax)
+}),
+  "relationships": zod.array(zod.object({
+  "id": zod.string(),
+  "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'custom']),
+  "customLabel": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemCustomLabelMax),
+  "description": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemDescriptionMax),
+  "closeness": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMax),
+  "trust": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTrustMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTrustMax),
+  "attraction": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemAttractionMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemAttractionMax).nullable(),
+  "tension": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTensionMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemTensionMax).nullable()
+})).max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsMax),
+  "routine": zod.object({
+  "timezone": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineTimezoneMax),
+  "flexibilityNotes": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineFlexibilityNotesMax),
+  "entries": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemTitleMax),
+  "activity": zod.enum(['sleep', 'work', 'study', 'meal', 'exercise', 'rehearsal', 'social', 'leisure', 'custom']),
+  "weekdays": zod.array(zod.number().int().min(1).max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemWeekdaysItemMax)).max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemWeekdaysMax),
+  "start": zod.string().regex(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemStartRegExp),
+  "end": zod.string().regex(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemEndRegExp),
+  "location": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemLocationMax),
+  "recurrence": zod.enum(['weekly', 'once']),
+  "date": zod.string().regex(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesItemDateRegExp).nullable(),
+  "flexibility": zod.enum(['low', 'medium', 'high'])
+})).max(createCreatorUniverseBodyStateCharactersItemConfigurationRoutineEntriesMax)
+}),
+  "social": zod.object({
+  "activity": zod.enum(['low', 'medium', 'high']),
+  "postsFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "storiesFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "likesFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "commentsFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "initiatesDMs": zod.enum(['rare', 'normal', 'frequent']),
+  "replySpeed": zod.enum(['slow', 'normal', 'quick']),
+  "sociability": zod.enum(['low', 'medium', 'high']),
+  "spontaneity": zod.enum(['low', 'medium', 'high']),
+  "allowSilence": zod.boolean(),
+  "silenceNotes": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationSocialSilenceNotesMax),
+  "postsPerWeek": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationSocialPostsPerWeekMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationSocialPostsPerWeekMax).nullable(),
+  "storiesPerWeek": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationSocialStoriesPerWeekMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationSocialStoriesPerWeekMax).nullable(),
+  "minReplyMinutes": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationSocialMinReplyMinutesMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationSocialMinReplyMinutesMax).nullable(),
+  "maxReplyMinutes": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationSocialMaxReplyMinutesMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationSocialMaxReplyMinutesMax).nullable()
+}),
+  "memory": zod.object({
+  "permanent": zod.array(zod.object({
+  "id": zod.string(),
+  "text": zod.string().min(1).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryPermanentItemTextMax),
+  "targetId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "kind": zod.enum(['manual', 'interaction', 'post', 'conversation', 'event']),
+  "sourceId": zod.string().nullable(),
+  "promotedTo": zod.string().nullable()
+})).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryPermanentMax),
+  "relationships": zod.array(zod.object({
+  "id": zod.string(),
+  "text": zod.string().min(1).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRelationshipsItemTextMax),
+  "targetId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "kind": zod.enum(['manual', 'interaction', 'post', 'conversation', 'event']),
+  "sourceId": zod.string().nullable(),
+  "promotedTo": zod.string().nullable()
+})).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRelationshipsMax),
+  "recent": zod.array(zod.object({
+  "id": zod.string(),
+  "text": zod.string().min(1).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentItemTextMax),
+  "targetId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "kind": zod.enum(['manual', 'interaction', 'post', 'conversation', 'event']),
+  "sourceId": zod.string().nullable(),
+  "promotedTo": zod.string().nullable()
+})).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentMax),
+  "recentLimit": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentLimitMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentLimitMax),
+  "recentSummary": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationMemoryRecentSummaryMax)
+}),
+  "currentState": zod.object({
+  "location": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateLocationMax),
+  "activity": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateActivityMax),
+  "mood": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateMoodMax),
+  "companions": zod.array(zod.string()).max(createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateCompanionsMax),
+  "lastActivityAt": zod.coerce.date().nullable(),
+  "nextEvent": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationCurrentStateNextEventMax),
+  "source": zod.enum(['manual', 'routine']),
+  "updatedAt": zod.coerce.date()
+}),
+  "assistance": zod.object({
+  "description": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationAssistanceDescriptionMax),
+  "status": zod.enum(['manual', 'unavailable', 'proposed', 'accepted']),
+  "provider": zod.string().nullable()
+})
+}).optional(),
+  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "verified": zod.boolean().optional(),
+  "archived": zod.boolean().optional(),
+  "displayMetrics": zod.object({
+  "followers": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowersMin).max(createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowersMax).nullish(),
+  "following": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowingMin).max(createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowingMax).nullish()
+}).optional(),
+  "id": zod.string(),
+  "handle": zod.string(),
+  "name": zod.string(),
+  "occupation": zod.string(),
+  "bio": zod.string(),
+  "location": zod.string(),
+  "avatar": zod.string(),
+  "providerRef": zod.object({
+  "provider": zod.string(),
+  "externalId": zod.string().nullable(),
+  "status": zod.string(),
+  "lastSyncAt": zod.coerce.date().nullable()
+}),
+  "identity": zod.object({
+  "provider": zod.string(),
+  "referenceImages": zod.array(zod.string()),
+  "seed": zod.number().int(),
+  "appearance": zod.string(),
+  "styleNotes": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+})),
+  "follows": zod.record(zod.string(), zod.array(zod.string())),
+  "posts": zod.array(zod.object({
+  "taggedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStatePostsItemTaggedAccountIdsMax).optional(),
+  "commentsEnabled": zod.boolean().optional(),
+  "pinned": zod.boolean().optional(),
+  "editedAt": zod.coerce.date().optional(),
+  "displayMetrics": zod.object({
+  "likes": zod.number().int().min(createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMin).max(createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMax).nullish(),
+  "comments": zod.number().int().min(createCreatorUniverseBodyStatePostsItemDisplayMetricsCommentsMin).max(createCreatorUniverseBodyStatePostsItemDisplayMetricsCommentsMax).nullish(),
+  "views": zod.number().int().min(createCreatorUniverseBodyStatePostsItemDisplayMetricsViewsMin).max(createCreatorUniverseBodyStatePostsItemDisplayMetricsViewsMax).nullish()
+}).optional(),
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "image": zod.string(),
+  "media": zod.array(zod.object({
+  "id": zod.string().min(1).max(createCreatorUniverseBodyStatePostsItemMediaItemIdMax),
+  "type": zod.enum(['image', 'video']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "width": zod.number().int().min(1).optional(),
+  "height": zod.number().int().min(1).optional(),
+  "durationSeconds": zod.number().min(createCreatorUniverseBodyStatePostsItemMediaItemDurationSecondsMin).optional()
+}).describe('Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.')).min(1).max(createCreatorUniverseBodyStatePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
+  "caption": zod.string(),
+  "location": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "likes": zod.array(zod.string()),
+  "savedBy": zod.array(zod.string()),
+  "origin": zod.string(),
+  "illustrative": zod.boolean()
+})),
+  "comments": zod.array(zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "authorId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "parentId": zod.string().nullable(),
+  "replyToAuthorId": zod.string().nullable(),
+  "likes": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "stories": zod.array(zod.object({
+  "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(createCreatorUniverseBodyStateStoriesItemReactionsItemValueMax)
+})).optional(),
+  "music": zod.object({
+  "title": zod.string().max(createCreatorUniverseBodyStateStoriesItemMusicTitleMax),
+  "artist": zod.string().max(createCreatorUniverseBodyStateStoriesItemMusicArtistMax),
+  "providerRef": zod.string().max(createCreatorUniverseBodyStateStoriesItemMusicProviderRefMax).optional()
+}).optional().describe('Metadata only; no music provider, audio stream or playback is connected.'),
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "image": zod.string(),
+  "caption": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "seenBy": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "messages": zod.array(zod.object({
+  "hiddenForIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateMessagesItemHiddenForIdsMax).optional(),
+  "quoteMessageId": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['image', 'video', 'audio']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "durationSeconds": zod.number().min(createCreatorUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin).optional()
+})).max(createCreatorUniverseBodyStateMessagesItemAttachmentsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(createCreatorUniverseBodyStateMessagesItemReactionsItemValueMax)
+})).optional(),
+  "id": zod.string(),
+  "threadId": zod.string(),
+  "senderId": zod.string(),
+  "recipientId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "storyId": zod.string().nullable(),
+  "postId": zod.string().nullable(),
+  "readBy": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "notifications": zod.array(zod.object({
+  "id": zod.string(),
+  "recipientId": zod.string(),
+  "actorId": zod.string(),
+  "kind": zod.string(),
+  "postId": zod.string().nullable(),
+  "commentId": zod.string().nullable(),
+  "storyId": zod.string().nullable(),
+  "excerpt": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "read": zod.boolean()
+}))
+})
+})
+
+
+export const createCreatorUniverseResponseStateAppearanceAccentRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const createCreatorUniverseResponseStateHighlightsItemTitleMax = 40;
+
+export const createCreatorUniverseResponseStateHighlightsItemStoryIdsMax = 100;
+
+export const createCreatorUniverseResponseStateHighlightsMax = 200;
+
+export const createCreatorUniverseResponseStateAccountCatalogVersionMin = 0;
+
+export const createCreatorUniverseResponseStateCreatorSetupUniverseNameMax = 60;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicNameMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicAgeMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicAgeMax = 150;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicPronounsMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicInterestsItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicInterestsMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicLikesItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicLikesMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicDislikesItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicDislikesMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationBasicNotesMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityDescriptionMax = 24000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityTraitsItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityTraitsMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityTemperamentMax = 2000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityValuesItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityValuesMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityHumorMax = 2000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityExpressivenessMax = 2000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityEmotionalStyleMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityCommonTopicsItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityCommonTopicsMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityBoundariesItemMax = 1000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityBoundariesMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceSpeakingStyleMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceVocabularyMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceEmojiStyleMax = 2000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceCaptionStyleMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceCommentStyleMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoicePostsAboutItemMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoicePostsAboutMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceAvoidsPostingItemMax = 500;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationVoiceAvoidsPostingMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemCustomLabelMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemDescriptionMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemClosenessMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemClosenessMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTrustMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTrustMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemAttractionMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemAttractionMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTensionMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTensionMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsMax = 300;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineTimezoneMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineFlexibilityNotesMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemTitleMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemWeekdaysItemMax = 7;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemWeekdaysMax = 7;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemStartRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemEndRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemLocationMax = 500;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialSilenceNotesMax = 4000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialPostsPerWeekMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialPostsPerWeekMax = 100;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialStoriesPerWeekMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialStoriesPerWeekMax = 300;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialMinReplyMinutesMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialMinReplyMinutesMax = 10080;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialMaxReplyMinutesMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationSocialMaxReplyMinutesMax = 10080;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryPermanentItemTextMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryPermanentMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRelationshipsItemTextMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRelationshipsMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentItemTextMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentLimitMin = 10;
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentLimitMax = 200;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentSummaryMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateLocationMax = 500;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateActivityMax = 1000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateMoodMax = 500;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateCompanionsMax = 50;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateNextEventMax = 1000;
+
+export const createCreatorUniverseResponseStateCharactersItemConfigurationAssistanceDescriptionMax = 8000;
+
+export const createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowersMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowersMax = 1000000000000;
+
+export const createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowingMin = 0;
+export const createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowingMax = 1000000000000;
+
+export const createCreatorUniverseResponseStatePostsItemTaggedAccountIdsMax = 50;
+
+export const createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMin = 0;
+export const createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMax = 1000000000000;
+
+export const createCreatorUniverseResponseStatePostsItemDisplayMetricsCommentsMin = 0;
+export const createCreatorUniverseResponseStatePostsItemDisplayMetricsCommentsMax = 1000000000000;
+
+export const createCreatorUniverseResponseStatePostsItemDisplayMetricsViewsMin = 0;
+export const createCreatorUniverseResponseStatePostsItemDisplayMetricsViewsMax = 1000000000000;
+
+export const createCreatorUniverseResponseStatePostsItemMediaItemIdMax = 120;
+
+
+
+
+export const createCreatorUniverseResponseStatePostsItemMediaItemDurationSecondsMin = 0;
+
+export const createCreatorUniverseResponseStatePostsItemMediaMax = 10;
+
+export const createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax = 50;
+
+export const createCreatorUniverseResponseStateStoriesItemReactionsItemValueMax = 32;
+
+export const createCreatorUniverseResponseStateStoriesItemMusicTitleMax = 160;
+
+export const createCreatorUniverseResponseStateStoriesItemMusicArtistMax = 160;
+
+export const createCreatorUniverseResponseStateStoriesItemMusicProviderRefMax = 300;
+
+export const createCreatorUniverseResponseStateMessagesItemHiddenForIdsMax = 2;
+
+
+export const createCreatorUniverseResponseStateMessagesItemAttachmentsItemDurationSecondsMin = 0;
+
+export const createCreatorUniverseResponseStateMessagesItemAttachmentsMax = 5;
+
+export const createCreatorUniverseResponseStateMessagesItemReactionsItemValueMax = 32;
+
+
+
+export const CreateCreatorUniverseResponse = zod.object({
+  "universeId": zod.string(),
+  "revision": zod.number().int().min(1),
+  "state": zod.object({
+  "appearance": zod.object({
+  "theme": zod.enum(['dark', 'light', 'system']),
+  "accent": zod.string().regex(createCreatorUniverseResponseStateAppearanceAccentRegExp)
+}).optional(),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "title": zod.string().min(1).max(createCreatorUniverseResponseStateHighlightsItemTitleMax),
+  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseResponseStateHighlightsItemStoryIdsMax)
+})).max(createCreatorUniverseResponseStateHighlightsMax).optional(),
+  "accountCatalogVersion": zod.number().int().min(createCreatorUniverseResponseStateAccountCatalogVersionMin).optional(),
+  "creatorSetup": zod.object({
+  "plan": zod.enum(['free', 'creator']),
+  "universeName": zod.string().min(1).max(createCreatorUniverseResponseStateCreatorSetupUniverseNameMax),
+  "completedAt": zod.coerce.date()
+}).optional(),
+  "version": zod.number().int(),
+  "currentCharacterId": zod.string(),
+  "characters": zod.array(zod.object({
+  "configuration": zod.object({
+  "version": zod.literal(1),
+  "basic": zod.object({
+  "name": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicNameMax),
+  "age": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationBasicAgeMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicAgeMax).nullable(),
+  "pronouns": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicPronounsMax),
+  "interests": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicInterestsItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicInterestsMax),
+  "likes": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicLikesItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicLikesMax),
+  "dislikes": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicDislikesItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicDislikesMax),
+  "notes": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationBasicNotesMax)
+}),
+  "personality": zod.object({
+  "description": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityDescriptionMax),
+  "traits": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityTraitsItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityTraitsMax),
+  "temperament": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityTemperamentMax),
+  "values": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityValuesItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityValuesMax),
+  "humor": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityHumorMax),
+  "sociability": zod.enum(['low', 'medium', 'high']),
+  "expressiveness": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityExpressivenessMax),
+  "emotionalStyle": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityEmotionalStyleMax),
+  "commonTopics": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityCommonTopicsItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityCommonTopicsMax),
+  "boundaries": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityBoundariesItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationPersonalityBoundariesMax)
+}),
+  "voice": zod.object({
+  "speakingStyle": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceSpeakingStyleMax),
+  "messageLength": zod.enum(['short', 'balanced', 'long']),
+  "vocabulary": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceVocabularyMax),
+  "emojiStyle": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceEmojiStyleMax),
+  "captionStyle": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceCaptionStyleMax),
+  "commentStyle": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceCommentStyleMax),
+  "disclosure": zod.enum(['private', 'balanced', 'open']),
+  "postsAbout": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoicePostsAboutItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationVoicePostsAboutMax),
+  "avoidsPosting": zod.array(zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceAvoidsPostingItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceAvoidsPostingMax)
+}),
+  "relationships": zod.array(zod.object({
+  "id": zod.string(),
+  "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'custom']),
+  "customLabel": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemCustomLabelMax),
+  "description": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemDescriptionMax),
+  "closeness": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemClosenessMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemClosenessMax),
+  "trust": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTrustMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTrustMax),
+  "attraction": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemAttractionMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemAttractionMax).nullable(),
+  "tension": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTensionMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemTensionMax).nullable()
+})).max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsMax),
+  "routine": zod.object({
+  "timezone": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineTimezoneMax),
+  "flexibilityNotes": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineFlexibilityNotesMax),
+  "entries": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemTitleMax),
+  "activity": zod.enum(['sleep', 'work', 'study', 'meal', 'exercise', 'rehearsal', 'social', 'leisure', 'custom']),
+  "weekdays": zod.array(zod.number().int().min(1).max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemWeekdaysItemMax)).max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemWeekdaysMax),
+  "start": zod.string().regex(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemStartRegExp),
+  "end": zod.string().regex(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemEndRegExp),
+  "location": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemLocationMax),
+  "recurrence": zod.enum(['weekly', 'once']),
+  "date": zod.string().regex(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesItemDateRegExp).nullable(),
+  "flexibility": zod.enum(['low', 'medium', 'high'])
+})).max(createCreatorUniverseResponseStateCharactersItemConfigurationRoutineEntriesMax)
+}),
+  "social": zod.object({
+  "activity": zod.enum(['low', 'medium', 'high']),
+  "postsFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "storiesFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "likesFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "commentsFrequency": zod.enum(['rare', 'normal', 'frequent']),
+  "initiatesDMs": zod.enum(['rare', 'normal', 'frequent']),
+  "replySpeed": zod.enum(['slow', 'normal', 'quick']),
+  "sociability": zod.enum(['low', 'medium', 'high']),
+  "spontaneity": zod.enum(['low', 'medium', 'high']),
+  "allowSilence": zod.boolean(),
+  "silenceNotes": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationSocialSilenceNotesMax),
+  "postsPerWeek": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationSocialPostsPerWeekMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationSocialPostsPerWeekMax).nullable(),
+  "storiesPerWeek": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationSocialStoriesPerWeekMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationSocialStoriesPerWeekMax).nullable(),
+  "minReplyMinutes": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationSocialMinReplyMinutesMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationSocialMinReplyMinutesMax).nullable(),
+  "maxReplyMinutes": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationSocialMaxReplyMinutesMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationSocialMaxReplyMinutesMax).nullable()
+}),
+  "memory": zod.object({
+  "permanent": zod.array(zod.object({
+  "id": zod.string(),
+  "text": zod.string().min(1).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryPermanentItemTextMax),
+  "targetId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "kind": zod.enum(['manual', 'interaction', 'post', 'conversation', 'event']),
+  "sourceId": zod.string().nullable(),
+  "promotedTo": zod.string().nullable()
+})).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryPermanentMax),
+  "relationships": zod.array(zod.object({
+  "id": zod.string(),
+  "text": zod.string().min(1).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRelationshipsItemTextMax),
+  "targetId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "kind": zod.enum(['manual', 'interaction', 'post', 'conversation', 'event']),
+  "sourceId": zod.string().nullable(),
+  "promotedTo": zod.string().nullable()
+})).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRelationshipsMax),
+  "recent": zod.array(zod.object({
+  "id": zod.string(),
+  "text": zod.string().min(1).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentItemTextMax),
+  "targetId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "kind": zod.enum(['manual', 'interaction', 'post', 'conversation', 'event']),
+  "sourceId": zod.string().nullable(),
+  "promotedTo": zod.string().nullable()
+})).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentMax),
+  "recentLimit": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentLimitMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentLimitMax),
+  "recentSummary": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationMemoryRecentSummaryMax)
+}),
+  "currentState": zod.object({
+  "location": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateLocationMax),
+  "activity": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateActivityMax),
+  "mood": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateMoodMax),
+  "companions": zod.array(zod.string()).max(createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateCompanionsMax),
+  "lastActivityAt": zod.coerce.date().nullable(),
+  "nextEvent": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationCurrentStateNextEventMax),
+  "source": zod.enum(['manual', 'routine']),
+  "updatedAt": zod.coerce.date()
+}),
+  "assistance": zod.object({
+  "description": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationAssistanceDescriptionMax),
+  "status": zod.enum(['manual', 'unavailable', 'proposed', 'accepted']),
+  "provider": zod.string().nullable()
+})
+}).optional(),
+  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "verified": zod.boolean().optional(),
+  "archived": zod.boolean().optional(),
+  "displayMetrics": zod.object({
+  "followers": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowersMin).max(createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowersMax).nullish(),
+  "following": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowingMin).max(createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollowingMax).nullish()
+}).optional(),
+  "id": zod.string(),
+  "handle": zod.string(),
+  "name": zod.string(),
+  "occupation": zod.string(),
+  "bio": zod.string(),
+  "location": zod.string(),
+  "avatar": zod.string(),
+  "providerRef": zod.object({
+  "provider": zod.string(),
+  "externalId": zod.string().nullable(),
+  "status": zod.string(),
+  "lastSyncAt": zod.coerce.date().nullable()
+}),
+  "identity": zod.object({
+  "provider": zod.string(),
+  "referenceImages": zod.array(zod.string()),
+  "seed": zod.number().int(),
+  "appearance": zod.string(),
+  "styleNotes": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+})),
+  "follows": zod.record(zod.string(), zod.array(zod.string())),
+  "posts": zod.array(zod.object({
+  "taggedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStatePostsItemTaggedAccountIdsMax).optional(),
+  "commentsEnabled": zod.boolean().optional(),
+  "pinned": zod.boolean().optional(),
+  "editedAt": zod.coerce.date().optional(),
+  "displayMetrics": zod.object({
+  "likes": zod.number().int().min(createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMin).max(createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMax).nullish(),
+  "comments": zod.number().int().min(createCreatorUniverseResponseStatePostsItemDisplayMetricsCommentsMin).max(createCreatorUniverseResponseStatePostsItemDisplayMetricsCommentsMax).nullish(),
+  "views": zod.number().int().min(createCreatorUniverseResponseStatePostsItemDisplayMetricsViewsMin).max(createCreatorUniverseResponseStatePostsItemDisplayMetricsViewsMax).nullish()
+}).optional(),
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "image": zod.string(),
+  "media": zod.array(zod.object({
+  "id": zod.string().min(1).max(createCreatorUniverseResponseStatePostsItemMediaItemIdMax),
+  "type": zod.enum(['image', 'video']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "width": zod.number().int().min(1).optional(),
+  "height": zod.number().int().min(1).optional(),
+  "durationSeconds": zod.number().min(createCreatorUniverseResponseStatePostsItemMediaItemDurationSecondsMin).optional()
+}).describe('Ordered post item. Stable IDs link images to owner-scoped persisted Vision v1 analysis; video analysis is not included.')).min(1).max(createCreatorUniverseResponseStatePostsItemMediaMax).optional().describe('Optional additive carousel; array order is display order. image remains its first item\'s URL for legacy covers.'),
+  "caption": zod.string(),
+  "location": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "likes": zod.array(zod.string()),
+  "savedBy": zod.array(zod.string()),
+  "origin": zod.string(),
+  "illustrative": zod.boolean()
+})),
+  "comments": zod.array(zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "authorId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "parentId": zod.string().nullable(),
+  "replyToAuthorId": zod.string().nullable(),
+  "likes": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "stories": zod.array(zod.object({
+  "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(createCreatorUniverseResponseStateStoriesItemReactionsItemValueMax)
+})).optional(),
+  "music": zod.object({
+  "title": zod.string().max(createCreatorUniverseResponseStateStoriesItemMusicTitleMax),
+  "artist": zod.string().max(createCreatorUniverseResponseStateStoriesItemMusicArtistMax),
+  "providerRef": zod.string().max(createCreatorUniverseResponseStateStoriesItemMusicProviderRefMax).optional()
+}).optional().describe('Metadata only; no music provider, audio stream or playback is connected.'),
+  "id": zod.string(),
+  "authorId": zod.string(),
+  "image": zod.string(),
+  "caption": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "seenBy": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "messages": zod.array(zod.object({
+  "hiddenForIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateMessagesItemHiddenForIdsMax).optional(),
+  "quoteMessageId": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['image', 'video', 'audio']),
+  "url": zod.string().min(1),
+  "mimeType": zod.string().optional(),
+  "durationSeconds": zod.number().min(createCreatorUniverseResponseStateMessagesItemAttachmentsItemDurationSecondsMin).optional()
+})).max(createCreatorUniverseResponseStateMessagesItemAttachmentsMax).optional(),
+  "reactions": zod.array(zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "value": zod.string().min(1).max(createCreatorUniverseResponseStateMessagesItemReactionsItemValueMax)
+})).optional(),
+  "id": zod.string(),
+  "threadId": zod.string(),
+  "senderId": zod.string(),
+  "recipientId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "storyId": zod.string().nullable(),
+  "postId": zod.string().nullable(),
+  "readBy": zod.array(zod.string()),
+  "origin": zod.string()
+})),
+  "notifications": zod.array(zod.object({
+  "id": zod.string(),
+  "recipientId": zod.string(),
+  "actorId": zod.string(),
+  "kind": zod.string(),
+  "postId": zod.string().nullable(),
+  "commentId": zod.string().nullable(),
+  "storyId": zod.string().nullable(),
+  "excerpt": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "read": zod.boolean()
+}))
+})
+})
 
 
 /**

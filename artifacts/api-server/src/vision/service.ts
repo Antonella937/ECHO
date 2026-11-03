@@ -15,6 +15,8 @@ import {
   type VisionProvider,
 } from "./contracts";
 import { OpenRouterVisionProvider } from "./openrouter";
+import { withMeteredVision } from "../lib/metered-ai";
+import { EngineError } from "../ai-engine/contracts";
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -188,7 +190,7 @@ async function analyzeOne(
   }
 
   try {
-    const outcome = await provider.analyze({
+    const outcome = await withMeteredVision(ownerId, {
       image: { mimeType: image.mimeType, base64: image.bytes.toString("base64") },
       prompt: [
         "Analiza esta foto para contexto social, sin identificar personas.",
@@ -197,7 +199,7 @@ async function analyzeOne(
         "No inventes eventos fuera de la imagen; conserva nombres de elementos concretos y expresa dudas en uncertainty.",
       ].join("\n"),
       validate: parseStoredAnalysisOrThrow,
-    });
+    }, provider);
     await db.update(echoVisionAnalysesTable).set({
       status: "complete", provider: outcome.provider, model: outcome.model, analysis: outcome.analysis,
       errorCode: null, updatedAt: new Date(),
@@ -207,6 +209,13 @@ async function analyzeOne(
       provider: outcome.provider, model: outcome.model, cacheHit: false, attempts: outcome.attempts, usage: outcome.usage,
     };
   } catch (error) {
+    if (error instanceof EngineError) {
+      const visionError = new VisionError(error.code, error.status);
+      await db.update(echoVisionAnalysesTable)
+        .set({ status: "failed", errorCode: error.code, updatedAt: new Date() })
+        .where(and(eq(echoVisionAnalysesTable.id, claim.id), eq(echoVisionAnalysesTable.ownerId, ownerId), eq(echoVisionAnalysesTable.status, "pending")));
+      throw visionError;
+    }
     const code = error instanceof VisionError ? error.code : "VISION_ANALYSIS_FAILED";
     await db.update(echoVisionAnalysesTable)
       .set({ status: "failed", errorCode: code, updatedAt: new Date() })

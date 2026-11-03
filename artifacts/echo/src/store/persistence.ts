@@ -52,17 +52,25 @@ export async function loadLegacyState(): Promise<SocialState | null> {
 }
 
 export interface UniverseEnvelope { state: SocialState | null; revision: number }
-export async function loadUniverse(): Promise<UniverseEnvelope> {
-  const response = await fetch('/api/universe', { credentials: 'same-origin', cache: 'no-store' });
+const ACTIVE_UNIVERSE_PREFIX = 'echo:active-universe:';
+export function getActiveUniverseId(ownerId: string): string {
+  return localStorage.getItem(`${ACTIVE_UNIVERSE_PREFIX}${ownerId}`) || 'primary';
+}
+export function setActiveUniverseId(ownerId: string, universeId: string): void {
+  localStorage.setItem(`${ACTIVE_UNIVERSE_PREFIX}${ownerId}`, universeId);
+}
+export async function loadUniverse(universeId = 'primary'): Promise<UniverseEnvelope> {
+  const params = new URLSearchParams({ universeId });
+  const response = await fetch(`/api/universe?${params}`, { credentials: 'same-origin', cache: 'no-store' });
   if (!response.ok) throw new Error(await responseError(response, 'No se pudo cargar tu universo.'));
   return response.json();
 }
 
 export class RevisionConflict extends Error {}
 
-export async function saveUniverse(state: SocialState, expectedRevision: number): Promise<UniverseEnvelope> {
+export async function saveUniverse(state: SocialState, expectedRevision: number, universeId = 'primary'): Promise<UniverseEnvelope> {
   const data: UniverseInput = { state, expectedRevision };
-  const response = await fetch('/api/universe', {
+  const response = await fetch(`/api/universe?${new URLSearchParams({ universeId })}`, {
     method: 'PUT',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
@@ -122,9 +130,9 @@ export async function cachedMigration(owner: string, hash: string): Promise<Soci
 export async function cacheMigration(owner: string, hash: string, state: SocialState): Promise<void> {
   await tx('readwrite', st => st.put(state, `migration:${owner}:${hash}`));
 }
-export async function verifySavedUniverse(expected: SocialState): Promise<void> {
+export async function verifySavedUniverse(expected: SocialState, universeId = 'primary'): Promise<void> {
   // A separate HTTP read, followed by a full server-side read of private files.
-  const response = await fetch('/api/universe/verify', { credentials: 'same-origin', cache: 'no-store' });
+  const response = await fetch(`/api/universe/verify?${new URLSearchParams({ universeId })}`, { credentials: 'same-origin', cache: 'no-store' });
   if (!response.ok) throw new Error(await responseError(response, 'No se pudo verificar el universo y sus fotos.'));
   const actual = await response.json() as UniverseEnvelope;
   if (JSON.stringify(actual.state) !== JSON.stringify(expected)) {

@@ -29,6 +29,7 @@ import {
 import { runAutonomyDryRun } from "../autonomy/service";
 import { executeAutonomyDecision } from "../autonomy/executor";
 import type { Opportunity } from "../autonomy/policy";
+import { MeteredTextProvider } from "../lib/metered-ai";
 
 const router: IRouter = Router();
 const provider = new FreeModelProvider();
@@ -139,7 +140,9 @@ router.post("/autonomy/dry-run", requireAuth, async (req, res): Promise<void> =>
   }
   ownerGates.set(ownerId, now + 5000);
   try {
-    const report = await runAutonomyDryRun(ownerId, parsed.data, { repository, provider });
+    const report = await runAutonomyDryRun(ownerId, parsed.data, {
+      repository, provider: new MeteredTextProvider(ownerId, "autonomy", provider),
+    });
     res.json(report);
   } catch (error) {
     const safe = error instanceof EngineError ? error : new EngineError("AUTONOMY_DRY_RUN_FAILED", 502);

@@ -9,6 +9,7 @@ import { EngineError } from '../ai-engine/contracts';
 import { z } from 'zod';
 import { VisionError } from '../vision/contracts';
 import { visionService } from '../vision/service';
+import { MeteredTextProvider } from '../lib/metered-ai';
 
 const router: IRouter = Router();
 const provider = new FreeModelProvider();
@@ -67,7 +68,7 @@ router.post('/ai-engine/preview', requireAuth, async (req, res): Promise<void> =
   try {
     res.json(await previewForOwner(owner, input.data, {
       read: readUniverse,
-      provider,
+      provider: new MeteredTextProvider(owner, "brain_text", provider),
       vision: (ownerId, state, decisionInput) => visionService.ensureForDecision(ownerId, state, decisionInput),
     }));
   } catch (error) {

@@ -5,263 +5,126 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface AutonomyCharacterControl {
-  characterId: string;
-  displayName: string;
-  username: string;
-  enabled: boolean;
+export type AiUsageCategory = typeof AiUsageCategory[keyof typeof AiUsageCategory];
+
+
+export const AiUsageCategory = {
+  autonomy: 'autonomy',
+  brain_text: 'brain_text',
+  memory_context: 'memory_context',
+  vision: 'vision',
+  images: 'images',
+} as const;
+
+export interface AiUsageCategoryWeight {
   /**
      * @minimum 1
-     * @maximum 4
+     * @maximum 10000
      */
-  maxActionsPerDay: number;
+  autonomy: number;
   /**
-     * @minimum 60
-     * @maximum 1440
+     * @minimum 1
+     * @maximum 10000
      */
-  minCooldownMinutes: number;
+  brain_text: number;
+  /**
+     * @minimum 1
+     * @maximum 10000
+     */
+  memory_context: number;
+  /**
+     * @minimum 1
+     * @maximum 10000
+     */
+  vision: number;
+  /**
+     * @minimum 1
+     * @maximum 10000
+     */
+  images: number;
 }
 
-export interface AutonomySettings {
-  globalKillSwitchEngaged: boolean;
-  liveExecutionEnabled: false;
-  characters: AutonomyCharacterControl[];
+export interface AiUsageCategorySummary {
+  /** @minimum 0 */
+  calls: number;
+  /** @minimum 0 */
+  units: number;
+  /** @minimum 0 */
+  promptTokens: number;
+  /** @minimum 0 */
+  completionTokens: number;
+  /** @nullable */
+  reportedCost: string | null;
 }
 
-export type AutonomySettingsUpdate = {
-  globalKillSwitchEngaged: boolean;
-} | {
-  /**
-     * @minLength 1
-     * @maxLength 120
-     */
-  characterId: string;
-  enabled: boolean;
+export type CreatorAiUsageCategories = {
+  autonomy: AiUsageCategorySummary;
+  brain_text: AiUsageCategorySummary;
+  memory_context: AiUsageCategorySummary;
+  vision: AiUsageCategorySummary;
+  images: AiUsageCategorySummary;
 };
 
-export interface AutonomyDryRunInput {
+export interface CreatorAiUsage {
+  /** @pattern ^\d{4}-\d{2}$ */
+  month: string;
+  categories: CreatorAiUsageCategories;
+  /** @minimum 0 */
+  totalUnits: number;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
-  characterId: string;
-  idempotencyKey: string;
-}
-
-export type AutonomyDryRunResultMode = typeof AutonomyDryRunResultMode[keyof typeof AutonomyDryRunResultMode];
-
-
-export const AutonomyDryRunResultMode = {
-  dry_run: 'dry_run',
-} as const;
-
-export type AutonomyDryRunResultStatus = typeof AutonomyDryRunResultStatus[keyof typeof AutonomyDryRunResultStatus];
-
-
-export const AutonomyDryRunResultStatus = {
-  previewed: 'previewed',
-  no_opportunity: 'no_opportunity',
-  cooldown: 'cooldown',
-  rate_limited: 'rate_limited',
-  duplicate: 'duplicate',
-  in_progress: 'in_progress',
-} as const;
-
-export type CharacterDecisionPreviewMode = typeof CharacterDecisionPreviewMode[keyof typeof CharacterDecisionPreviewMode];
-
-
-export const CharacterDecisionPreviewMode = {
-  preview: 'preview',
-} as const;
-
-export type CharacterDecisionAction = typeof CharacterDecisionAction[keyof typeof CharacterDecisionAction];
-
-
-export const CharacterDecisionAction = {
-  none: 'none',
-  draft: 'draft',
-  like: 'like',
-  react: 'react',
-} as const;
-
-export type CharacterDecisionSituation = typeof CharacterDecisionSituation[keyof typeof CharacterDecisionSituation];
-
-
-export const CharacterDecisionSituation = {
-  post: 'post',
-  comment: 'comment',
-  dm: 'dm',
-  like_post: 'like_post',
-  like_comment: 'like_comment',
-  story_reaction: 'story_reaction',
-  dm_reaction: 'dm_reaction',
-} as const;
-
-export type CharacterDecisionContextSectionsItem = typeof CharacterDecisionContextSectionsItem[keyof typeof CharacterDecisionContextSectionsItem];
-
-
-export const CharacterDecisionContextSectionsItem = {
-  identity: 'identity',
-  personality: 'personality',
-  relationships: 'relationships',
-  routine: 'routine',
-  social: 'social',
-  memory: 'memory',
-  currentState: 'currentState',
-  recentSocial: 'recentSocial',
-} as const;
-
-export interface CharacterDecision {
-  action: CharacterDecisionAction;
-  situation: CharacterDecisionSituation;
-  /**
-     * @maxLength 2000
+     * @minimum 1
      * @nullable
      */
-  text: string | null;
-  /**
-     * Brief explanation
-     * @minLength 1
-     * @maxLength 400
-     */
-  reason: string;
+  monthlyHardCeilingUnits: number | null;
   /**
      * @minimum 0
-     * @maximum 10080
+     * @maximum 90
      */
-  suggestedDelayMinutes: number;
-  /**
-     * @maxLength 32
-     * @nullable
-     */
-  reaction?: string | null;
-  /** @maxItems 8 */
-  contextSections: CharacterDecisionContextSectionsItem[];
+  autonomyReservePercent: number;
+  categoryWeights: AiUsageCategoryWeight;
 }
 
-export type CharacterContextAuditSource = typeof CharacterContextAuditSource[keyof typeof CharacterContextAuditSource];
+export type CreatorAccountPlan = typeof CreatorAccountPlan[keyof typeof CreatorAccountPlan];
 
 
-export const CharacterContextAuditSource = {
-  persisted_owner_universe: 'persisted_owner_universe',
-  provided_snapshot: 'provided_snapshot',
+export const CreatorAccountPlan = {
+  free: 'free',
+  creator: 'creator',
 } as const;
 
-export interface CharacterContextSection {
+export type CreatorAccountBillingStatus = typeof CreatorAccountBillingStatus[keyof typeof CreatorAccountBillingStatus];
+
+
+export const CreatorAccountBillingStatus = {
+  not_connected: 'not_connected',
+} as const;
+
+export interface CreatorAccount {
+  plan: CreatorAccountPlan;
+  billingStatus: CreatorAccountBillingStatus;
+  /** @minimum 1 */
+  maxUniverses: number;
+  /** @minimum 1 */
+  maxCharacters: number;
+  /** @minimum 0 */
+  addonUniverses: number;
+  /** @minimum 0 */
+  addonCharacters: number;
+  /** @minimum 0 */
+  universeCount: number;
+  /** @minimum 0 */
+  characterCount: number;
+  usage: CreatorAiUsage;
+}
+
+export interface CreatorUniverseSummary {
+  universeId: string;
   name: string;
-  /** Meaningful content */
-  hasContent: boolean;
   /** @minimum 0 */
-  recordCount: number;
-  /** Included field paths only; never private field values */
-  fields: string[];
-}
-
-export type CharacterContextAuditPrivateDmScope = typeof CharacterContextAuditPrivateDmScope[keyof typeof CharacterContextAuditPrivateDmScope];
-
-
-export const CharacterContextAuditPrivateDmScope = {
-  none: 'none',
-  actor_and_recipient_only: 'actor_and_recipient_only',
-} as const;
-
-export type CharacterContextAuditRecentCounts = {[key: string]: number};
-
-export interface CharacterContextAudit {
-  source: CharacterContextAuditSource;
-  /** SHA-256 of the exact bounded text context */
-  contextHash: string;
-  characterId: string;
+  revision: number;
   /** @minimum 0 */
-  sourceRevision: number;
-  sections: CharacterContextSection[];
-  recentCounts: CharacterContextAuditRecentCounts;
-  privateDmScope: CharacterContextAuditPrivateDmScope;
-  /**
-     * Count of persisted per-item vision analyses included; no image bytes or URLs
-     * @minimum 0
-     */
-  visionMediaIncluded: number;
-  /**
-     * Count of persisted ordered post summaries included
-     * @minimum 0
-     */
-  visionPostSummariesIncluded: number;
-}
-
-export interface EngineUsage {
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  promptTokens: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  completionTokens: number | null;
-  /**
-     * Provider-reported USD; null means not reported
-     * @minimum 0
-     * @nullable
-     */
-  cost: number | null;
-}
-
-export type EngineAttemptOutcome = typeof EngineAttemptOutcome[keyof typeof EngineAttemptOutcome];
-
-
-export const EngineAttemptOutcome = {
-  success: 'success',
-  failure: 'failure',
-  skipped: 'skipped',
-} as const;
-
-export interface EngineAttempt {
-  model: string;
-  outcome: EngineAttemptOutcome;
-  /** @nullable */
-  code: string | null;
-  usage: EngineUsage;
-}
-
-export interface CharacterDecisionPreview {
-  mode: CharacterDecisionPreviewMode;
-  executed: false;
-  characterId: string;
-  /** @minimum 0 */
-  sourceRevision: number;
-  provider: string;
-  model: string;
-  decision: CharacterDecision;
-  availableContextSections: string[];
-  warnings: string[];
-  contextAudit: CharacterContextAudit;
-  usage: EngineUsage;
-  attempts: EngineAttempt[];
-  /** @nullable */
-  targetId?: string | null;
-}
-
-export interface AutonomyDryRunResult {
-  mode: AutonomyDryRunResultMode;
-  /** @nullable */
-  runId: string | null;
-  characterId: string;
-  status: AutonomyDryRunResultStatus;
-  liveExecutionEnabled: false;
-  liveEligible: boolean;
-  socialActionsExecuted: false;
-  /** @maxLength 300 */
-  reason: string;
-  /** @nullable */
-  targetId?: string | null;
-  preview: CharacterDecisionPreview | null;
-  createdAt: string;
-}
-
-export interface HealthStatus {
-  status: string;
+  characterCount: number;
+  current: boolean;
 }
 
 export type AppearanceTheme = typeof AppearanceTheme[keyof typeof AppearanceTheme];
@@ -1035,6 +898,295 @@ export interface SocialState {
   notifications: Notification[];
 }
 
+export interface CreatorUniverseInput {
+  /**
+     * @minLength 1
+     * @maxLength 60
+     */
+  name: string;
+  state: SocialState;
+}
+
+export interface CreatorUniverseCreated {
+  universeId: string;
+  /** @minimum 1 */
+  revision: number;
+  state: SocialState;
+}
+
+export interface CreatorAiBudgetInput {
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  monthlyHardCeilingUnits: number | null;
+  /**
+     * @minimum 0
+     * @maximum 90
+     */
+  autonomyReservePercent: number;
+  categoryWeights: AiUsageCategoryWeight;
+}
+
+export interface AutonomyCharacterControl {
+  characterId: string;
+  displayName: string;
+  username: string;
+  enabled: boolean;
+  /**
+     * @minimum 1
+     * @maximum 4
+     */
+  maxActionsPerDay: number;
+  /**
+     * @minimum 60
+     * @maximum 1440
+     */
+  minCooldownMinutes: number;
+}
+
+export interface AutonomySettings {
+  globalKillSwitchEngaged: boolean;
+  liveExecutionEnabled: false;
+  characters: AutonomyCharacterControl[];
+}
+
+export type AutonomySettingsUpdate = {
+  globalKillSwitchEngaged: boolean;
+} | {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  characterId: string;
+  enabled: boolean;
+};
+
+export interface AutonomyDryRunInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  characterId: string;
+  idempotencyKey: string;
+}
+
+export type AutonomyDryRunResultMode = typeof AutonomyDryRunResultMode[keyof typeof AutonomyDryRunResultMode];
+
+
+export const AutonomyDryRunResultMode = {
+  dry_run: 'dry_run',
+} as const;
+
+export type AutonomyDryRunResultStatus = typeof AutonomyDryRunResultStatus[keyof typeof AutonomyDryRunResultStatus];
+
+
+export const AutonomyDryRunResultStatus = {
+  previewed: 'previewed',
+  no_opportunity: 'no_opportunity',
+  cooldown: 'cooldown',
+  rate_limited: 'rate_limited',
+  duplicate: 'duplicate',
+  in_progress: 'in_progress',
+} as const;
+
+export type CharacterDecisionPreviewMode = typeof CharacterDecisionPreviewMode[keyof typeof CharacterDecisionPreviewMode];
+
+
+export const CharacterDecisionPreviewMode = {
+  preview: 'preview',
+} as const;
+
+export type CharacterDecisionAction = typeof CharacterDecisionAction[keyof typeof CharacterDecisionAction];
+
+
+export const CharacterDecisionAction = {
+  none: 'none',
+  draft: 'draft',
+  like: 'like',
+  react: 'react',
+} as const;
+
+export type CharacterDecisionSituation = typeof CharacterDecisionSituation[keyof typeof CharacterDecisionSituation];
+
+
+export const CharacterDecisionSituation = {
+  post: 'post',
+  comment: 'comment',
+  dm: 'dm',
+  like_post: 'like_post',
+  like_comment: 'like_comment',
+  story_reaction: 'story_reaction',
+  dm_reaction: 'dm_reaction',
+} as const;
+
+export type CharacterDecisionContextSectionsItem = typeof CharacterDecisionContextSectionsItem[keyof typeof CharacterDecisionContextSectionsItem];
+
+
+export const CharacterDecisionContextSectionsItem = {
+  identity: 'identity',
+  personality: 'personality',
+  relationships: 'relationships',
+  routine: 'routine',
+  social: 'social',
+  memory: 'memory',
+  currentState: 'currentState',
+  recentSocial: 'recentSocial',
+} as const;
+
+export interface CharacterDecision {
+  action: CharacterDecisionAction;
+  situation: CharacterDecisionSituation;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  text: string | null;
+  /**
+     * Brief explanation
+     * @minLength 1
+     * @maxLength 400
+     */
+  reason: string;
+  /**
+     * @minimum 0
+     * @maximum 10080
+     */
+  suggestedDelayMinutes: number;
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  reaction?: string | null;
+  /** @maxItems 8 */
+  contextSections: CharacterDecisionContextSectionsItem[];
+}
+
+export type CharacterContextAuditSource = typeof CharacterContextAuditSource[keyof typeof CharacterContextAuditSource];
+
+
+export const CharacterContextAuditSource = {
+  persisted_owner_universe: 'persisted_owner_universe',
+  provided_snapshot: 'provided_snapshot',
+} as const;
+
+export interface CharacterContextSection {
+  name: string;
+  /** Meaningful content */
+  hasContent: boolean;
+  /** @minimum 0 */
+  recordCount: number;
+  /** Included field paths only; never private field values */
+  fields: string[];
+}
+
+export type CharacterContextAuditPrivateDmScope = typeof CharacterContextAuditPrivateDmScope[keyof typeof CharacterContextAuditPrivateDmScope];
+
+
+export const CharacterContextAuditPrivateDmScope = {
+  none: 'none',
+  actor_and_recipient_only: 'actor_and_recipient_only',
+} as const;
+
+export type CharacterContextAuditRecentCounts = {[key: string]: number};
+
+export interface CharacterContextAudit {
+  source: CharacterContextAuditSource;
+  /** SHA-256 of the exact bounded text context */
+  contextHash: string;
+  characterId: string;
+  /** @minimum 0 */
+  sourceRevision: number;
+  sections: CharacterContextSection[];
+  recentCounts: CharacterContextAuditRecentCounts;
+  privateDmScope: CharacterContextAuditPrivateDmScope;
+  /**
+     * Count of persisted per-item vision analyses included; no image bytes or URLs
+     * @minimum 0
+     */
+  visionMediaIncluded: number;
+  /**
+     * Count of persisted ordered post summaries included
+     * @minimum 0
+     */
+  visionPostSummariesIncluded: number;
+}
+
+export interface EngineUsage {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  promptTokens: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  completionTokens: number | null;
+  /**
+     * Provider-reported USD; null means not reported
+     * @minimum 0
+     * @nullable
+     */
+  cost: number | null;
+}
+
+export type EngineAttemptOutcome = typeof EngineAttemptOutcome[keyof typeof EngineAttemptOutcome];
+
+
+export const EngineAttemptOutcome = {
+  success: 'success',
+  failure: 'failure',
+  skipped: 'skipped',
+} as const;
+
+export interface EngineAttempt {
+  model: string;
+  outcome: EngineAttemptOutcome;
+  /** @nullable */
+  code: string | null;
+  usage: EngineUsage;
+}
+
+export interface CharacterDecisionPreview {
+  mode: CharacterDecisionPreviewMode;
+  executed: false;
+  characterId: string;
+  /** @minimum 0 */
+  sourceRevision: number;
+  provider: string;
+  model: string;
+  decision: CharacterDecision;
+  availableContextSections: string[];
+  warnings: string[];
+  contextAudit: CharacterContextAudit;
+  usage: EngineUsage;
+  attempts: EngineAttempt[];
+  /** @nullable */
+  targetId?: string | null;
+}
+
+export interface AutonomyDryRunResult {
+  mode: AutonomyDryRunResultMode;
+  /** @nullable */
+  runId: string | null;
+  characterId: string;
+  status: AutonomyDryRunResultStatus;
+  liveExecutionEnabled: false;
+  liveEligible: boolean;
+  socialActionsExecuted: false;
+  /** @maxLength 300 */
+  reason: string;
+  /** @nullable */
+  targetId?: string | null;
+  preview: CharacterDecisionPreview | null;
+  createdAt: string;
+}
+
+export interface HealthStatus {
+  status: string;
+}
+
 export interface UniverseEnvelope {
   /** @minimum 0 */
   revision: number;
@@ -1349,4 +1501,36 @@ export interface UploadClaimInput {
 export interface UploadClaimResult {
   objectPath: string;
 }
+
+export type GetUniverseParams = {
+/**
+ * @minLength 1
+ * @maxLength 80
+ */
+universeId?: string;
+};
+
+export type SaveUniverseParams = {
+/**
+ * @minLength 1
+ * @maxLength 80
+ */
+universeId?: string;
+};
+
+export type VerifyUniverseParams = {
+/**
+ * @minLength 1
+ * @maxLength 80
+ */
+universeId?: string;
+};
+
+export type ListCreatorUniversesParams = {
+/**
+ * @minLength 1
+ * @maxLength 80
+ */
+universeId?: string;
+};
 

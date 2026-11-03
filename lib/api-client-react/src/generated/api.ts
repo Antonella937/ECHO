@@ -29,7 +29,15 @@ import type {
   CharacterDecisionPreview,
   CharacterProposal,
   CharacterProposalInput,
+  CreatorAccount,
+  CreatorAiBudgetInput,
+  CreatorUniverseCreated,
+  CreatorUniverseInput,
+  CreatorUniverseSummary,
+  GetUniverseParams,
   HealthStatus,
+  ListCreatorUniversesParams,
+  SaveUniverseParams,
   UniverseEnvelope,
   UniverseInput,
   UniverseVerification,
@@ -37,6 +45,7 @@ import type {
   UploadClaimResult,
   UploadUrlInput,
   UploadUrlResult,
+  VerifyUniverseParams,
   VisionAnalysisResponse,
   VisionAnalyzeInput
 } from './api.schemas';
@@ -740,20 +749,27 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
-export const getGetUniverseUrl = () => {
+export const getGetUniverseUrl = (params?: GetUniverseParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/universe`
+  return stringifiedParams.length > 0 ? `/api/universe?${stringifiedParams}` : `/api/universe`
 }
 
 /**
  * @summary Load the authenticated user's universe
  */
-export const getUniverse = async ( options?: Parameters<typeof customFetch>[1]): Promise<UniverseEnvelope> => {
+export const getUniverse = async (params?: GetUniverseParams, options?: Parameters<typeof customFetch>[1]): Promise<UniverseEnvelope> => {
 
-  return customFetch<UniverseEnvelope>(getGetUniverseUrl(),
+  return customFetch<UniverseEnvelope>(getGetUniverseUrl(params),
   {
     ...options,
     method: 'GET'
@@ -766,23 +782,23 @@ export const getUniverse = async ( options?: Parameters<typeof customFetch>[1]):
 
 
 
-export const getGetUniverseQueryKey = () => {
+export const getGetUniverseQueryKey = (params?: GetUniverseParams,) => {
     return [
-    `/api/universe`
+    `/api/universe`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetUniverseQueryOptions = <TData = Awaited<ReturnType<typeof getUniverse>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetUniverseQueryOptions = <TData = Awaited<ReturnType<typeof getUniverse>>, TError = ErrorType<void>>(params?: GetUniverseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUniverseQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetUniverseQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUniverse>>> = ({ signal }) => getUniverse({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUniverse>>> = ({ signal }) => getUniverse(params, { signal, ...requestOptions });
 
 
 
@@ -800,11 +816,11 @@ export type GetUniverseQueryError = ErrorType<void>
  */
 
 export function useGetUniverse<TData = Awaited<ReturnType<typeof getUniverse>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetUniverseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetUniverseQueryOptions(options)
+  const queryOptions = getGetUniverseQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -817,18 +833,26 @@ export function useGetUniverse<TData = Awaited<ReturnType<typeof getUniverse>>, 
 
 
 
-export const getSaveUniverseUrl = () => {
+export const getSaveUniverseUrl = (params?: SaveUniverseParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/universe`
+  return stringifiedParams.length > 0 ? `/api/universe?${stringifiedParams}` : `/api/universe`
 }
 
 /**
  * @summary Save the authenticated user's universe
  */
-export const saveUniverse = async (universeInput: UniverseInput, options?: Parameters<typeof customFetch>[1]): Promise<UniverseEnvelope> => {
+export const saveUniverse = async (universeInput: UniverseInput,
+    params?: SaveUniverseParams, options?: Parameters<typeof customFetch>[1]): Promise<UniverseEnvelope> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -844,7 +868,7 @@ export const saveUniverse = async (universeInput: UniverseInput, options?: Param
     }
     return headers;
   };
-return customFetch<UniverseEnvelope>(getSaveUniverseUrl(),
+return customFetch<UniverseEnvelope>(getSaveUniverseUrl(params),
   {
     ...options,
     method: 'PUT',
@@ -874,9 +898,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveUniverse>>, SaveUniverseMutationVariables> = (props) => {
-          const {data} = props ?? {};
+          const {data,params} = props ?? {};
 
-          return  saveUniverse(data,requestOptions)
+          return  saveUniverse(data,params,requestOptions)
         }
 
 
@@ -889,7 +913,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SaveUniverseMutationResult = NonNullable<Awaited<ReturnType<typeof saveUniverse>>>
     export type SaveUniverseMutationBody = BodyType<UniverseInput>
     export type SaveUniverseMutationError = ErrorType<void>
-    export type SaveUniverseMutationVariables = {data: BodyType<UniverseInput>}
+    export type SaveUniverseMutationVariables = {data: BodyType<UniverseInput>;params?: SaveUniverseParams}
 
     /**
  * @summary Save the authenticated user's universe
@@ -1081,20 +1105,27 @@ export const useClaimUpload = <TError = ErrorType<void>,
       return useMutation(getClaimUploadMutationOptions(options));
     }
 
-export const getVerifyUniverseUrl = () => {
+export const getVerifyUniverseUrl = (params?: VerifyUniverseParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/universe/verify`
+  return stringifiedParams.length > 0 ? `/api/universe/verify?${stringifiedParams}` : `/api/universe/verify`
 }
 
 /**
  * @summary Re-read the saved universe and verify every private image is readable
  */
-export const verifyUniverse = async ( options?: Parameters<typeof customFetch>[1]): Promise<UniverseVerification> => {
+export const verifyUniverse = async (params?: VerifyUniverseParams, options?: Parameters<typeof customFetch>[1]): Promise<UniverseVerification> => {
 
-  return customFetch<UniverseVerification>(getVerifyUniverseUrl(),
+  return customFetch<UniverseVerification>(getVerifyUniverseUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1107,23 +1138,23 @@ export const verifyUniverse = async ( options?: Parameters<typeof customFetch>[1
 
 
 
-export const getVerifyUniverseQueryKey = () => {
+export const getVerifyUniverseQueryKey = (params?: VerifyUniverseParams,) => {
     return [
-    `/api/universe/verify`
+    `/api/universe/verify`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getVerifyUniverseQueryOptions = <TData = Awaited<ReturnType<typeof verifyUniverse>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getVerifyUniverseQueryOptions = <TData = Awaited<ReturnType<typeof verifyUniverse>>, TError = ErrorType<void>>(params?: VerifyUniverseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getVerifyUniverseQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getVerifyUniverseQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyUniverse>>> = ({ signal }) => verifyUniverse({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyUniverse>>> = ({ signal }) => verifyUniverse(params, { signal, ...requestOptions });
 
 
 
@@ -1141,11 +1172,11 @@ export type VerifyUniverseQueryError = ErrorType<void>
  */
 
 export function useVerifyUniverse<TData = Awaited<ReturnType<typeof verifyUniverse>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: VerifyUniverseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyUniverse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getVerifyUniverseQueryOptions(options)
+  const queryOptions = getVerifyUniverseQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1157,6 +1188,343 @@ export function useVerifyUniverse<TData = Awaited<ReturnType<typeof verifyUniver
 
 
 
+
+export const getGetCreatorAccountUrl = () => {
+
+
+
+
+  return `/api/creator/account`
+}
+
+/**
+ * @summary Load owner-scoped plan, structural capacity and monthly AI usage
+ */
+export const getCreatorAccount = async ( options?: Parameters<typeof customFetch>[1]): Promise<CreatorAccount> => {
+
+  return customFetch<CreatorAccount>(getGetCreatorAccountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCreatorAccountQueryKey = () => {
+    return [
+    `/api/creator/account`
+    ] as const;
+    }
+
+
+export const getGetCreatorAccountQueryOptions = <TData = Awaited<ReturnType<typeof getCreatorAccount>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreatorAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCreatorAccountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCreatorAccount>>> = ({ signal }) => getCreatorAccount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCreatorAccount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCreatorAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getCreatorAccount>>>
+export type GetCreatorAccountQueryError = ErrorType<void>
+
+
+/**
+ * @summary Load owner-scoped plan, structural capacity and monthly AI usage
+ */
+
+export function useGetCreatorAccount<TData = Awaited<ReturnType<typeof getCreatorAccount>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreatorAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCreatorAccountQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getConfigureCreatorAiBudgetUrl = () => {
+
+
+
+
+  return `/api/creator/ai-budget`
+}
+
+/**
+ * @summary Configure an internal weighted usage ceiling and autonomy reserve
+ */
+export const configureCreatorAiBudget = async (creatorAiBudgetInput: CreatorAiBudgetInput, options?: Parameters<typeof customFetch>[1]): Promise<CreatorAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CreatorAccount>(getConfigureCreatorAiBudgetUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(creatorAiBudgetInput)
+  }
+);}
+
+
+
+
+
+export const getConfigureCreatorAiBudgetMutationKey = () => ['configureCreatorAiBudget'] as const;
+
+export const getConfigureCreatorAiBudgetMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureCreatorAiBudget>>, TError,ConfigureCreatorAiBudgetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof configureCreatorAiBudget>>, TError,ConfigureCreatorAiBudgetMutationVariables, TContext> => {
+
+const mutationKey = getConfigureCreatorAiBudgetMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof configureCreatorAiBudget>>, ConfigureCreatorAiBudgetMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  configureCreatorAiBudget(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfigureCreatorAiBudgetMutationResult = NonNullable<Awaited<ReturnType<typeof configureCreatorAiBudget>>>
+    export type ConfigureCreatorAiBudgetMutationBody = BodyType<CreatorAiBudgetInput>
+    export type ConfigureCreatorAiBudgetMutationError = ErrorType<void>
+    export type ConfigureCreatorAiBudgetMutationVariables = {data: BodyType<CreatorAiBudgetInput>}
+
+    /**
+ * @summary Configure an internal weighted usage ceiling and autonomy reserve
+ */
+export const useConfigureCreatorAiBudget = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureCreatorAiBudget>>, TError,ConfigureCreatorAiBudgetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof configureCreatorAiBudget>>,
+        TError,
+        ConfigureCreatorAiBudgetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfigureCreatorAiBudgetMutationOptions(options));
+    }
+
+export const getListCreatorUniversesUrl = (params?: ListCreatorUniversesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/creator/universes?${stringifiedParams}` : `/api/creator/universes`
+}
+
+/**
+ * @summary List the authenticated owner's universes and character counts
+ */
+export const listCreatorUniverses = async (params?: ListCreatorUniversesParams, options?: Parameters<typeof customFetch>[1]): Promise<CreatorUniverseSummary[]> => {
+
+  return customFetch<CreatorUniverseSummary[]>(getListCreatorUniversesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCreatorUniversesQueryKey = (params?: ListCreatorUniversesParams,) => {
+    return [
+    `/api/creator/universes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCreatorUniversesQueryOptions = <TData = Awaited<ReturnType<typeof listCreatorUniverses>>, TError = ErrorType<void>>(params?: ListCreatorUniversesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreatorUniverses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCreatorUniversesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCreatorUniverses>>> = ({ signal }) => listCreatorUniverses(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCreatorUniverses>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCreatorUniversesQueryResult = NonNullable<Awaited<ReturnType<typeof listCreatorUniverses>>>
+export type ListCreatorUniversesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the authenticated owner's universes and character counts
+ */
+
+export function useListCreatorUniverses<TData = Awaited<ReturnType<typeof listCreatorUniverses>>, TError = ErrorType<void>>(
+ params?: ListCreatorUniversesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCreatorUniverses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCreatorUniversesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateCreatorUniverseUrl = () => {
+
+
+
+
+  return `/api/creator/universes`
+}
+
+/**
+ * @summary Create another owner-scoped universe within structural capacity
+ */
+export const createCreatorUniverse = async (creatorUniverseInput: CreatorUniverseInput, options?: Parameters<typeof customFetch>[1]): Promise<CreatorUniverseCreated> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CreatorUniverseCreated>(getCreateCreatorUniverseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(creatorUniverseInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCreatorUniverseMutationKey = () => ['createCreatorUniverse'] as const;
+
+export const getCreateCreatorUniverseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCreatorUniverse>>, TError,CreateCreatorUniverseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCreatorUniverse>>, TError,CreateCreatorUniverseMutationVariables, TContext> => {
+
+const mutationKey = getCreateCreatorUniverseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCreatorUniverse>>, CreateCreatorUniverseMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCreatorUniverse(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCreatorUniverseMutationResult = NonNullable<Awaited<ReturnType<typeof createCreatorUniverse>>>
+    export type CreateCreatorUniverseMutationBody = BodyType<CreatorUniverseInput>
+    export type CreateCreatorUniverseMutationError = ErrorType<void>
+    export type CreateCreatorUniverseMutationVariables = {data: BodyType<CreatorUniverseInput>}
+
+    /**
+ * @summary Create another owner-scoped universe within structural capacity
+ */
+export const useCreateCreatorUniverse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCreatorUniverse>>, TError,CreateCreatorUniverseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCreatorUniverse>>,
+        TError,
+        CreateCreatorUniverseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateCreatorUniverseMutationOptions(options));
+    }
 
 export const getGetPrivateObjectUrl = (objectPath: string,) => {
 

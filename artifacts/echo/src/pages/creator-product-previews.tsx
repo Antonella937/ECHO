@@ -17,7 +17,21 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import { Link } from 'wouter';
+import { useState } from 'react';
+import { useUser } from '@clerk/react';
+import {
+  getGetCreatorAccountQueryKey,
+  getGetUniverseQueryKey,
+  getListCreatorUniversesQueryKey,
+  useCreateCreatorUniverse,
+  useGetCreatorAccount,
+  useGetUniverse,
+  useListCreatorUniverses,
+} from '@workspace/api-client-react';
 import { PublicFooter, PublicHeader } from './landing';
+import { createStarterUniverse } from '@/store/create-starter-universe';
+import { getActiveUniverseId, setActiveUniverseId } from '@/store/persistence';
+import { useLocation } from 'wouter';
 import './creator-product-previews.css';
 
 function PreviewShell({ children }: { children: React.ReactNode }) {
@@ -62,6 +76,10 @@ function PreviewHeading({
 }
 
 export function CreatorAccountPreview() {
+  const { isLoaded, isSignedIn } = useUser();
+  const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getGetCreatorAccountQueryKey() } });
+  const account = isSignedIn ? live.data : undefined;
+  const usage = account?.usage;
   return (
     <PreviewShell>
       <PreviewHeading
@@ -70,25 +88,38 @@ export function CreatorAccountPreview() {
         accent="tu ritmo."
         description="Una vista de ejemplo para entender qué acompaña a una cuenta ECHO Creator."
       />
-      <PreviewNotice>Datos ilustrativos: esta pantalla no está conectada a tu cuenta ni refleja uso real.</PreviewNotice>
+      <PreviewNotice>{account ? 'Plan, capacidad y uso de IA de tu cuenta. Los cobros todavía no están conectados.' : 'Datos ilustrativos: inicia sesión para ver el plan y el uso reales de tu cuenta.'}</PreviewNotice>
       <section className="epc-account-layout" aria-label="Resumen ilustrativo de cuenta">
         <article className="epc-plan-panel">
-          <div className="epc-panel-topline"><span>PLAN DE EJEMPLO</span><span className="epc-status">Activo · ilustrativo</span></div>
-          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>Plan actual</span><h2>Free</h2></div></div>
+          <div className="epc-panel-topline"><span>{account ? 'TU PLAN' : 'PLAN DE EJEMPLO'}</span><span className="epc-status">{account ? 'Activo · sin cobros' : 'Activo · ilustrativo'}</span></div>
+          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>Plan actual</span><h2>{account?.plan === 'creator' ? 'Creator' : 'Free'}</h2></div></div>
           <p className="epc-panel-copy">Un comienzo para crear un universo privado y darle forma a sus personajes.</p>
           <div className="epc-capacity">
-            <div><span>Universos</span><strong>1 universo</strong></div>
+            <div><span>Universos</span><strong>{account ? `${account.universeCount} / ${account.maxUniverses}` : '1 universo'}</strong></div>
             <div className="epc-capacity-rule" aria-hidden="true"><i /></div>
-            <div><span>Personajes</span><strong>Hasta 5 personajes</strong></div>
+            <div><span>Personajes</span><strong>{account ? `${account.characterCount} / ${account.maxCharacters}` : 'Hasta 5 personajes'}</strong></div>
           </div>
-          <Link href="/creator-preview/store" className="ep-button epc-wide-link">Explorar Creator <ArrowRight size={15} /></Link>
+          <Link href="/creator-preview/store" className="ep-button epc-wide-link">{account?.plan === 'creator' ? 'Ver capacidad Creator' : 'Explorar Creator'} <ArrowRight size={15} /></Link>
         </article>
         <article className="epc-activity-panel">
           <div className="epc-panel-title"><span className="epc-icon-tile"><Sparkles size={17} /></span><div><span>Herramientas</span><h2>Lo que puedes explorar</h2></div></div>
-          <div className="epc-tool-row"><span className="epc-tool-icon"><WandSparkles size={16} /></span><div><strong>IA</strong><small>Uso con límites diarios en Free</small></div><span className="epc-tool-state">Disponible</span></div>
-          <div className="epc-tool-row"><span className="epc-tool-icon"><Image size={16} /></span><div><strong>Imágenes</strong><small>Límites de uso por definir</small></div><span className="epc-tool-state">Por definir</span></div>
-          <div className="epc-tool-row"><span className="epc-tool-icon"><Eye size={16} /></span><div><strong>Vision</strong><small>Contexto de imágenes compartidas</small></div><span className="epc-tool-state">Disponible</span></div>
-          <p className="epc-subtle-note">El uso se muestra sin cifras: no hay actividad real en esta vista.</p>
+          {[
+            { key: 'brain_text', label: 'Texto · Brain', icon: <WandSparkles size={16} /> },
+            { key: 'autonomy', label: 'Autonomy', icon: <Sparkles size={16} /> },
+            { key: 'memory_context', label: 'Memoria y contexto', icon: <MessageCircle size={16} /> },
+            { key: 'vision', label: 'Vision', icon: <Eye size={16} /> },
+            { key: 'images', label: 'Imágenes', icon: <Image size={16} /> },
+          ].map(item => {
+            const entry = usage?.categories[item.key as keyof NonNullable<typeof usage>['categories']];
+            return <div className="epc-tool-row" key={item.key}>
+              <span className="epc-tool-icon">{item.icon}</span>
+              <div><strong>{item.label}</strong><small>{account ? `${entry?.calls ?? 0} operaciones · ${entry?.units ?? 0} unidades internas este mes` : 'Consumo mensual por categoría'}</small></div>
+              <span className="epc-tool-state">{account ? 'Registrado' : 'Por definir'}</span>
+            </div>;
+          })}
+          <p className="epc-subtle-note">{account
+            ? `Unidades ponderadas; pesos configurables. ${usage?.monthlyHardCeilingUnits == null ? 'El techo mensual sigue sin calibrar.' : `Techo interno: ${usage.monthlyHardCeilingUnits} unidades.`} Autonomy conserva una reserva del ${usage?.autonomyReservePercent ?? 20}%.`
+            : 'No se muestran límites numéricos de IA hasta calibrarlos con costos reales.'}</p>
         </article>
       </section>
       <div className="epc-back-row"><Link href="/creator-preview" className="ep-text-link"><ArrowLeft size={15} /> Pantallas de revisión</Link></div>
@@ -97,50 +128,114 @@ export function CreatorAccountPreview() {
 }
 
 export function CreatorUniversePreview() {
-  const sampleSlots = [true, true, true, false, false];
+  const { isLoaded, isSignedIn, user } = useUser();
+  const accountQuery = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getGetCreatorAccountQueryKey() } });
+  const account = isSignedIn ? accountQuery.data : undefined;
+  const activeUniverseId = user?.id ? getActiveUniverseId(user.id) : 'primary';
+  const universesQuery = useListCreatorUniverses({ universeId: activeUniverseId }, {
+    query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getListCreatorUniversesQueryKey({ universeId: activeUniverseId }) },
+  });
+  const activeUniverseQuery = useGetUniverse({ universeId: activeUniverseId }, {
+    query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getGetUniverseQueryKey({ universeId: activeUniverseId }) },
+  });
+  const universes = universesQuery.data ?? [];
+  const activeUniverse = activeUniverseQuery.data?.state ?? null;
+  const slots = account ? Array.from({ length: Math.min(account.maxCharacters, 25) },
+    (_, index) => index < account.characterCount) : [true, true, true, false, false];
+  const createUniverse = useCreateCreatorUniverse();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [, navigate] = useLocation();
+  const atCharacterLimit = Boolean(account && account.characterCount >= account.maxCharacters);
+  const createCharacter = () => {
+    if (!isSignedIn) return;
+    if (atCharacterLimit) { navigate('/creator-preview/limit'); return; }
+    navigate('/characters/new');
+  };
+  const addUniverse = async () => {
+    if (!isSignedIn || !user) return;
+    if (account && account.universeCount >= account.maxUniverses) { navigate('/creator-preview/limit'); return; }
+    const name = window.prompt('Nombre del nuevo universo');
+    if (!name?.trim()) return;
+    setActionError(null);
+    try {
+      const plan = account?.plan ?? 'free';
+      const state = createStarterUniverse({
+        plan, universeName: name.trim(), displayName: 'Nela Paez', username: 'nela', bio: '',
+      });
+      const created = await createUniverse.mutateAsync({ data: { name: name.trim(), state } });
+      setActiveUniverseId(user.id, created.universeId);
+      window.location.assign('/');
+    } catch (error) {
+      const message = (error as { data?: { error?: string } })?.data?.error ?? (error as Error).message;
+      setActionError(message);
+      if (message.includes('LIMIT_REACHED')) navigate('/creator-preview/limit');
+    }
+  };
   return (
     <PreviewShell>
       <PreviewHeading
         eyebrow="Tu universo · personajes"
         title="Un lugar para"
         accent="cada personaje."
-        description="Una composición de muestra para visualizar cómo se organiza un universo y sus personajes."
+        description={account ? 'Tus universos y personajes, con capacidad sincronizada desde tu cuenta.' : 'Una composición de muestra para visualizar cómo se organiza un universo y sus personajes.'}
       />
-      <PreviewNotice>Ilustración con conteos de ejemplo. No muestra personajes reales ni permite cambios.</PreviewNotice>
+      <PreviewNotice>{account ? 'Datos privados de tu cuenta. Los extras mostrados no están disponibles para compra todavía.' : 'Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.'}</PreviewNotice>
       <section className="epc-universe-board" aria-label="Ilustración de gestión de universo">
         <div className="epc-universe-sidebar">
           <div className="epc-universe-symbol">e</div>
-          <span className="epc-overline">UNIVERSO DE EJEMPLO</span>
-          <h2>Casa de papel</h2>
+          <span className="epc-overline">{account ? 'TU UNIVERSO ACTIVO' : 'UNIVERSO DE EJEMPLO'}</span>
+          <h2>{activeUniverse?.creatorSetup?.universeName ?? (account ? 'Mi universo' : 'Casa de papel')}</h2>
           <p>Un espacio privado para reunir personajes, ideas y conversaciones.</p>
           <div className="epc-universe-stats">
-            <div><span>Universos usados</span><strong>1 <small>/ 1</small></strong></div>
-            <div><span>Personajes usados</span><strong>3 <small>/ 5</small></strong></div>
+            <div><span>Universos usados</span><strong>{account ? `${account.universeCount} ` : '1 '}<small>/ {account?.maxUniverses ?? 1}</small></strong></div>
+            <div><span>Personajes usados</span><strong>{account ? `${account.characterCount} ` : '3 '}<small>/ {account?.maxCharacters ?? 5}</small></strong></div>
           </div>
-          <div className="epc-slot-label"><span>Capacidad de ejemplo</span><span>3 de 5</span></div>
-          <div className="epc-slots" aria-label="Tres de cinco espacios ilustrativos ocupados">
-            {sampleSlots.map((filled, index) => <i key={index} className={filled ? 'is-filled' : ''} />)}
+          <div className="epc-slot-label"><span>{account ? 'Capacidad de personajes' : 'Capacidad de ejemplo'}</span><span>{account ? `${account.characterCount} de ${account.maxCharacters}` : '3 de 5'}</span></div>
+          <div className="epc-slots" aria-label="Capacidad de personajes">
+            {slots.map((filled, index) => <i key={index} className={filled ? 'is-filled' : ''} />)}
           </div>
-          <small className="epc-caption">Muestra conceptual de Free</small>
+          {account && <button type="button" className="epc-caption" onClick={() => void addUniverse()} disabled={createUniverse.isPending || account.universeCount >= account.maxUniverses}>
+            {createUniverse.isPending ? 'Creando…' : account.universeCount >= account.maxUniverses ? 'Cupo de universos alcanzado' : 'Añadir universo'}
+          </button>}
+          {!account && <small className="epc-caption">Muestra conceptual de Free</small>}
         </div>
         <div className="epc-characters-area">
           <div className="epc-characters-head"><div><span className="ep-overline">COLECCIÓN</span><h2>Personajes</h2></div><span className="epc-example-tag">EJEMPLO</span></div>
           <div className="epc-character-list">
-            {[
+            {(account && activeUniverse ? activeUniverse.characters.filter(character => !character.archived).map(character => ({
+              monogram: character.name.trim().charAt(0).toUpperCase() || 'E',
+              label: character.name,
+              tint: 'rose',
+              handle: character.handle,
+            })) : [
               { monogram: 'A', label: 'Personaje de muestra A', tint: 'rose' },
               { monogram: 'B', label: 'Personaje de muestra B', tint: 'lilac' },
               { monogram: 'C', label: 'Personaje de muestra C', tint: 'sand' },
-            ].map((character) => (
+            ]).map((character) => (
               <div className="epc-character-row" key={character.monogram}>
                 <span className={`epc-character-avatar ${character.tint}`} aria-hidden="true">{character.monogram}</span>
-                <span className="epc-character-name">{character.label}<small>Perfil privado · muestra</small></span>
+                <span className="epc-character-name">{character.label}<small>{account ? `@${'handle' in character ? character.handle : ''}` : 'Perfil privado · muestra'}</small></span>
                 <ChevronRight size={16} aria-hidden="true" />
               </div>
             ))}
           </div>
-          <button className="epc-add-character" type="button" disabled aria-label="Añadir personaje, solo ilustrativo">
-            <span><Plus size={16} /></span><strong>Añadir personaje</strong><small>Acción ilustrativa</small>
+          <button className="epc-add-character" type="button" disabled={!account} onClick={createCharacter} aria-label="Añadir personaje">
+            <span><Plus size={16} /></span><strong>Añadir personaje</strong><small>{account ? atCharacterLimit ? 'Límite alcanzado' : 'En este universo' : 'Acción ilustrativa'}</small>
           </button>
+          {actionError && <p role="alert" className="epc-subtle-note">{actionError}</p>}
+          {account && universes.length > 1 && <div className="epc-character-list" aria-label="Tus universos">
+            {universes.map(universe => <button key={universe.universeId} type="button" className="epc-character-row w-full text-left"
+              onClick={() => {
+                if (user && universe.universeId !== activeUniverseId) {
+                  setActiveUniverseId(user.id, universe.universeId);
+                  window.location.assign('/');
+                }
+              }}>
+              <span className="epc-character-avatar lilac" aria-hidden="true">e</span>
+              <span className="epc-character-name">{universe.name}<small>{universe.characterCount} personajes · {universe.current ? 'Activo' : 'Cambiar'}</small></span>
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>)}
+          </div>}
         </div>
       </section>
       <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> Ver plan de ejemplo</Link></div>

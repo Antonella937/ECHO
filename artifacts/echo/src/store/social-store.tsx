@@ -11,6 +11,7 @@ import { validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
 import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/types';
 import { editSocialPost, setPinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, type PostEdit } from '@/domain/social-features';
+import { getActiveUniverseId } from './persistence';
 
 export interface SocialActions {
   editPost(id: string, patch: Partial<PostEdit>, expected?: Partial<PostEdit>): void;
@@ -72,7 +73,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     const engine = new UniverseSync(userId, createSeedState, next => {
       stateRef.current = next.state;
       setView(next);
-    });
+    }, undefined, getActiveUniverseId(userId));
     coordinator.current = engine;
     void engine.initialize();
     const refresh = () => { if (document.visibilityState !== 'hidden') void engine.sync(); };

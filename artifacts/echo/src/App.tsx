@@ -47,6 +47,7 @@ import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding'
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
 import { loadLegacyState, loadRecovery } from '@/store/persistence';
+import { getActiveUniverseId } from '@/store/persistence';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -169,10 +170,11 @@ function AuthenticatedExperience() {
   const { isLoaded, isSignedIn, user } = useUser();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-  const universeQuery = useGetUniverse({
+  const activeUniverseId = user?.id ? getActiveUniverseId(user.id) : 'primary';
+  const universeQuery = useGetUniverse({ universeId: activeUniverseId }, {
     query: {
       enabled: isLoaded && Boolean(isSignedIn && user?.id),
-      queryKey: getGetUniverseQueryKey(),
+      queryKey: getGetUniverseQueryKey({ universeId: activeUniverseId }),
     },
   });
   const saveUniverseMutation = useSaveUniverse();
@@ -262,7 +264,7 @@ function AuthenticatedExperience() {
             onComplete={completeOnboarding}
             onEnter={() => {
               if (!onboardingResult) return;
-              queryClient.setQueryData(getGetUniverseQueryKey(), onboardingResult);
+              queryClient.setQueryData(getGetUniverseQueryKey({ universeId: 'primary' }), onboardingResult);
               setLocation('/');
             }}
           />
@@ -274,7 +276,7 @@ function AuthenticatedExperience() {
             onComplete={completeOnboarding}
             onEnter={() => {
               if (!onboardingResult) return;
-              queryClient.setQueryData(getGetUniverseQueryKey(), onboardingResult);
+              queryClient.setQueryData(getGetUniverseQueryKey({ universeId: 'primary' }), onboardingResult);
               setLocation('/');
             }}
           />

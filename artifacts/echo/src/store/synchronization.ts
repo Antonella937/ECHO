@@ -46,6 +46,7 @@ export class UniverseSync {
     private owner: string, private seed: () => SocialState,
     private publish: (view: SyncView) => void,
     private io = defaultIO,
+    private universeId = 'primary',
   ) {}
 
   private emit() { if (!this.stopped) this.publish({ ...this.view }); }
@@ -60,7 +61,7 @@ export class UniverseSync {
     this.view.busy = true; this.view.error = null; this.emit();
     try {
       const [remote, recovery, legacy] = await Promise.all([
-        this.io.loadUniverse(), this.io.loadRecovery(this.owner), this.io.loadLegacyState(),
+        this.io.loadUniverse(this.universeId), this.io.loadRecovery(this.owner), this.io.loadLegacyState(),
       ]);
       if (this.stopped) return;
       if (legacy) {
@@ -134,7 +135,7 @@ export class UniverseSync {
     try {
       await this.disk;
       for (let attempt = 0; attempt < 5; attempt++) {
-        const remote = await this.io.loadUniverse();
+        const remote = await this.io.loadUniverse(this.universeId);
         if (this.stopped) return;
         // Resolutions apply only to the exact remote version the user reviewed.
         if (Object.keys(this.decisions).length && !same(remote.state, this.conflictRemote)) {
@@ -158,7 +159,7 @@ export class UniverseSync {
           const contentOnly = (s: SocialState | null) => s && { ...s, currentCharacterId: 'nela' };
           const identityChangedLocally = this.base?.currentCharacterId !== draft.currentCharacterId;
           if (!same(contentOnly(privateState), contentOnly(remote.state)) || identityChangedLocally)
-            saved = await this.io.saveUniverse(privateState, remote.revision);
+            saved = await this.io.saveUniverse(privateState, remote.revision, this.universeId);
         } catch (e) {
           if (e instanceof RevisionConflict) { this.decisions = {}; continue; }
           throw e;
@@ -180,7 +181,7 @@ export class UniverseSync {
         this.decisions = {};
         await this.backup();
         if (this.importHash) {
-          await this.io.verifySavedUniverse(saved.state);
+          await this.io.verifySavedUniverse(saved.state, this.universeId);
           await this.io.markImported(this.owner, this.importHash);
           this.importHash = null;
           this.view.legacyAvailable = false;
