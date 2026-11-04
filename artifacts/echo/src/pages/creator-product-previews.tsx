@@ -225,21 +225,22 @@ export function CreatorUniversePreview() {
           {!account && <small className="epc-caption">Muestra conceptual de Free</small>}
         </div>
         <div className="epc-characters-area">
-          <div className="epc-characters-head"><div><span className="ep-overline">COLECCIÓN</span><h2>Personajes</h2></div><span className="epc-example-tag">EJEMPLO</span></div>
+          <div className="epc-characters-head"><div><span className="ep-overline">COLECCIÓN</span><h2>Personajes</h2></div>{!account && <span className="epc-example-tag">EJEMPLO</span>}</div>
           <div className="epc-character-list">
-            {(account && activeUniverse ? activeUniverse.characters.filter(character => !character.archived).map(character => ({
-              monogram: character.name.trim().charAt(0).toUpperCase() || 'E',
-              label: character.name,
-              tint: 'rose',
-              handle: character.handle,
-            })) : [
+            {account && activeUniverse ? activeUniverse.characters.filter(character => !character.archived).map(character => (
+              <Link href={`/profile/${character.id}`} className="epc-character-row" key={character.id} data-testid={`link-creator-character-${character.id}`}>
+                <span className="epc-character-avatar rose" aria-hidden="true">{character.name.trim().charAt(0).toUpperCase() || 'E'}</span>
+                <span className="epc-character-name">{character.name}<small>@{character.handle}</small></span>
+                <ChevronRight size={16} aria-hidden="true" />
+              </Link>
+            )) : [
               { monogram: 'A', label: 'Personaje de muestra A', tint: 'rose' },
               { monogram: 'B', label: 'Personaje de muestra B', tint: 'lilac' },
               { monogram: 'C', label: 'Personaje de muestra C', tint: 'sand' },
-            ]).map((character) => (
+            ].map(character => (
               <div className="epc-character-row" key={character.monogram}>
                 <span className={`epc-character-avatar ${character.tint}`} aria-hidden="true">{character.monogram}</span>
-                <span className="epc-character-name">{character.label}<small>{account ? `@${'handle' in character ? character.handle : ''}` : 'Perfil privado · muestra'}</small></span>
+                <span className="epc-character-name">{character.label}<small>Perfil privado · muestra</small></span>
                 <ChevronRight size={16} aria-hidden="true" />
               </div>
             ))}
