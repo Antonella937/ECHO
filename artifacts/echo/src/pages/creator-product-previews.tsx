@@ -178,8 +178,14 @@ export function CreatorUniversePreview() {
     setActionError(null);
     try {
       const plan = account?.plan ?? 'free';
+      const ownerCharacter = activeUniverse?.characters.find(
+        character => character.id === activeUniverse.currentCharacterId && !character.archived,
+      ) ?? activeUniverse?.characters.find(character => !character.archived);
+      const displayName = ownerCharacter?.name?.trim() || user.fullName?.trim() || user.username?.trim() || 'Creator';
+      const rawHandle = ownerCharacter?.handle || user.username || user.id;
+      const username = rawHandle.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9_.-]/g, '') || 'creator';
       const state = createStarterUniverse({
-        plan, universeName: name.trim(), displayName: 'Nela Paez', username: 'nela', bio: '',
+        plan, universeName: name.trim(), displayName, username, bio: ownerCharacter?.bio ?? '',
       });
       const created = await createUniverse.mutateAsync({ data: { name: name.trim(), state } });
       setActiveUniverseId(user.id, created.universeId);
