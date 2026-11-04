@@ -1,0 +1,21 @@
+name: ECHO database setup
+on:
+  workflow_dispatch:
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/db run push
+        env:
+          DATABASE_URL: ${{ secrets.ECHO_DATABASE_URL }}
+      - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/echo-beta-seats.sql
+        env:
+          DATABASE_URL: ${{ secrets.ECHO_DATABASE_URL }}
