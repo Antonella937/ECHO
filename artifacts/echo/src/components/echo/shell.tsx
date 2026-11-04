@@ -24,7 +24,7 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="grain min-h-[100dvh] bg-background text-foreground lg:grid lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_300px]">
       {/* Desktop rail */}
-      <aside className="sticky top-0 hidden h-[100dvh] flex-col border-r border-border/70 px-4 py-8 lg:flex">
+      <aside className="sticky top-0 hidden h-[100dvh] min-h-0 flex-col overflow-y-auto border-r border-border/70 px-4 py-8 lg:flex">
         <Link href="/" className="wordmark px-3 text-[26px] text-foreground" data-testid="link-wordmark-rail">
           ECHO
         </Link>
@@ -71,10 +71,10 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className={cn('mx-auto w-full max-w-[520px] lg:max-w-[600px]', !inConversation && 'pb-nav lg:pb-10')}>{children}</main>
+      <main className={cn('mx-auto min-w-0 w-full max-w-[520px] lg:max-w-[600px]', !inConversation && 'pb-nav lg:pb-10')}>{children}</main>
 
       {/* Desktop right column */}
-      <aside className="sticky top-0 hidden h-[100dvh] flex-col gap-6 px-6 py-10 xl:flex">
+      <aside className="sticky top-0 hidden h-[100dvh] min-h-0 flex-col gap-6 overflow-y-auto px-6 py-10 xl:flex">
         <div className="rounded-3xl border border-card-border bg-card p-4">
           <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Publicando como</div>
           <Link href={`/profile/${me.id}`} className="mt-3 flex items-center gap-3" data-testid="link-current-identity">
