@@ -219,7 +219,7 @@ export function CreatorUniversePreview() {
           <div className="epc-slots" aria-label="Capacidad de personajes">
             {slots.map((filled, index) => <i key={index} className={filled ? 'is-filled' : ''} />)}
           </div>
-          {account && <button type="button" className="epc-caption" onClick={() => void addUniverse()} disabled={createUniverse.isPending || account.universeCount >= account.maxUniverses}>
+          {account && <button type="button" className="epc-caption" onClick={() => void addUniverse()} disabled={createUniverse.isPending}>
             {createUniverse.isPending ? 'Creando…' : account.universeCount >= account.maxUniverses ? 'Cupo de universos alcanzado' : 'Añadir universo'}
           </button>}
           {!account && <small className="epc-caption">Muestra conceptual de Free</small>}
