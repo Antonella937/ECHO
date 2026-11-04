@@ -1,0 +1,3 @@
+# Cloudflare Pages SPA fallback: deep links must load the React router.
+# Real static files are served before this fallback.
+/* /index.html 200
