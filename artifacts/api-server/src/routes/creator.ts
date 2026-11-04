@@ -49,6 +49,7 @@ router.get("/creator/account", async (req, res): Promise<void> => {
   res.json({
     plan: entitlements.plan,
     billingStatus: "not_connected",
+    betaAccess: process.env.ECHO_BETA_ACCESS_MODE === "three_seats",
     maxUniverses: (entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
     maxCharacters: (entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
     addonUniverses: entitlements.addonUniverses,
