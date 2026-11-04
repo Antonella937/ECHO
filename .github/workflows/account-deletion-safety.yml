@@ -5,11 +5,15 @@ on:
     paths:
       - 'artifacts/api-server/src/lib/accountDeletionPlan.ts'
       - 'artifacts/api-server/tests/account-deletion-plan.test.ts'
+      - 'artifacts/api-server/src/lib/accountDeletionExecutor.ts'
+      - 'artifacts/api-server/tests/account-deletion-executor.test.ts'
       - '.github/workflows/account-deletion-safety.yml'
   pull_request:
     paths:
       - 'artifacts/api-server/src/lib/accountDeletionPlan.ts'
       - 'artifacts/api-server/tests/account-deletion-plan.test.ts'
+      - 'artifacts/api-server/src/lib/accountDeletionExecutor.ts'
+      - 'artifacts/api-server/tests/account-deletion-executor.test.ts'
       - '.github/workflows/account-deletion-safety.yml'
   workflow_dispatch:
 
@@ -36,4 +40,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run pure, no-network deletion planning tests
-        run: pnpm --filter @workspace/api-server exec tsx --test tests/account-deletion-plan.test.ts
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/account-deletion-plan.test.ts tests/account-deletion-executor.test.ts
