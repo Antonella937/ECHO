@@ -4,7 +4,7 @@ import { db, echoMediaTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { ClaimUploadBody, ClaimUploadResponse, RequestUploadUrlBody, RequestUploadUrlResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { mediaLimits, validMediaHeader, byteRange } from "../lib/mediaSafety";
+import { mediaLimits, validMediaHeader } from "../lib/mediaSafety";
 import { canReadSocialMedia } from "../lib/socialContentAccess";
 
 const bucket = "echo-media";
@@ -36,7 +36,7 @@ export function createSupabaseStorageRouter(): IRouter {
       if (!signed.ok) { res.status(502).json({ error: "STORAGE_SIGN_FAILED" }); return; }
       const payload = await signed.json() as { url?: string; signedURL?: string; token?: string };
       const relative = payload.url ?? payload.signedURL;
-      const uploadURL = relative ? new URL(relative, base).toString()
+      const uploadURL = relative ? new URL(relative.startsWith("/") ? relative : `/storage/v1/${relative}`, base).toString()
         : payload.token ? `${base}/storage/v1/object/upload/sign/${bucket}/${path}?token=${encodeURIComponent(payload.token)}` : null;
       if (!uploadURL || !uploadURL.startsWith(base + "/storage/v1/")) {
         res.status(502).json({ error: "STORAGE_SIGN_INVALID" }); return;
