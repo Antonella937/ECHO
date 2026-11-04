@@ -278,7 +278,7 @@ export function CreatorUniversePreview() {
             }) : undefined,
           }))} />
       )}
-      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> Ver plan de ejemplo</Link></div>
+      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> {account ? 'Ver mi plan' : 'Ver plan de ejemplo'}</Link></div>
     </PreviewShell>
   );
 }
