@@ -90,10 +90,15 @@ export const imageProvider: ImageGenerationProvider = new MockImageGenerationPro
 
 /** Run one provider pass for every character and forward events through the adapter seam. */
 export async function runProviderPass(state: SocialState, adapter: ActivityAdapter, maxEvents = 3) {
+  // A mock provider must never be mistaken for live autonomous activity.
+  if (!characterProvider.live || !Number.isFinite(maxEvents) || maxEvents <= 0) return 0;
+
   const all: SocialEvent[] = [];
   for (const character of state.characters) {
-    const events = await characterProvider.proposeActivity({ state, character, maxEvents });
-    all.push(...events.filter((e) => e.source === 'provider'));
+    if (character.archived) continue;
+    const events = await characterProvider.proposeActivity({ state, character, maxEvents: Math.floor(maxEvents) });
+    // Only accept provider-originated events within the per-character budget.
+    all.push(...events.filter((e) => e.source === 'provider').slice(0, Math.floor(maxEvents)));
   }
   if (all.length) adapter.ingest(all);
   return all.length;
