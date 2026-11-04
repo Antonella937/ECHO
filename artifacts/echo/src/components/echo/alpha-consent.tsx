@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -56,6 +57,7 @@ export function AlphaConsentForm({ version, pending = false, error = null, onSub
           todavía no están disponibles. Registrar este borrador nunca habilita el uso externo ni el compartir contenido.
         </p>
       </aside>
+      <p className="ep-field-hint">Antes de continuar, podés <Link href="/beta-info" className="underline">leer qué datos usa esta beta privada y cómo contactar al soporte</Link>. Esta información es preliminar y no reemplaza documentos legales definitivos.</p>
       {keys.map(key => (
         <label key={key} className="ep-field" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
           <Checkbox
