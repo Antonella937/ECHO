@@ -10,13 +10,14 @@ import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core
 import { validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
 import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/types';
-import { editSocialPost, setPinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, type PostEdit } from '@/domain/social-features';
+import { editSocialPost, setPinnedPost, movePinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, type PostEdit } from '@/domain/social-features';
 import { getActiveUniverseId } from './persistence';
 import { MediaScopeContext } from '@/lib/media';
 
 export interface SocialActions {
   editPost(id: string, patch: Partial<PostEdit>, expected?: Partial<PostEdit>): void;
   pinPost(id: string, pinned: boolean): void;
+  movePinnedPost(id: string, direction: -1 | 1): void;
   reactStory(id: string, value: string): void;
   saveHighlight(highlight: StoryHighlight, expected?: StoryHighlight): void;
   deleteHighlight(id: string): void;
@@ -202,6 +203,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       editPost(id, patch, expected) { coordinator.current?.edit(s => editSocialPost(s, id, myId(), patch, expected)); },
       pinPost(id, pinned) { coordinator.current?.edit(s => setPinnedPost(s, id, myId(), pinned)); },
+      movePinnedPost(id, direction) { coordinator.current?.edit(s => movePinnedPost(s, id, myId(), direction)); },
       reactMessage(id, value) {
         coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
           (m.senderId === myId() || m.recipientId === myId()) ? { ...m, reactions: toggleReaction(m.reactions, myId(), value) } : m) }));

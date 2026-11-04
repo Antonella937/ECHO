@@ -13,6 +13,12 @@ export interface Post {
   taggedAccountIds?: string[];
   commentsEnabled?: boolean;
   pinned?: boolean;
+  /**
+     * Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.
+     * @minimum 0
+     * @maximum 2
+     */
+  pinOrder?: number;
   editedAt?: Date;
   displayMetrics?: PostDisplayMetrics;
   id: string;

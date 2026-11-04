@@ -52,6 +52,7 @@ export interface Post {
   taggedAccountIds?: string[];
   commentsEnabled?: boolean;
   pinned?: boolean;
+  pinOrder?: number;
   editedAt?: ISODate;
   id: string;
   authorId: CharacterId;

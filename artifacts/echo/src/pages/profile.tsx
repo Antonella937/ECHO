@@ -13,6 +13,7 @@ import { AccountEditor } from '@/components/echo/account-editor';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { realFollowCounts } from '@/components/echo/account-stats';
 import { HighlightsRow } from '@/components/echo/highlights';
+import { getOrderedPinnedPosts } from '@/domain/social-features';
 import { cn } from '@/lib/utils';
 import { isStoryActive } from '@/domain/social-features';
 import { accountTypes, shownCount, formatCount } from '@/domain/accounts';
@@ -28,7 +29,9 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<'posts' | 'tagged'>('posts');
   const posts = useMemo(() => {
     const own = state.posts.filter((p) => p.authorId === id).sort(byDateDesc);
-    return [...own.filter((p) => p.pinned).slice(0, 3), ...own.filter((p) => !own.filter((q) => q.pinned).slice(0, 3).includes(p))];
+    const pinned = getOrderedPinnedPosts(state, id!).slice(0, 3);
+    const pinnedIds = new Set(pinned.map(p => p.id));
+    return [...pinned, ...own.filter(p => !pinnedIds.has(p.id))];
   }, [state.posts, id]);
   const tagged = useMemo(() => state.posts.filter((p) => p.authorId !== id && p.taggedAccountIds?.includes(id)).sort(byDateDesc), [state.posts, id]);
 

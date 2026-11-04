@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Check, Copy, Link2, MessageCircleOff, MessageCircle, Pencil, Pin, PinOff, Share, Trash2, User } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Copy, Link2, MessageCircleOff, MessageCircle, Pencil, Pin, PinOff, Share, Trash2, User } from 'lucide-react';
 import { EditPostSheet } from './edit-post-sheet';
 import { useSocial } from '@/store/social-store';
 import { Sheet } from './sheet';
@@ -9,6 +9,7 @@ import { CommentComposer, CommentList } from './comments-panel';
 import { postUrl } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import type { Comment, Post } from '@/domain/types';
+import { getOrderedPinnedPosts } from '@/domain/social-features';
 
 export function CommentsSheet({ post, open, onClose }: { post: Post; open: boolean; onClose(): void }) {
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
@@ -135,12 +136,14 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
 }
 
 export function OptionsSheet({ post, open, onClose }: { post: Post; open: boolean; onClose(): void }) {
-  const { me, actions, character } = useSocial();
+  const { state, me, actions, character } = useSocial();
   const [, navigate] = useLocation();
   const [confirm, setConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
   const author = character(post.authorId);
   const mine = post.authorId === me.id;
+  const pinned = getOrderedPinnedPosts(state, me.id);
+  const pinIndex = pinned.findIndex(p => p.id === post.id);
 
   const close = () => {
     setConfirm(false);
@@ -202,6 +205,18 @@ export function OptionsSheet({ post, open, onClose }: { post: Post; open: boolea
               <button onClick={() => run(() => actions.pinPost(post.id, !post.pinned), post.pinned ? 'Publicación desfijada' : 'Publicación fijada')} className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-option-pin">
                 {post.pinned ? <PinOff className="h-5 w-5" strokeWidth={1.6} /> : <Pin className="h-5 w-5" strokeWidth={1.6} />} {post.pinned ? 'Desfijar del perfil' : 'Fijar en el perfil'}
               </button>
+              {post.pinned && (
+                <>
+                  <button disabled={pinIndex <= 0} onClick={() => run(() => actions.movePinnedPost(post.id, -1), 'Orden actualizado')}
+                    className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium disabled:opacity-40" data-testid="button-option-pin-up">
+                    <ArrowUp className="h-[18px] w-[18px]" /> Mover fijada arriba
+                  </button>
+                  <button disabled={pinIndex < 0 || pinIndex >= pinned.length - 1} onClick={() => run(() => actions.movePinnedPost(post.id, 1), 'Orden actualizado')}
+                    className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium disabled:opacity-40" data-testid="button-option-pin-down">
+                    <ArrowDown className="h-[18px] w-[18px]" /> Mover fijada abajo
+                  </button>
+                </>
+              )}
               <button onClick={() => { const on = post.commentsEnabled === false; run(() => actions.editPost(post.id, { commentsEnabled: on }, { commentsEnabled: post.commentsEnabled }), on ? 'Comentarios activados' : 'Comentarios desactivados'); }} className="flex h-12 items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-option-comments">
                 {post.commentsEnabled === false ? <MessageCircle className="h-5 w-5" strokeWidth={1.6} /> : <MessageCircleOff className="h-5 w-5" strokeWidth={1.6} />} {post.commentsEnabled === false ? 'Activar comentarios' : 'Desactivar comentarios'}
               </button>

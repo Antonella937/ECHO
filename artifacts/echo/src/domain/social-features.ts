@@ -1,4 +1,6 @@
 import type { Character, Notification, Post, SocialReaction, SocialState, Story, StoryHighlight } from './types';
+import { getOrderedPinnedPosts, applyPinnedOrder, getOrderedHighlights, applyHighlightOrder } from './social-ordering';
+export { getOrderedPinnedPosts, movePinnedPost, getOrderedHighlights, moveHighlight, highlightCover } from './social-ordering';
 
 export type PostEdit = Pick<Post, 'caption' | 'location'> & Pick<Partial<Post>, 'taggedAccountIds' | 'commentsEnabled'>;
 export const isStoryActive = (s: Story, now = Date.now()) => {
@@ -42,7 +44,10 @@ export function setPinnedPost(state: SocialState, id: string, actor: string, pin
   if (!post || post.authorId !== actor) throw new Error('Solo la identidad autora puede fijar esta publicación.');
   if (pinned && !post.pinned && state.posts.filter(p => p.authorId === actor && p.pinned).length >= 3)
     throw new Error('Podés fijar hasta 3 publicaciones. Desfijá una primero.');
-  return { ...state, posts: state.posts.map(p => p.id === id ? { ...p, pinned } : p) };
+  if (!!post.pinned === pinned) return state;
+  const ordered = getOrderedPinnedPosts(state, actor).filter(p => p.id !== id).map(p => p.id);
+  if (pinned) ordered.push(id);
+  return applyPinnedOrder({ ...state, posts: state.posts.map(p => p.id === id ? { ...p, pinned } : p) }, actor, ordered);
 }
 export function toggleReaction(reactions: SocialReaction[] = [], actorId: string, value: string): SocialReaction[] {
   if (!value.trim() || value.length > 32) throw new Error('Reacción inválida.');
@@ -53,11 +58,22 @@ export function toggleReaction(reactions: SocialReaction[] = [], actorId: string
 export function saveHighlight(state: SocialState, actor: string, highlight: StoryHighlight, expected?: StoryHighlight): SocialState {
   if (highlight.authorId !== actor) throw new Error('La destacada debe pertenecer a la identidad activa.');
   const current = state.highlights?.find(h => h.id === highlight.id);
-  if (current && (!expected || JSON.stringify(current) !== JSON.stringify(expected))) throw new Error('La destacada cambió. Volvé a abrirla antes de guardar.');
+  // PostgreSQL JSONB can change object key order without changing any field.
+  const snapshot = (h: StoryHighlight) => JSON.stringify([h.id, h.authorId, h.title, h.storyIds, h.order ?? null, h.coverStoryId ?? null]);
+  if (current && (!expected || snapshot(current) !== snapshot(expected))) throw new Error('La destacada cambió. Volvé a abrirla antes de guardar.');
   if (!highlight.title.trim() || highlight.title.length > 40 || !highlight.storyIds.length ||
     highlight.storyIds.some(id => !state.stories.some(s => s.id === id && s.authorId === actor)))
     throw new Error('Elegí un título y al menos una historia propia.');
-  return { ...state, highlights: [...(state.highlights ?? []).filter(h => h.id !== highlight.id), { ...highlight, storyIds: [...new Set(highlight.storyIds)] }] };
+  const previous = getOrderedHighlights(state, actor).map(h => h.id);
+  const ordered = previous.filter(id => id !== highlight.id);
+  const position = highlight.order ?? (current ? previous.indexOf(highlight.id) : ordered.length);
+  if (!Number.isInteger(position) || position < 0 || position > ordered.length)
+    throw new Error('La posición de la destacada no es válida.');
+  ordered.splice(position, 0, highlight.id);
+  const saved = { ...highlight, storyIds: [...new Set(highlight.storyIds)],
+    coverStoryId: highlight.coverStoryId && highlight.storyIds.includes(highlight.coverStoryId) ? highlight.coverStoryId : null };
+  const next = current ? (state.highlights ?? []).map(h => h.id === highlight.id ? saved : h) : [...(state.highlights ?? []), saved];
+  return applyHighlightOrder({ ...state, highlights: next }, actor, ordered);
 }
 export function groupNotifications(notifications: Notification[]) {
   const groups = new Map<string, Notification & { ids: string[]; actorIds: string[]; count: number }>();

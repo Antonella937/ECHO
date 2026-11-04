@@ -1026,6 +1026,8 @@ components:
         authorId: { type: string }
         title: { type: string, minLength: 1, maxLength: 40 }
         storyIds: { type: array, minItems: 1, maxItems: 100, items: { type: string } }
+        order: { type: integer, minimum: 0, maximum: 199, description: "Optional identity-scoped manual order; legacy collections retain their stored order." }
+        coverStoryId: { type: [string, "null"], description: "A Story in this collection, or null for an automatic cover." }
     StoryMusic:
       type: object
       description: Metadata only; no music provider, audio stream or playback is connected.
@@ -1053,6 +1055,7 @@ components:
         taggedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
         commentsEnabled: { type: boolean }
         pinned: { type: boolean }
+        pinOrder: { type: integer, minimum: 0, maximum: 2, description: "Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts." }
         editedAt: { type: string, format: date-time }
         displayMetrics:
           type: object

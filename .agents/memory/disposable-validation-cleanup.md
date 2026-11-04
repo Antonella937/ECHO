@@ -14,3 +14,9 @@ Recover abandoned fixtures only with positive ownership evidence: matching Clerk
 **Why:** Interrupted browser work can leave accounts, files and universes behind. A previous teardown removed universes but omitted entitlement rows created indirectly, introducing snapshot differences that content counts alone did not detect.
 
 **How to apply:** Stop if ownership is ambiguous. Attribute any newly leaked test rows to exact owners and the current execution window; do not sweep older rows by prefix. Confirm account deletion, physical file absence, credential-file removal and all owner-scoped groups before retiring the temporary runner.
+
+Clerk development sign-in tickets are single-use. After a testing-browser context is lost, issue a fresh ticket for the positively identified disposable owner instead of reusing its private manifest's consumed ticket.
+
+**Why:** A browser context expired during validation; the replacement browser correctly rejected the already-consumed ticket. That was a test-session recovery problem, not an application authentication defect.
+
+**How to apply:** Keep ticket values out of logs/reports, replace them only in the private temporary manifest, and continue the same disposable-owner validation without changing normal authentication.

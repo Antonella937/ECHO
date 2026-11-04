@@ -827,6 +827,9 @@ export const getUniverseResponseStateOneHighlightsItemTitleMax = 40;
 
 export const getUniverseResponseStateOneHighlightsItemStoryIdsMax = 100;
 
+export const getUniverseResponseStateOneHighlightsItemOrderMin = 0;
+export const getUniverseResponseStateOneHighlightsItemOrderMax = 199;
+
 export const getUniverseResponseStateOneHighlightsMax = 200;
 
 export const getUniverseResponseStateOneAccountCatalogVersionMin = 0;
@@ -986,6 +989,9 @@ export const getUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMax
 
 export const getUniverseResponseStateOnePostsItemTaggedAccountIdsMax = 50;
 
+export const getUniverseResponseStateOnePostsItemPinOrderMin = 0;
+export const getUniverseResponseStateOnePostsItemPinOrderMax = 2;
+
 export const getUniverseResponseStateOnePostsItemDisplayMetricsLikesMin = 0;
 export const getUniverseResponseStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -1036,7 +1042,9 @@ export const GetUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(getUniverseResponseStateOneHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax)
+  "storyIds": zod.array(zod.string()).min(1).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax),
+  "order": zod.number().int().min(getUniverseResponseStateOneHighlightsItemOrderMin).max(getUniverseResponseStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
 })).max(getUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(getUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -1210,6 +1218,7 @@ export const GetUniverseResponse = zod.object({
   "taggedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOnePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
+  "pinOrder": zod.number().int().min(getUniverseResponseStateOnePostsItemPinOrderMin).max(getUniverseResponseStateOnePostsItemPinOrderMax).optional().describe('Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.'),
   "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(getUniverseResponseStateOnePostsItemDisplayMetricsLikesMin).max(getUniverseResponseStateOnePostsItemDisplayMetricsLikesMax).nullish(),
@@ -1326,6 +1335,9 @@ export const saveUniverseBodyStateAppearanceAccentRegExp = new RegExp('^#[0-9a-f
 export const saveUniverseBodyStateHighlightsItemTitleMax = 40;
 
 export const saveUniverseBodyStateHighlightsItemStoryIdsMax = 100;
+
+export const saveUniverseBodyStateHighlightsItemOrderMin = 0;
+export const saveUniverseBodyStateHighlightsItemOrderMax = 199;
 
 export const saveUniverseBodyStateHighlightsMax = 200;
 
@@ -1486,6 +1498,9 @@ export const saveUniverseBodyStateCharactersItemDisplayMetricsFollowingMax = 100
 
 export const saveUniverseBodyStatePostsItemTaggedAccountIdsMax = 50;
 
+export const saveUniverseBodyStatePostsItemPinOrderMin = 0;
+export const saveUniverseBodyStatePostsItemPinOrderMax = 2;
+
 export const saveUniverseBodyStatePostsItemDisplayMetricsLikesMin = 0;
 export const saveUniverseBodyStatePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -1536,7 +1551,9 @@ export const SaveUniverseBody = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(saveUniverseBodyStateHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseBodyStateHighlightsItemStoryIdsMax)
+  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseBodyStateHighlightsItemStoryIdsMax),
+  "order": zod.number().int().min(saveUniverseBodyStateHighlightsItemOrderMin).max(saveUniverseBodyStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
 })).max(saveUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseBodyStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -1710,6 +1727,7 @@ export const SaveUniverseBody = zod.object({
   "taggedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStatePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
+  "pinOrder": zod.number().int().min(saveUniverseBodyStatePostsItemPinOrderMin).max(saveUniverseBodyStatePostsItemPinOrderMax).optional().describe('Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.'),
   "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(saveUniverseBodyStatePostsItemDisplayMetricsLikesMin).max(saveUniverseBodyStatePostsItemDisplayMetricsLikesMax).nullish(),
@@ -1814,6 +1832,9 @@ export const saveUniverseResponseStateOneAppearanceAccentRegExp = new RegExp('^#
 export const saveUniverseResponseStateOneHighlightsItemTitleMax = 40;
 
 export const saveUniverseResponseStateOneHighlightsItemStoryIdsMax = 100;
+
+export const saveUniverseResponseStateOneHighlightsItemOrderMin = 0;
+export const saveUniverseResponseStateOneHighlightsItemOrderMax = 199;
 
 export const saveUniverseResponseStateOneHighlightsMax = 200;
 
@@ -1974,6 +1995,9 @@ export const saveUniverseResponseStateOneCharactersItemDisplayMetricsFollowingMa
 
 export const saveUniverseResponseStateOnePostsItemTaggedAccountIdsMax = 50;
 
+export const saveUniverseResponseStateOnePostsItemPinOrderMin = 0;
+export const saveUniverseResponseStateOnePostsItemPinOrderMax = 2;
+
 export const saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMin = 0;
 export const saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -2024,7 +2048,9 @@ export const SaveUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(saveUniverseResponseStateOneHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax)
+  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax),
+  "order": zod.number().int().min(saveUniverseResponseStateOneHighlightsItemOrderMin).max(saveUniverseResponseStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
 })).max(saveUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -2198,6 +2224,7 @@ export const SaveUniverseResponse = zod.object({
   "taggedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOnePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
+  "pinOrder": zod.number().int().min(saveUniverseResponseStateOnePostsItemPinOrderMin).max(saveUniverseResponseStateOnePostsItemPinOrderMax).optional().describe('Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.'),
   "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMin).max(saveUniverseResponseStateOnePostsItemDisplayMetricsLikesMax).nullish(),
@@ -2350,6 +2377,9 @@ export const verifyUniverseResponseOneStateOneAppearanceAccentRegExp = new RegEx
 export const verifyUniverseResponseOneStateOneHighlightsItemTitleMax = 40;
 
 export const verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax = 100;
+
+export const verifyUniverseResponseOneStateOneHighlightsItemOrderMin = 0;
+export const verifyUniverseResponseOneStateOneHighlightsItemOrderMax = 199;
 
 export const verifyUniverseResponseOneStateOneHighlightsMax = 200;
 
@@ -2510,6 +2540,9 @@ export const verifyUniverseResponseOneStateOneCharactersItemDisplayMetricsFollow
 
 export const verifyUniverseResponseOneStateOnePostsItemTaggedAccountIdsMax = 50;
 
+export const verifyUniverseResponseOneStateOnePostsItemPinOrderMin = 0;
+export const verifyUniverseResponseOneStateOnePostsItemPinOrderMax = 2;
+
 export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMin = 0;
 export const verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -2562,7 +2595,9 @@ export const VerifyUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(verifyUniverseResponseOneStateOneHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax)
+  "storyIds": zod.array(zod.string()).min(1).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax),
+  "order": zod.number().int().min(verifyUniverseResponseOneStateOneHighlightsItemOrderMin).max(verifyUniverseResponseOneStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
 })).max(verifyUniverseResponseOneStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(verifyUniverseResponseOneStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -2736,6 +2771,7 @@ export const VerifyUniverseResponse = zod.object({
   "taggedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOnePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
+  "pinOrder": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemPinOrderMin).max(verifyUniverseResponseOneStateOnePostsItemPinOrderMax).optional().describe('Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.'),
   "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMin).max(verifyUniverseResponseOneStateOnePostsItemDisplayMetricsLikesMax).nullish(),
@@ -3163,6 +3199,9 @@ export const createCreatorUniverseBodyStateHighlightsItemTitleMax = 40;
 
 export const createCreatorUniverseBodyStateHighlightsItemStoryIdsMax = 100;
 
+export const createCreatorUniverseBodyStateHighlightsItemOrderMin = 0;
+export const createCreatorUniverseBodyStateHighlightsItemOrderMax = 199;
+
 export const createCreatorUniverseBodyStateHighlightsMax = 200;
 
 export const createCreatorUniverseBodyStateAccountCatalogVersionMin = 0;
@@ -3322,6 +3361,9 @@ export const createCreatorUniverseBodyStateCharactersItemDisplayMetricsFollowing
 
 export const createCreatorUniverseBodyStatePostsItemTaggedAccountIdsMax = 50;
 
+export const createCreatorUniverseBodyStatePostsItemPinOrderMin = 0;
+export const createCreatorUniverseBodyStatePostsItemPinOrderMax = 2;
+
 export const createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMin = 0;
 export const createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -3372,7 +3414,9 @@ export const CreateCreatorUniverseBody = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(createCreatorUniverseBodyStateHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseBodyStateHighlightsItemStoryIdsMax)
+  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseBodyStateHighlightsItemStoryIdsMax),
+  "order": zod.number().int().min(createCreatorUniverseBodyStateHighlightsItemOrderMin).max(createCreatorUniverseBodyStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
 })).max(createCreatorUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(createCreatorUniverseBodyStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -3546,6 +3590,7 @@ export const CreateCreatorUniverseBody = zod.object({
   "taggedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStatePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
+  "pinOrder": zod.number().int().min(createCreatorUniverseBodyStatePostsItemPinOrderMin).max(createCreatorUniverseBodyStatePostsItemPinOrderMax).optional().describe('Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.'),
   "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMin).max(createCreatorUniverseBodyStatePostsItemDisplayMetricsLikesMax).nullish(),
@@ -3649,6 +3694,9 @@ export const createCreatorUniverseResponseStateAppearanceAccentRegExp = new RegE
 export const createCreatorUniverseResponseStateHighlightsItemTitleMax = 40;
 
 export const createCreatorUniverseResponseStateHighlightsItemStoryIdsMax = 100;
+
+export const createCreatorUniverseResponseStateHighlightsItemOrderMin = 0;
+export const createCreatorUniverseResponseStateHighlightsItemOrderMax = 199;
 
 export const createCreatorUniverseResponseStateHighlightsMax = 200;
 
@@ -3809,6 +3857,9 @@ export const createCreatorUniverseResponseStateCharactersItemDisplayMetricsFollo
 
 export const createCreatorUniverseResponseStatePostsItemTaggedAccountIdsMax = 50;
 
+export const createCreatorUniverseResponseStatePostsItemPinOrderMin = 0;
+export const createCreatorUniverseResponseStatePostsItemPinOrderMax = 2;
+
 export const createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMin = 0;
 export const createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMax = 1000000000000;
 
@@ -3860,7 +3911,9 @@ export const CreateCreatorUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(createCreatorUniverseResponseStateHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseResponseStateHighlightsItemStoryIdsMax)
+  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseResponseStateHighlightsItemStoryIdsMax),
+  "order": zod.number().int().min(createCreatorUniverseResponseStateHighlightsItemOrderMin).max(createCreatorUniverseResponseStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
 })).max(createCreatorUniverseResponseStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(createCreatorUniverseResponseStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -4034,6 +4087,7 @@ export const CreateCreatorUniverseResponse = zod.object({
   "taggedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStatePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
+  "pinOrder": zod.number().int().min(createCreatorUniverseResponseStatePostsItemPinOrderMin).max(createCreatorUniverseResponseStatePostsItemPinOrderMax).optional().describe('Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts.'),
   "editedAt": zod.coerce.date().optional(),
   "displayMetrics": zod.object({
   "likes": zod.number().int().min(createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMin).max(createCreatorUniverseResponseStatePostsItemDisplayMetricsLikesMax).nullish(),

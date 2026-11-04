@@ -19,4 +19,15 @@ export interface StoryHighlight {
      * @maxItems 100
      */
   storyIds: string[];
+  /**
+     * Optional identity-scoped manual order; legacy collections retain their stored order.
+     * @minimum 0
+     * @maximum 199
+     */
+  order?: number;
+  /**
+     * A Story in this collection, or null for an automatic cover.
+     * @nullable
+     */
+  coverStoryId?: string | null;
 }

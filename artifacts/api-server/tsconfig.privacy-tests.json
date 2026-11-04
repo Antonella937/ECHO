@@ -11,6 +11,8 @@
     "tests/character-privacy.test.ts",
     "tests/universe-sharing.test.ts",
     "tests/social-content-access.test.ts",
-    "tests/social-reads.test.ts"
+    "tests/social-reads.test.ts",
+    "tests/social-ordering.test.ts",
+    "../echo/tests/social-ordering.test.ts"
   ]
 }

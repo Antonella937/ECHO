@@ -29,7 +29,12 @@ export function universeAccountError(state: SocialState): string | null {
   if (actors.some(id => !ids.has(id))) return 'Falta una cuenta referenciada por el historial. Archiva las cuentas en lugar de eliminarlas.';
   for (const accountId of ids) {
     if (state.posts.filter(p => p.authorId === accountId && p.pinned).length > 3) return 'Solo se pueden fijar 3 publicaciones por perfil.';
+    const pinOrders = state.posts.filter(p => p.authorId === accountId && p.pinned && p.pinOrder !== undefined).map(p => p.pinOrder);
+    if (new Set(pinOrders).size !== pinOrders.length) return 'El orden de las publicaciones fijadas debe ser único por perfil.';
+    const highlightOrders = (state.highlights ?? []).filter(h => h.authorId === accountId && h.order !== undefined).map(h => h.order);
+    if (new Set(highlightOrders).size !== highlightOrders.length) return 'El orden de las destacadas debe ser único por perfil.';
   }
+  if (state.posts.some(p => !p.pinned && p.pinOrder !== undefined)) return 'Solo las publicaciones fijadas pueden tener orden.';
   if (state.posts.some(p => p.taggedAccountIds?.some(id => !ids.has(id))) ||
     state.stories.some(s => s.mentionedAccountIds?.some(id => !ids.has(id)))) return 'Una etiqueta referencia una cuenta inexistente.';
   const comments = new Map(state.comments.map(c => [c.id, c]));
@@ -57,6 +62,8 @@ export function universeAccountError(state: SocialState): string | null {
   if (new Set(state.highlights?.map(h => h.id)).size !== (state.highlights?.length ?? 0) ||
     state.highlights?.some(h => !ids.has(h.authorId) || h.storyIds.some(id => !state.stories.some(s => s.id === id && s.authorId === h.authorId))))
     return 'La destacada debe contener historias de su propia cuenta.';
+  if (state.highlights?.some(h => h.coverStoryId != null && !h.storyIds.includes(h.coverStoryId)))
+    return 'La portada debe pertenecer a la destacada.';
   const validTarget = (id: string, self: string) => id === 'owner' || (ids.has(id) && id !== self);
   for (const account of state.characters) {
     const config = account.configuration;
