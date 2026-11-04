@@ -60,6 +60,32 @@ router.get("/creator/account", async (req, res): Promise<void> => {
   });
 });
 
+// Read-only preview: never deletes files, database records, or Clerk identities.
+router.get("/creator/account/deletion-preview", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  try {
+    const ownerId = req.userId!;
+    const [media, universes] = await Promise.all([
+      db.select({ ownerId: echoMediaTable.ownerId, objectPath: echoMediaTable.objectPath })
+        .from(echoMediaTable).where(eq(echoMediaTable.ownerId, ownerId)),
+      listUniverses(ownerId),
+    ]);
+    const { planOwnedMediaDeletion } = await import("../lib/accountDeletionPlan");
+    const plan = planOwnedMediaDeletion(ownerId, media);
+    res.json({
+      status: "PREVIEW_ONLY",
+      ownerId,
+      universeCount: universes.length,
+      mediaCount: plan.objectPaths.length,
+      willDelete: false,
+      warning: "No account deletion executor is enabled. Provider files, account and backups are untouched.",
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Could not build account deletion preview");
+    res.status(503).json({ error: "DELETION_PREVIEW_UNAVAILABLE" });
+  }
+});
+
 router.put("/creator/ai-budget", async (req, res): Promise<void> => {
   const parsed = budgetSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_AI_BUDGET" }); return; }
