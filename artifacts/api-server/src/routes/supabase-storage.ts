@@ -33,7 +33,7 @@ export function createSupabaseStorageRouter(): IRouter {
         method: "POST", headers: { ...authHeaders(key), "Content-Type": "application/json" },
         body: JSON.stringify({ upsert: false }), signal: AbortSignal.timeout(10000),
       });
-      if (!signed.ok) { res.status(502).json({ error: "STORAGE_SIGN_FAILED" }); return; }
+      if (!signed.ok) { req.log.error({ status: signed.status, body: (await signed.text()).slice(0, 500) }, "Supabase upload signing failed"); res.status(502).json({ error: "STORAGE_SIGN_FAILED" }); return; }
       const payload = await signed.json() as { url?: string; signedURL?: string; token?: string };
       const relative = payload.url ?? payload.signedURL;
       const uploadURL = relative ? new URL(relative.startsWith("/") ? relative : `/storage/v1/${relative}`, base).toString()
@@ -42,9 +42,14 @@ export function createSupabaseStorageRouter(): IRouter {
         res.status(502).json({ error: "STORAGE_SIGN_INVALID" }); return;
       }
       const objectPath = `/objects/${path}`;
-      await db.insert(echoMediaTable).values({ ownerId: req.userId!, objectPath });
+      try {
+        await db.insert(echoMediaTable).values({ ownerId: req.userId!, objectPath });
+      } catch (error) {
+        req.log.error({ err: error }, "Supabase media registration database failed");
+        res.status(503).json({ error: "MEDIA_DATABASE_UNAVAILABLE" }); return;
+      }
       res.json(RequestUploadUrlResponse.parse({ uploadURL, objectPath }));
-    } catch { res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); }
+    } catch (error) { req.log.error({ err: error }, "Supabase upload URL creation failed"); res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); }
   });
 
   router.post("/storage/uploads/claim", requireAuth, async (req, res) => {
