@@ -208,7 +208,7 @@ export default function CreatePage() {
           </button>
         )}
 
-        {mode === 'post' && items.length === 0 && !busy && (
+        {(mode === 'post' || mode === 'story') && items.length === 0 && !busy && (
           <button
             type="button"
             onClick={() => {
