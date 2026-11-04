@@ -319,18 +319,20 @@ function AuthenticatedExperience() {
   );
 }
 
-function ApiConnection() {
+function ApiConnection({ children }: { children: ReactNode }) {
   const { getToken } = useAuth();
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     const apiOrigin = import.meta.env.VITE_ECHO_API_ORIGIN?.trim();
     setBaseUrl(apiOrigin || null);
     setAuthTokenGetter(() => getToken());
+    setReady(true);
     return () => {
       setAuthTokenGetter(null);
       setBaseUrl(null);
     };
   }, [getToken]);
-  return null;
+  return ready ? <>{children}</> : <EchoSplash />;
 }
 
 function ClerkQueryCacheInvalidator() {
@@ -381,7 +383,7 @@ function ClerkRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
-        <ApiConnection />
+        <ApiConnection>
         <ClerkQueryCacheInvalidator />
         <Switch>
           <Route path="/creator-preview" component={PublicReviewHub} />
@@ -401,6 +403,7 @@ function ClerkRoutes() {
           <Route path="/faq" component={() => <FaqPage />} />
           <Route component={ConsentedExperience} />
         </Switch>
+        </ApiConnection>
       </QueryClientProvider>
     </ClerkProvider>
   );
