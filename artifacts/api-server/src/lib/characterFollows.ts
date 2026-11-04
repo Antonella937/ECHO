@@ -335,6 +335,7 @@ export async function listOwnFollowRequests(
   universeId: string,
   direction: "incoming" | "outgoing" | "all",
   status: CharacterFollowRequestStatus | "all",
+  internalOnly = false,
 ) {
   const sourceInUniverse = and(
     eq(echoCharacterFollowRequestsTable.sourceOwnerId, authenticatedOwnerId),
@@ -364,7 +365,10 @@ export async function listOwnFollowRequests(
     createdAt: echoCharacterFollowRequestsTable.createdAt,
     updatedAt: echoCharacterFollowRequestsTable.updatedAt,
   }).from(echoCharacterFollowRequestsTable)
-    .where(statusFilter ? and(directionFilter, statusFilter) : directionFilter)
+    .where(and(directionFilter, statusFilter, internalOnly ? and(
+      eq(echoCharacterFollowRequestsTable.sourceOwnerId, authenticatedOwnerId),
+      eq(echoCharacterFollowRequestsTable.targetOwnerId, authenticatedOwnerId),
+    ) : undefined))
     .orderBy(desc(echoCharacterFollowRequestsTable.createdAt));
 
   const universeCache = new Map<string, Promise<LockedUniverse | null>>();

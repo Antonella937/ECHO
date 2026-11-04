@@ -15,6 +15,35 @@ tags:
   - name: storage
     description: Private image upload and serving
 paths:
+  /creator/consent:
+    get:
+      operationId: getOwnerConsent
+      summary: Read the authenticated owner's alpha draft acknowledgement, not valid legal consent
+      responses:
+        "200":
+          description: Current version, acknowledgement and unavailable legal-document status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerConsentStatus"
+    put:
+      operationId: recordOwnerConsent
+      summary: Idempotently record three alpha draft acknowledgements, never enable external use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerConsentAcknowledgement"
+      responses:
+        "200":
+          description: Persisted draft status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerConsentStatus"
+        "422":
+          description: Missing acknowledgement, unknown fields or stale version
   /ai-engine/preview:
     post:
       operationId: previewCharacterDecision
@@ -384,6 +413,28 @@ paths:
           description: Image not found
 components:
   schemas:
+    OwnerConsentAcknowledgement:
+      type: object
+      additionalProperties: false
+      required: [version, adultDeclared, fictionAcknowledged, legalDraftAcknowledged]
+      properties:
+        version: { type: string, enum: [alpha-draft-1] }
+        adultDeclared: { type: boolean }
+        fictionAcknowledged: { type: boolean }
+        legalDraftAcknowledged: { type: boolean }
+    OwnerConsentStatus:
+      type: object
+      required: [version, adultDeclared, fictionAcknowledged, legalDraftAcknowledged, draftAcknowledged, acknowledgedAt, legalDocumentsAvailable, legalConsentValid, externalUseAllowed]
+      properties:
+        version: { type: string }
+        adultDeclared: { type: boolean }
+        fictionAcknowledged: { type: boolean }
+        legalDraftAcknowledged: { type: boolean }
+        draftAcknowledged: { type: boolean }
+        acknowledgedAt: { type: [string, "null"] }
+        legalDocumentsAvailable: { type: boolean }
+        legalConsentValid: { type: boolean }
+        externalUseAllowed: { type: boolean }
     AiUsageCategory:
       type: string
       enum: [autonomy, brain_text, memory_context, vision, images]

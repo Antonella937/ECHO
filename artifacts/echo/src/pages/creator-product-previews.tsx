@@ -17,7 +17,7 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import { Link } from 'wouter';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { UniverseCover } from '../components/echo/visual-defaults';
 import { PrivateShareCards } from '../components/echo/private-share-cards';
 import { hasCharacterImage, ownerScopedPreviewKey } from '../lib/visual-defaults';
@@ -38,7 +38,7 @@ import { getActiveUniverseId, setActiveUniverseId } from '@/store/persistence';
 import { useLocation } from 'wouter';
 import './creator-product-previews.css';
 
-function PreviewShell({ children }: { children: React.ReactNode }) {
+export function PreviewShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="echo-public epc-shell">
       <div className="ep-wrap">
@@ -59,7 +59,7 @@ function PreviewNotice({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PreviewHeading({
+export function PreviewHeading({
   eyebrow,
   title,
   accent,
@@ -79,19 +79,32 @@ function PreviewHeading({
   );
 }
 
+function OwnerAccountPending({ loading, onRetry }: { loading: boolean; onRetry: () => void }) {
+  return (
+    <section className="ep-complete" role={loading ? 'status' : 'alert'} data-testid={loading ? 'status-account-loading' : 'status-account-error'}>
+      <span className="ep-eyebrow">{loading ? 'Cargando tu cuenta…' : 'No se pudo cargar tu cuenta'}</span>
+      {!loading && <button type="button" className="ep-button" onClick={onRetry} data-testid="button-retry-account">Reintentar</button>}
+    </section>
+  );
+}
+
 export function CreatorAccountPreview() {
-  const { isLoaded, isSignedIn } = useUser();
-  const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getGetCreatorAccountQueryKey() } });
+  const { isLoaded, isSignedIn, user } = useUser();
+  const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? live.data : undefined;
   const usage = account?.usage;
-  return (
-    <PreviewShell>
-      <PreviewHeading
+  const heading = <PreviewHeading
         eyebrow="Cuenta · plan"
         title="Tu espacio, a"
         accent="tu ritmo."
         description="Una vista de ejemplo para entender qué acompaña a una cuenta ECHO Creator."
-      />
+      />;
+  if (!isLoaded || (isSignedIn && !account)) {
+    return <PreviewShell>{heading}<OwnerAccountPending loading={!live.isError} onRetry={() => void live.refetch()} /></PreviewShell>;
+  }
+  return (
+    <PreviewShell>
+      {heading}
       <PreviewNotice>{account ? 'Plan, capacidad y uso de IA de tu cuenta. Los cobros todavía no están conectados.' : 'Datos ilustrativos: inicia sesión para ver el plan y el uso reales de tu cuenta.'}</PreviewNotice>
       <section className="epc-account-layout" aria-label="Resumen ilustrativo de cuenta">
         <article className="epc-plan-panel">
@@ -341,14 +354,48 @@ export function CreatorPrivacyPreview() {
 }
 
 export function CreatorLimitPreview() {
-  return (
-    <PreviewShell>
-      <PreviewHeading
+  const { isLoaded, isSignedIn, user } = useUser();
+  const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
+  const account = isSignedIn ? live.data : undefined;
+  const heading = <PreviewHeading
         eyebrow="Estado · capacidad"
         title="Una pausa antes"
         accent="de seguir."
         description="Así podría verse una orientación cuando un espacio conceptual llega a su capacidad."
-      />
+      />;
+  if (!isLoaded || (isSignedIn && !account)) {
+    return <PreviewShell>{heading}<OwnerAccountPending loading={!live.isError} onRetry={() => void live.refetch()} /></PreviewShell>;
+  }
+  if (account) {
+    const used = account.characterCount;
+    const max = account.maxCharacters;
+    const ratio = max > 0 ? Math.min(1, used / max) : 1;
+    const full = used >= max;
+    return (
+      <PreviewShell>
+        {heading}
+        <div className="epc-modal-stage">
+          <div className="epc-modal-backdrop" aria-hidden="true" />
+          <section className="epc-limit-dialog" role="dialog" aria-labelledby="epc-limit-title" aria-describedby="epc-limit-description">
+            <div className="epc-limit-symbol"><UsersRound size={20} /></div>
+            <span className="ep-overline">TU CUENTA · PLAN {account.plan === 'creator' ? 'CREATOR' : 'FREE'}</span>
+            <h2 id="epc-limit-title">{full ? <>Has llegado al límite<br />de personajes.</> : <>Aún tienes espacio<br />para crear.</>}</h2>
+            <p id="epc-limit-description" data-testid="text-limit-usage">Usas {used} de {max} personajes y {account.universeCount} de {account.maxUniverses} universos. Las ampliaciones todavía no están a la venta.</p>
+            <div className="epc-limit-meter"><div><span>Personajes</span><strong>{used} <small>/ {max}</small></strong></div><div className="epc-meter-track"><i style={{ transform: `scaleX(${ratio})`, transformOrigin: 'left' }} /></div><small>Capacidad real de tu cuenta</small></div>
+            <div className="epc-limit-actions">
+              <Link href="/creator-preview/universes" className="ep-button">Ver mis personajes <ArrowRight size={15} /></Link>
+              <span className="epc-secondary-link" aria-disabled="true">Ampliaciones pendientes · sin pago</span>
+            </div>
+            <p className="epc-dialog-footnote"><Eye size={13} /> No hay checkout ni cobros conectados.</p>
+          </section>
+        </div>
+        <div className="epc-back-row"><Link href="/creator-preview" className="ep-text-link"><ArrowLeft size={15} /> Pantallas de revisión</Link></div>
+      </PreviewShell>
+    );
+  }
+  return (
+    <PreviewShell>
+      {heading}
       <div className="epc-modal-stage">
         <div className="epc-modal-backdrop" aria-hidden="true" />
         <section className="epc-limit-dialog" role="dialog" aria-labelledby="epc-limit-title" aria-describedby="epc-limit-description">

@@ -38,6 +38,8 @@ import type {
   GetUniverseParams,
   HealthStatus,
   ListCreatorUniversesParams,
+  OwnerConsentAcknowledgement,
+  OwnerConsentStatus,
   SaveUniverseParams,
   UniverseEnvelope,
   UniverseInput,
@@ -79,6 +81,171 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetOwnerConsentUrl = () => {
+
+
+
+
+  return `/api/creator/consent`
+}
+
+/**
+ * @summary Read the authenticated owner's alpha draft acknowledgement, not valid legal consent
+ */
+export const getOwnerConsent = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerConsentStatus> => {
+
+  return customFetch<OwnerConsentStatus>(getGetOwnerConsentUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerConsentQueryKey = () => {
+    return [
+    `/api/creator/consent`
+    ] as const;
+    }
+
+
+export const getGetOwnerConsentQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerConsent>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerConsentQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerConsent>>> = ({ signal }) => getOwnerConsent({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerConsent>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerConsentQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerConsent>>>
+export type GetOwnerConsentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read the authenticated owner's alpha draft acknowledgement, not valid legal consent
+ */
+
+export function useGetOwnerConsent<TData = Awaited<ReturnType<typeof getOwnerConsent>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerConsentQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRecordOwnerConsentUrl = () => {
+
+
+
+
+  return `/api/creator/consent`
+}
+
+/**
+ * @summary Idempotently record three alpha draft acknowledgements, never enable external use
+ */
+export const recordOwnerConsent = async (ownerConsentAcknowledgement: OwnerConsentAcknowledgement, options?: Parameters<typeof customFetch>[1]): Promise<OwnerConsentStatus> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerConsentStatus>(getRecordOwnerConsentUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(ownerConsentAcknowledgement)
+  }
+);}
+
+
+
+
+
+export const getRecordOwnerConsentMutationKey = () => ['recordOwnerConsent'] as const;
+
+export const getRecordOwnerConsentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordOwnerConsent>>, TError,RecordOwnerConsentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordOwnerConsent>>, TError,RecordOwnerConsentMutationVariables, TContext> => {
+
+const mutationKey = getRecordOwnerConsentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordOwnerConsent>>, RecordOwnerConsentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordOwnerConsent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordOwnerConsentMutationResult = NonNullable<Awaited<ReturnType<typeof recordOwnerConsent>>>
+    export type RecordOwnerConsentMutationBody = BodyType<OwnerConsentAcknowledgement>
+    export type RecordOwnerConsentMutationError = ErrorType<void>
+    export type RecordOwnerConsentMutationVariables = {data: BodyType<OwnerConsentAcknowledgement>}
+
+    /**
+ * @summary Idempotently record three alpha draft acknowledgements, never enable external use
+ */
+export const useRecordOwnerConsent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordOwnerConsent>>, TError,RecordOwnerConsentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordOwnerConsent>>,
+        TError,
+        RecordOwnerConsentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecordOwnerConsentMutationOptions(options));
+    }
 
 export const getPreviewCharacterDecisionUrl = () => {
 

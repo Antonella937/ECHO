@@ -10,8 +10,12 @@ import creatorRouter from "./creator";
 import { characterPrivacyRouter } from "./character-privacy";
 import { socialFollowsRouter } from "./social-follows";
 import { socialReadRouter } from "./social-reads";
+import { createOwnerConsentRouter } from "./owner-consent";
+import { createConsentSafetyGate } from "../middlewares/consentSafety";
 
 const router: IRouter = Router();
+router.use(createConsentSafetyGate());
+router.use(createOwnerConsentRouter());
 
 router.use(healthRouter);
 router.use(universeRouter);

@@ -46,6 +46,8 @@ import {
   CreatorUniversePreview,
 } from '@/pages/creator-product-previews';
 import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding';
+import { AlphaConsentBoundary } from '@/components/echo/alpha-consent';
+import CreatorPrivacyCenter from '@/pages/creator-privacy-center';
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
 import { loadLegacyState, loadRecovery } from '@/store/persistence';
@@ -167,6 +169,10 @@ function SignUpPage() {
       </div>
     </main>
   );
+}
+
+function ConsentedExperience() {
+  return <AlphaConsentBoundary><AuthenticatedExperience /></AlphaConsentBoundary>;
 }
 
 function AuthenticatedExperience() {
@@ -366,13 +372,13 @@ function ClerkRoutes() {
           <Route path="/creator-preview/account" component={CreatorAccountPreview} />
           <Route path="/creator-preview/universes" component={CreatorUniversePreview} />
           <Route path="/creator-preview/store" component={CreatorStorePreview} />
-          <Route path="/creator-preview/privacy" component={CreatorPrivacyPreview} />
+          <Route path="/creator-preview/privacy" component={CreatorPrivacyCenter} />
           <Route path="/creator-preview/limit" component={CreatorLimitPreview} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/pricing" component={() => <PricingPage />} />
           <Route path="/faq" component={() => <FaqPage />} />
-          <Route component={AuthenticatedExperience} />
+          <Route component={ConsentedExperience} />
         </Switch>
       </QueryClientProvider>
     </ClerkProvider>

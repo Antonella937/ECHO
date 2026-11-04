@@ -1,10 +1,11 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startAutonomyBackgroundWorker } from "./autonomy/runtime";
+import { LEGAL_DOCUMENTS_AVAILABLE } from "./lib/ownerConsent";
 
 // The worker is wired into the API process but remains dormant while the
 // source-level live execution switch is false.
-const autonomyWorker = startAutonomyBackgroundWorker();
+const autonomyWorker = LEGAL_DOCUMENTS_AVAILABLE ? startAutonomyBackgroundWorker() : { stop() {} };
 
 const rawPort = process.env["PORT"];
 

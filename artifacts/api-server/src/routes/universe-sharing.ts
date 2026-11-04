@@ -1,5 +1,5 @@
 import { db, echoUniversesTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -39,6 +39,7 @@ export function createUniverseSharingRouter(
     }).from(echoUniversesTable).where(and(
       eq(echoUniversesTable.ownerId, req.userId!),
       eq(echoUniversesTable.universeId, params.data.universeId),
+      isNull(echoUniversesTable.archivedAt), isNull(echoUniversesTable.deletedAt),
     )).limit(1);
     if (!universe) {
       res.status(404).json({ error: "UNIVERSE_NOT_FOUND" });
@@ -66,6 +67,7 @@ export function createUniverseSharingRouter(
       .where(and(
         eq(echoUniversesTable.ownerId, req.userId!),
         eq(echoUniversesTable.universeId, params.data.universeId),
+        isNull(echoUniversesTable.archivedAt), isNull(echoUniversesTable.deletedAt),
       ))
       .returning({ sharingEnabled: echoUniversesTable.sharingEnabled });
     if (!universe) {

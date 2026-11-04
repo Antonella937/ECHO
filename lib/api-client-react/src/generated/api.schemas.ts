@@ -5,6 +5,33 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type OwnerConsentAcknowledgementVersion = typeof OwnerConsentAcknowledgementVersion[keyof typeof OwnerConsentAcknowledgementVersion];
+
+
+export const OwnerConsentAcknowledgementVersion = {
+  'alpha-draft-1': 'alpha-draft-1',
+} as const;
+
+export interface OwnerConsentAcknowledgement {
+  version: OwnerConsentAcknowledgementVersion;
+  adultDeclared: boolean;
+  fictionAcknowledged: boolean;
+  legalDraftAcknowledged: boolean;
+}
+
+export interface OwnerConsentStatus {
+  version: string;
+  adultDeclared: boolean;
+  fictionAcknowledged: boolean;
+  legalDraftAcknowledged: boolean;
+  draftAcknowledged: boolean;
+  /** @nullable */
+  acknowledgedAt: string | null;
+  legalDocumentsAvailable: boolean;
+  legalConsentValid: boolean;
+  externalUseAllowed: boolean;
+}
+
 export type AiUsageCategory = typeof AiUsageCategory[keyof typeof AiUsageCategory];
 
 

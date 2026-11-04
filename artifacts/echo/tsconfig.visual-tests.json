@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["tests/visual-defaults.test.ts"],
+  "include": ["tests/visual-defaults.test.ts", "tests/alpha-consent.test.ts"],
   "exclude": ["node_modules", "build", "dist"],
   "compilerOptions": { "incremental": false, "rootDir": "../..", "noEmit": true }
 }

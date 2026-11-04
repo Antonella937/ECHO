@@ -9,6 +9,45 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read the authenticated owner's alpha draft acknowledgement, not valid legal consent
+ */
+export const GetOwnerConsentResponse = zod.object({
+  "version": zod.string(),
+  "adultDeclared": zod.boolean(),
+  "fictionAcknowledged": zod.boolean(),
+  "legalDraftAcknowledged": zod.boolean(),
+  "draftAcknowledged": zod.boolean(),
+  "acknowledgedAt": zod.string().nullable(),
+  "legalDocumentsAvailable": zod.boolean(),
+  "legalConsentValid": zod.boolean(),
+  "externalUseAllowed": zod.boolean()
+})
+
+
+/**
+ * @summary Idempotently record three alpha draft acknowledgements, never enable external use
+ */
+export const RecordOwnerConsentBody = zod.object({
+  "version": zod.enum(['alpha-draft-1']),
+  "adultDeclared": zod.boolean(),
+  "fictionAcknowledged": zod.boolean(),
+  "legalDraftAcknowledged": zod.boolean()
+})
+
+export const RecordOwnerConsentResponse = zod.object({
+  "version": zod.string(),
+  "adultDeclared": zod.boolean(),
+  "fictionAcknowledged": zod.boolean(),
+  "legalDraftAcknowledged": zod.boolean(),
+  "draftAcknowledged": zod.boolean(),
+  "acknowledgedAt": zod.string().nullable(),
+  "legalDocumentsAvailable": zod.boolean(),
+  "legalConsentValid": zod.boolean(),
+  "externalUseAllowed": zod.boolean()
+})
+
+
+/**
  * @summary Manual text-only character decision; never executes or persists social actions
  */
 export const previewCharacterDecisionBodyCharacterIdMax = 120;

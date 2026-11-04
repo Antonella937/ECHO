@@ -8,6 +8,7 @@
   },
   "include": [
     "src/app.ts",
+    "tests/owner-consent.test.ts",
     "tests/character-privacy.test.ts",
     "tests/universe-sharing.test.ts",
     "tests/social-content-access.test.ts",

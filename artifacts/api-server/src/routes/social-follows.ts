@@ -67,6 +67,7 @@ export function createSocialFollowsRouter(options: SocialFollowsRouterOptions = 
       parsed.data.universeId,
       parsed.data.direction,
       parsed.data.status,
+      res.locals.alphaInternalOnly === true,
     );
     res.json({ requests });
   });
