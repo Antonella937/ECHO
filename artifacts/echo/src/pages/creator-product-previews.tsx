@@ -146,7 +146,7 @@ export function CreatorAccountPreview() {
 
 export function CreatorUniversePreview() {
   const { isLoaded, isSignedIn, user } = useUser();
-  const accountQuery = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getGetCreatorAccountQueryKey() } });
+  const accountQuery = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? accountQuery.data : undefined;
   const activeUniverseId = user?.id ? getActiveUniverseId(user.id) : 'primary';
   const universesQuery = useListCreatorUniverses({ universeId: activeUniverseId }, {
