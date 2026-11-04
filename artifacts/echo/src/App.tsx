@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { esES } from '@clerk/localizations';
 import { shadcn } from '@clerk/themes';
@@ -11,6 +11,8 @@ import {
   useGetUniverse,
   useSaveUniverse,
   type UniverseEnvelope,
+  setBaseUrl,
+  setAuthTokenGetter,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -317,6 +319,20 @@ function AuthenticatedExperience() {
   );
 }
 
+function ApiConnection() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    const apiOrigin = import.meta.env.VITE_ECHO_API_ORIGIN?.trim();
+    setBaseUrl(apiOrigin || null);
+    setAuthTokenGetter(() => getToken());
+    return () => {
+      setAuthTokenGetter(null);
+      setBaseUrl(null);
+    };
+  }, [getToken]);
+  return null;
+}
+
 function ClerkQueryCacheInvalidator() {
   const { addListener } = useClerk();
   const prevUserId = useRef<string | null | undefined>(undefined);
@@ -365,6 +381,7 @@ function ClerkRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <ApiConnection />
         <ClerkQueryCacheInvalidator />
         <Switch>
           <Route path="/creator-preview" component={PublicReviewHub} />
