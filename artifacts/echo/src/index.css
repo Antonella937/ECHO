@@ -311,3 +311,10 @@ html.theme-light {
   --shadow-lg: 0 14px 40px hsl(340 20% 20% / 0.12);
   --shadow-xl: 0 24px 60px hsl(340 20% 20% / 0.14);
 }
+
+/* Mobile rendering: avoid repainting the full-viewport SVG noise overlay while scrolling. */
+@media (max-width: 767px) {
+  .grain::after {
+    content: none;
+  }
+}
