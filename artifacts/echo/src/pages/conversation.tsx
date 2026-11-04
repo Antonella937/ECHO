@@ -58,8 +58,10 @@ export default function ConversationPage() {
     const update = () => {
       const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       root.style.setProperty('--echo-keyboard-inset', `${Math.round(inset)}px`);
-      if (inset > 0) endRef.current?.scrollIntoView({ block: 'end' });
     };
+    // Recalculate on keyboard resize, but do not force-scroll on every visual viewport event:
+    // iOS fires viewport scroll events while the user is reading older messages.
+    update();
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
     return () => {
