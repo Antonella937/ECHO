@@ -12,6 +12,7 @@ export class StructuralLimitError extends Error {
 }
 
 const planCaps = (plan: CreatorPlan, addonCharacters: number, addonUniverses: number) => ({
+  // Beta seats use the creator capacity without changing billing entitlements.
   maxUniverses: (plan === "creator" ? 5 : 1) + addonUniverses,
   maxCharacters: (plan === "creator" ? 25 : 5) + addonCharacters,
 });
