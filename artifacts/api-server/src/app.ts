@@ -65,6 +65,9 @@ const betaIds = betaIdsRaw.split(",").map(id => id.trim()).filter(Boolean);
 const betaConfigured = betaIds.length > 0 && betaIds.length <= 3 &&
   new Set(betaIds).size === betaIds.length && betaIds.every(id => /^user_[A-Za-z0-9]+$/.test(id));
 const betaSeatMode = process.env.ECHO_BETA_ACCESS_MODE === "three_seats";
+if (process.env.NODE_ENV === "production" && permittedOrigins.length === 0) {
+  throw new Error("ECHO_ALLOWED_ORIGINS must specify the production frontend origin");
+}
 if (process.env.NODE_ENV === "production" && !betaConfigured && !betaSeatMode) {
   throw new Error("ECHO_BETA_ALLOWED_USER_IDS must contain 1 to 3 distinct Clerk user IDs in production");
 }
