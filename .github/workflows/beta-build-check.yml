@@ -1,0 +1,40 @@
+name: ECHO beta build checks
+
+on:
+  push:
+    paths:
+      - 'artifacts/echo/**'
+      - 'artifacts/api-server/**'
+      - 'lib/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/beta-build-check.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck workspace
+        run: pnpm run typecheck
+      - name: Build frontend
+        run: pnpm --filter @workspace/echo run build
+      - name: Build API
+        run: pnpm --filter @workspace/api-server run build
