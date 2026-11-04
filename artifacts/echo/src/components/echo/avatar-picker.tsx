@@ -1,14 +1,8 @@
 import { useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { compressImage, useMediaResolver, uploadPrivateImage } from '@/lib/media';
-import { cn } from '@/lib/utils';
 import { hasCharacterImage } from '../../lib/visual-defaults';
 import { CharacterInitials } from './visual-defaults';
-
-const PRESETS = [
-  'account-default', 'official-pretty-violence', 'official-false-halo', 'official-saint-vulture',
-  'official-stray-kids', 'official-the-hollow', 'official-dead-static',
-];
 
 export function AvatarPicker({ value, name = '', onChange, onBusy }: { value: string; name?: string; onChange(v: string): void; onBusy(b: boolean): void }) {
   const resolveMedia = useMediaResolver();
@@ -55,19 +49,7 @@ export function AvatarPicker({ value, name = '', onChange, onBusy }: { value: st
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} />
       </div>
       {error && <p role="alert" className="mt-2 text-sm text-destructive" data-testid="text-upload-error">{error}</p>}
-      <div className="no-scrollbar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1" role="radiogroup" aria-label="Avatares predefinidos">
-        {PRESETS.map((k) => {
-          const ref = `asset:${k}`;
-          return (
-            <button key={k} type="button" role="radio" aria-checked={value === ref} aria-label={k} onClick={() => onChange(ref)}
-              className={cn('shrink-0 rounded-full p-[2px]', value === ref ? 'bg-primary' : 'bg-transparent')} data-testid={`button-preset-avatar-${k}`}>
-              {hasCharacterImage(ref)
-                ? <img src={resolveMedia(ref)} alt="" className="h-11 w-11 rounded-full" />
-                : <CharacterInitials name={name} size={44} />}
-            </button>
-          );
-        })}
-      </div>
+
     </div>
   );
 }
