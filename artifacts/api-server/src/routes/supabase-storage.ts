@@ -9,7 +9,7 @@ import { canReadSocialMedia } from "../lib/socialContentAccess";
 
 const bucket = "echo-media";
 const config = () => {
-  const base = process.env.SUPABASE_URL?.replace(/\\/$/, "");
+  const base = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base) || !key) throw Error("SUPABASE_NOT_CONFIGURED");
   return { base, key };
