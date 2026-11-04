@@ -50,8 +50,8 @@ router.get("/creator/account", async (req, res): Promise<void> => {
     plan: entitlements.plan,
     billingStatus: "not_connected",
     betaAccess: process.env.ECHO_BETA_ACCESS_MODE === "three_seats",
-    maxUniverses: (entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
-    maxCharacters: (entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
+    maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
+    maxCharacters: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
     addonUniverses: entitlements.addonUniverses,
     addonCharacters: entitlements.addonCharacters,
     universeCount: universes.length,
@@ -70,8 +70,8 @@ router.put("/creator/ai-budget", async (req, res): Promise<void> => {
     (Array.isArray(universe.state.characters) ? universe.state.characters.length : 0), 0);
   res.json({
     plan: entitlements.plan, billingStatus: "not_connected",
-    maxUniverses: (entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
-    maxCharacters: (entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
+    maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
+    maxCharacters: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
     addonUniverses: entitlements.addonUniverses, addonCharacters: entitlements.addonCharacters,
     universeCount: universes.length, characterCount, usage,
   });
