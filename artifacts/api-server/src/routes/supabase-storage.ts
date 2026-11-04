@@ -33,13 +33,34 @@ export function createSupabaseStorageRouter(): IRouter {
         method: "POST", headers: { ...authHeaders(key), "Content-Type": "application/json" },
         body: JSON.stringify({ upsert: false }), signal: AbortSignal.timeout(10000),
       });
-      if (!signed.ok) { req.log.error({ status: signed.status, body: (await signed.text()).slice(0, 500) }, "Supabase upload signing failed"); res.status(502).json({ error: "STORAGE_SIGN_FAILED" }); return; }
+      if (!signed.ok) {
+        const detail = (await signed.text()).slice(0, 500);
+        req.log.error({ status: signed.status, detail }, "Supabase upload signing failed");
+        res.status(502).json({ error: "STORAGE_SIGN_FAILED", upstreamStatus: signed.status });
+        return;
+      }
       const payload = await signed.json() as { url?: string; signedURL?: string; token?: string };
       const relative = payload.url ?? payload.signedURL;
-      const uploadURL = relative ? new URL(relative.startsWith("/") ? relative : `/storage/v1/${relative}`, base).toString()
-        : payload.token ? `${base}/storage/v1/object/upload/sign/${bucket}/${path}?token=${encodeURIComponent(payload.token)}` : null;
-      if (!uploadURL || !uploadURL.startsWith(base + "/storage/v1/")) {
-        res.status(502).json({ error: "STORAGE_SIGN_INVALID" }); return;
+      let uploadURL: string | null = null;
+      if (relative) {
+        // Supabase may return /object/upload/sign/..., /storage/v1/object/..., or an absolute URL.
+        const normalized = relative.startsWith("http")
+          ? relative
+          : `${base}/storage/v1/${relative.replace(/^\\/?(?:storage\\/v1\\/)?/, "")}`;
+        try {
+          const candidate = new URL(normalized);
+          if (candidate.origin === new URL(base).origin &&
+              candidate.pathname.startsWith("/storage/v1/object/upload/sign/")) {
+            uploadURL = candidate.toString();
+          }
+        } catch { /* Reject malformed signed URLs. */ }
+      } else if (payload.token) {
+        uploadURL = `${base}/storage/v1/object/upload/sign/${bucket}/${path}?token=${encodeURIComponent(payload.token)}`;
+      }
+      if (!uploadURL) {
+        req.log.error({ hasUrl: Boolean(relative), hasToken: Boolean(payload.token) }, "Supabase returned invalid signed upload URL");
+        res.status(502).json({ error: "STORAGE_SIGN_INVALID" });
+        return;
       }
       const objectPath = `/objects/${path}`;
       try {
