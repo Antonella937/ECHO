@@ -133,10 +133,10 @@ function commentTarget(state: SocialState, character: Character, now: Date) {
       now.getTime() - (asTime(post.createdAt) ?? 0) < 30 * DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
   for (const post of posts) {
-    const relevant = post.authorId === character.id ||
+    const relevant = post.authorId !== character.id && (
       relationshipIds.has(post.authorId) ||
       !!post.taggedAccountIds?.includes(character.id) ||
-      !!state.follows[character.id]?.includes(post.authorId);
+      !!state.follows[character.id]?.includes(post.authorId));
     if (!relevant) continue;
     const reply = [...state.comments]
       .filter((item) => item.postId === post.id && item.authorId !== character.id && item.parentId === null &&
