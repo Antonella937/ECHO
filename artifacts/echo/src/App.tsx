@@ -49,6 +49,7 @@ import {
 } from '@/pages/creator-product-previews';
 import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding';
 import { AlphaConsentBoundary } from '@/components/echo/alpha-consent';
+import BetaInformationPage from '@/pages/beta-information';
 import CreatorPrivacyCenter from '@/pages/creator-privacy-center';
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
@@ -162,6 +163,7 @@ function SignUpPage() {
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-[440px]">
         <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
+        <p className="mb-4 text-center text-sm text-muted-foreground">Antes de crear tu cuenta, <Link href="/beta-info" className="underline">leé la información de la beta privada</Link>.</p>
         <SignUp
           routing="path"
           path={`${basePath}/sign-up`}
@@ -399,6 +401,7 @@ function ClerkRoutes() {
           <Route path="/creator-preview/limit" component={CreatorLimitPreview} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/beta-info" component={BetaInformationPage} />
           <Route path="/pricing" component={() => <PricingPage />} />
           <Route path="/faq" component={() => <FaqPage />} />
           <Route component={ConsentedExperience} />
