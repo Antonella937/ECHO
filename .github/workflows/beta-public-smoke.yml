@@ -1,0 +1,44 @@
+name: ECHO public availability smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/beta-public-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  public-endpoints:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check Cloudflare frontend responds
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 5 \
+            --connect-timeout 15 --max-time 50 \
+            --output /tmp/echo-home.html \
+            https://echo-3o2.pages.dev/
+          test -s /tmp/echo-home.html
+          grep -qi '<html' /tmp/echo-home.html
+      - name: Check Render API liveness
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 4 --retry-delay 10 \
+            --connect-timeout 20 --max-time 90 \
+            https://echo-private-beta-api.onrender.com/api/healthz \
+            | python3 -c 'import json,sys; assert json.load(sys.stdin).get("status") == "ok"'
+      - name: Check public signup route responds
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 5 \
+            --connect-timeout 15 --max-time 50 \
+            --output /tmp/echo-signup.html \
+            https://echo-3o2.pages.dev/sign-up
+          test -s /tmp/echo-signup.html
+          grep -qi '<html' /tmp/echo-signup.html
