@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
+import { privateBetaSeats } from "./middlewares/privateBetaSeats";
 import { logger } from "./lib/logger";
 import {
   CLERK_PROXY_PATH,
@@ -53,10 +54,11 @@ const betaIdsRaw = process.env.ECHO_BETA_ALLOWED_USER_IDS?.trim() ?? "";
 const betaIds = betaIdsRaw.split(",").map(id => id.trim()).filter(Boolean);
 const betaConfigured = betaIds.length > 0 && betaIds.length <= 3 &&
   new Set(betaIds).size === betaIds.length && betaIds.every(id => /^user_[A-Za-z0-9]+$/.test(id));
-if (process.env.NODE_ENV === "production" && !betaConfigured) {
+const betaSeatMode = process.env.ECHO_BETA_ACCESS_MODE === "three_seats";
+if (process.env.NODE_ENV === "production" && !betaConfigured && !betaSeatMode) {
   throw new Error("ECHO_BETA_ALLOWED_USER_IDS must contain 1 to 3 distinct Clerk user IDs in production");
 }
-app.use("/api", (req, res, next) => {
+app.use("/api", betaSeatMode ? privateBetaSeats : (req, res, next) => {
   if (req.path === "/healthz") return next();
   if (!betaConfigured && process.env.NODE_ENV !== "production") return next();
   res.setHeader("Cache-Control", "private, no-store");
