@@ -9,7 +9,6 @@ import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
 import { UniverseSelector } from '@/components/echo/universe-selector';
 import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
-import { characterProvider, imageProvider } from '@/domain/providers';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -107,29 +106,9 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="mt-9" aria-labelledby="prov-h">
-          <h2 id="prov-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Conexiones futuras</h2>
-          <div className="mt-3 divide-y divide-border rounded-2xl border border-border text-[13px]">
-            <Row label="Motor de personajes" value={characterProvider.label} />
-            <Row label="Generación de imágenes" value={imageProvider.label} />
-            {state.characters.filter((c) => !c.archived).map((c) => (
-              <Row key={c.id} label={`Kin ID de ${c.name.split(' ')[0]}`} value={c.providerRef.externalId ?? 'Sin vincular'} />
-            ))}
-          </div>
-        </section>
-
         <NelaEasterEgg />
       </div>
 
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right">{value}</span>
     </div>
   );
 }
