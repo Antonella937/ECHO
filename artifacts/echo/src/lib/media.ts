@@ -21,6 +21,7 @@ import a4 from '@/assets/media/official-the-hollow.svg';
 import a5 from '@/assets/media/official-dead-static.svg';
 import a6 from '@/assets/media/account-default.svg';
 import { createContext, useContext } from 'react';
+import { customFetch } from '@workspace/api-client-react';
 import { mediaSourceFor, privateMediaUrl, type MediaHint, type MediaScope, type MediaSource } from './media-source';
 
 const MEDIA: Record<string, string> = {
@@ -91,21 +92,11 @@ export async function uploadPrivateImage(dataUrl: string): Promise<string> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
     throw new Error('El formato de esta imagen no se puede guardar de forma segura.');
   }
-  const request = await fetch('/api/storage/uploads/request-url', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: 'echo-image',
-      size: image.size,
-      contentType,
-    }),
-  });
-  if (!request.ok) throw new Error(await responseError(request, 'No se pudo preparar la subida.'));
-  const { uploadURL, objectPath } = (await request.json()) as {
-    uploadURL: string;
-    objectPath: string;
-  };
+  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+    '/api/storage/uploads/request-url',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'echo-image', size: image.size, contentType }), responseType: 'json' },
+  );
   const upload = await fetch(uploadURL, {
     method: 'PUT',
     headers: { 'Content-Type': contentType },
@@ -113,23 +104,11 @@ export async function uploadPrivateImage(dataUrl: string): Promise<string> {
   });
   if (!upload.ok) throw new Error('No se pudo subir la imagen al almacenamiento privado.');
 
-  const claim = await fetch('/api/storage/uploads/claim', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ objectPath }),
+  const claimed = await customFetch<{ objectPath: string }>('/api/storage/uploads/claim', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objectPath }), responseType: 'json',
   });
-  if (!claim.ok) throw new Error(await responseError(claim, 'No se pudo proteger la imagen.'));
-  return ((await claim.json()) as { objectPath: string }).objectPath;
-}
-
-async function responseError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { error?: string };
-    return payload.error || fallback;
-  } catch {
-    return fallback;
-  }
+  return claimed.objectPath;
 }
 
 /** Private binary attachments. Video/audio bytes are never re-encoded or muted. */
@@ -145,16 +124,17 @@ export async function uploadPrivateFile(file: Blob): Promise<import('@/domain/ty
     const imageFile = file instanceof File ? file : new File([file], 'foto', { type: mimeType });
     return { id, type, url: await uploadPrivateImage(await compressImage(imageFile)), mimeType: 'image/jpeg' };
   }
-  const request = await fetch('/api/storage/uploads/request-url', { method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'echo-attachment', size: file.size, contentType: mimeType }) });
-  if (!request.ok) throw new Error(await responseError(request, 'No se pudo preparar el adjunto.'));
-  const { uploadURL, objectPath } = await request.json();
+  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+    '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'echo-attachment', size: file.size, contentType: mimeType }), responseType: 'json' },
+  );
   const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': mimeType }, body: file });
   if (!upload.ok) throw new Error('No se pudo subir el adjunto.');
-  const claim = await fetch('/api/storage/uploads/claim', { method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objectPath }) });
-  if (!claim.ok) throw new Error(await responseError(claim, 'No se pudo proteger el adjunto.'));
-  return { id, type, url: (await claim.json()).objectPath, mimeType };
+  const claimed = await customFetch<{ objectPath: string }>('/api/storage/uploads/claim', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objectPath }), responseType: 'json',
+  });
+  return { id, type, url: claimed.objectPath, mimeType };
 }
 
 export function timeAgo(iso: string): string {
