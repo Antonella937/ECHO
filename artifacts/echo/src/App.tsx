@@ -209,7 +209,7 @@ function AuthenticatedExperience() {
     }
     let current = true;
     setLegacyCheck({ ownerId: user.id, status: 'checking' });
-    Promise.all([loadLegacyState(), loadRecovery(user.id)])
+    Promise.all([import.meta.env.VITE_ECHO_PRIVATE_BETA === 'true' ? Promise.resolve(null) : loadLegacyState(), loadRecovery(user.id)])
       .then(([legacy, recovery]) => {
         if (current) setLegacyCheck({
           ownerId: user.id,
