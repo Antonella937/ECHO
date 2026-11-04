@@ -12,8 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export const ALPHA_CONSENT_TEXTS = {
   adultDeclared: 'Declaro que tengo 18 años o más y entiendo que ECHO es una plataforma destinada exclusivamente a personas adultas.',
-  fictionAcknowledged: 'Entiendo que ECHO permite crear e interactuar con personajes, historias y universos ficticios, incluidos contenidos generados o asistidos por inteligencia artificial. Reconozco que estas interacciones no representan necesariamente personas ni acontecimientos reales.',
-  legalDraftAcknowledged: 'Entiendo que los Términos de uso y la Política de privacidad de ECHO todavía no están disponibles. Esta confirmación es solo para probar la versión alfa y no constituye aceptación de documentos legales definitivos.',
+  fictionAcknowledged: 'Entiendo que ECHO permite crear personajes, historias y universos ficticios que no representan necesariamente personas ni acontecimientos reales. Durante esta beta privada, las funciones de inteligencia artificial, autonomía y comunicación entre cuentas están deshabilitadas.',
+  legalDraftAcknowledged: 'Leí la información preliminar de la beta privada. Entiendo que los Términos de uso y la Política de privacidad definitivos todavía no están disponibles, y que esta confirmación no constituye su aceptación.',
 } as const;
 
 type ConsentKey = keyof typeof ALPHA_CONSENT_TEXTS;
@@ -48,13 +48,13 @@ export function AlphaConsentForm({ version, pending = false, error = null, onSub
         });
       }}
     >
-      <span className="ep-eyebrow">Borrador alfa · versión {version}</span>
+      <span className="ep-eyebrow">Reconocimiento preliminar · versión {version}</span>
       <h2 className="ep-step-title">Antes de entrar</h2>
       <aside className="epc-notice" role="note" data-testid="note-alpha-draft">
         <p>
-          <strong>ALPHA DRAFT.</strong> Estas confirmaciones son un borrador interno de la fase alfa. No constituyen un
-          consentimiento legal real ni una verificación de edad. Los Términos de uso y la Política de privacidad
-          todavía no están disponibles. Registrar este borrador nunca habilita el uso externo ni el compartir contenido.
+          <strong>BETA PRIVADA EN PREPARACIÓN.</strong> Estas confirmaciones son un reconocimiento preliminar de la fase alfa. No constituyen un
+          consentimiento de los documentos definitivos ni una verificación de edad. Los Términos de uso y la Política de privacidad
+          definitivos todavía no están disponibles. Registrar este reconocimiento no habilita las funciones externas ni compartir contenido.
         </p>
       </aside>
       <p className="ep-field-hint">Antes de continuar, podés <Link href="/beta-info" className="underline">leer qué datos usa esta beta privada y cómo contactar al soporte</Link>. Esta información es preliminar y no reemplaza documentos legales definitivos.</p>
@@ -74,7 +74,7 @@ export function AlphaConsentForm({ version, pending = false, error = null, onSub
       <div className="ep-step-actions">
         <span className="ep-field-hint">Las tres confirmaciones son obligatorias.</span>
         <button type="submit" className="ep-button" disabled={!all || pending} data-testid="button-record-alpha-draft">
-          {pending ? 'Registrando…' : 'Registrar borrador alfa'}
+          {pending ? 'Registrando…' : 'Confirmar y continuar'}
         </button>
       </div>
     </form>
