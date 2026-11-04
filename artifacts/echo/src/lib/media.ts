@@ -20,7 +20,7 @@ import a3 from '@/assets/media/official-stray-kids.svg';
 import a4 from '@/assets/media/official-the-hollow.svg';
 import a5 from '@/assets/media/official-dead-static.svg';
 import a6 from '@/assets/media/account-default.svg';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { mediaSourceFor, privateMediaUrl, type MediaHint, type MediaScope, type MediaSource } from './media-source';
 
@@ -56,10 +56,40 @@ export function resolveMedia(ref: string, source?: MediaSource): string {
 
 export const MediaScopeContext = createContext<MediaScope | null>(null);
 
-/** All existing media callers share the loaded owner/universe scope without global mutable caches. */
+/** Private files require Clerk bearer auth; plain <img src> requests cannot send it.
+ * Cache decoded object URLs for the current browser session, never expose signed URLs.
+ */
+const privateMediaCache = new Map<string, string>();
+const privateMediaPending = new Set<string>();
+const privateMediaListeners = new Set<() => void>();
+function loadPrivateMedia(url: string) {
+  if (privateMediaCache.has(url) || privateMediaPending.has(url)) return;
+  privateMediaPending.add(url);
+  void customFetch<Blob>(url, { responseType: 'blob' })
+    .then(blob => {
+      if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/') && !blob.type.startsWith('audio/')) return;
+      privateMediaCache.set(url, URL.createObjectURL(blob));
+      privateMediaListeners.forEach(notify => notify());
+    })
+    .catch(error => console.warn('No se pudo mostrar un archivo privado de ECHO.', error))
+    .finally(() => privateMediaPending.delete(url));
+}
 export function useMediaResolver() {
   const scope = useContext(MediaScopeContext);
-  return (ref: string, hint?: MediaHint) => resolveMedia(ref, mediaSourceFor(scope, ref, hint));
+  const [, refresh] = useState(0);
+  useEffect(() => {
+    const notify = () => refresh(value => value + 1);
+    privateMediaListeners.add(notify);
+    return () => { privateMediaListeners.delete(notify); };
+  }, []);
+  return (ref: string, hint?: MediaHint) => {
+    const url = resolveMedia(ref, mediaSourceFor(scope, ref, hint));
+    if (!ref.startsWith('/objects/') && !ref.startsWith('/api/storage/objects/')) return url;
+    if (!privateMediaCache.has(url) && !privateMediaPending.has(url)) {
+      queueMicrotask(() => loadPrivateMedia(url));
+    }
+    return privateMediaCache.get(url) ?? '';
+  };
 }
 
 /** Downscale and re-encode an image before moving it to private object storage. */
