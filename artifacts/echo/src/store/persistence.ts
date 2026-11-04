@@ -1,5 +1,5 @@
 import type { SocialState } from '@/domain/types';
-import type { UniverseInput } from '@workspace/api-client-react';
+import { customFetch, ApiError, type UniverseInput } from '@workspace/api-client-react';
 
 const DB_NAME = 'echo-local';
 const STORE = 'kv';
@@ -59,26 +59,28 @@ export function getActiveUniverseId(ownerId: string): string {
 export function setActiveUniverseId(ownerId: string, universeId: string): void {
   localStorage.setItem(`${ACTIVE_UNIVERSE_PREFIX}${ownerId}`, universeId);
 }
-export async function loadUniverse(universeId = 'primary'): Promise<UniverseEnvelope> {
-  const params = new URLSearchParams({ universeId });
-  const response = await fetch(`/api/universe?${params}`, { credentials: 'same-origin', cache: 'no-store' });
-  if (!response.ok) throw new Error(await responseError(response, 'No se pudo cargar tu universo.'));
-  return response.json();
-}
-
 export class RevisionConflict extends Error {}
+
+/** Use the same Render API origin and Clerk bearer token as generated API hooks. */
+export async function loadUniverse(universeId = 'primary'): Promise<UniverseEnvelope> {
+  return customFetch<UniverseEnvelope>(`/api/universe?${new URLSearchParams({ universeId })}`, {
+    method: 'GET', responseType: 'json', cache: 'no-store',
+  });
+}
 
 export async function saveUniverse(state: SocialState, expectedRevision: number, universeId = 'primary'): Promise<UniverseEnvelope> {
   const data: UniverseInput = { state, expectedRevision };
-  const response = await fetch(`/api/universe?${new URLSearchParams({ universeId })}`, {
-    method: 'PUT',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (response.status === 409) throw new RevisionConflict('Otro dispositivo guardó cambios. Se volverán a combinar.');
-  if (!response.ok) throw new Error(await responseError(response, 'No se pudo guardar tu universo.'));
-  return response.json();
+  try {
+    return await customFetch<UniverseEnvelope>(`/api/universe?${new URLSearchParams({ universeId })}`, {
+      method: 'PUT', responseType: 'json',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409)
+      throw new RevisionConflict('Otro dispositivo guardó cambios. Se volverán a combinar.');
+    throw error;
+  }
 }
 
 // Owner-scoped recovery never overwrites or removes the original legacy copy.
@@ -131,12 +133,10 @@ export async function cacheMigration(owner: string, hash: string, state: SocialS
   await tx('readwrite', st => st.put(state, `migration:${owner}:${hash}`));
 }
 export async function verifySavedUniverse(expected: SocialState, universeId = 'primary'): Promise<void> {
-  // A separate HTTP read, followed by a full server-side read of private files.
-  const response = await fetch(`/api/universe/verify?${new URLSearchParams({ universeId })}`, { credentials: 'same-origin', cache: 'no-store' });
-  if (!response.ok) throw new Error(await responseError(response, 'No se pudo verificar el universo y sus fotos.'));
-  const actual = await response.json() as UniverseEnvelope;
+  const actual = await customFetch<UniverseEnvelope>(`/api/universe/verify?${new URLSearchParams({ universeId })}`, {
+    method: 'GET', responseType: 'json', cache: 'no-store',
+  });
   if (JSON.stringify(actual.state) !== JSON.stringify(expected)) {
-    // PostgreSQL jsonb reorders object properties; compare canonical data.
     const canonical = (v: unknown): string => JSON.stringify(v, (_key, value) =>
       value && typeof value === 'object' && !Array.isArray(value)
         ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
@@ -189,11 +189,3 @@ export async function moveLocalImagesToPrivateStorage(state: SocialState): Promi
   };
 }
 
-async function responseError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { error?: string };
-    return payload.error || fallback;
-  } catch {
-    return fallback;
-  }
-}
