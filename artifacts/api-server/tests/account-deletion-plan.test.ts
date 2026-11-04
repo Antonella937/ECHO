@@ -38,3 +38,17 @@ test("result is immutable and input remains unchanged", () => {
   assert.ok(Object.isFrozen(plan.objectPaths));
   assert.equal(records.length, 1);
 });
+
+test("two independent fictional accounts cannot plan each other's media", () => {
+  const records = [
+    { ownerId: ownerA, objectPath: pathA },
+    { ownerId: ownerB, objectPath: pathB },
+  ];
+  const planA = planOwnedMediaDeletion(ownerA, records.filter(item => item.ownerId === ownerA));
+  const planB = planOwnedMediaDeletion(ownerB, records.filter(item => item.ownerId === ownerB));
+  assert.deepEqual(planA.objectPaths, [pathA]);
+  assert.deepEqual(planB.objectPaths, [pathB]);
+  assert.ok(!planA.objectPaths.includes(pathB));
+  assert.ok(!planB.objectPaths.includes(pathA));
+  assert.throws(() => planOwnedMediaDeletion(ownerA, records), /CROSS_OWNER_MEDIA/);
+});
