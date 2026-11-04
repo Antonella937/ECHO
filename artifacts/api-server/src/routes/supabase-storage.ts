@@ -46,7 +46,7 @@ export function createSupabaseStorageRouter(): IRouter {
         // Supabase may return /object/upload/sign/..., /storage/v1/object/..., or an absolute URL.
         const normalized = relative.startsWith("http")
           ? relative
-          : `${base}/storage/v1/${relative.replace(/^\\/?(?:storage\\/v1\\/)?/, "")}`;
+          : `${base}/storage/v1/${relative.replace(/^\/?(?:storage\/v1\/)?/, "")}`;
         try {
           const candidate = new URL(normalized);
           if (candidate.origin === new URL(base).origin &&
