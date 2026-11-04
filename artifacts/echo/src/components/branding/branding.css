@@ -1,0 +1,30 @@
+/* Block 01 only. Brand selectors deliberately do not target page titles or app typography. */
+.wordmark,
+.echo-public .ep-brand > span:last-child,
+.echo-public .ep-auth-review-brand {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+}
+.echo-loader { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+.echo-loader svg { display: block; overflow: visible; }
+.echo-loader-arcs { transform-origin: 100px 100px; animation: echo-brand-orbit 18s linear infinite; }
+@keyframes echo-brand-orbit { to { transform: rotate(360deg); } }
+.echo-splash { min-height: 100dvh; display: grid; place-items: center; background: var(--color-background); color: var(--color-foreground); }
+.echo-splash-content { display: flex; flex-direction: column; align-items: center; padding: 32px 16px; }
+.echo-splash-wordmark { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(48px, 10vw, 64px); letter-spacing: .22em; padding-left: .22em; line-height: 1.2; }
+.echo-splash-rule { height: 1px; width: 72px; margin: 22px 0; background: #95809f; opacity: .65; }
+.echo-splash-tagline { margin: 0 0 28px; font-size: 9px; letter-spacing: .2em; text-align: center; }
+.echo-signature-host { position: relative; }
+.echo-signature { font-weight: 400; }
+.echo-signature-host > .echo-signature { position: absolute; bottom: 7px; }
+.echo-signature-created { font-size: 8px; letter-spacing: .25em; color: inherit; opacity: .65; }
+.echo-signature-host > .echo-signature-created { left: 0; right: 0; text-align: center; }
+.echo-signature-script { font-family: 'Instrument Serif', Georgia, serif; font-size: 13px; font-style: italic; opacity: .65; }
+.echo-signature-host > .echo-signature-script { right: 0; }
+.echo-nela-egg { margin-top: 16px; text-align: right; }
+.echo-nela-trigger { min-width: 44px; min-height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--color-muted-foreground); font-family: 'Instrument Serif', Georgia, serif; font-size: 13px; cursor: pointer; }
+.echo-nela-trigger:hover { color: var(--color-primary); }
+.echo-nela-trigger:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.echo-nela-response { padding: 16px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); text-align: center; font-size: 12px; }
+.echo-nela-response p { margin: 0 0 8px; }
+@media (prefers-reduced-motion: reduce) { .echo-loader-arcs { animation: none; } }

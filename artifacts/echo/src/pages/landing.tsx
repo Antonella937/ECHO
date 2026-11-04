@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowRight, LockKeyhole, MessageCircle, Sparkles, UsersRound } from 'lucide-react';
 import { Link } from 'wouter';
 import './public-surface.css';
+import { CreatorSignature } from '@/components/branding/echo-brand';
 
 export function publicPreviewHref(path: string, previewMode = false) {
   if (!previewMode) return path;
@@ -22,9 +23,9 @@ function PublicHeader({ previewMode = false }: { previewMode?: boolean }) {
   );
 }
 
-function PublicFooter({ previewMode = false }: { previewMode?: boolean }) {
+function PublicFooter({ previewMode = false, signature }: { previewMode?: boolean; signature?: 'created' | 'script' }) {
   return (
-    <footer className="ep-footer">
+    <footer className="ep-footer echo-signature-host">
       <div className="ep-footer-inner">
         <span>© ECHO · Un espacio privado para tus personajes</span>
         <div className="ep-footer-links">
@@ -33,6 +34,7 @@ function PublicFooter({ previewMode = false }: { previewMode?: boolean }) {
           <Link href={publicPreviewHref('/sign-in', previewMode)}>Iniciar sesión</Link>
         </div>
       </div>
+      {signature && <CreatorSignature variant={signature} />}
     </footer>
   );
 }
@@ -97,7 +99,7 @@ export default function LandingPage({ previewMode = false }: { previewMode?: boo
             <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-start-now">Empezar <ArrowDown size={15} /></Link>
           </div>
         </section>
-        <PublicFooter previewMode={previewMode} />
+        <PublicFooter previewMode={previewMode} signature="created" />
       </div>
     </main>
   );

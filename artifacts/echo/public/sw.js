@@ -1,4 +1,4 @@
-const CACHE = 'echo-shell-v1';
+const CACHE = 'echo-shell-brand01-v2';
 const ROOT = new URL('./', self.location.href);
 const shell = ['.', 'manifest.webmanifest', 'icon.svg', 'icon-maskable.svg'];
 

@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
+import { NelaEasterEgg } from '@/components/branding/echo-brand';
+
 export default function SettingsPage() {
   const { state, me, actions, storageError, lastSavedAt } = useSocial();
   const { user } = useUser();
@@ -107,6 +109,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <NelaEasterEgg />
       </div>
 
     </div>

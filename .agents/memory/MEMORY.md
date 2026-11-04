@@ -10,3 +10,4 @@
 - [Disposable validation cleanup](disposable-validation-cleanup.md) — stop test sessions and verify all dependent owner-scoped rows; universe-only cleanup reports are insufficient.
 - [Universe lifecycle safety](universe-management-safety.md) — archive retains capacity; deletion prevents stale-client recreation and preserves shared uploads/accounting.
 - [Narrative counters](narrative-counters.md) — editable bases add fictional scale without creating or removing real social activity or viewers.
+- [Brand approval boundary](branding-approval.md) — branding does not authorize page redesigns; creator signatures must remain exclusive per screen.

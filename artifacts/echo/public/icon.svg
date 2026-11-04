@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="116" fill="#111113"/>
-  <path d="M318 154H192v204h126M192 256h105" fill="none" stroke="#d9acbb" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="352" cy="358" r="12" fill="#d9acbb"/>
+  <defs><linearGradient id="edge" x2="1" y2="1"><stop stop-color="#e5c5f6" stop-opacity=".24"/><stop offset=".55" stop-color="#e5c5f6" stop-opacity=".03"/><stop offset="1" stop-color="#e5c5f6" stop-opacity=".12"/></linearGradient></defs>
+  <rect width="512" height="512" rx="116" fill="#30233d"/>
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="url(#edge)" stroke-width="3"/>
+  <text x="256" y="236" dominant-baseline="central" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="370" fill="#e5c5f6">e</text>
 </svg>

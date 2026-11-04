@@ -22,6 +22,7 @@ import { AppearanceSync } from '@/components/echo/appearance-sync';
 import HashtagPage from '@/pages/hashtag';
 import SearchPage from '@/pages/search';
 import { AppSkeleton } from '@/components/echo/skeletons';
+import { EchoSplash } from '@/components/branding/echo-brand';
 import HomePage from '@/pages/home';
 import ProfilePage from '@/pages/profile';
 import PostPage from '@/pages/post';
@@ -215,7 +216,7 @@ function AuthenticatedExperience() {
     return () => { current = false; };
   }, [isLoaded, isSignedIn, user?.id, universeQuery.data?.state, legacyCheckAttempt]);
 
-  if (!isLoaded) return <AppSkeleton />;
+  if (!isLoaded) return <EchoSplash />;
   if (!isSignedIn || !user) return <LandingPage />;
   if (universeQuery.isError) {
     return (

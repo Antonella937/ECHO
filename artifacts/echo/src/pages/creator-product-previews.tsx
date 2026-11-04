@@ -40,7 +40,7 @@ function PreviewShell({ children }: { children: React.ReactNode }) {
       <div className="ep-wrap">
         <PublicHeader previewMode />
         {children}
-        <PublicFooter previewMode />
+        <PublicFooter previewMode signature="script" />
       </div>
     </main>
   );

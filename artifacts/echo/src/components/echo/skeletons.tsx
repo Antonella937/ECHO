@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
+import { EchoLoader } from '../branding/echo-brand';
 export function AppSkeleton() {
   return (
     <div className="min-h-[100dvh] bg-background" aria-busy="true" aria-label="Cargando ECHO">
       <div className="mx-auto max-w-[520px]">
         <div className="flex h-16 items-center justify-center">
-          <span className="wordmark animate-pulse text-[28px] text-foreground/40">ECHO</span>
+          <EchoLoader />
         </div>
         <div className="flex gap-4 px-4 pb-5">
           {Array.from({ length: 5 }).map((_, i) => (

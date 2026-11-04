@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["tests/branding.test.ts"],
+  "exclude": ["node_modules", "build", "dist"],
+  "compilerOptions": { "incremental": false, "rootDir": "../..", "noEmit": true }
+}
