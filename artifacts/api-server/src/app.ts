@@ -34,7 +34,17 @@ app.use(
   }),
 );
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-app.use(cors({ credentials: true, origin: true }));
+const permittedOrigins = (process.env.ECHO_ALLOWED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean);
+app.use(cors({
+  credentials: true,
+  origin(origin, callback) {
+    if (!origin || permittedOrigins.includes(origin) || (process.env.NODE_ENV !== "production" && permittedOrigins.length === 0)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+}));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
