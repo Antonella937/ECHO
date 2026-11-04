@@ -209,7 +209,7 @@ export function CreatorUniversePreview() {
         <div className="epc-universe-sidebar">
           <UniverseCover name={universeName} />
           <span className="epc-overline">{account ? 'TU UNIVERSO ACTIVO' : 'UNIVERSO DE EJEMPLO'}</span>
-          <h2>{activeUniverse?.creatorSetup?.universeName ?? (account ? 'Mi universo' : 'Casa de papel')}</h2>
+          <h2>{universeName || 'Mi universo'}</h2>
           <p>Un espacio privado para reunir personajes, ideas y conversaciones.</p>
           <div className="epc-universe-stats">
             <div><span>Universos usados</span><strong>{account ? `${account.universeCount} ` : '1 '}<small>/ {account?.maxUniverses ?? 1}</small></strong></div>
