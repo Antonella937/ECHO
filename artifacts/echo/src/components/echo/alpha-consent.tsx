@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 export const ALPHA_CONSENT_TEXTS = {
   adultDeclared: 'Declaro que tengo 18 años o más y entiendo que ECHO es una plataforma destinada exclusivamente a personas adultas.',
   fictionAcknowledged: 'Entiendo que ECHO permite crear e interactuar con personajes, historias y universos ficticios, incluidos contenidos generados o asistidos por inteligencia artificial. Reconozco que estas interacciones no representan necesariamente personas ni acontecimientos reales.',
-  legalDraftAcknowledged: 'He leído y acepto los Términos de uso y la Política de privacidad de ECHO, y entiendo cómo se gestionan mis datos y contenidos.',
+  legalDraftAcknowledged: 'Entiendo que los Términos de uso y la Política de privacidad de ECHO todavía no están disponibles. Esta confirmación es solo para probar la versión alfa y no constituye aceptación de documentos legales definitivos.',
 } as const;
 
 type ConsentKey = keyof typeof ALPHA_CONSENT_TEXTS;
