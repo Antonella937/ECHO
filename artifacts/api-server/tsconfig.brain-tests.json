@@ -6,5 +6,10 @@
     "noEmit": true,
     "rootDir": "../.."
   },
-  "include": ["tests/ai-engine-active-universe.test.ts"]
+  "include": [
+    "tests/ai-engine-active-universe.test.ts",
+    "tests/ai-engine-persisted.test.ts",
+    "tests/universe-repository.test.ts",
+    "tests/disposable-owner-cleanup.test.ts"
+  ]
 }

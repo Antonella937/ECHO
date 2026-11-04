@@ -11,6 +11,6 @@ Stop disposable browser writers and revoke/delete the disposable Clerk account b
 
 Recover abandoned fixtures only with positive ownership evidence: matching Clerk development markers, expected synthetic content, the private file's ACL/known seed fingerprint, and no references outside the verified fixture scope. Compare counts and table fingerprints outside that scope before and after cleanup. A clean Git tree is not evidence that external resources were removed.
 
-**Why:** Interrupted browser work can leave accounts, files and universes behind. Some backend tests also clean their universes but leave technical entitlement rows, so rerunning tests can introduce unrelated-looking snapshot differences.
+**Why:** Interrupted browser work can leave accounts, files and universes behind. A previous teardown removed universes but omitted entitlement rows created indirectly, introducing snapshot differences that content counts alone did not detect.
 
 **How to apply:** Stop if ownership is ambiguous. Attribute any newly leaked test rows to exact owners and the current execution window; do not sweep older rows by prefix. Confirm account deletion, physical file absence, credential-file removal and all owner-scoped groups before retiring the temporary runner.

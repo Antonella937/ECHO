@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "L6G65SDnUjfiBd41RZ0am"
+uri = "file://attached_assets/testing_screenshot/85b2yf.jpg"
+type = "image"
+title = "Stories: imagen renderizada con Clerk real"
+description = "Captura del visor existente con la imagen desechable de cuatro colores. La cuenta, ambos universos y el archivo de prueba ya fueron eliminados y verificados."
+logical_id = "d482b8c5-b9c0-4f3e-9132-116bb4167fb8"
+content_hash = "sha256:681eed5153aeb374bb99467e77b54c5b1f525b1c5627df192eea20652993b0ce"
+size = 72690
+mtime_ms = 1793787408798
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:fbe95d54-1dfe-47aa-af89-4618190d7e94/d482b8c5-b9c0-4f3e-9132-116bb4167fb8/6da438ee-5a96-4ef7-9459-d5561ffe780e"
+storage_version_token = "1793787739530831"
+content_type = "image/jpeg"

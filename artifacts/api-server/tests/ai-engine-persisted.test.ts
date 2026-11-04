@@ -1,15 +1,17 @@
 /** Real PostgreSQL, isolated synthetic test owners. NOT a live character/AI result. */
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { inArray } from 'drizzle-orm';
-import { db, pool, echoUniversesTable } from '@workspace/db';
+import { pool } from '@workspace/db';
+import { cleanupDisposableOwners } from './helpers/cleanup-disposable-owners';
 import { createSeedState } from '../../echo/src/store/seed';
 import { defaultCharacterConfig } from '../../echo/src/domain/character-core';
 import { readUniverse, writeUniverse } from '../src/lib/universeRepository';
 import { previewForOwner } from '../src/ai-engine/service';
 import { FreeModelProvider } from '../src/ai-engine/free-models';
 import type { TextProvider } from '../src/ai-engine/contracts';
+
+after(async () => { await pool.end(); });
 
 test('PostgreSQL: contexto profundo persistido, nueva revisión, aislamiento y 3 previews sin escrituras', async () => {
   const owners = [`ai-checkpoint-test-${crypto.randomUUID()}`, `ai-checkpoint-test-${crypto.randomUUID()}`];
@@ -66,8 +68,7 @@ test('PostgreSQL: contexto profundo persistido, nueva revisión, aislamiento y 3
     assert.equal(isolated.decision.text, 'OTHER_OWNER_PRIVATE_SENTINEL');
     await assert.rejects(previewForOwner('nonexistent-test-owner', { characterId: 'mar', situation: 'post' }, { read: readUniverse, provider }), /UNIVERSE_NOT_FOUND/);
   } finally {
-    await db.delete(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, owners));
-    await pool.end();
+    await cleanupDisposableOwners(owners);
   }
 });
 

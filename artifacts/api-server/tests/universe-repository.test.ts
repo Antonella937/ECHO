@@ -1,7 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { db, pool, echoUniversesTable } from '@workspace/db';
-import { inArray } from 'drizzle-orm';
+import { pool } from '@workspace/db';
+import { cleanupDisposableOwners } from './helpers/cleanup-disposable-owners';
 import { readUniverse, writeUniverse } from '../src/lib/universeRepository';
 import { ObjectStorageService } from '../src/lib/objectStorage';
 import { ObjectPermission } from '../src/lib/objectAcl';
@@ -9,8 +9,8 @@ import { ObjectPermission } from '../src/lib/objectAcl';
 const prefix = `echo-test-${crypto.randomUUID()}`;
 const owners = [`${prefix}-a`, `${prefix}-b`];
 after(async () => {
-  await db.delete(echoUniversesTable).where(inArray(echoUniversesTable.ownerId, owners));
-  await pool.end();
+  try { await cleanupDisposableOwners(owners); }
+  finally { await pool.end(); }
 });
 test('PostgreSQL: aislamiento por propietario y creación atómica', async () => {
   assert.equal((await readUniverse(owners[0])).revision, 0);
