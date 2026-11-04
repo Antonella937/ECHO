@@ -111,7 +111,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
       }
     >
       <form onSubmit={(e) => { e.preventDefault(); save(); }} noValidate>
-        <AvatarPicker value={avatar} onChange={setAvatar} onBusy={setUploading} />
+        <AvatarPicker value={avatar} name={name} onChange={setAvatar} onBusy={setUploading} />
         <Field id="acc-name" label="Nombre" hint={`${name.length}/80`}>
           <input id="acc-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} className={inputCls} autoComplete="off" data-testid="input-account-name" />
         </Field>

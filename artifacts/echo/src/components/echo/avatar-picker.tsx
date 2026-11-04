@@ -2,13 +2,15 @@ import { useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { compressImage, useMediaResolver, uploadPrivateImage } from '@/lib/media';
 import { cn } from '@/lib/utils';
+import { hasCharacterImage } from '../../lib/visual-defaults';
+import { CharacterInitials } from './visual-defaults';
 
 const PRESETS = [
   'account-default', 'official-pretty-violence', 'official-false-halo', 'official-saint-vulture',
   'official-stray-kids', 'official-the-hollow', 'official-dead-static',
 ];
 
-export function AvatarPicker({ value, onChange, onBusy }: { value: string; onChange(v: string): void; onBusy(b: boolean): void }) {
+export function AvatarPicker({ value, name = '', onChange, onBusy }: { value: string; name?: string; onChange(v: string): void; onBusy(b: boolean): void }) {
   const resolveMedia = useMediaResolver();
   const input = useRef<HTMLInputElement>(null);
   const token = useRef(0);
@@ -36,7 +38,9 @@ export function AvatarPicker({ value, onChange, onBusy }: { value: string; onCha
     <div>
       <div className="flex items-center gap-4">
         <div className="relative">
-          <img src={resolveMedia(value)} alt="Avatar seleccionado" className="h-20 w-20 rounded-full bg-muted object-cover" data-testid="img-editor-avatar" />
+          {hasCharacterImage(value)
+            ? <img src={resolveMedia(value)} alt="Avatar seleccionado" className="h-20 w-20 rounded-full bg-muted object-cover" data-testid="img-editor-avatar" />
+            : <CharacterInitials name={name} size={80} testId="img-editor-avatar" />}
           {busy && <span className="absolute inset-0 grid place-items-center rounded-full bg-background/70"><Loader2 className="h-6 w-6 animate-spin text-primary" /></span>}
         </div>
         <div className="flex flex-col gap-2">
@@ -57,7 +61,9 @@ export function AvatarPicker({ value, onChange, onBusy }: { value: string; onCha
           return (
             <button key={k} type="button" role="radio" aria-checked={value === ref} aria-label={k} onClick={() => onChange(ref)}
               className={cn('shrink-0 rounded-full p-[2px]', value === ref ? 'bg-primary' : 'bg-transparent')} data-testid={`button-preset-avatar-${k}`}>
-              <img src={resolveMedia(ref)} alt="" className="h-11 w-11 rounded-full" />
+              {hasCharacterImage(ref)
+                ? <img src={resolveMedia(ref)} alt="" className="h-11 w-11 rounded-full" />
+                : <CharacterInitials name={name} size={44} />}
             </button>
           );
         })}

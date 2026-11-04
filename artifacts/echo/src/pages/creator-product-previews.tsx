@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useState } from 'react';
+import { UniverseCover } from '../components/echo/visual-defaults';
+import { PrivateShareCards } from '../components/echo/private-share-cards';
+import { hasCharacterImage, ownerScopedPreviewKey } from '../lib/visual-defaults';
+import { resolveMedia } from '../lib/media';
 import { useUser } from '@clerk/react';
 import {
   getGetCreatorAccountQueryKey,
@@ -133,13 +137,15 @@ export function CreatorUniversePreview() {
   const account = isSignedIn ? accountQuery.data : undefined;
   const activeUniverseId = user?.id ? getActiveUniverseId(user.id) : 'primary';
   const universesQuery = useListCreatorUniverses({ universeId: activeUniverseId }, {
-    query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getListCreatorUniversesQueryKey({ universeId: activeUniverseId }) },
+    query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getListCreatorUniversesQueryKey({ universeId: activeUniverseId }), user?.id) },
   });
   const activeUniverseQuery = useGetUniverse({ universeId: activeUniverseId }, {
-    query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: getGetUniverseQueryKey({ universeId: activeUniverseId }) },
+    query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetUniverseQueryKey({ universeId: activeUniverseId }), user?.id) },
   });
   const universes = universesQuery.data ?? [];
-  const activeUniverse = activeUniverseQuery.data?.state ?? null;
+  const activeUniverse = isSignedIn ? activeUniverseQuery.data?.state ?? null : null;
+  const universeMetadata = universes.find(universe => universe.universeId === activeUniverseId);
+  const universeName = universeMetadata?.name ?? activeUniverse?.creatorSetup?.universeName ?? (account ? '' : 'Casa de papel');
   const slots = account ? Array.from({ length: Math.min(account.maxCharacters, 25) },
     (_, index) => index < account.characterCount) : [true, true, true, false, false];
   const createUniverse = useCreateCreatorUniverse();
@@ -182,7 +188,7 @@ export function CreatorUniversePreview() {
       <PreviewNotice>{account ? 'Datos privados de tu cuenta. Los extras mostrados no están disponibles para compra todavía.' : 'Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.'}</PreviewNotice>
       <section className="epc-universe-board" aria-label="Ilustración de gestión de universo">
         <div className="epc-universe-sidebar">
-          <div className="epc-universe-symbol">e</div>
+          <UniverseCover name={universeName} />
           <span className="epc-overline">{account ? 'TU UNIVERSO ACTIVO' : 'UNIVERSO DE EJEMPLO'}</span>
           <h2>{activeUniverse?.creatorSetup?.universeName ?? (account ? 'Mi universo' : 'Casa de papel')}</h2>
           <p>Un espacio privado para reunir personajes, ideas y conversaciones.</p>
@@ -238,6 +244,20 @@ export function CreatorUniversePreview() {
           </div>}
         </div>
       </section>
+      {isLoaded && isSignedIn && user && activeUniverse && universeMetadata && !universeMetadata.archived && (
+        <PrivateShareCards key={`${user.id}:${activeUniverseId}`}
+          universeName={universeName}
+          description={universeMetadata.description || activeUniverse.creatorSetup?.universeDescription}
+          creatorName={user.fullName || user.username || undefined}
+          initialCharacterId={activeUniverse.currentCharacterId}
+          characters={activeUniverse.characters.filter(character => !character.archived).map(character => ({
+            id: character.id, name: character.name,
+            imageSrc: hasCharacterImage(character.avatar) ? resolveMedia(character.avatar, {
+              sourceUniverseId: activeUniverseId, sourceCharacterId: character.id,
+              sourceType: 'avatar', sourceContentId: character.id,
+            }) : undefined,
+          }))} />
+      )}
       <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> Ver plan de ejemplo</Link></div>
     </PreviewShell>
   );

@@ -21,6 +21,12 @@ Cross-owner social reads must authorize a full target identity (owner + universe
 
 **How to apply:** require a viewer character scoped to the authenticated owner for private-follow access; filter inaccessible content before pagination and omit internal configuration, messages, reactions, and counts from cross-owner read responses.
 
+Universe sharing consent is not itself an authorized share-link frontend flow. Do not turn local-ID profile URLs into shareable links or expose owner-only card data as public previews.
+
+**Why:** The user explicitly required sharing controls to remain safely blocked if private-sharing authorization is missing; local IDs can collide across owners and universes.
+
+**How to apply:** A future copy/native-share activation needs a real scoped route and recipient authorization first. Never infer that sharingEnabled alone makes an arbitrary URL safe or public.
+
 Until cross-owner mutation APIs exist, posts from other owners must remain read-only in the client; posts in the owner's active universe retain their existing interactions.
 
 **Why:** local social actions resolve only character/post IDs, which can collide across owners and universes.

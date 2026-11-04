@@ -11,3 +11,4 @@
 - [Universe lifecycle safety](universe-management-safety.md) — archive retains capacity; deletion prevents stale-client recreation and preserves shared uploads/accounting.
 - [Narrative counters](narrative-counters.md) — editable bases add fictional scale without creating or removing real social activity or viewers.
 - [Brand approval boundary](branding-approval.md) — branding does not authorize page redesigns; creator signatures must remain exclusive per screen.
+- [Frontend SSR runner](frontend-ssr-runner.md) — API-hosted tsx tests do not inherit Vite's automatic JSX transform; keep explicit React scope in SSR-tested TSX.

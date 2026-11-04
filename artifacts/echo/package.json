@@ -9,6 +9,7 @@
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:branding-tests": "tsc -p tsconfig.branding-tests.json",
+    "typecheck:visual-tests": "tsc -p tsconfig.visual-tests.json",
     "typecheck:media-tests": "tsc -p tsconfig.media-tests.json"
   },
   "devDependencies": {
