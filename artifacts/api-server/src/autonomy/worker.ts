@@ -52,7 +52,7 @@ export async function runAutonomyWorkerTick(input: {
     const targets = await input.repository.listLiveOptInTargets();
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
     for (const target of targets) {
-      const characterHash = createHash("sha256").update(`${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
+      const characterHash = createHash("sha256").update(`${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
       const idempotencyKey = `worker:${slot}:${characterHash}`;
       evaluated += 1;
       try {
