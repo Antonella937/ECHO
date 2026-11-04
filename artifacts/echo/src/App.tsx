@@ -225,16 +225,20 @@ function AuthenticatedExperience() {
   if (!isLoaded) return <EchoSplash />;
   if (!isSignedIn || !user) return <LandingPage />;
   if (universeQuery.isError) {
+    const failure = universeQuery.error as { data?: { error?: string }; message?: string } | null;
+    const betaError = failure?.data?.error;
+    const betaFull = betaError === 'PRIVATE_BETA_FULL';
+    const betaUnavailable = betaError === 'PRIVATE_BETA_UNAVAILABLE';
     return (
       <main className="echo-public ep-onboarding">
         <section className="ep-onboarding-main">
           <div className="ep-complete" role="alert" data-testid="status-universe-load-error">
-            <span className="ep-eyebrow">No se pudo cargar tu espacio</span>
-            <h1>Tu universo sigue protegido.</h1>
-            <p>Vuelve a intentarlo antes de continuar. No se creó ni se reemplazó ningún dato.</p>
-            <button type="button" className="ep-button" onClick={() => void universeQuery.refetch()} data-testid="button-retry-universe">
+            <span className="ep-eyebrow">{betaFull ? 'ECHO · BETA PRIVADA' : betaUnavailable ? 'Acceso temporalmente no disponible' : 'No se pudo cargar tu espacio'}</span>
+            <h1>{betaFull ? 'Los tres lugares ya están ocupados.' : betaUnavailable ? 'Estamos preparando el acceso.' : 'Tu universo sigue protegido.'}</h1>
+            <p>{betaFull ? 'Esta beta tiene solo tres cuentas de prueba. No se creó ningún universo en tu cuenta.' : betaUnavailable ? 'El acceso privado no está disponible en este momento. Volvé a intentarlo más tarde.' : 'Vuelve a intentarlo antes de continuar. No se creó ni se reemplazó ningún dato.'}</p>
+            {!betaFull && <button type="button" className="ep-button" onClick={() => void universeQuery.refetch()} data-testid="button-retry-universe">
               Reintentar
-            </button>
+            </button>}
           </div>
         </section>
       </main>
