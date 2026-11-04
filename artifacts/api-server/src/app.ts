@@ -48,6 +48,12 @@ app.use(cors({
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Public liveness probe: must not require Clerk, a beta seat, or database access.
+app.get("/api/healthz", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ status: "ok" });
+});
+
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
