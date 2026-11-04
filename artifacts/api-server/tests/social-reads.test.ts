@@ -24,7 +24,8 @@ const owners = [
 const [targetOwner, viewerOwner, otherOwner] = owners;
 const characterId = "repeated-character-id";
 const postId = "repeated-post-id";
-const NOW = Date.parse("2026-11-03T12:00:00.000Z");
+// Relative lifetimes must remain active/expired regardless of the day this suite runs.
+const NOW = Date.now();
 
 let server: Server;
 let baseUrl = "";

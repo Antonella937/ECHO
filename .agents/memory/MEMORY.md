@@ -9,3 +9,4 @@
 - [Universe and character privacy gates](character-privacy-scope.md) — cross-owner social reads require universe consent first, then character visibility; follows and media have separate rollout steps.
 - [Disposable validation cleanup](disposable-validation-cleanup.md) — stop test sessions and verify all dependent owner-scoped rows; universe-only cleanup reports are insufficient.
 - [Universe lifecycle safety](universe-management-safety.md) — archive retains capacity; deletion prevents stale-client recreation and preserves shared uploads/accounting.
+- [Narrative counters](narrative-counters.md) — editable bases add fictional scale without creating or removing real social activity or viewers.

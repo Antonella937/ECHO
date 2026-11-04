@@ -86,6 +86,7 @@ export interface Comment {
 }
 
 export interface Story {
+  displayMetrics?: { views?: number | null };
   mentionedAccountIds?: string[];
   reactions?: SocialReaction[];
   music?: import('@workspace/api-client-react').StoryMusic;

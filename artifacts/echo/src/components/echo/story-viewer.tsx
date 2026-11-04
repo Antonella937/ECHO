@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AtSign, ChevronLeft, ChevronRight, Eye, Music2, Send, X } from 'lucide-react';
 import { isStoryActive } from '@/domain/social-features';
+import { storyViewCount, storyViewerIds, formatCount } from '@/domain/accounts';
+import { StoryMetricsEditor } from './story-metrics-editor';
 import { SocialText } from './social-text';
 import { MentionSuggestions } from './mention-suggestions';
 
@@ -86,12 +88,14 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [paused, setPaused] = useState(false);
   const [reply, setReply] = useState('');
   const [showViewers, setShowViewers] = useState(false);
+  const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const group = groups[Math.min(gi, groups.length - 1)];
   const story = group.stories[Math.min(si, group.stories.length - 1)];
   const isMine = group.author.id === me.id;
   const liveStory = state.stories.find((s) => s.id === story.id) ?? story;
+  const editingMetrics = editingMetricsId === story.id;
 
   useEffect(() => {
     actions.seeStory(story.id);
@@ -118,6 +122,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (editingMetrics) return;
       if (document.activeElement === inputRef.current) {
         if (e.key === 'Escape') inputRef.current?.blur();
         return;
@@ -132,9 +137,9 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [next, prev, onClose]);
+  }, [next, prev, onClose, editingMetrics]);
 
-  const isPaused = paused || reply.length > 0 || showViewers;
+  const isPaused = paused || reply.length > 0 || showViewers || editingMetrics;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -145,7 +150,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     toast({ title: `Respuesta enviada a ${group.author.name.split(' ')[0]}`, description: 'La encontrarás en Mensajes.' });
   };
 
-  const viewers = liveStory.seenBy.map(character).filter(Boolean);
+  const viewers = storyViewerIds(liveStory).map(character).filter(Boolean);
+  const totalViews = storyViewCount(liveStory);
   const active = isStoryActive(liveStory);
   const mentioned = (liveStory.mentionedAccountIds ?? []).map(character).filter((c): c is NonNullable<typeof c> => !!c);
   const myReaction = liveStory.reactions?.find((r) => r.actorId === me.id)?.value;
@@ -283,15 +289,16 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
         <div className="relative z-10 px-3 pb-[max(env(safe-area-inset-bottom),14px)] pt-2">
           {isMine ? (
-            <div>
+            <div className="relative">
               <button
                 onClick={() => setShowViewers((v) => !v)}
                 className="flex h-11 items-center gap-2 rounded-full px-3 text-sm text-foreground/85"
                 data-testid="button-story-viewers"
               >
                 <Eye className="h-5 w-5" strokeWidth={1.6} />
-                {viewers.length === 0 ? 'Nadie la ha visto todavía' : `Vista por ${viewers.length}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} reacción(es)` : ''}
+                {totalViews === 0 ? 'Nadie la ha visto todavía' : `Vista por ${formatCount(totalViews)}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} reacción(es)` : ''}
               </button>
+              <StoryMetricsEditor key={story.id} story={liveStory} onOpenChange={open => setEditingMetricsId(open ? story.id : null)} />
               {showViewers && viewers.length > 0 && (
                 <div className="mt-1 flex flex-col gap-2 rounded-3xl bg-card/95 p-3 backdrop-blur">
                   {viewers.map((v) =>

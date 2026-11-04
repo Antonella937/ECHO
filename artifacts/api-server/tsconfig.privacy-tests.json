@@ -13,6 +13,8 @@
     "tests/social-content-access.test.ts",
     "tests/social-reads.test.ts",
     "tests/social-ordering.test.ts",
-    "../echo/tests/social-ordering.test.ts"
+    "../echo/tests/social-ordering.test.ts",
+    "../echo/tests/narrative-metrics.test.ts",
+    "tests/narrative-metrics.test.ts"
   ]
 }

@@ -5,7 +5,7 @@ import type { ActivityAdapter } from '@/domain/providers';
 import { createSeedState } from './seed';
 import { UniverseSync, type SyncView } from './synchronization';
 import { SyncNotices } from './sync-notices';
-import { archiveAccount, editAccount, editPostMetrics, validateAccount, type AccountInput, type PostMetrics } from '@/domain/accounts';
+import { archiveAccount, editAccount, editPostMetrics, editStoryMetrics, validateAccount, type AccountInput, type PostMetrics, type StoryMetrics } from '@/domain/accounts';
 import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core';
 import { validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
@@ -30,6 +30,7 @@ export interface SocialActions {
   duplicateAccount(id: string): string;
   deleteAccount(id: string): void;
   updatePostMetrics(id: string, metrics: PostMetrics, expected?: PostMetrics): void;
+  updateStoryMetrics(id: string, metrics: StoryMetrics, expected?: StoryMetrics): void;
   toggleLike(postId: string): void;
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
@@ -168,6 +169,9 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       updatePostMetrics(id, metrics, expected) {
         const next = editPostMetrics(cur(), id, metrics, expected);
         coordinator.current?.edit(() => next);
+      },
+      updateStoryMetrics(id, metrics, expected) {
+        coordinator.current?.edit(s => editStoryMetrics(s, id, myId(), metrics, expected));
       },
       toggleLike(postId) {
         const p = cur().posts.find((x) => x.id === postId);

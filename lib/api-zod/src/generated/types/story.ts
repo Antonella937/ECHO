@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SocialReaction } from './socialReaction';
+import type { StoryDisplayMetrics } from './storyDisplayMetrics';
 import type { StoryMusic } from './storyMusic';
 
 export interface Story {
+  displayMetrics?: StoryDisplayMetrics;
   /** @maxItems 50 */
   mentionedAccountIds?: string[];
   reactions?: SocialReaction[];

@@ -103,6 +103,7 @@ export * from './socialReaction';
 export * from './socialState';
 export * from './socialStateFollows';
 export * from './story';
+export * from './storyDisplayMetrics';
 export * from './storyHighlight';
 export * from './storyMusic';
 export * from './universeEnvelope';

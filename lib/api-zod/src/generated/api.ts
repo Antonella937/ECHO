@@ -1010,6 +1010,9 @@ export const getUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin = 0
 
 export const getUniverseResponseStateOnePostsItemMediaMax = 10;
 
+export const getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin = 0;
+export const getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax = 1000000000000;
+
 export const getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax = 50;
 
 export const getUniverseResponseStateOneStoriesItemReactionsItemValueMax = 32;
@@ -1257,6 +1260,9 @@ export const GetUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "views": zod.number().int().min(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
+}).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -1519,6 +1525,9 @@ export const saveUniverseBodyStatePostsItemMediaItemDurationSecondsMin = 0;
 
 export const saveUniverseBodyStatePostsItemMediaMax = 10;
 
+export const saveUniverseBodyStateStoriesItemDisplayMetricsViewsMin = 0;
+export const saveUniverseBodyStateStoriesItemDisplayMetricsViewsMax = 1000000000000;
+
 export const saveUniverseBodyStateStoriesItemMentionedAccountIdsMax = 50;
 
 export const saveUniverseBodyStateStoriesItemReactionsItemValueMax = 32;
@@ -1766,6 +1775,9 @@ export const SaveUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "views": zod.number().int().min(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
+}).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2016,6 +2028,9 @@ export const saveUniverseResponseStateOnePostsItemMediaItemDurationSecondsMin = 
 
 export const saveUniverseResponseStateOnePostsItemMediaMax = 10;
 
+export const saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin = 0;
+export const saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax = 1000000000000;
+
 export const saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax = 50;
 
 export const saveUniverseResponseStateOneStoriesItemReactionsItemValueMax = 32;
@@ -2263,6 +2278,9 @@ export const SaveUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "views": zod.number().int().min(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
+}).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2561,6 +2579,9 @@ export const verifyUniverseResponseOneStateOnePostsItemMediaItemDurationSecondsM
 
 export const verifyUniverseResponseOneStateOnePostsItemMediaMax = 10;
 
+export const verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMin = 0;
+export const verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMax = 1000000000000;
+
 export const verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax = 50;
 
 export const verifyUniverseResponseOneStateOneStoriesItemReactionsItemValueMax = 32;
@@ -2810,6 +2831,9 @@ export const VerifyUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "views": zod.number().int().min(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMin).max(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
+}).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3382,6 +3406,9 @@ export const createCreatorUniverseBodyStatePostsItemMediaItemDurationSecondsMin 
 
 export const createCreatorUniverseBodyStatePostsItemMediaMax = 10;
 
+export const createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMin = 0;
+export const createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMax = 1000000000000;
+
 export const createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax = 50;
 
 export const createCreatorUniverseBodyStateStoriesItemReactionsItemValueMax = 32;
@@ -3629,6 +3656,9 @@ export const CreateCreatorUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "views": zod.number().int().min(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
+}).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3878,6 +3908,9 @@ export const createCreatorUniverseResponseStatePostsItemMediaItemDurationSeconds
 
 export const createCreatorUniverseResponseStatePostsItemMediaMax = 10;
 
+export const createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMin = 0;
+export const createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMax = 1000000000000;
+
 export const createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax = 50;
 
 export const createCreatorUniverseResponseStateStoriesItemReactionsItemValueMax = 32;
@@ -4126,6 +4159,9 @@ export const CreateCreatorUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "displayMetrics": zod.object({
+  "views": zod.number().int().min(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
+}).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),

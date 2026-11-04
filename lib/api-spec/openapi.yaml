@@ -1096,6 +1096,10 @@ components:
       type: object
       required: [id, authorId, image, caption, createdAt, seenBy, origin]
       properties:
+        displayMetrics:
+          type: object
+          properties:
+            views: { type: [integer, "null"], minimum: 0, maximum: 1000000000000, description: "Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers." }
         mentionedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         music: { $ref: "#/components/schemas/StoryMusic" }

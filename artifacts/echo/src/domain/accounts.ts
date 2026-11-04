@@ -1,4 +1,4 @@
-import type { Character, Post, SocialState } from './types';
+import type { Character, Post, Story, SocialState } from './types';
 import { characterConfig, sameCharacterValue, validateCharacterConfig } from './character-core';
 
 export type AccountInput = Pick<Character, 'name' | 'handle' | 'bio' | 'avatar'> &
@@ -50,6 +50,25 @@ export function validateMetrics(metrics?: Record<string, number | null | undefin
     throw Error('Las cifras deben ser enteros entre 0 y 1.000.000.000.000, o quedar vacías.');
 }
 export function shownCount(base: number | null | undefined, real: number) { return (base ?? 0) + real; }
+/** Real views remain identity memberships, never synthetic people or repeat impressions. */
+export function storyViewerIds(story: Story): string[] {
+  return [...new Set(story.seenBy)].filter(id => id !== story.authorId);
+}
+export function storyViewCount(story: Story): number {
+  return shownCount(story.displayMetrics?.views, storyViewerIds(story).length);
+}
+export type StoryMetrics = NonNullable<Story['displayMetrics']>;
+export function editStoryMetrics(state: SocialState, id: string, actor: string, metrics: StoryMetrics, expected?: StoryMetrics): SocialState {
+  const story = state.stories.find(s => s.id === id);
+  if (!story || story.authorId !== actor || state.currentCharacterId !== actor || !state.characters.some(c => c.id === actor && !c.archived))
+    throw Error('Solo la identidad autora activa puede editar las cifras de esta historia.');
+  validateMetrics(metrics);
+  const views = expected
+    ? formField(story.displayMetrics?.views ?? null, metrics.views ?? null, expected.views ?? null)
+    : metrics.views ?? null;
+  return { ...state, stories: state.stories.map(s => s.id === id
+    ? { ...s, displayMetrics: { ...s.displayMetrics, views } } : s) };
+}
 export function formatCount(value: number) {
   return new Intl.NumberFormat('es', { notation: value >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value);
 }

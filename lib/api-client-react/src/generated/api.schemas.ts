@@ -851,7 +851,18 @@ export interface StoryMusic {
   providerRef?: string;
 }
 
+export type StoryDisplayMetrics = {
+  /**
+     * Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.
+     * @minimum 0
+     * @maximum 1000000000000
+     * @nullable
+     */
+  views?: number | null;
+};
+
 export interface Story {
+  displayMetrics?: StoryDisplayMetrics;
   /** @maxItems 50 */
   mentionedAccountIds?: string[];
   reactions?: SocialReaction[];
