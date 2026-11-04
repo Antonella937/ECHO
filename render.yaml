@@ -1,0 +1,26 @@
+# Render Blueprint for ECHO's Express API.
+# Create a PostgreSQL database separately (for example, Neon).
+# Never commit actual credentials to this file.
+services:
+  - type: web
+    name: echo-private-beta-api
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && corepack prepare pnpm@10 --activate && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ECHO_BETA_ACCESS_MODE
+        value: three_seats
+      - key: ECHO_ALLOWED_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
