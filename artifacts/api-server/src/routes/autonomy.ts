@@ -16,6 +16,7 @@ import { visionService } from "../vision/service";
 import {
   DEFAULT_CHARACTER_CONTROL,
   isAutonomyLiveExecutionEnabled,
+  isAutonomyOwnerAuthorized,
   withIsolatedAutonomyLiveEnabledForTest,
 } from "../autonomy/constants";
 import {
@@ -86,7 +87,7 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
   return GetAutonomySettingsResponse.parse({
     universeId,
     globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
-    liveExecutionEnabled: isAutonomyLiveExecutionEnabled(),
+    liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: parsed.data.state.characters.filter((character) => !character.archived).map((character) => {
       const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
       return {
@@ -129,6 +130,9 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
         : undefined;
       if (!account || (account.archived && update.enabled)) {
         res.status(404).json({ error: "CHARACTER_NOT_FOUND_OR_ARCHIVED" }); return;
+      }
+      if (update.enabled && !isAutonomyOwnerAuthorized(ownerId)) {
+        res.status(403).json({ error: "AUTONOMY_OWNER_NOT_AUTHORIZED" }); return;
       }
       await updateCharacterControl(ownerId, account.id, update.enabled, universeId);
     }
