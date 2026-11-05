@@ -193,7 +193,7 @@ export function chooseAutonomyOpportunity(input: {
       !message.hiddenForIds?.includes(character.id) &&
       !!message.text.trim() &&
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
-      now.getTime() - (asTime(message.createdAt) ?? 0) < DAY_MS)
+      now.getTime() - (asTime(message.createdAt) ?? 0) < 30 * DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
   const unanswered = incoming.slice(0, 1).find((message) => {
     const sentAt = asTime(message.createdAt) ?? 0;
