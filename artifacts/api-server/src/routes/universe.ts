@@ -11,6 +11,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { universeAccountError } from "../lib/universeValidation";
+import { recordIncomingConversationEvents } from "../ai-engine/incoming-memory";
 
 const router: IRouter = Router();
 
@@ -60,8 +61,14 @@ router.put("/universe", async (req, res): Promise<void> => {
       return;
     }
   }
+  // Use the same owner/universe and expected revision for memory extraction.
+  // A concurrent write still fails closed in writeUniverse.
+  const previous = await readUniverse(req.userId!, universeId);
+  const previousState = SaveUniverseBody.shape.state.safeParse(previous.state);
+  const enrichedState = previous.revision === expectedRevision && previousState.success
+    ? recordIncomingConversationEvents(previousState.data, state) : state;
   let saved;
-  try { saved = await writeUniverse(req.userId!, state, expectedRevision, universeId); }
+  try { saved = await writeUniverse(req.userId!, { ...enrichedState }, expectedRevision, universeId); }
   catch (error) {
     if (error instanceof Error && error.message === "UNIVERSE_UNAVAILABLE") {
       res.status(409).json({ error: error.message }); return;
