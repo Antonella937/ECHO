@@ -13,6 +13,7 @@ import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/typ
 import { editSocialPost, setPinnedPost, movePinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, canViewStory, type PostEdit } from '@/domain/social-features';
 import { getActiveUniverseId } from './persistence';
 import { MediaScopeContext } from '@/lib/media';
+import { playMessageSound } from '@/lib/message-sounds';
 
 export interface SocialActions {
   editPost(id: string, patch: Partial<PostEdit>, expected?: Partial<PostEdit>): void;
@@ -133,6 +134,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       if (!text.trim() && !extra?.attachments?.length && !extra?.postId && !extra?.storyId) return;
       if (extra?.quoteMessageId && !cur().messages.some(m => m.id === extra.quoteMessageId && m.threadId === threadIdFor(myId(), to)))
         throw new Error('La cita debe pertenecer a esta conversación.');
+      playMessageSound('outgoing');
       dispatch({ type: 'message.sent', message: { id: uid('m'), threadId: threadIdFor(myId(), to), senderId: myId(), recipientId: to,
         text: text.trim(), createdAt: new Date().toISOString(), storyId: extra?.storyId ?? null, postId: extra?.postId ?? null,
         readBy: [myId()], origin: 'user', ...(extra?.quoteMessageId ? { quoteMessageId: extra.quoteMessageId } : {}),
