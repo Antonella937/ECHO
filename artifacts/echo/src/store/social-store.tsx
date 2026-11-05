@@ -39,6 +39,7 @@ export interface SocialActions {
   createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; commentsEnabled?: boolean }): string;
   createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic }): string;
   deletePost(postId: string): void;
+  deleteStory(storyId: string): void;
   seeStory(storyId: string): void;
   sendMessage(to: CharacterId, text: string, extra?: { storyId?: string; postId?: string; quoteMessageId?: string; attachments?: MessageAttachment[] }): void;
   markThreadRead(otherId: CharacterId): void;
@@ -224,6 +225,21 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const removing = story.reactions?.some(r => r.actorId === myId() && r.value === value);
         coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, reactions: toggleReaction(st.reactions, myId(), value) } : st) }));
         if (!removing) send(story.authorId, value, { storyId: id });
+      },
+      deleteStory(storyId) {
+        const story = cur().stories.find(s => s.id === storyId);
+        if (!story || story.authorId !== myId()) throw new Error('Solo podés eliminar tus propias historias.');
+        coordinator.current?.edit(s => ({
+          ...s,
+          stories: s.stories.filter(item => item.id !== storyId),
+          highlights: (s.highlights ?? []).flatMap(h => {
+            if (!h.storyIds.includes(storyId)) return [h];
+            const storyIds = h.storyIds.filter(id => id !== storyId);
+            return storyIds.length ? [{ ...h, storyIds, coverStoryId: h.coverStoryId === storyId ? null : h.coverStoryId }] : [];
+          }),
+          notifications: s.notifications.filter(n => n.storyId !== storyId),
+          messages: s.messages.map(m => m.storyId === storyId ? { ...m, storyId: null } : m),
+        }));
       },
       saveHighlight(highlight, expected) { coordinator.current?.edit(s => saveHighlight(s, myId(), highlight, expected)); },
       deleteHighlight(id) { coordinator.current?.edit(s => ({ ...s, highlights: s.highlights?.filter(h => h.id !== id || h.authorId !== myId()) })); },
