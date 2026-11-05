@@ -20,7 +20,12 @@ export default function SupportAdminPage() {
       setNotes(Object.fromEntries(items.map(t => [t.id, t.admin_note ?? ''])));
       setStatuses(Object.fromEntries(items.map(t => [t.id, t.status])));
       setError('');
-    } catch { setError('No tenés acceso al panel o no pudimos cargar los reportes.'); }
+    } catch {
+      setTickets([]);
+      setNotes({});
+      setStatuses({});
+      setError('No tenés acceso al panel o no pudimos cargar los reportes.');
+    }
     finally { setLoading(false); }
   };
   useEffect(() => { void refresh(); }, []);
