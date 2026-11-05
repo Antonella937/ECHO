@@ -1,26 +1,34 @@
-# ECHO image generation — preflight (no paid calls)
+# ECHO image generation — production activation checklist
 
-## Implemented scaffolding
-- Authenticated /api/ai-engine/images/prepare reads the active character and server-side visual identity; it returns a text preview, not a generated image.
-- /api/ai-engine/images/status returns disabled and non-secret setup flags.
-- /api/ai-engine/images/generate rejects all requests with HTTP 503.
-- Owner-scoped reference reader in src/lib/imageReferences.ts reads image bytes from private Supabase storage.
-- src/lib/generatedImageStorage.ts stores a validated image as a private /objects/uploads/... asset.
-- lib/db/src/schema/echo-image-budget.ts and lib/db/src/migrations/20261105-image-generation-budget.sql define the global USD ledger, defaulting to zero.
-- src/lib/imageBudget.ts implements atomic reservation and conservative settlement.
+## Current implementation (as of 2026-11-05)
 
-## Must complete before first generation
-1. Verify the actual OpenRouter image model ID, image-generation request/response shape, image reference support and current pricing with the provider. The model constant is a placeholder, not a verified contract.
-2. Build and test the API and frontend. No CI/build success has been confirmed for these commits.
-3. Apply the SQL migration to the actual production database; verify it completed.
-4. Implement the provider adapter (request, response parsing, MIME validation, cost accounting). Keep image generation disabled until this is tested against a mock provider.
-5. Wire the authenticated /generate endpoint to validate the active character, load owned references, reserve budget atomically BEFORE the paid request, call the provider exactly once, store the image privately, and settle the job in all outcomes.
-6. Wire the generated image preview and acceptance/publishing flow in the frontend. Do not publish an unapproved generation automatically.
-7. Decide and explicitly approve a USD monthly global cap. Set it in the database only after provider tests. It currently defaults to $0.
-8. Tomorrow: owner adds OPENROUTER_API_KEY as a secret to the Render API service (not the frontend, repository or chat). Confirm credentials and credits. Never commit API keys.
-9. Perform one explicitly approved paid test image, review cost and likeness.
+- The authenticated `POST /api/ai-engine/images/prepare` previews a server-built character prompt without paid requests.
+- The authenticated `GET /api/ai-engine/images/status` returns conservative, non-secret preflight flags. Its `enabled` field remains `false` until production activation is actually verified.
+- `POST /api/ai-engine/images/generate` is wired to the service, but is gated by **both** `ECHO_PAID_IMAGE_GENERATION_ENABLED=true` and `ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED=true`, plus a per-user allowlist. Leave both switches OFF until the checklist below is completed.
+- The service reads owner-verified private references, reserves a global monthly budget atomically, performs one provider request, stores the result privately and settles the ledger. Failures with uncertain provider billing retain the reservation conservatively.
+- The image generation provider adapter and HTTP transport have offline/mock tests. Green CI means these code tests pass, **not** that the real provider, production database, Supabase or Render has been tested.
+- The frontend contains a generation preview and accept/discard workflow. Confirm it end-to-end before claiming it is operational.
 
-## Important safety
-The existing AI usage "units" are not money. Do not use them to enforce USD spending.
-A provider timeout may still incur charges: no automatic retries; retain full budget reservation when cost is unknown.
-Do not enable autonomous image generation until explicit user approval and separate rate/cost controls.
+## Remaining prerequisites — in order
+
+1. **Provider contract verification:** independently confirm the exact supported OpenRouter endpoint, model identifier, reference-image request structure, response format, whether `usage.cost` is always returned, and pricing. Do not set `ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED=true` merely because mock tests pass. If the provider does not return an authoritative cost, implement an alternative authoritative cost lookup or fail closed.
+2. **End-to-end tests:** test route authorization, active-character validation, private reference ownership, budget reservation and settlement, and image acceptance using mock provider/storage. Test denial when flags, allowlist or budget are missing.
+3. **Production database:** apply `lib/db/src/migrations/20261105-image-generation-budget.sql` through the established migration process and verify both tables exist. The monthly ceiling defaults to zero. Do not infer successful migration from a GitHub commit.
+4. **Private storage:** verify the Supabase `echo-media` bucket and object registration are configured, and test that another account cannot access references or generated media.
+5. **Owner-only access:** configure `ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS` with only the owner's authenticated user ID in Render. Do not grant access to other users for the initial test.
+6. **Budget:** obtain explicit owner approval for a small USD global monthly spending cap; configure the database ceiling for the correct UTC month, and confirm reservation, consumption and failure accounting. A provider key or prepaid credits do not set a spending cap.
+7. **Credentials:** the owner creates a restricted OpenRouter key and adds `OPENROUTER_API_KEY` to Render's backend environment only. Never send it in chat, commit it, or expose it in frontend code.
+8. **Activation:** only after verifying all previous steps, enable the two feature flags, confirm status and the real provider contract, and perform exactly one owner-approved paid test. Inspect actual cost and likeness before any second test.
+
+## Safety invariants
+
+- **No automatic retries** of ambiguous provider failures; they might have been billed.
+- **No generation without atomic reservation** and a strictly positive database ceiling.
+- **No unapproved publication:** a generated image must be accepted by the user before it becomes a post or story.
+- **No cross-account media:** references and generated images must remain owner-scoped.
+- **No automatic public rollout:** beta access is explicitly allowlisted.
+- The existing AI usage “units” are not USD and cannot replace the spending ledger.
+
+## Known caveat
+
+The `imageGenerationAvailability()` status intentionally reports `enabled: false` and a zero budget, even if an operator configures flags. This is conservative, but means the frontend will not offer live generation until a **database-backed readiness/status implementation** is completed. Do not flip paid flags as a shortcut.
