@@ -197,7 +197,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           key={story.id}
           src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })}
           alt={story.caption || `Historia de ${group.author.name}`}
-          className="fade-up absolute inset-0 h-full w-full object-cover"
+          className="fade-up absolute inset-0 h-full w-full object-contain md:object-cover"
           draggable={false}
           data-testid={`img-story-${story.id}`}
         />
