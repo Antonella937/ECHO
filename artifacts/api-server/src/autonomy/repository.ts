@@ -7,7 +7,7 @@ import {
   echoAutonomyRunsTable,
   echoUniversesTable,
 } from "@workspace/db";
-import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
+import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled, isAutonomyOwnerAuthorized } from "./constants";
 
 export { DEFAULT_CHARACTER_CONTROL } from "./constants";
 
@@ -21,7 +21,7 @@ export async function readOwnerControls(ownerId: string, universeId = "primary")
     ));
   return {
     globalKillSwitchEngaged: owner?.killSwitchEngaged ?? true,
-    liveExecutionEnabled: isAutonomyLiveExecutionEnabled(),
+    liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
       maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),
@@ -86,7 +86,7 @@ export async function listLiveOptInTargets() {
     isNull(echoUniversesTable.archivedAt),
     isNull(echoUniversesTable.deletedAt),
   ));
-  return rows;
+  return rows.filter((row) => isAutonomyOwnerAuthorized(row.ownerId));
 }
 
 export async function claimAutonomyWorkerLease(token: string, now = new Date(), ttlMs = 5 * 60_000) {
