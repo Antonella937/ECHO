@@ -262,7 +262,7 @@ export default function CreatePage() {
           <p className="text-sm font-semibold">¿Quién puede ver esta historia?</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button type="button" aria-pressed={!closeFriendsOnly} onClick={() => setCloseFriendsOnly(false)} className={cn('h-11 rounded-xl text-sm', !closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-everyone">Todos</button>
-            <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-green-700 text-white' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ Mejores amigos</button>
+            <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ Mejores amigos</button>
           </div>
           {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} mejores amigos seleccionados. Podés editarlos en Ajustes.</p>}
         </div>}
