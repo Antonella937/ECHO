@@ -32,12 +32,21 @@ export function recordAutonomyEvent(
     sourceId: input.sourceId,
     promotedTo: null,
   };
-  const recent = [...config.memory.recent, entry].slice(-limit);
+  const combined = [...config.memory.recent, entry];
+  const evicted = combined.slice(0, Math.max(0, combined.length - limit));
+  const recent = combined.slice(-limit);
+  // Source-linked, deterministic digest: never invents interpretations.
+  // Full durable historical retention is handled in a later stage.
+  const lines = evicted.map(item =>
+    `[${item.kind}:${item.sourceId ?? item.id}] ${item.text.replace(/\s+/g, " ").slice(0, 180)}`);
+  const summary = [config.memory.recentSummary.trim(), ...lines]
+    .filter(Boolean).join("\n").split("\n");
+  const recentSummary = summary.slice(-30).join("\n").slice(-6000);
   return {
     ...state,
     characters: state.characters.map((character, i) => i === index ? {
       ...character,
-      configuration: { ...config, memory: { ...config.memory, recent } },
+      configuration: { ...config, memory: { ...config.memory, recent, recentSummary } },
     } : character),
   };
 }
