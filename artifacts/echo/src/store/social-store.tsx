@@ -143,7 +143,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           ...data, id, occupation: data.occupation ?? '', location: data.location ?? '', accountType: data.accountType ?? 'personal',
           verified: data.verified ?? false, archived: false,
           providerRef: { provider: 'mock', externalId: null, status: 'not_connected', lastSyncAt: null },
-          identity: { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date().toISOString() },
+          identity: data.identity ?? { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date().toISOString() },
         };
         coordinator.current?.edit(s => ({ ...s, characters: [...s.characters, account] }));
         return id;
