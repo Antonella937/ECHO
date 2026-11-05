@@ -127,6 +127,29 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const messages = dmTargetId ? latest(state.messages.filter(m =>
     !m.hiddenForIds?.includes(actor.id) &&
     ((m.senderId === actor.id && m.recipientId === dmTargetId) || (m.recipientId === actor.id && m.senderId === dmTargetId))), 10) : [];
+  // Keep the most recent entries and recover older, explicitly recorded memories
+  // only when their text matches the current social situation. This is a pure,
+  // deterministic retrieval step: no model calls, mutations, or invented facts.
+  const memoryQuery = [
+    post?.caption, comment?.text, story?.caption, message?.text,
+    ...messages.slice(-3).map(item => item.text),
+  ].filter((value): value is string => !!value?.trim()).join(' ').toLocaleLowerCase();
+  const queryTerms = new Set((memoryQuery.match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+    .filter(term => !['para', 'como', 'esta', 'este', 'pero', 'sobre', 'porque'].includes(term)));
+  const memoryRecent = c?.memory.recent ?? [];
+  const chronological = latest(memoryRecent, 10);
+  const chronologicalIds = new Set(chronological.map(item => item.id));
+  const recalled = queryTerms.size ? memoryRecent
+    .filter(item => !chronologicalIds.has(item.id))
+    .map(item => ({
+      item,
+      score: (item.text.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+        .filter(term => queryTerms.has(term)).length,
+    }))
+    .filter(entry => entry.score > 0)
+    .sort((a, b) => b.score - a.score ||
+      new Date(b.item.createdAt).getTime() - new Date(a.item.createdAt).getTime())
+    .slice(0, 3).map(entry => entry.item) : [];
   const data = {
     identity: { id: actor.id, name: actor.name, handle: actor.handle, bio: actor.bio, occupation: actor.occupation, location: actor.location,
       accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null },
@@ -136,7 +159,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     routine: c ? { ...c.routine, localNow: localTime(now, c.routine.timezone), interpretation: 'probabilistic_context_not_commands' } : null,
     social: c?.social ?? null,
     memory: c ? { permanent: c.memory.permanent, relationships: c.memory.relationships,
-      recent: latest(c.memory.recent, 10), recentSummary: c.memory.recentSummary } : null,
+      recent: chronological, recalled, recentSummary: c.memory.recentSummary } : null,
     currentState: c ? { ...c.currentState, companions: c.currentState.companions.map(identityOf), provenance: 'manual_or_routine_not_observed_autonomy' } : null,
     recentSocial: {
       posts: relevantPosts.map(postText),

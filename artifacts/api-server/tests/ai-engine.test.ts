@@ -187,3 +187,34 @@ test('narrative context sees known characters posts but not unrelated feeds or p
   assert.ok(!context.recentSocial.posts.some((p: { id: string }) => p.id === 'unrelated-post'));
   assert.ok(!JSON.stringify(context).includes('UNRELATED_PRIVATE_SENTINEL'));
 });
+
+test('older recorded memories are recalled by topic without rewriting the stored timeline', () => {
+  const s = fixture();
+  const mar = s.characters.find(c => c.id === 'mar')!;
+  const before = structuredClone(s);
+  const memories = mar.configuration!.memory.recent;
+  memories.push({
+    id: 'old-essay', text: 'Noah y Mar discutieron durante el ensayo de batería',
+    targetId: null, kind: 'manual',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    sourceId: null, promotedTo: null,
+  });
+  for (let i = 0; i < 12; i++) memories.push({
+    id: 'new-' + i, text: 'Otro acontecimiento cotidiano ' + i,
+    targetId: null, kind: 'manual',
+    createdAt: new Date(Date.UTC(2026, 1, i + 1)).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 1, i + 1)).toISOString(),
+    sourceId: null, promotedTo: null,
+  });
+  s.posts = [{
+    id: 'essay-post', authorId: 'noah', image: '', caption: '¿Recordás el ensayo de batería?',
+    location: '', createdAt: new Date(), likes: [], savedBy: [], commentsEnabled: true,
+  }];
+  const context = JSON.parse(buildCharacterContext(s, {
+    characterId: 'mar', situation: 'comment', postId: 'essay-post',
+  }).serialized);
+  assert.equal(context.memory.recent.length, 10);
+  assert.ok(context.memory.recalled.some((m: { id: string }) => m.id === 'old-essay'));
+  assert.equal(memories.length, 13);
+  assert.equal(before.characters.find(c => c.id === 'mar')!.configuration!.memory.recent.length, 0);
+});
