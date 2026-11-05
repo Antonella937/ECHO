@@ -28,9 +28,17 @@ export default function HelpCenterPage() {
     catch { setTickets([]); setTicketsError(true); }
   };
   useEffect(() => {
+    let active = true;
     setTickets([]);
     setTicketsError(false);
-    if (user?.id) void refreshTickets();
+    if (user?.id) {
+      void getSupportTickets().then(items => {
+        if (active) { setTickets(items); setTicketsError(false); }
+      }).catch(() => {
+        if (active) { setTickets([]); setTicketsError(true); }
+      });
+    }
+    return () => { active = false; };
   }, [user?.id]);
   const send = async () => {
     if (!description.trim() || !consent || sending) return;
