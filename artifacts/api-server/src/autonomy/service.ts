@@ -19,6 +19,16 @@ import type { LiveExecutionOutcome } from "./executor";
 
 const DAY_MS = 24 * 60 * 60_000;
 
+const activeDmTyping = new Map<string, number>();
+const typingKey = (ownerId: string, universeId: string, characterId: string) => `${ownerId}:${universeId}:${characterId}`;
+export function isAutonomyDmTyping(ownerId: string, universeId: string, characterId: string): boolean {
+  const key = typingKey(ownerId, universeId, characterId);
+  const until = activeDmTyping.get(key) ?? 0;
+  if (until <= Date.now()) { activeDmTyping.delete(key); return false; }
+  return true;
+}
+
+
 export interface AutonomyRepository {
   read(ownerId: string, universeId?: string): Promise<{ state: unknown; revision: number }>;
   readControls(ownerId: string, universeId?: string): Promise<{
@@ -314,10 +324,17 @@ export async function runAutonomyLiveCycle(
       ...(opportunity.storyId ? { storyId: opportunity.storyId } : {}),
       ...(opportunity.messageId ? { messageId: opportunity.messageId } : {}),
     };
-    const preview = await previewForOwner(ownerId, decisionInput, {
-      read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
-      vision: (id, state, input) => visionService.loadContext(id, state, input),
-    });
+    const typingId = typingKey(ownerId, universeId, character.id);
+    if (opportunity.situation === "dm") activeDmTyping.set(typingId, Date.now() + 120_000);
+    let preview;
+    try {
+      preview = await previewForOwner(ownerId, decisionInput, {
+        read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
+        vision: (id, state, input) => visionService.loadContext(id, state, input),
+      });
+    } finally {
+      activeDmTyping.delete(typingId);
+    }
     if (preview.decision.action === "none") {
       await dependencies.repository.complete(ownerId, runId, {
         status: "no_action", action: "none", situation: preview.decision.situation,
