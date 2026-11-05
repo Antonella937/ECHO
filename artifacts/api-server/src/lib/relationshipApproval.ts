@@ -53,7 +53,7 @@ export async function approveRelationshipProgression(
           (message.senderId === targetId && message.recipientId === actorId));
     }).map(message => message.id);
     const updated = await tx.update(echoUniversesTable)
-      .set({ state: result.state, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: now })
+      .set({ state: { ...result.state }, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: now })
       .where(and(scope, eq(echoUniversesTable.revision, expectedRevision)))
       .returning({ revision: echoUniversesTable.revision });
     if (!updated[0]) throw new Error("RELATIONSHIP_REVISION_RACE");
