@@ -68,7 +68,7 @@ router.put("/universe", async (req, res): Promise<void> => {
   const enrichedState = previous.revision === expectedRevision && previousState.success
     ? recordIncomingConversationEvents(previousState.data, state) : state;
   let saved;
-  try { saved = await writeUniverse(req.userId!, enrichedState, expectedRevision, universeId); }
+  try { saved = await writeUniverse(req.userId!, { ...enrichedState }, expectedRevision, universeId); }
   catch (error) {
     if (error instanceof Error && error.message === "UNIVERSE_UNAVAILABLE") {
       res.status(409).json({ error: error.message }); return;
