@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
 export const AUTONOMY_WORKER_INTERVAL_MS = 2 * 60_000;
-const SPONTANEOUS_INTERVAL_MS = 30 * 60_000;
 const WORKER_LEASE_MS = 10 * 60_000;
 
 export interface AutonomyWorkerTarget {
@@ -52,7 +51,6 @@ export async function runAutonomyWorkerTick(input: {
   try {
     const targets = await input.repository.listLiveOptInTargets();
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
-    const spontaneousSlot = Math.floor(now.getTime() / SPONTANEOUS_INTERVAL_MS);
     for (const target of targets) {
       const characterHash = createHash("sha256").update(`${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
       const digest = createHash("sha256").update(`worker:${slot}:${characterHash}`).digest("hex");
