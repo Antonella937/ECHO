@@ -30,6 +30,7 @@ export default function CreatePage() {
   const [aiPreview, setAiPreview] = useState(false);
   const [aiPrepared, setAiPrepared] = useState<{ preparedPrompt: string; referenceCount: number; style: string } | null>(null);
   const [aiPreparing, setAiPreparing] = useState(false);
+  const [aiStatus, setAiStatus] = useState<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } } | null>(null);
   const [items, setItems] = useState<PostMedia[]>([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -107,6 +108,15 @@ export default function CreatePage() {
     }
   };
 
+  const checkAiStatus = async () => {
+    try {
+      const status = await customFetch<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } }>('/api/ai-engine/images/status', { responseType: 'json' });
+      setAiStatus(status);
+    } catch {
+      setAiStatus(null);
+    }
+  };
+
   const prepareAi = async () => {
     if (!aiPrompt.trim() || aiPreparing) return;
     setAiPreparing(true);
@@ -120,6 +130,7 @@ export default function CreatePage() {
       if (result.generationEnabled) throw new Error('La preparación no debe generar imágenes.');
       setAiPrepared(result);
       setAiPreview(true);
+      void checkAiStatus();
     } catch (err) { setError((err as Error).message || 'No se pudo preparar la imagen.'); }
     finally { setAiPreparing(false); }
   };
@@ -220,6 +231,13 @@ export default function CreatePage() {
             <div className="mt-1 text-muted-foreground">Descripciones: {me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente'} · {me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente'}</div>
             <Link href={`/characters/${me.id}/edit`} className="mt-2 inline-block text-primary underline">Editar identidad visual</Link>
           </div>
+          {aiStatus && <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-xs" data-testid="ai-provider-status">
+            <div className="font-semibold">{aiStatus.enabled ? 'Generador disponible' : 'Generador pendiente de activación'}</div>
+            {!aiStatus.enabled && <p className="mt-1 text-muted-foreground">La vista previa es gratuita. Todavía no se envían solicitudes pagas.</p>}
+            {aiStatus.prerequisites && <p className="mt-1 text-muted-foreground">
+              Clave API: {aiStatus.prerequisites.openRouterKeyConfigured ? 'configurada' : 'pendiente'} · Almacenamiento: {aiStatus.prerequisites.privateStorageConfigured ? 'configurado' : 'pendiente'} · Proveedor: {aiStatus.prerequisites.providerValidated ? 'validado' : 'pendiente'} · Presupuesto: {aiStatus.prerequisites.budgetActivated ? 'habilitado' : 'bloqueado'}
+            </p>}
+          </div>}
           <button type="button" disabled={!aiPrompt.trim() || aiPreparing} onClick={() => void prepareAi()}
             className="mt-3 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40"
             data-testid="button-ai-image-preview">{aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis'}</button>
