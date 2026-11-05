@@ -35,7 +35,7 @@ jobs:
       - name: Typecheck workspace
         run: pnpm run typecheck
       - name: Verify fresh participant starts with empty universe
-        run: pnpm --filter @workspace/echo exec tsx --test tests/private-beta-starter.test.ts
+        run: pnpm --filter @workspace/api-server exec tsx --test ../../artifacts/echo/tests/private-beta-starter.test.ts
       - name: Build frontend
         run: pnpm --filter @workspace/echo run build
       - name: Build API
