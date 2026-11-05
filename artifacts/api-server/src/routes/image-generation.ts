@@ -7,6 +7,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { imageGenerationAvailability } from '../lib/imageGenerationProvider';
 import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imagePromptBuilder';
 import { imageGenerationAccessStatus } from '../lib/imageGenerationAccess';
+import { generateCharacterImage } from '../lib/imageGenerationService';
 
 /**
  * Image generation preparation. Strictly NO provider calls, no paid operations.
@@ -76,13 +77,47 @@ router.get('/ai-engine/images/status', requireAuth, (req, res) => {
   res.json({ ...imageGenerationAvailability(), access: imageGenerationAccessStatus(req.userId) });
 });
 
-router.post('/ai-engine/images/generate', requireAuth, (req, res) => {
+router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   if (!imageGenerationAccessStatus(req.userId).allowed) {
     res.status(403).json({ error: 'IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED' });
     return;
   }
-  res.status(503).json({ error: 'IMAGE_GENERATION_DISABLED', generationEnabled: false, paidCallsMade: 0 });
+  // Hard stop until provider's real request/response and cost contract are
+  // verified. An environment variable alone must not enable paid requests.
+  if (process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED !== 'true' ||
+      process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED !== 'true') {
+    res.status(503).json({ error: 'IMAGE_GENERATION_DISABLED', generationEnabled: false });
+    return;
+  }
+  const input = Input.safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: 'INVALID_IMAGE_REQUEST' }); return; }
+  try {
+    const { state } = await readUniverse(req.userId!, input.data.universeId);
+    if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
+    const characters = Array.isArray(state.characters) ? state.characters : [];
+    const character = characters.find((c: any) => c?.id === input.data.characterId && !c.archived) as any;
+    if (!character || state.currentCharacterId !== character.id) {
+      res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
+    }
+    const identity = character.identity ?? {};
+    const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
+      ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
+    const candidates = [character.avatar, ...(Array.isArray(identity.referenceImages) ? identity.referenceImages : [])];
+    const referencePaths = [...new Set(candidates.filter((v): v is string =>
+      typeof v === 'string' && /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(v)))].slice(0, 4);
+    const preparedPrompt = buildCharacterImagePrompt({
+      name: String(character.name ?? ''), scene: input.data.prompt, style: selected, identity,
+    });
+    const result = await generateCharacterImage({
+      ownerId: req.userId!, universeId: input.data.universeId,
+      characterId: character.id, preparedPrompt, style: selected, referencePaths,
+    });
+    res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId });
+  } catch (error) {
+    req.log.error({ err: error }, 'Image generation failed');
+    res.status(503).json({ error: 'IMAGE_GENERATION_UNAVAILABLE' });
+  }
 });
 
 export default router;
