@@ -186,13 +186,12 @@ export function chooseAutonomyOpportunity(input: {
     0,
   );
   // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
-  // Only conversations represented by real character accounts are eligible.
+  // All identities in a universe, including owner-controlled identities, can receive replies.
   const incoming = [...state.messages]
     .filter((message) => message.recipientId === character.id &&
       message.senderId !== character.id &&
       !message.hiddenForIds?.includes(character.id) &&
       !!message.text.trim() &&
-      state.characters.some((candidate) => candidate.id === message.senderId && !candidate.archived) &&
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
       now.getTime() - (asTime(message.createdAt) ?? 0) < DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
