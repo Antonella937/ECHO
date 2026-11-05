@@ -123,6 +123,7 @@ export async function reserveDryRun(
   idempotencyKey: string,
   sourceRevision: number,
   universeId = "primary",
+  lane: "dm" | "social" = "social",
 ): Promise<Reservation> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}), hashtext(${universeId}))`);
@@ -192,8 +193,8 @@ export async function reserveDryRun(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
       gte(echoAutonomyRunsTable.createdAt, dayAgo),
     ));
-    if ((perCharacterHour?.value ?? 0) >= 3 || (perCharacterDay?.value ?? 0) >= 10 ||
-      (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12) {
+    if (lane === "social" && ((perCharacterHour?.value ?? 0) >= 3 || (perCharacterDay?.value ?? 0) >= 10 ||
+      (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
       return { kind: "rate_limited" };
     }
 
