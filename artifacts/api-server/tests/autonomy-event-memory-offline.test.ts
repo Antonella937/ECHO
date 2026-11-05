@@ -36,6 +36,8 @@ test("bounds recent memories and does not write to other characters", () => {
   const recent = state.characters.find(c => c.id === "mar")!.configuration!.memory.recent;
   assert.deepEqual(recent.map(m => m.sourceId), Array.from({ length: 10 }, (_, i) => "event-" + (i + 1)));
   assert.equal(state.characters.find(c => c.id === "noah")?.configuration?.memory.recent.length ?? 0, 0);
+  assert.match(state.characters.find(c => c.id === "mar")!.configuration!.memory.recentSummary, /interaction:event-0/);
+  assert.ok(SaveUniverseBody.safeParse({ state, expectedRevision: 2 }).success);
 });
 
 test("rejects trivial, missing-source and missing-character events", () => {
@@ -44,3 +46,4 @@ test("rejects trivial, missing-source and missing-character events", () => {
   assert.equal(recordAutonomyEvent(state, "mar", { sourceId: "short", kind: "post", text: "hola" }, new Date()), state);
   assert.equal(recordAutonomyEvent(state, "missing", { sourceId: "x", kind: "post", text: "A very long event that should be rejected" }, new Date()), state);
 });
+\n
