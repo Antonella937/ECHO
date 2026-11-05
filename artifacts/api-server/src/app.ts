@@ -84,6 +84,18 @@ app.use("/api", betaSeatMode ? privateBetaSeats : (req, res, next) => {
   next();
 });
 
+app.get("/api/autonomy/typing", (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const ownerId = getAuth(req).userId;
+  if (!ownerId) { res.status(401).json({ error: "Authentication required" }); return; }
+  const universeId = String(req.query.universeId ?? "primary");
+  const characterId = String(req.query.characterId ?? "");
+  if (universeId.length > 128 || characterId.length > 128 || !characterId) {
+    res.status(400).json({ error: "Invalid query" }); return;
+  }
+  res.json({ typing: isAutonomyDmTyping(ownerId, universeId, characterId) });
+});
+
 app.use("/api", router);
 
 export default app;
