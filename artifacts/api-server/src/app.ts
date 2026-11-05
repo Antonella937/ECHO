@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import router from "./routes";
+import { isAutonomyDmTyping } from "./autonomy/service";
 import { privateBetaSeats } from "./middlewares/privateBetaSeats";
 import { logger } from "./lib/logger";
 import {
