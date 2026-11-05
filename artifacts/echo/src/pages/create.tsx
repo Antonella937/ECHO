@@ -40,6 +40,7 @@ export default function CreatePage() {
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [alsoStory, setAlsoStory] = useState(false);
+  const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [tagged, setTagged] = useState<string[]>([]);
   const [mentioned, setMentioned] = useState<string[]>([]);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
@@ -200,7 +201,7 @@ export default function CreatePage() {
         }
         if (storyVideo) { setError('Las historias admiten solo fotos.'); return; }
         if (musicPartial) { setError('Completá título y artista de la música, o dejá ambos vacíos.'); return; }
-        actions.createStory({ image, caption, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
+        actions.createStory({ image, caption, closeFriendsOnly, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: 'Historia publicada', description: `Como ${me.name}` });
         navigate('/');
@@ -257,6 +258,14 @@ export default function CreatePage() {
             className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'ai' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
             data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> Generar con IA</button>
         </div>
+        {mode === 'story' && <div className="mb-4 rounded-2xl border border-border bg-card/60 p-4" data-testid="story-audience">
+          <p className="text-sm font-semibold">¿Quién puede ver esta historia?</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" aria-pressed={!closeFriendsOnly} onClick={() => setCloseFriendsOnly(false)} className={cn('h-11 rounded-xl text-sm', !closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-everyone">Todos</button>
+            <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-green-700 text-white' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ Mejores amigos</button>
+          </div>
+          {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} mejores amigos seleccionados. Podés editarlos en Ajustes.</p>}
+        </div>}
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
