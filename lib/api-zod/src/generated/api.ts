@@ -358,7 +358,7 @@ export const getAutonomySettingsResponseCharactersItemMinCooldownMinutesMax = 14
 export const GetAutonomySettingsResponse = zod.object({
   "universeId": zod.string().min(1).max(getAutonomySettingsResponseUniverseIdMax),
   "globalKillSwitchEngaged": zod.boolean(),
-  "liveExecutionEnabled": zod.literal(false),
+  "liveExecutionEnabled": zod.boolean(),
   "characters": zod.array(zod.object({
   "characterId": zod.string(),
   "displayName": zod.string(),
