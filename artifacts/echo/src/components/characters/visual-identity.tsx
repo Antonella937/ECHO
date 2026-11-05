@@ -6,7 +6,7 @@ import { Area } from './ui';
 
 export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
   avatar: string;
-  identity: IdentityReference;
+  identity: IdentityReference | undefined;
   onChange: (next: IdentityReference) => void;
   onBusy: (busy: boolean) => void;
 }) {
@@ -15,9 +15,9 @@ export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const patch = (change: Partial<IdentityReference>) => onChange({
-    ...identity, ...change, updatedAt: new Date().toISOString(),
+    ...(identity ?? { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date(0).toISOString() }), ...change, updatedAt: new Date().toISOString(),
   });
-  const images = identity.referenceImages ?? [];
+  const images = identity?.referenceImages ?? [];
   async function addFiles(files: FileList | null) {
     if (!files?.length || uploading) return;
     setError('');
@@ -50,9 +50,9 @@ export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
       {avatar && <img src={resolve(avatar)} alt="Referencia facial principal" className="h-20 w-20 rounded-xl object-cover bg-secondary" />}
       <div className="text-xs text-muted-foreground">Foto de perfil · referencia principal del rostro. Se actualiza desde el selector de avatar de arriba.</div>
     </div>
-    <Area id="character-facial-description" label="Descripción facial" value={identity.facialDescription ?? ''} onChange={facialDescription => patch({ facialDescription })} max={4000} rows={3} />
-    <Area id="character-body-description" label="Descripción física y corporal" value={identity.bodyDescription ?? ''} onChange={bodyDescription => patch({ bodyDescription })} max={4000} rows={3} />
-    <Area id="character-visual-style" label="Estilo y detalles visuales (opcional)" value={identity.styleNotes ?? ''} onChange={styleNotes => patch({ styleNotes })} max={4000} rows={2} />
+    <Area id="character-facial-description" label="Descripción facial" value={identity?.facialDescription ?? ''} onChange={facialDescription => patch({ facialDescription })} max={4000} rows={3} />
+    <Area id="character-body-description" label="Descripción física y corporal" value={identity?.bodyDescription ?? ''} onChange={bodyDescription => patch({ bodyDescription })} max={4000} rows={3} />
+    <Area id="character-visual-style" label="Estilo y detalles visuales (opcional)" value={identity?.styleNotes ?? ''} onChange={styleNotes => patch({ styleNotes })} max={4000} rows={2} />
     <p className="mb-2 text-sm font-medium">Fotos adicionales ({images.length}/5)</p>
     <div className="grid grid-cols-3 gap-2">
       {images.map((ref, index) => <div key={ref + index} className="relative overflow-hidden rounded-xl bg-secondary">
