@@ -7,7 +7,7 @@ test('makes exactly one request to provider with secret in header and parses res
   let calls = 0;
   const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
     calls++;
-    assert.equal(String(url), 'https://openrouter.ai/api/v1/images/generations');
+    assert.equal(String(url), 'https://openrouter.ai/api/v1/images');
     assert.equal(init?.method, 'POST');
     assert.equal((init?.headers as Record<string, string>).Authorization, 'Bearer private-test-key');
     const body = JSON.parse(String(init?.body));
