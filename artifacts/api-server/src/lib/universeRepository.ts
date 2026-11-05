@@ -3,6 +3,7 @@ import {
   db, echoCreatorEntitlementsTable, echoUniversesTable,
   type CreatorPlan, type EchoCreatorEntitlement,
 } from "@workspace/db";
+import { lifetimeAccessForOwner } from "./lifetimeAccess";
 import { DEFAULT_AI_CATEGORY_WEIGHTS, DEFAULT_MONTHLY_HARD_CEILING_UNITS } from "./ai-usage";
 import { ensureCharacterPrivacyDefaultsInTransaction } from "./characterPrivacy";
 import { removeCharacterSocialRecordsForDeletedCharacters } from "./characterFollows";
@@ -22,7 +23,7 @@ async function lockEntitlement(tx: Parameters<Parameters<typeof db.transaction>[
   await tx.insert(echoCreatorEntitlementsTable).values({ ownerId, plan: fallbackPlan }).onConflictDoNothing();
   const [row] = await tx.select().from(echoCreatorEntitlementsTable)
     .where(eq(echoCreatorEntitlementsTable.ownerId, ownerId)).for("update").limit(1);
-  return row;
+  return row && lifetimeAccessForOwner(ownerId) ? { ...row, plan: "creator" as const } : row;
 }
 
 /** Owner and universe id are always paired; old callers continue to use primary. */
@@ -154,11 +155,11 @@ export async function listUniverses(ownerId: string) {
 export async function creatorEntitlements(ownerId: string) {
   const [saved] = await db.select().from(echoCreatorEntitlementsTable)
     .where(eq(echoCreatorEntitlementsTable.ownerId, ownerId)).limit(1);
-  if (saved) return saved;
+  if (saved) return lifetimeAccessForOwner(ownerId) ? { ...saved, plan: "creator" as const } : saved;
   const [primary] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
     .where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, "primary"))).limit(1);
   if (!primary) return {
-    ownerId, plan: "free" as const, addonCharacters: 0, addonUniverses: 0,
+    ownerId, plan: lifetimeAccessForOwner(ownerId) ? "creator" as const : "free" as const, addonCharacters: 0, addonUniverses: 0,
     monthlyHardCeilingUnits: DEFAULT_MONTHLY_HARD_CEILING_UNITS, autonomyReservePercent: 20,
     categoryWeights: DEFAULT_AI_CATEGORY_WEIGHTS,
     createdAt: new Date(0), updatedAt: new Date(0),
