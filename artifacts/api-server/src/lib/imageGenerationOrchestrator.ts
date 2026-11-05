@@ -1,6 +1,7 @@
 import type { ImageGenerationResult } from './imageGenerationProvider';
 import type { ImageGenerationStyle } from './imageGenerationProvider';
 import type { ImageGenerationReference } from './imageGenerationPayload';
+import { prepareImageMessage } from './imageGenerationPayload';
 
 /**
  * Injectable orchestration for deterministic, no-credit integration tests.
@@ -25,6 +26,9 @@ export interface GenerationContext {
 }
 export async function orchestrateImageGeneration(deps: GenerationDependencies, input: GenerationContext) {
   if (!Number.isFinite(input.maximumUsd) || input.maximumUsd <= 0) throw Error('INVALID_IMAGE_BUDGET');
+  // Reject invalid requests before reserving funds. This validation is offline.
+  prepareImageMessage(input.prompt, input.style, input.references);
+  if (!input.ownerId || !input.universeId || !input.characterId || !input.provider || !input.model) throw Error('INVALID_IMAGE_CONTEXT');
   // The reserve must be committed before calling a potentially billable provider.
   const reservation = await deps.reserve({
     ownerId: input.ownerId, universeId: input.universeId, characterId: input.characterId,
@@ -38,7 +42,8 @@ export async function orchestrateImageGeneration(deps: GenerationDependencies, i
     await deps.settle(reservation.id, { status: 'unknown' });
     throw error;
   }
-  if (!Number.isFinite(result.billedUsd) || result.billedUsd < 0 || result.billedUsd > input.maximumUsd) {
+  if (result.provider !== input.provider || result.model !== input.model ||
+      !Number.isFinite(result.billedUsd) || result.billedUsd < 0 || result.billedUsd > input.maximumUsd) {
     await deps.settle(reservation.id, { status: 'unknown' });
     throw Error('IMAGE_COST_EXCEEDS_RESERVATION_OR_UNKNOWN');
   }
