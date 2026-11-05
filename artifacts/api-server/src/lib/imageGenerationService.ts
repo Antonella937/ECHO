@@ -1,5 +1,6 @@
 import { IMAGE_GENERATION_MODEL, MAX_IMAGE_COST_USD, type ImageGenerationStyle } from './imageGenerationProvider';
 import { canGenerateImages } from './imageGenerationAccess';
+import { paidImageGenerationActivated } from './imageGenerationActivation';
 import { loadImageReferences } from './imageReferences';
 import { reserveImageBudget, settleImageBudget } from './imageBudget';
 import { requestOpenRouterImage } from './openRouterImageTransport';
@@ -19,7 +20,7 @@ export async function generateCharacterImage(input: {
   style: ImageGenerationStyle;
   referencePaths: string[];
 }) {
-  if (process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED !== 'true') throw Error('PAID_IMAGE_GENERATION_DISABLED');
+  if (!paidImageGenerationActivated()) throw Error('PAID_IMAGE_GENERATION_DISABLED');
   if (!canGenerateImages(input.ownerId)) throw Error('IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED');
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw Error('IMAGE_PROVIDER_KEY_MISSING');
