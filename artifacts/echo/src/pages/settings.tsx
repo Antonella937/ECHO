@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Check, Cloud, Info, LogOut, Monitor, Moon, Search, Sun } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
-import type { Appearance } from '@/domain/types';
+import type { Appearance, ImageStyle } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
@@ -64,6 +64,8 @@ export default function SettingsPage() {
         </section>
 
         <AppearanceSection />
+
+        <ImageGenerationStyleSection />
 
         <AutonomySettingsSection />
 
@@ -162,4 +164,36 @@ function AppearanceSection() {
       </div>
     </section>
   );
+}
+
+function ImageGenerationStyleSection() {
+  const { state, actions } = useSocial();
+  const selected = state.imageStyle ?? 'natural';
+  const styles: { id: ImageStyle; label: string; detail: string }[] = [
+    { id: 'natural', label: 'Realismo natural', detail: 'Fotos cotidianas, piel con textura, luz real y rasgos naturales.' },
+    { id: 'phone', label: 'Cámara de celular', detail: 'Selfies espontáneas, flash, encuadres casuales y ruido digital.' },
+    { id: 'analog', label: 'Analógica / 35 mm', detail: 'Grano de película, colores orgánicos y sensación nostálgica.' },
+    { id: 'editorial', label: 'Editorial', detail: 'Fotografía profesional de moda, iluminación cuidada y detalle realista.' },
+    { id: 'cinematic', label: 'Cinematográfica', detail: 'Sombras, luz dramática y composición de película.' },
+  ];
+  return <section className="mt-9" aria-labelledby="image-style-h" data-testid="section-ai-image-settings">
+    <h2 id="image-style-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Generación de imágenes IA</h2>
+    <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
+      <h3 className="text-sm font-semibold">Estilo fotográfico predeterminado</h3>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Elegí cómo querés que se vean las imágenes generadas. Las referencias visuales y rasgos de cada personaje se mantienen independientemente del estilo.</p>
+      <div className="mt-4 space-y-2" role="radiogroup" aria-label="Estilo de imágenes IA">
+        {styles.map(({ id, label, detail }) => <button key={id} type="button" role="radio" aria-checked={selected === id}
+          onClick={() => { actions.setImageStyle(id); toast({ title: 'Estilo de imagen guardado', description: label }); }}
+          data-testid={`button-image-style-${id}`}
+          className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors', selected === id ? 'border-primary bg-primary/10' : 'border-border bg-background/30')}>
+          <span className={cn('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border', selected === id ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50')}>
+            {selected === id && <Check className="h-3 w-3" />}
+          </span>
+          <span><span className="block text-sm font-semibold">{label}{id === 'natural' && <span className="ml-1 text-[11px] font-normal text-muted-foreground">· recomendado</span>}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span></span>
+        </button>)}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">La preferencia se sincroniza con este universo. Se aplicará al generador cuando esté conectado; elegir un estilo no genera imágenes ni consume créditos.</p>
+    </div>
+  </section>;
 }
