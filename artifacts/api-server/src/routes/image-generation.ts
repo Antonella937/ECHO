@@ -23,6 +23,7 @@ const Input = z.object({
 }).strict();
 const GenerateInput = Input.extend({
   imageTransferAcknowledgement: z.literal('image-transfer-preview-v1'),
+  sourceObjectPath: z.string().regex(/^\/objects\/uploads\/[0-9a-f-]{36}$/i).optional(),
 });
 const router: IRouter = Router();
 
@@ -161,6 +162,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const result = await generateCharacterImage({
       ownerId: req.userId!, universeId: input.data.universeId,
       characterId: character.id, preparedPrompt, style: selected, referencePaths,
+      ...(input.data.sourceObjectPath ? { edit: { sourcePath: input.data.sourceObjectPath, instruction: input.data.prompt } } : {}),
     });
     res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId });
   } catch (error) {
