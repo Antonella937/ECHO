@@ -10,7 +10,7 @@ import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core
 import { validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
 import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/types';
-import { editSocialPost, setPinnedPost, movePinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, type PostEdit } from '@/domain/social-features';
+import { editSocialPost, setPinnedPost, movePinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, canViewStory, type PostEdit } from '@/domain/social-features';
 import { getActiveUniverseId } from './persistence';
 import { MediaScopeContext } from '@/lib/media';
 
@@ -37,8 +37,10 @@ export interface SocialActions {
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
   createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; commentsEnabled?: boolean }): string;
-  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic }): string;
+  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean }): string;
   deletePost(postId: string): void;
+  deleteStory(storyId: string): void;
+  toggleCloseFriend(characterId: string): void;
   seeStory(storyId: string): void;
   sendMessage(to: CharacterId, text: string, extra?: { storyId?: string; postId?: string; quoteMessageId?: string; attachments?: MessageAttachment[] }): void;
   markThreadRead(otherId: CharacterId): void;
@@ -220,10 +222,32 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       reactStory(id, value) {
         const story = cur().stories.find(s => s.id === id);
-        if (!story || !isStoryActive(story) || story.authorId === myId()) return;
+        if (!story || !canViewStory(story, myId(), cur()) || !isStoryActive(story) || story.authorId === myId()) return;
         const removing = story.reactions?.some(r => r.actorId === myId() && r.value === value);
         coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, reactions: toggleReaction(st.reactions, myId(), value) } : st) }));
         if (!removing) send(story.authorId, value, { storyId: id });
+      },
+      toggleCloseFriend(characterId) {
+        if (characterId === myId() || !cur().characters.some(c => c.id === characterId && !c.archived)) throw new Error('Elegí otro personaje disponible.');
+        coordinator.current?.edit(s => {
+          const list = s.closeFriends?.[myId()] ?? [];
+          return { ...s, closeFriends: { ...(s.closeFriends ?? {}), [myId()]: list.includes(characterId) ? list.filter(id => id !== characterId) : [...list, characterId] } };
+        });
+      },
+      deleteStory(storyId) {
+        const story = cur().stories.find(s => s.id === storyId);
+        if (!story || story.authorId !== myId()) throw new Error('Solo podés eliminar tus propias historias.');
+        coordinator.current?.edit(s => ({
+          ...s,
+          stories: s.stories.filter(item => item.id !== storyId),
+          highlights: (s.highlights ?? []).flatMap(h => {
+            if (!h.storyIds.includes(storyId)) return [h];
+            const storyIds = h.storyIds.filter(id => id !== storyId);
+            return [{ ...h, storyIds, coverStoryId: h.coverStoryId === storyId ? null : h.coverStoryId }];
+          }),
+          notifications: s.notifications.filter(n => n.storyId !== storyId),
+          messages: s.messages.map(m => m.storyId === storyId ? { ...m, storyId: null } : m),
+        }));
       },
       saveHighlight(highlight, expected) { coordinator.current?.edit(s => saveHighlight(s, myId(), highlight, expected)); },
       deleteHighlight(id) { coordinator.current?.edit(s => ({ ...s, highlights: s.highlights?.filter(h => h.id !== id || h.authorId !== myId()) })); },
@@ -259,14 +283,20 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { postId: id }, taggedAccountIds));
         return id;
       },
-      createStory({ image, caption, mentionedAccountIds, music }) {
+      createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly }) {
+        const allowedViewerIds = closeFriendsOnly ? (cur().closeFriends?.[myId()] ?? []) : [];
+        if (closeFriendsOnly && !allowedViewerIds.length) throw new Error('Agregá al menos un mejor amigo antes de publicar.');
         const id = uid('s');
         dispatch({
           type: 'story.created',
           story: { id, authorId: myId(), image, caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
-            ...(mentionedAccountIds ? { mentionedAccountIds } : {}), ...(music ? { music } : {}) },
+            ...(mentionedAccountIds ? { mentionedAccountIds: mentionedAccountIds.filter(id => !closeFriendsOnly || allowedViewerIds.includes(id)) } : {}),
+            ...(closeFriendsOnly ? { closeFriendsOnly: true, allowedViewerIds } : {}), ...(music ? { music } : {}) },
         });
-        coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { storyId: id }, mentionedAccountIds));
+        coordinator.current?.edit(s => {
+          const next = mentionNotifications(s, caption, myId(), { storyId: id }, mentionedAccountIds);
+          return closeFriendsOnly ? { ...next, notifications: next.notifications.filter(n => n.storyId !== id || allowedViewerIds.includes(n.recipientId)) } : next;
+        });
         return id;
       },
       deletePost(postId) {
@@ -274,7 +304,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       seeStory(storyId) {
         const s = cur().stories.find((x) => x.id === storyId);
-        if (s && !s.seenBy.includes(myId()) && s.authorId !== myId())
+        if (s && canViewStory(s, myId(), cur()) && !s.seenBy.includes(myId()) && s.authorId !== myId())
           dispatch({ type: 'story.seen', storyId, actorId: myId() });
       },
       sendMessage(to, text, extra) {
