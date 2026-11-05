@@ -44,6 +44,7 @@ export function startAutonomyBackgroundWorker() {
           provider: new MeteredTextProvider(ownerId, "autonomy", provider),
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
           now,
+          lane: input.lane,
             });
             if (outcome.status === "failed") logger.warn({ code: outcome.reasonCode }, "Autonomy character failed");
             return outcome;
