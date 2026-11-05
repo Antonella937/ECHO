@@ -24,6 +24,10 @@ export interface IdentityReference {
   seed: number;
   /** Physical description and style notes injected into every prompt. */
   appearance: string;
+  /** Specific facial features for image-reference prompting. */
+  facialDescription?: string;
+  /** Body shape, tattoos, hair and other physical characteristics. */
+  bodyDescription?: string;
   styleNotes: string;
   updatedAt: ISODate;
 }
