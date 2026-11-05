@@ -212,7 +212,7 @@ export function chooseAutonomyOpportunity(input: {
     message.senderId === character.id && message.origin === "autonomy" &&
     (asTime(message.createdAt) ?? 0) > now.getTime() - DAY_MS).length;
   if (unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
-      now.getTime() - latestReplyAt >= replyDelayMs && recentReplies < 12 &&
+      now.getTime() - latestReplyAt >= replyDelayMs &&
       !/\b(sleep|sleeping|dormir|durmiendo|descansando)\b/.test(
         `${config?.currentState?.activity ?? ""}`.toLowerCase())) {
     return { situation: "dm", recipientId: unanswered.senderId,
