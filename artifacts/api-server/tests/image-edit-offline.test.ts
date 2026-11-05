@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { paidImageGenerationActivated } from '../src/lib/imageGenerationActivation';
 import { prepareImageEdit, validateImageEditReferences } from '../src/lib/imageEditPreparation';
 import { buildOpenRouterImageRequest } from '../src/lib/openRouterImageAdapter';
 import { orchestrateImageGeneration } from '../src/lib/imageGenerationOrchestrator';
@@ -53,4 +54,12 @@ test('mock editing charges zero external credits and settles budget reservation'
   });
   assert.equal(result.billedUsd, 0);
   assert.deepEqual(events, ['mock-reserve', 'mock-generate', 'mock-store', 'mock-settle:succeeded']);
+});
+
+
+test('paid image generation remains blocked until both explicit flags are enabled', () => {
+  assert.equal(paidImageGenerationActivated({}), false);
+  assert.equal(paidImageGenerationActivated({ ECHO_PAID_IMAGE_GENERATION_ENABLED: 'true' }), false);
+  assert.equal(paidImageGenerationActivated({ ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED: 'true' }), false);
+  assert.equal(paidImageGenerationActivated({ ECHO_PAID_IMAGE_GENERATION_ENABLED: 'true', ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED: 'true' }), true);
 });

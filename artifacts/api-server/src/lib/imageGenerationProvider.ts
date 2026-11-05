@@ -28,8 +28,8 @@ export const MAX_IMAGE_COST_USD = 0.10;
 /** Conservative status: no API key or feature flag alone proves that a production budget is active. */
 export function imageGenerationAvailability() {
   return {
-    enabled: false as const,
-    reason: 'PAID_IMAGE_GENERATION_DISABLED' as const,
+    enabled: false as boolean,
+    reason: 'PAID_IMAGE_GENERATION_DISABLED' as string,
     // Model capability verified against public docs; production contract and
     // per-account data-transfer consent still require separate approval.
     providerDocumentationChecked: true as const,

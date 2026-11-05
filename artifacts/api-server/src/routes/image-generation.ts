@@ -117,6 +117,8 @@ router.get('/ai-engine/images/status', requireAuth, async (req, res) => {
     // activation still require explicit owner validation and approval.
     res.json({
       ...availability,
+      enabled: access.allowed && paidImageGenerationActivated() && budget.canReserveOneImage && availability.prerequisites.openRouterKeyConfigured && availability.prerequisites.privateStorageConfigured,
+      reason: access.allowed && paidImageGenerationActivated() && budget.canReserveOneImage && availability.prerequisites.openRouterKeyConfigured && availability.prerequisites.privateStorageConfigured ? 'READY_FOR_PAID_GENERATION' : 'PAID_IMAGE_GENERATION_DISABLED',
       access,
       monthlySpendingLimitUsd: budget.ceilingUsd,
       prerequisites: { ...availability.prerequisites, budgetActivated: budget.canReserveOneImage },

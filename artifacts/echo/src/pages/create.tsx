@@ -306,9 +306,9 @@ export default function CreatePage() {
                 <button type="button" onClick={() => { setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-regenerate">Otra versión</button>
               </div>
             </div> : <div className="mt-3 space-y-2">
-              <button type="button" disabled={!aiStatus?.enabled || !!aiEditSource || !aiTransferAcknowledged || aiGenerating} onClick={() => void generateAi()}
+              <button type="button" disabled={!aiStatus?.enabled || !aiTransferAcknowledged || aiGenerating} onClick={() => void generateAi()}
                 className="h-11 w-full rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-ai-generate">
-                {aiGenerating ? 'Generando…' : aiEditSource ? 'Edición pendiente de activación' : aiStatus?.enabled ? 'Generar imagen' : 'Generación pendiente de activación'}
+                {aiGenerating ? 'Generando…' : aiStatus?.enabled ? (aiEditSource ? 'Generar edición' : 'Generar imagen') : aiEditSource ? 'Edición pendiente de activación' : 'Generación pendiente de activación'}
               </button>
               <p className="text-xs text-muted-foreground">{aiStatus?.enabled ? 'Generar puede consumir créditos. Revisá el presupuesto antes de continuar.' : 'Todavía no se envían solicitudes pagas. Podés subir una foto desde la otra pestaña.'}</p>
             </div>}
