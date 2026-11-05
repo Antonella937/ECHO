@@ -6,3 +6,4 @@ export * from "./echo-creator";
 export * from "./echo-character-privacy";
 export * from "./echo-character-follows";
 export * from "./echo-owner-consents";
+export * from './echo-image-budget';
