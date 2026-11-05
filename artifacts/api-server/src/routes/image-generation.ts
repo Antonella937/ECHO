@@ -7,6 +7,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { imageGenerationAvailability } from '../lib/imageGenerationProvider';
 import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imagePromptBuilder';
 import { imageGenerationAccessStatus } from '../lib/imageGenerationAccess';
+import { paidImageGenerationActivated } from '../lib/imageGenerationActivation';
 import { generateCharacterImage } from '../lib/imageGenerationService';
 
 /**
@@ -85,8 +86,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
   }
   // Hard stop until provider's real request/response and cost contract are
   // verified. An environment variable alone must not enable paid requests.
-  if (process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED !== 'true' ||
-      process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED !== 'true') {
+  if (!paidImageGenerationActivated()) {
     res.status(503).json({ error: 'IMAGE_GENERATION_DISABLED', generationEnabled: false });
     return;
   }
