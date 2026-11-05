@@ -7,6 +7,10 @@ export const isStoryActive = (s: Story, now = Date.now()) => {
   const age = now - Date.parse(s.createdAt);
   return age >= 0 && age < 24 * 60 * 60 * 1000;
 };
+export function canViewStory(story: Story, viewerId: string, state: SocialState): boolean {
+  if (story.authorId === viewerId || !story.closeFriendsOnly) return true;
+  return (story.allowedViewerIds ?? state.closeFriends?.[story.authorId] ?? []).includes(viewerId);
+}
 export function mentionIds(text: string, accounts: Character[]): string[] {
   const handles = [...text.matchAll(/(?:^|[^a-zA-Z0-9_])@([a-zA-Z0-9_][a-zA-Z0-9_.]{0,29})/g)].map(m => m[1].replace(/\.+$/, '').toLowerCase());
   return accounts.filter(c => handles.includes(c.handle.toLowerCase())).map(c => c.id);
