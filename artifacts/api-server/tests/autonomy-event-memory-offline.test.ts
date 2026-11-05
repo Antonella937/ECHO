@@ -46,4 +46,4 @@ test("rejects trivial, missing-source and missing-character events", () => {
   assert.equal(recordAutonomyEvent(state, "mar", { sourceId: "short", kind: "post", text: "hola" }, new Date()), state);
   assert.equal(recordAutonomyEvent(state, "missing", { sourceId: "x", kind: "post", text: "A very long event that should be rejected" }, new Date()), state);
 });
-\n
+
