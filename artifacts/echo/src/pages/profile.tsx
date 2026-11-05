@@ -15,7 +15,7 @@ import { realFollowCounts } from '@/components/echo/account-stats';
 import { HighlightsRow } from '@/components/echo/highlights';
 import { getOrderedPinnedPosts } from '@/domain/social-features';
 import { cn } from '@/lib/utils';
-import { isStoryActive } from '@/domain/social-features';
+import { canViewStory, isStoryActive } from '@/domain/social-features';
 import { accountTypes, shownCount, formatCount } from '@/domain/accounts';
 
 export default function ProfilePage() {
@@ -44,7 +44,7 @@ export default function ProfilePage() {
     );
 
   const isMe = person.id === me.id;
-  const stories = state.stories.filter((s) => s.authorId === person.id && isStoryActive(s));
+  const stories = state.stories.filter((s) => s.authorId === person.id && isStoryActive(s) && canViewStory(s, me.id, state));
   const unseen = !isMe && stories.some((s) => !s.seenBy.includes(me.id));
   const friends = (state.follows[person.id] ?? []).map(character).filter(Boolean);
   const real = realFollowCounts(state, person.id);
