@@ -8,7 +8,7 @@ import { GracefulImage } from './graceful-image';
 interface Props {
   character: Character;
   size?: number;
-  ring?: 'unseen' | 'seen' | 'none';
+  ring?: 'unseen' | 'seen' | 'none' | 'close-friends';
   className?: string;
 }
 
@@ -38,7 +38,7 @@ export function CharacterAvatar({ character, size = 36, ring = 'none', className
     <span
       className={cn(
         'inline-flex shrink-0 rounded-full p-[2.5px]',
-        ring === 'unseen' ? 'story-ring' : 'bg-[hsl(240_4%_22%)]',
+        ring === 'unseen' ? 'story-ring' : ring === 'close-friends' ? 'bg-primary' : 'bg-[hsl(240_4%_22%)]',
         className,
       )}
     >
