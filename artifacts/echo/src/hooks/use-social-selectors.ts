@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSocial } from '@/store/social-store';
 import { threadIdFor, type Character, type Message, type Story } from '@/domain/types';
 import { hasMessageContent, selectInbox } from '@/domain/inbox';
-import { isStoryActive } from '@/domain/social-features';
+import { canViewStory, isStoryActive } from '@/domain/social-features';
 
 export const hiddenFor = (m: Message, id: string) => !!m.hiddenForIds?.includes(id);
 export type { ThreadSummary } from '@/domain/inbox';
@@ -44,7 +44,7 @@ export function useStoryGroups(): StoryGroup[] {
   return useMemo(() => {
     const groups: StoryGroup[] = [];
     for (const c of state.characters) {
-      const stories = state.stories.filter((s) => s.authorId === c.id && isStoryActive(s, now)).sort(byDateAsc);
+      const stories = state.stories.filter((s) => s.authorId === c.id && isStoryActive(s, now) && canViewStory(s, me.id, state)).sort(byDateAsc);
       if (!stories.length) continue;
       const allSeen = c.id === me.id || stories.every((s) => s.seenBy.includes(me.id));
       groups.push({ author: c, stories, allSeen });

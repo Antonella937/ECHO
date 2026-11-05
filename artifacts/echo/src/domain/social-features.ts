@@ -7,6 +7,11 @@ export const isStoryActive = (s: Story, now = Date.now()) => {
   const age = now - Date.parse(s.createdAt);
   return age >= 0 && age < 24 * 60 * 60 * 1000;
 };
+export function canViewStory(story: Story, viewerId: string, state: SocialState): boolean {
+  if (story.authorId === viewerId || !story.closeFriendsOnly) return true;
+  const current = state.closeFriends?.[story.authorId] ?? [];
+  return current.includes(viewerId) && (story.allowedViewerIds ?? current).includes(viewerId);
+}
 export function mentionIds(text: string, accounts: Character[]): string[] {
   const handles = [...text.matchAll(/(?:^|[^a-zA-Z0-9_])@([a-zA-Z0-9_][a-zA-Z0-9_.]{0,29})/g)].map(m => m[1].replace(/\.+$/, '').toLowerCase());
   return accounts.filter(c => handles.includes(c.handle.toLowerCase())).map(c => c.id);
@@ -59,11 +64,13 @@ export function saveHighlight(state: SocialState, actor: string, highlight: Stor
   if (highlight.authorId !== actor) throw new Error('La destacada debe pertenecer a la identidad activa.');
   const current = state.highlights?.find(h => h.id === highlight.id);
   // PostgreSQL JSONB can change object key order without changing any field.
-  const snapshot = (h: StoryHighlight) => JSON.stringify([h.id, h.authorId, h.title, h.storyIds, h.order ?? null, h.coverStoryId ?? null]);
+  const snapshot = (h: StoryHighlight) => JSON.stringify([h.id, h.authorId, h.title, h.storyIds, h.order ?? null, h.coverStoryId ?? null, h.coverImage ?? null]);
   if (current && (!expected || snapshot(current) !== snapshot(expected))) throw new Error('La destacada cambió. Volvé a abrirla antes de guardar.');
   if (!highlight.title.trim() || highlight.title.length > 40 || !highlight.storyIds.length ||
     highlight.storyIds.some(id => !state.stories.some(s => s.id === id && s.authorId === actor)))
     throw new Error('Elegí un título y al menos una historia propia.');
+  if (highlight.coverImage && !/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(highlight.coverImage))
+    throw new Error('La portada debe ser una imagen subida de forma privada.');
   const previous = getOrderedHighlights(state, actor).map(h => h.id);
   const ordered = previous.filter(id => id !== highlight.id);
   const position = highlight.order ?? (current ? previous.indexOf(highlight.id) : ordered.length);
