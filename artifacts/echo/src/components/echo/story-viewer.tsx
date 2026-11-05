@@ -2,7 +2,7 @@ import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AtSign, ChevronLeft, ChevronRight, Eye, Music2, Send, X } from 'lucide-react';
+import { AtSign, ChevronLeft, ChevronRight, Eye, Music2, Send, Trash2, X } from 'lucide-react';
 import { isStoryActive } from '@/domain/social-features';
 import { storyViewCount, storyViewerIds, formatCount } from '@/domain/accounts';
 import { StoryMetricsEditor } from './story-metrics-editor';
@@ -89,6 +89,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [replyFocused, setReplyFocused] = useState(false);
   const [reply, setReply] = useState('');
   const [showViewers, setShowViewers] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -140,7 +141,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     };
   }, [next, prev, onClose, editingMetrics]);
 
-  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || editingMetrics;
+  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || editingMetrics || confirmDelete;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -244,6 +245,16 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           </button>
         </div>
 
+        {confirmDelete && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 px-6" role="alertdialog" aria-modal="true" aria-label="Eliminar historia">
+          <div className="w-full max-w-sm rounded-3xl bg-card p-5 text-foreground">
+            <h2 className="text-lg font-semibold">¿Eliminar esta historia?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">También se quitará de las destacadas que la incluyan. No se puede deshacer.</p>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={() => setConfirmDelete(false)} className="h-11 flex-1 rounded-xl bg-secondary text-sm" data-testid="button-story-delete-cancel">Cancelar</button>
+              <button type="button" onClick={() => { try { actions.deleteStory(story.id); toast({ title: 'Historia eliminada' }); onClose(); } catch (e) { toast({ title: 'No se pudo eliminar', description: (e as Error).message }); } }} className="h-11 flex-1 rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground" data-testid="button-story-delete-confirm">Eliminar</button>
+            </div>
+          </div>
+        </div>}
         {/* tap zones */}
         <div className="relative z-0 flex flex-1">
           <button
