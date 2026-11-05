@@ -20,6 +20,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { SocialStoreProvider } from '@/store/social-store';
 import { StoryViewerProvider } from '@/components/echo/story-viewer';
 import { Shell } from '@/components/echo/shell';
+import { FounderSurprise } from '@/components/echo/founder-surprise';
 import { AppearanceSync } from '@/components/echo/appearance-sync';
 import HashtagPage from '@/pages/hashtag';
 import SearchPage from '@/pages/search';
@@ -120,6 +121,7 @@ function ProtectedRouter() {
   }, [location]);
   return (
     <Shell>
+      <FounderSurprise />
       <RoutedErrorBoundary>
         <Switch>
           <Route path="/" component={HomePage} />
