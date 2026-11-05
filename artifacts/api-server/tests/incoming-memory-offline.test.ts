@@ -20,7 +20,7 @@ test("recipient remembers new direct message but unrelated characters do not", (
   incoming.messages.push({
     id: "user-msg-1", threadId: "mar__nela", senderId: "nela", recipientId: "mar",
     text: "Quiero hablar sobre el ensayo de anoche y lo que ocurrió con Noah",
-    createdAt: new Date("2026-11-05T12:00:00Z"), storyId: null, postId: null, readBy: ["nela"],
+    createdAt: new Date("2026-11-05T12:00:00Z"), storyId: null, postId: null, readBy: ["nela"], origin: "manual",
   });
   const next = recordIncomingConversationEvents(previous, incoming);
   assert.equal(next.characters.find(c => c.id === "mar")!.configuration!.memory.recent.at(-1)?.sourceId, "user-msg-1");
@@ -36,7 +36,7 @@ test("existing, hidden and autonomous messages are not ingested", () => {
   const base = {
     threadId: "mar__nela", senderId: "nela", recipientId: "mar",
     text: "Necesitamos hablar de todo lo que pasó ayer en el ensayo",
-    createdAt: new Date("2026-11-05T12:00:00Z"), storyId: null, postId: null, readBy: ["nela"],
+    createdAt: new Date("2026-11-05T12:00:00Z"), storyId: null, postId: null, readBy: ["nela"], origin: "manual",
   };
   incoming.messages.push({ ...base, id: "hidden-msg", hiddenForIds: ["mar"] });
   incoming.messages.push({ ...base, id: "autonomy-msg", origin: "autonomy" });
