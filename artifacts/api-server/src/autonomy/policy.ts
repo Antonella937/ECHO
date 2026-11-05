@@ -217,6 +217,31 @@ export function chooseAutonomyOpportunity(input: {
     return { situation: null, reasonCode: "SILENCE_SELECTED", reason: "Current activity and configured social pace favor doing nothing.", localHour: local.hour, timezone };
   }
 
+  // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
+  // Only conversations represented by real character accounts are eligible.
+  const incoming = [...state.messages]
+    .filter((message) => message.recipientId === character.id &&
+      message.senderId !== character.id &&
+      !message.hiddenForIds?.includes(character.id) &&
+      !!message.text.trim() &&
+      state.characters.some((candidate) => candidate.id === message.senderId && !candidate.archived) &&
+      (asTime(message.createdAt) ?? 0) <= now.getTime() &&
+      now.getTime() - (asTime(message.createdAt) ?? 0) < DAY_MS)
+    .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
+  const unanswered = incoming.find((message) => {
+    const sentAt = asTime(message.createdAt) ?? 0;
+    const latestOwnReply = state.messages
+      .filter((item) => item.senderId === character.id && item.recipientId === message.senderId)
+      .reduce((latest, item) => Math.max(latest, asTime(item.createdAt) ?? 0), 0);
+    return latestOwnReply < sentAt;
+  });
+  if (unanswered) {
+    return { situation: "dm", recipientId: unanswered.senderId,
+      reasonCode: "OPPORTUNITY_SELECTED",
+      reason: "A recent incoming direct message is awaiting a reply.",
+      localHour: local.hour, timezone };
+  }
+
   const comment = commentTarget(state, character, now);
   const recipients = availableTargets(state, character);
   const relationIds = new Set((config?.relationships ?? []).filter(item => item.targetId !== "owner").map(item => item.targetId));
