@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
+import { GracefulImage } from './graceful-image';
 import { useMediaResolver } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import type { PostMedia } from '@/domain/types';
@@ -23,6 +24,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   const downLeft = useRef(0);
   const count = media.length;
 
+  const imageFallback = <span className="flex flex-col items-center gap-2 text-muted-foreground/55"><ImageIcon className="h-8 w-8" strokeWidth={1.2} /><span className="text-xs">Imagen no disponible</span></span>;
   if (count <= 1 && media[0]?.type === 'video') {
     return (
       <div className="relative w-full overflow-hidden bg-card sm:rounded-[22px]">
@@ -35,7 +37,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   if (count <= 1) {
     return (
       <button onClick={onTap} className="relative block w-full overflow-hidden bg-card sm:rounded-[22px]" aria-label="Doble toque para indicar que te gusta" data-testid={`button-image-${postId}`}>
-        <img src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} draggable={false} className="aspect-[4/5] w-full object-cover" data-testid={`img-post-${postId}`} />
+        <GracefulImage key={resolveMedia(media[0]?.url ?? '')} src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} draggable={false} containerClassName="aspect-[4/5] w-full" className="absolute inset-0 h-full w-full object-cover" fallback={<span className="absolute inset-0 animate-pulse bg-card" />} errorFallback={imageFallback} data-testid={`img-post-${postId}`} />
         {overlay}
       </button>
     );
@@ -86,14 +88,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
                 data-testid={`video-post-${postId}-${i}`}
               />
             ) : (
-              <img
-                src={resolveMedia(m.url)}
-                alt={`${alt} · foto ${i + 1} de ${count}`}
-                loading={eager && i === 0 ? 'eager' : 'lazy'}
-                draggable={false}
-                className="aspect-[4/5] w-full object-cover"
-                data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`}
-              />
+              <GracefulImage key={resolveMedia(m.url)} src={resolveMedia(m.url)} alt={`${alt} · foto ${i + 1} de ${count}`} loading={eager && i === 0 ? 'eager' : 'lazy'} draggable={false} containerClassName="aspect-[4/5] w-full" className="absolute inset-0 h-full w-full object-cover" fallback={imageFallback} data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`} />
             )}
           </div>
         ))}

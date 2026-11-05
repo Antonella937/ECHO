@@ -3,6 +3,7 @@ import { useMediaResolver } from '@/lib/media';
 import type { Character } from '@/domain/types';
 import { hasCharacterImage } from '../../lib/visual-defaults';
 import { CharacterInitials } from './visual-defaults';
+import { GracefulImage } from './graceful-image';
 
 interface Props {
   character: Character;
@@ -15,16 +16,20 @@ export function CharacterAvatar({ character, size = 36, ring = 'none', className
   const resolveScopedMedia = useMediaResolver();
   const resolveMedia = (ref: string) => resolveScopedMedia(ref,
     { sourceType: 'avatar', sourceContentId: character.id, sourceCharacterId: character.id });
-  const img = hasCharacterImage(character.avatar) ? (
-    <img
-      src={resolveMedia(character.avatar)}
+  const src = hasCharacterImage(character.avatar) ? resolveMedia(character.avatar) : '';
+  const img = src ? (
+    <GracefulImage
+      key={src}
+      src={src}
       alt={character.name}
       width={size}
       height={size}
-      loading="lazy"
+      loading={size >= 60 ? 'eager' : 'lazy'}
       draggable={false}
-      className="rounded-full object-cover bg-muted"
+      containerClassName="rounded-full shrink-0"
+      className="rounded-full object-cover"
       style={{ width: size, height: size }}
+      fallback={<CharacterInitials name={character.name} size={size} />}
       data-testid={`img-avatar-${character.id}`}
     />
   ) : <CharacterInitials name={character.name} size={size} testId={`img-avatar-${character.id}`} />;
