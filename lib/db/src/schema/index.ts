@@ -9,3 +9,4 @@ export * from "./echo-owner-consents";
 export * from './echo-image-budget';
 
 export * from "./echo-support-tickets";
+export * from "./echo-memory-archive";

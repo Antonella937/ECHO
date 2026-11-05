@@ -1,9 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import {
-  db, echoCreatorEntitlementsTable, echoUniversesTable,
+  db, echoCreatorEntitlementsTable, echoUniversesTable, echoMemoryArchiveTable,
   type CreatorPlan, type EchoCreatorEntitlement,
 } from "@workspace/db";
 import { lifetimeAccessForOwner } from "./lifetimeAccess";
+import { displacedMemories } from "./memoryArchive";
+import { SaveUniverseBody } from "@workspace/api-zod";
 import { DEFAULT_AI_CATEGORY_WEIGHTS, DEFAULT_MONTHLY_HARD_CEILING_UNITS } from "./ai-usage";
 import { ensureCharacterPrivacyDefaultsInTransaction } from "./characterPrivacy";
 import { removeCharacterSocialRecordsForDeletedCharacters } from "./characterFollows";
@@ -100,6 +102,18 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
           current.state,
           canonicalState,
         );
+      }
+      // Opt-in only after the archive table migration is deployed. Keep writes
+      // in the same transaction so a failed revision never archives anything.
+      if (current && process.env.ECHO_MEMORY_ARCHIVE_ENABLED === "true") {
+        const before = SaveUniverseBody.shape.state.safeParse(current.state);
+        const after = SaveUniverseBody.shape.state.safeParse(canonicalState);
+        if (before.success && after.success) {
+          const events = displacedMemories(before.data, after.data);
+          if (events.length) await tx.insert(echoMemoryArchiveTable)
+            .values(events.map(event => ({ ownerId, universeId, ...event })))
+            .onConflictDoNothing();
+        }
       }
       await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
     }
