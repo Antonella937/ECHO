@@ -1252,6 +1252,8 @@ export const GetUniverseResponse = zod.object({
   "seed": zod.number().int(),
   "appearance": zod.string(),
   "styleNotes": zod.string(),
+  "facialDescription": zod.string().max(4000).optional(),
+  "bodyDescription": zod.string().max(4000).optional(),
   "updatedAt": zod.coerce.date()
 })
 })),
@@ -1767,6 +1769,8 @@ export const SaveUniverseBody = zod.object({
   "seed": zod.number().int(),
   "appearance": zod.string(),
   "styleNotes": zod.string(),
+  "facialDescription": zod.string().max(4000).optional(),
+  "bodyDescription": zod.string().max(4000).optional(),
   "updatedAt": zod.coerce.date()
 })
 })),
@@ -2270,6 +2274,8 @@ export const SaveUniverseResponse = zod.object({
   "seed": zod.number().int(),
   "appearance": zod.string(),
   "styleNotes": zod.string(),
+  "facialDescription": zod.string().max(4000).optional(),
+  "bodyDescription": zod.string().max(4000).optional(),
   "updatedAt": zod.coerce.date()
 })
 })),
@@ -2823,6 +2829,8 @@ export const VerifyUniverseResponse = zod.object({
   "seed": zod.number().int(),
   "appearance": zod.string(),
   "styleNotes": zod.string(),
+  "facialDescription": zod.string().max(4000).optional(),
+  "bodyDescription": zod.string().max(4000).optional(),
   "updatedAt": zod.coerce.date()
 })
 })),
@@ -3648,6 +3656,8 @@ export const CreateCreatorUniverseBody = zod.object({
   "seed": zod.number().int(),
   "appearance": zod.string(),
   "styleNotes": zod.string(),
+  "facialDescription": zod.string().max(4000).optional(),
+  "bodyDescription": zod.string().max(4000).optional(),
   "updatedAt": zod.coerce.date()
 })
 })),
@@ -4151,6 +4161,8 @@ export const CreateCreatorUniverseResponse = zod.object({
   "seed": zod.number().int(),
   "appearance": zod.string(),
   "styleNotes": zod.string(),
+  "facialDescription": zod.string().max(4000).optional(),
+  "bodyDescription": zod.string().max(4000).optional(),
   "updatedAt": zod.coerce.date()
 })
 })),
