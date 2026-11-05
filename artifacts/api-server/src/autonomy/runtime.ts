@@ -1,4 +1,5 @@
 import { FreeModelProvider } from "../ai-engine/free-models";
+import { MeteredTextProvider } from "../lib/metered-ai";
 import { executeAutonomyDecision } from "./executor";
 import { AUTONOMY_LIVE_EXECUTION_ENABLED } from "./constants";
 import {
@@ -38,7 +39,7 @@ export function startAutonomyBackgroundWorker() {
         },
         processCharacter: (ownerId, input, now) => runAutonomyLiveCycle(ownerId, input, {
           repository,
-          provider,
+          provider: new MeteredTextProvider(ownerId, "autonomy", provider),
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
           now,
         }),
