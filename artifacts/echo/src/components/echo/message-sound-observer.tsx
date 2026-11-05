@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useUser } from '@clerk/react';
 import { useSocial } from '@/store/social-store';
 import { getActiveUniverseId } from '@/store/persistence';
 import { playMessageSound, unlockMessageAudio } from '@/lib/message-sounds';
@@ -6,8 +7,9 @@ import { playMessageSound, unlockMessageAudio } from '@/lib/message-sounds';
 /** Watch newly synchronized messages, never play historical messages on mount. */
 export function MessageSoundObserver() {
   const { state } = useSocial();
+  const { user } = useUser();
   const previous = useRef<{ universe: string; identity: string; ids: Set<string>; notificationIds: Set<string> } | null>(null);
-  const universe = getActiveUniverseId() ?? '';
+  const universe = user?.id ? getActiveUniverseId(user.id) : 'primary';
   const identity = state.currentCharacterId;
   useEffect(() => {
     const onInteraction = () => unlockMessageAudio();
