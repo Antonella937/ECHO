@@ -77,12 +77,8 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
   }
 });
 
-/**
- * Offline edit preview. The source must be a private image registered to this owner.
- * No image bytes leave ECHO, and no paid edit request is made.
- */
 const EditPreviewInput = Input.extend({
-  sourceObjectPath: z.string().regex(new RegExp('^/objects/uploads/[0-9a-f-]{36}
+  sourceObjectPath: z.string().min(20).max(100).refine(value => value.startsWith('/objects/uploads/')),
 });
 router.post('/ai-engine/images/prepare-edit', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
@@ -91,123 +87,19 @@ router.post('/ai-engine/images/prepare-edit', requireAuth, async (req, res) => {
   try {
     const { state } = await readUniverse(req.userId!, input.data.universeId);
     if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
-    const character = (Array.isArray(state.characters) ? state.characters : [])
-      .find((c: any) => c?.id === input.data.characterId && !c.archived);
-    if (!character || state.currentCharacterId !== character.id) {
-      res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
-    }
-    const owned = await db.select({ objectPath: echoMediaTable.objectPath })
-      .from(echoMediaTable).where(and(eq(echoMediaTable.ownerId, req.userId!),
-        eq(echoMediaTable.objectPath, input.data.sourceObjectPath))).limit(1);
+    const character = (Array.isArray(state.characters) ? state.characters : []).find((item: any) => item?.id === input.data.characterId && !item.archived);
+    if (!character || state.currentCharacterId !== character.id) { res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return; }
+    const owned = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+      .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, input.data.sourceObjectPath))).limit(1);
     if (!owned.length) { res.status(403).json({ error: 'IMAGE_EDIT_SOURCE_NOT_OWNED' }); return; }
     const style = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
     const preparedPrompt = buildCharacterImagePrompt({
       name: String(character.name ?? ''), scene: input.data.prompt, style, identity: character.identity ?? {},
-    }) + '\\nEdit the supplied source image, preserving its composition and character identity except for the requested changes.';
-    res.json({
-      status: 'preview_only', generationEnabled: false, paidCallsMade: 0,
+    });
+    res.json({ status: 'preview_only', generationEnabled: false, paidCallsMade: 0,
       sourceObjectPath: input.data.sourceObjectPath, preparedPrompt, style,
-      note: 'Edit preview only. Source image stays private; no provider call was made.',
-    });
-  } catch (error) {
-    req.log.error({ err: error }, 'Image edit preview failed');
-    res.status(503).json({ error: 'IMAGE_EDIT_PREPARATION_UNAVAILABLE' });
-  }
-});
-
-router.get('/ai-engine/images/status', requireAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'private, no-store');
-  const access = imageGenerationAccessStatus(req.userId);
-  const availability = imageGenerationAvailability();
-  try {
-    const budget = await readImageBudgetReadiness();
-    // Conservative public readiness: provider contract and production
-    // activation still require explicit owner validation and approval.
-    res.json({
-      ...availability,
-      access,
-      monthlySpendingLimitUsd: budget.ceilingUsd,
-      prerequisites: { ...availability.prerequisites, budgetActivated: budget.canReserveOneImage },
-      budget: access.allowed ? budget : undefined,
-    });
-  } catch (error) {
-    req.log.warn({ err: error }, 'Image budget readiness unavailable');
-    res.json({ ...availability, access, budgetStatus: 'unavailable' });
-  }
-});
-
-router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'private, no-store');
-  if (!imageGenerationAccessStatus(req.userId).allowed) {
-    res.status(403).json({ error: 'IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED' });
-    return;
-  }
-  // Hard stop until provider's real request/response and cost contract are
-  // verified. An environment variable alone must not enable paid requests.
-  if (!paidImageGenerationActivated()) {
-    res.status(503).json({ error: 'IMAGE_GENERATION_DISABLED', generationEnabled: false });
-    return;
-  }
-  const input = GenerateInput.safeParse(req.body);
-  if (!input.success) { res.status(400).json({ error: 'IMAGE_TRANSFER_ACKNOWLEDGEMENT_REQUIRED_OR_INVALID_REQUEST' }); return; }
-  try {
-    const { state } = await readUniverse(req.userId!, input.data.universeId);
-    if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
-    const characters = Array.isArray(state.characters) ? state.characters : [];
-    const character = characters.find((c: any) => c?.id === input.data.characterId && !c.archived) as any;
-    if (!character || state.currentCharacterId !== character.id) {
-      res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
-    }
-    const identity = character.identity ?? {};
-    const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
-      ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const candidates = [character.avatar, ...(Array.isArray(identity.referenceImages) ? identity.referenceImages : [])];
-    const referencePaths = [...new Set(candidates.filter((v): v is string =>
-      typeof v === 'string' && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(v)))].slice(0, 4);
-    const preparedPrompt = buildCharacterImagePrompt({
-      name: String(character.name ?? ''), scene: input.data.prompt, style: selected, identity,
-    });
-    const result = await generateCharacterImage({
-      ownerId: req.userId!, universeId: input.data.universeId,
-      characterId: character.id, preparedPrompt, style: selected, referencePaths,
-    });
-    res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId });
-  } catch (error) {
-    req.log.error({ err: error }, 'Image generation failed');
-    res.status(503).json({ error: 'IMAGE_GENERATION_UNAVAILABLE' });
-  }
-});
-
-export default router;
-, 'i')),
-});
-router.post('/ai-engine/images/prepare-edit', requireAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'private, no-store');
-  const input = EditPreviewInput.safeParse(req.body);
-  if (!input.success) { res.status(400).json({ error: 'INVALID_IMAGE_EDIT_REQUEST' }); return; }
-  try {
-    const { state } = await readUniverse(req.userId!, input.data.universeId);
-    if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
-    const character = (Array.isArray(state.characters) ? state.characters : [])
-      .find((c: any) => c?.id === input.data.characterId && !c.archived);
-    if (!character || state.currentCharacterId !== character.id) {
-      res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
-    }
-    const owned = await db.select({ objectPath: echoMediaTable.objectPath })
-      .from(echoMediaTable).where(and(eq(echoMediaTable.ownerId, req.userId!),
-        eq(echoMediaTable.objectPath, input.data.sourceObjectPath))).limit(1);
-    if (!owned.length) { res.status(403).json({ error: 'IMAGE_EDIT_SOURCE_NOT_OWNED' }); return; }
-    const style = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
-      ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const preparedPrompt = buildCharacterImagePrompt({
-      name: String(character.name ?? ''), scene: input.data.prompt, style, identity: character.identity ?? {},
-    }) + '\\nEdit the supplied source image, preserving its composition and character identity except for the requested changes.';
-    res.json({
-      status: 'preview_only', generationEnabled: false, paidCallsMade: 0,
-      sourceObjectPath: input.data.sourceObjectPath, preparedPrompt, style,
-      note: 'Edit preview only. Source image stays private; no provider call was made.',
-    });
+      note: 'Edit preview only. No provider call or private image transfer.' });
   } catch (error) {
     req.log.error({ err: error }, 'Image edit preview failed');
     res.status(503).json({ error: 'IMAGE_EDIT_PREPARATION_UNAVAILABLE' });
