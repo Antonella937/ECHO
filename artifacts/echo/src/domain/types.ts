@@ -90,6 +90,8 @@ export interface Comment {
 }
 
 export interface Story {
+  closeFriendsOnly?: boolean;
+  allowedViewerIds?: string[];
   displayMetrics?: { views?: number | null };
   mentionedAccountIds?: string[];
   reactions?: SocialReaction[];
@@ -151,6 +153,7 @@ export interface SocialState {
   imageStyle?: ImageStyle;
   appearance?: Appearance;
   highlights?: StoryHighlight[];
+  closeFriends?: Record<CharacterId, CharacterId[]>;
   /** Beta product selection saved with a newly-created private universe. */
   creatorSetup?: import('@workspace/api-client-react').CreatorSetup;
   version: number;
