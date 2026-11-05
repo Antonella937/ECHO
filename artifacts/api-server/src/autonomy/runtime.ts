@@ -37,12 +37,21 @@ export function startAutonomyBackgroundWorker() {
           claimWorkerLease: claimAutonomyWorkerLease,
           releaseWorkerLease: releaseAutonomyWorkerLease,
         },
-        processCharacter: (ownerId, input, now) => runAutonomyLiveCycle(ownerId, input, {
+        processCharacter: async (ownerId, input, now) => {
+          try {
+            const outcome = await runAutonomyLiveCycle(ownerId, input, {
           repository,
           provider: new MeteredTextProvider(ownerId, "autonomy", provider),
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
           now,
-        }),
+            });
+            if (outcome.status === "failed") logger.warn({ code: outcome.reasonCode }, "Autonomy character failed");
+            return outcome;
+          } catch (error) {
+            logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" }, "Autonomy character threw");
+            throw error;
+          }
+        },
       });
       if (result.status === "completed") {
         logger.info({
