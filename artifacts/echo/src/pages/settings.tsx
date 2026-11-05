@@ -69,6 +69,13 @@ export default function SettingsPage() {
 
         <AutonomySettingsSection />
 
+        <section className="mt-9" aria-labelledby="support-h">
+          <h2 id="support-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Ayuda y seguridad</h2>
+          <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
+            <Link href="/help" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Centro de ayuda · Reportar un problema</Link>
+          </div>
+        </section>
+
         <section className="mt-9" aria-labelledby="about-h">
           <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sobre ECHO</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">

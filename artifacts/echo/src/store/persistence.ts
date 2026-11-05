@@ -175,8 +175,12 @@ export async function moveLocalImagesToPrivateStorage(state: SocialState): Promi
       ...character,
       avatar: mapRef(character.avatar),
       identity: {
-        provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date(0).toISOString(),
         ...(character.identity ?? {}),
+        provider: character.identity?.provider ?? 'mock',
+        seed: character.identity?.seed ?? 0,
+        appearance: character.identity?.appearance ?? '',
+        styleNotes: character.identity?.styleNotes ?? '',
+        updatedAt: character.identity?.updatedAt ?? new Date(0).toISOString(),
         referenceImages: (character.identity?.referenceImages ?? []).map(mapRef),
       },
     })),

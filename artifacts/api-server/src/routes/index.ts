@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import supportRouter from "./support";
 import universeRouter from "./universe";
 import universeSharingRouter from "./universe-sharing";
 import storageRouter from "./storage";
@@ -19,6 +20,7 @@ router.use(createConsentSafetyGate());
 router.use(createOwnerConsentRouter());
 
 router.use(healthRouter);
+router.use(supportRouter);
 router.use(universeRouter);
 router.use(universeSharingRouter);
 router.use(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY

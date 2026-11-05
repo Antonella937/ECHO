@@ -15,7 +15,7 @@ export function createConsentSafetyGate(
   return async (req, res, next) => {
     try {
       const ownerId = resolveOwner(req);
-      if (!ownerId || req.path === "/creator/consent" || req.path === "/healthz") return next();
+      if (!ownerId || req.path === "/creator/consent" || req.path === "/healthz" || req.path.startsWith("/support/")) return next();
       res.setHeader("Cache-Control", "private, no-store");
       const unavailable = () => { res.status(404).json({ error: "Not found" }); };
       const path = req.path;

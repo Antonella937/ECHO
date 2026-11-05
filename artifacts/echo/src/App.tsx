@@ -35,6 +35,8 @@ import MessagesPage from '@/pages/messages';
 import ConversationPage from '@/pages/conversation';
 import SavedPage from '@/pages/saved';
 import SettingsPage from '@/pages/settings';
+import HelpCenterPage from '@/pages/help-center';
+import SupportAdminPage from '@/pages/support-admin';
 import NotFound from '@/pages/not-found';
 import CharacterEditorPage from '@/pages/character-editor';
 import LandingPage from '@/pages/landing';
@@ -134,6 +136,8 @@ function ProtectedRouter() {
           <Route path="/saved" component={SavedPage} />
           <Route path="/tags/:tag" component={HashtagPage} />
           <Route path="/settings" component={SettingsPage} />
+          <Route path="/help" component={HelpCenterPage} />
+          <Route path="/admin/support" component={SupportAdminPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/characters/new" component={CharacterEditorPage} />
           <Route path="/characters/:id/edit" component={CharacterEditorPage} />
