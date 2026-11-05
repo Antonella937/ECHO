@@ -2,20 +2,17 @@ import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { isSupportAdmin, validSupportSubmission, validSupportUpdate } from "../lib/supportPolicy";
 
 const router: IRouter = Router();
-const kinds = new Set(["technical", "safety", "billing", "privacy", "other"]);
-const statuses = new Set(["open", "investigating", "resolved", "closed"]);
-const adminIds = () => new Set((process.env.ECHO_ADMIN_USER_IDS ?? "").split(",").map(s => s.trim()).filter(Boolean));
 
 router.use("/support", requireAuth);
 
 router.post("/support/tickets", async (req, res): Promise<void> => {
-  const { category, area, description } = req.body ?? {};
-  if (!kinds.has(category) || typeof description !== "string" || !description.trim() ||
-      description.length > 4000 || (area !== undefined && (typeof area !== "string" || area.length > 120))) {
+  if (!validSupportSubmission(req.body)) {
     res.status(400).json({ error: "INVALID_TICKET" }); return;
   }
+  const { category, area, description } = req.body;
   try {
     const id = randomUUID();
     const result = await pool.query(
@@ -35,7 +32,7 @@ router.get("/support/tickets", async (req, res): Promise<void> => {
 });
 
 router.get("/support/admin/tickets", async (req, res): Promise<void> => {
-  if (!adminIds().has(req.userId!)) { res.status(403).json({ error: "FORBIDDEN" }); return; }
+  if (!isSupportAdmin(req.userId, process.env.ECHO_ADMIN_USER_IDS)) { res.status(403).json({ error: "FORBIDDEN" }); return; }
   try {
     const result = await pool.query(
       "SELECT id,owner_id,category,area,description,status,admin_note,created_at,updated_at FROM echo_support_tickets ORDER BY created_at DESC LIMIT 200");
@@ -44,11 +41,11 @@ router.get("/support/admin/tickets", async (req, res): Promise<void> => {
 });
 
 router.patch("/support/admin/tickets/:id", async (req, res): Promise<void> => {
-  if (!adminIds().has(req.userId!)) { res.status(403).json({ error: "FORBIDDEN" }); return; }
-  const { status, adminNote } = req.body ?? {};
-  if (!statuses.has(status) || (adminNote !== undefined && (typeof adminNote !== "string" || adminNote.length > 2000))) {
+  if (!isSupportAdmin(req.userId, process.env.ECHO_ADMIN_USER_IDS)) { res.status(403).json({ error: "FORBIDDEN" }); return; }
+  if (!validSupportUpdate(req.body)) {
     res.status(400).json({ error: "INVALID_UPDATE" }); return;
   }
+  const { status, adminNote } = req.body;
   try {
     const result = await pool.query(
       "UPDATE echo_support_tickets SET status=$1,admin_note=$2,updated_at=now() WHERE id=$3 RETURNING id,status,admin_note,updated_at",
