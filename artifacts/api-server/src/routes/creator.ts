@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import {
   configureAiBudget,
   creatorUsageSummary,
@@ -48,6 +49,8 @@ router.get("/creator/account", async (req, res): Promise<void> => {
   }, 0);
   res.json({
     plan: entitlements.plan,
+    lifetimeAccess: lifetimeAccessForOwner(ownerId),
+    billingExempt: lifetimeAccessForOwner(ownerId) !== null,
     billingStatus: "not_connected",
     betaAccess: process.env.ECHO_BETA_ACCESS_MODE === "three_seats",
     maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
@@ -95,7 +98,8 @@ router.put("/creator/ai-budget", async (req, res): Promise<void> => {
   const characterCount = universes.reduce((sum, universe) => sum +
     (Array.isArray(universe.state.characters) ? universe.state.characters.length : 0), 0);
   res.json({
-    plan: entitlements.plan, billingStatus: "not_connected",
+    plan: entitlements.plan, lifetimeAccess: lifetimeAccessForOwner(ownerId),
+    billingExempt: lifetimeAccessForOwner(ownerId) !== null, billingStatus: "not_connected",
     maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
     maxCharacters: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
     addonUniverses: entitlements.addonUniverses, addonCharacters: entitlements.addonCharacters,
