@@ -158,7 +158,7 @@ export default function CreatePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim() }), responseType: 'json',
       });
-      if (!/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error('El generador devolvió una imagen inválida.');
+      if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error('El generador devolvió una imagen inválida.');
       setAiGeneratedPath(result.objectPath);
     } catch (err) { setError((err as Error).message || 'No se pudo generar la imagen.'); }
     finally { setAiGenerating(false); void checkAiStatus(); }
