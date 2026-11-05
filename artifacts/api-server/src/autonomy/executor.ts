@@ -18,7 +18,7 @@ import {
   echoUniversesTable,
   echoMemoryArchiveTable,
 } from "@workspace/db";
-import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
+import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled, isAutonomyOwnerAuthorized } from "./constants";
 import type { Opportunity } from "./policy";
 import { recordAutonomyEvent } from "./event-memory";
 import { displacedMemories } from "../lib/memoryArchive";
@@ -267,7 +267,7 @@ export async function executeAutonomyDecision(input: {
   now?: Date;
 }): Promise<LiveExecutionOutcome> {
   if (!(input.liveEnabled ?? isAutonomyLiveExecutionEnabled())) return { status: "disabled", reasonCode: "LIVE_EXECUTION_DISABLED" };
-  if (!input.ownerId) return { status: "disabled", reasonCode: "OWNER_REQUIRED" };
+  if (!input.ownerId || !isAutonomyOwnerAuthorized(input.ownerId)) return { status: "disabled", reasonCode: "OWNER_NOT_AUTHORIZED" };
   const now = input.now ?? new Date();
   const universeId = input.universeId ?? "primary";
   return db.transaction(async (tx) => {
