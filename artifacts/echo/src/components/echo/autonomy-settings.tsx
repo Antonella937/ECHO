@@ -68,14 +68,14 @@ export function AutonomySettingsSection() {
         Autonomía de texto
       </h2>
       <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
-        Las simulaciones son manuales. La ejecución automática está desactivada en esta etapa.
+        {settings?.liveExecutionEnabled ? "Beta privada: los personajes habilitados pueden actuar solos con IA de texto. Las imágenes IA permanecen apagadas." : "La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales."}
       </p>
       <div className="mt-3 divide-y divide-border rounded-2xl border border-border bg-card/60">
         <div className="flex items-center gap-3 p-4">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">Bloqueo global</div>
             <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {settings?.globalKillSwitchEngaged === false ? "Pausa general desactivada; el motor en vivo sigue apagado." : "Pausa general activa para todas las cuentas."}
+              {settings?.globalKillSwitchEngaged === false ? settings.liveExecutionEnabled ? "Pausa general desactivada; los personajes habilitados pueden actuar." : "Pausa general desactivada; el motor en vivo sigue apagado." : "Pausa general activa para todas las cuentas."}
             </div>
           </div>
           <Switch
@@ -99,7 +99,7 @@ export function AutonomySettingsSection() {
               <div className="truncate text-sm font-semibold">{character.displayName}</div>
               <div className="mt-1 text-xs text-muted-foreground">@{character.username}</div>
               <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                {character.enabled ? "Designada por ti para autonomía futura" : "Solo se opera manualmente"}
+                {character.enabled ? settings.liveExecutionEnabled ? "Puede actuar automáticamente si el bloqueo global está desactivado" : "Designada para autonomía futura" : "Solo se opera manualmente"}
               </div>
             </div>
             <Switch
