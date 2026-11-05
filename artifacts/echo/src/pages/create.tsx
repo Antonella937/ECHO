@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Music2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
@@ -118,6 +118,15 @@ export default function CreatePage() {
       setAiStatus(null);
     }
   };
+
+  useEffect(() => {
+    if (mediaSource !== 'ai') return;
+    let active = true;
+    void customFetch<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } }>('/api/ai-engine/images/status', { responseType: 'json' })
+      .then((status) => { if (active) setAiStatus(status); })
+      .catch(() => { if (active) setAiStatus(null); });
+    return () => { active = false; };
+  }, [mediaSource]);
 
   const prepareAi = async () => {
     if (!aiPrompt.trim() || aiPreparing) return;
