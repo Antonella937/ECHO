@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
+import { rateLimit } from "express-rate-limit";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSupportAdmin, validSupportSubmission, validSupportUpdate } from "../lib/supportPolicy";
@@ -8,7 +9,16 @@ const router: IRouter = Router();
 
 router.use("/support", requireAuth);
 
-router.post("/support/tickets", async (req, res): Promise<void> => {
+const ticketLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: req => req.userId!,
+  message: { error: "SUPPORT_RATE_LIMITED" },
+});
+
+router.post("/support/tickets", ticketLimiter, async (req, res): Promise<void> => {
   if (!validSupportSubmission(req.body)) {
     res.status(400).json({ error: "INVALID_TICKET" }); return;
   }
