@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { applyEvent, makeEvent, uid, type EventSource, type SocialEvent, type SocialEventPayload } from '@/domain/events';
-import { threadIdFor, type Character, type CharacterId, type SocialState } from '@/domain/types';
+import { threadIdFor, type Character, type CharacterId, type ImageStyle, type SocialState } from '@/domain/types';
 import type { ActivityAdapter } from '@/domain/providers';
 import { createSeedState } from './seed';
 import { UniverseSync, type SyncView } from './synchronization';
@@ -24,6 +24,7 @@ export interface SocialActions {
   reactMessage(id: string, value: string): void;
   hideMessage(id: string): void;
   setAppearance(appearance: Appearance): void;
+  setImageStyle(style: ImageStyle): void;
   createAccount(input: AccountInput): string;
   updateAccount(id: string, input: AccountInput, expected?: AccountInput): void;
   archiveAccount(id: string, archived: boolean): void;
@@ -226,6 +227,10 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       saveHighlight(highlight, expected) { coordinator.current?.edit(s => saveHighlight(s, myId(), highlight, expected)); },
       deleteHighlight(id) { coordinator.current?.edit(s => ({ ...s, highlights: s.highlights?.filter(h => h.id !== id || h.authorId !== myId()) })); },
+      setImageStyle(style) {
+        if (!['natural', 'phone', 'analog', 'editorial', 'cinematic'].includes(style)) throw new Error('Estilo de imagen inválido.');
+        coordinator.current?.edit(s => ({ ...s, imageStyle: style }));
+      },
       setAppearance(appearance) {
         if (!['dark', 'light', 'system'].includes(appearance.theme) || !/^#[a-f0-9]{6}$/i.test(appearance.accent)) throw new Error('Apariencia inválida.');
         coordinator.current?.edit(s => ({ ...s, appearance }));
