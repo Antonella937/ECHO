@@ -152,14 +152,14 @@ export default function CreatePage() {
   };
 
   const generateAi = async () => {
-    if (!aiPrepared || !aiStatus?.enabled || aiEditSource || !aiTransferAcknowledged || aiGenerating || !aiPrompt.trim()) return;
+    if (!aiPrepared || !aiStatus?.enabled || !aiTransferAcknowledged || aiGenerating || !aiPrompt.trim()) return;
     setAiGenerating(true);
     setAiGeneratedPath(null);
     setError(null);
     try {
       const result = await customFetch<{ objectPath: string }>('/api/ai-engine/images/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1' }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1', ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error('El generador devolvió una imagen inválida.');
       setAiGeneratedPath(result.objectPath);
