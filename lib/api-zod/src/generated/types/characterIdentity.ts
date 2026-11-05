@@ -12,5 +12,7 @@ export type CharacterIdentity = {
   seed: number;
   appearance: string;
   styleNotes: string;
+  facialDescription?: string;
+  bodyDescription?: string;
   updatedAt: Date;
 };
