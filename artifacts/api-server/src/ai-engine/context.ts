@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import { EngineError, sections } from './contracts';
 import type { VisionContext, VisionEntityType } from '../vision/contracts';
 
+export type HistoricalRecall = { memoryId: string; sourceId: string | null; kind: string; targetId: string | null; content: string; occurredAt: Date };
+
 const noVision: VisionContext = { analyses: {}, postSummaries: {} };
 const visionKey = (entityType: VisionEntityType, entityId: string, mediaId: string) =>
   `${entityType}:${entityId}:${mediaId}`;
@@ -10,7 +12,7 @@ const visionKey = (entityType: VisionEntityType, entityId: string, mediaId: stri
 /** Builds text-only context from an already owner-scoped persisted snapshot.
  * Never includes file URLs/bytes, provider IDs, credentials or unrelated DMs.
  */
-export function buildCharacterContext(state: SocialState, input: CharacterDecisionInput, now = new Date(), vision: VisionContext = noVision) {
+export function buildCharacterContext(state: SocialState, input: CharacterDecisionInput, now = new Date(), vision: VisionContext = noVision, historical: HistoricalRecall[] = []) {
   const actor = state.characters.find(c => c.id === input.characterId && !c.archived);
   if (!actor) throw new EngineError('CHARACTER_NOT_FOUND', 404);
   const post = input.postId ? state.posts.find(p => p.id === input.postId) : undefined;
@@ -150,6 +152,16 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     .sort((a, b) => b.score - a.score ||
       new Date(b.item.createdAt).getTime() - new Date(a.item.createdAt).getTime())
     .slice(0, 3).map(entry => entry.item) : [];
+  // Archive entries are already owner/universe/character scoped by the server.
+  // Never surface private conversation memories in a different DM or public context.
+  const historicalRecalled = queryTerms.size ? historical
+    .filter(item => item.kind !== 'conversation' || (!!dmTargetId && item.targetId === dmTargetId))
+    .map(item => ({ item, score: (item.content.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
+      .filter(term => queryTerms.has(term)).length }))
+    .filter(entry => entry.score > 0)
+    .sort((a, b) => b.score - a.score || b.item.occurredAt.getTime() - a.item.occurredAt.getTime())
+    .slice(0, 3).map(entry => ({ sourceId: entry.item.sourceId, kind: entry.item.kind,
+      targetId: entry.item.targetId, text: entry.item.content.slice(0, 400), createdAt: entry.item.occurredAt })) : [];
   const data = {
     identity: { id: actor.id, name: actor.name, handle: actor.handle, bio: actor.bio, occupation: actor.occupation, location: actor.location,
       accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null },
@@ -159,7 +171,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     routine: c ? { ...c.routine, localNow: localTime(now, c.routine.timezone), interpretation: 'probabilistic_context_not_commands' } : null,
     social: c?.social ?? null,
     memory: c ? { permanent: c.memory.permanent, relationships: c.memory.relationships,
-      recent: chronological, recalled, recentSummary: c.memory.recentSummary } : null,
+      recent: chronological, recalled, historicalRecalled, recentSummary: c.memory.recentSummary } : null,
     currentState: c ? { ...c.currentState, companions: c.currentState.companions.map(identityOf), provenance: 'manual_or_routine_not_observed_autonomy' } : null,
     recentSocial: {
       posts: relevantPosts.map(postText),
