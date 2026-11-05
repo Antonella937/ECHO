@@ -6,7 +6,7 @@ Status: **draft / not deployed**. Do not merge until all checks pass.
 1. Back up the intended staging PostgreSQL database and review Drizzle's proposed SQL.
 2. Apply the `echo_support_tickets` schema to staging with the existing Drizzle workflow; confirm it exists before enabling API routes.
 3. Set `ECHO_ADMIN_USER_IDS` on the staging Render API to the exact authorized Clerk `user_...` ID(s). Do not store IDs in client code.
-4. Verify `ECHO_ALLOWED_ORIGINS` and existing beta allowlist settings remain unchanged.
+4. Verify the existing CORS configuration and beta allowlist settings remain unchanged.
 5. Run workspace typecheck and builds, then smoke test with two separate Clerk accounts and one admin.
 
 ## Privacy/security checks
@@ -29,4 +29,12 @@ Status: **draft / not deployed**. Do not merge until all checks pass.
 ## Known limitations
 - No screenshot upload, email notifications, rate limiting, ticket retention/deletion policy or audit trail yet.
 - Admin access is enforced server-side via `ECHO_ADMIN_USER_IDS`; client route visibility alone is not authorization.
-- No CI or end-to-end tests have been executed in this branch yet.
+- GitHub Actions typecheck, build and support policy unit tests passed at commit `3083c870ec6fe5224011b7b16108c5326f0bcf9d`; database-backed integration and end-to-end tests remain pending.
+
+## Two-account beta acceptance test (Ala + owner)
+1. Only after staging migration and admin configuration, have Ala sign in to her existing premium account and submit a harmless test ticket (e.g. `Prueba de soporte ECHO — verificar recepción`). Premium status is unrelated to support permissions.
+2. Confirm Ala sees the ticket ID and `open` status in **Mis reportes**.
+3. Confirm the owner/admin sees it in `/admin/support` and changes status to `investigating`.
+4. Have Ala reload **Mis reportes** and verify the updated status.
+5. Confirm Ala cannot access `/support/admin/tickets` or modify tickets; use a separate non-admin account to confirm isolation. Do not ask users to share passwords or tokens.
+6. Document results and delete the test ticket only through a reviewed, authorized database operation once retention policy is decided; no delete endpoint currently exists.
