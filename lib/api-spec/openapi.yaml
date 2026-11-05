@@ -704,6 +704,8 @@ components:
             seed: { type: integer }
             appearance: { type: string }
             styleNotes: { type: string }
+            facialDescription: { type: string, maxLength: 4000 }
+            bodyDescription: { type: string, maxLength: 4000 }
             updatedAt: { type: string, format: date-time }
     CharacterAssistanceStatus:
       type: object
