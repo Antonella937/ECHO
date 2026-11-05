@@ -222,7 +222,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       reactStory(id, value) {
         const story = cur().stories.find(s => s.id === id);
-        if (!story || !isStoryActive(story) || story.authorId === myId()) return;
+        if (!story || !canViewStory(story, myId(), cur()) || !isStoryActive(story) || story.authorId === myId()) return;
         const removing = story.reactions?.some(r => r.actorId === myId() && r.value === value);
         coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, reactions: toggleReaction(st.reactions, myId(), value) } : st) }));
         if (!removing) send(story.authorId, value, { storyId: id });
@@ -304,7 +304,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       seeStory(storyId) {
         const s = cur().stories.find((x) => x.id === storyId);
-        if (s && !s.seenBy.includes(myId()) && s.authorId !== myId())
+        if (s && canViewStory(s, myId(), cur()) && !s.seenBy.includes(myId()) && s.authorId !== myId())
           dispatch({ type: 'story.seen', storyId, actorId: myId() });
       },
       sendMessage(to, text, extra) {
