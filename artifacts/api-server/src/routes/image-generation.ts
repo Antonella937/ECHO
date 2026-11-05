@@ -6,6 +6,7 @@ import { db, echoMediaTable } from '@workspace/db';
 import { and, eq, inArray } from 'drizzle-orm';
 import { imageGenerationAvailability } from '../lib/imageGenerationProvider';
 import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imagePromptBuilder';
+import { imageGenerationAccessStatus } from '../lib/imageGenerationAccess';
 
 /**
  * Image generation preparation. Strictly NO provider calls, no paid operations.
@@ -53,6 +54,7 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
       generationEnabled: false,
       paidCallsMade: 0,
       provider: imageGenerationAvailability(),
+      access: imageGenerationAccessStatus(req.userId),
       characterId: character.id,
       characterName: character.name,
       style: selected,
@@ -69,13 +71,17 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/ai-engine/images/status', requireAuth, (_req, res) => {
+router.get('/ai-engine/images/status', requireAuth, (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
-  res.json(imageGenerationAvailability());
+  res.json({ ...imageGenerationAvailability(), access: imageGenerationAccessStatus(req.userId) });
 });
 
-router.post('/ai-engine/images/generate', requireAuth, (_req, res) => {
+router.post('/ai-engine/images/generate', requireAuth, (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
+  if (!imageGenerationAccessStatus(req.userId).allowed) {
+    res.status(403).json({ error: 'IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED' });
+    return;
+  }
   res.status(503).json({ error: 'IMAGE_GENERATION_DISABLED', generationEnabled: false, paidCallsMade: 0 });
 });
 
