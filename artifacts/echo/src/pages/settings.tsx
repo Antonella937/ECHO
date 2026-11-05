@@ -64,14 +64,14 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-9" aria-labelledby="close-friends-h" data-testid="section-close-friends">
-          <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-green-500" /> Mejores amigos · {me.name}</h2>
+          <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> Mejores amigos · {me.name}</h2>
           <p className="mt-2 px-1 text-xs text-muted-foreground">Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.</p>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-3">
             {state.characters.filter(c => c.id !== me.id && !c.archived).map(c => {
               const selected = (state.closeFriends?.[me.id] ?? []).includes(c.id);
               return <button key={c.id} type="button" aria-pressed={selected} onClick={() => actions.toggleCloseFriend(c.id)} className="flex min-h-12 w-full items-center justify-between gap-3 border-b border-border/50 px-2 text-left text-sm last:border-0" data-testid={`button-close-friend-${c.id}`}>
                 <span className="truncate">{c.name} <span className="text-xs text-muted-foreground">@{c.handle}</span></span>
-                <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-semibold', selected ? 'bg-green-700 text-white' : 'bg-secondary text-muted-foreground')}>{selected ? 'Agregado' : 'Agregar'}</span>
+                <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-semibold', selected ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground')}>{selected ? 'Agregado' : 'Agregar'}</span>
               </button>;
             })}
           </div>
