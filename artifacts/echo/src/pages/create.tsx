@@ -116,6 +116,7 @@ export default function CreatePage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
+    if (mediaSource === 'ai') { setError('La generación IA está en modo preparación. Cambiá a Subir foto o video para publicar.'); return; }
     if (!image) {
       setError('Elige una foto para continuar.');
       return;
@@ -255,7 +256,7 @@ export default function CreatePage() {
           </button>
         )}
 
-        {items.length > 0 && (mode === 'post' || items.length > 1) && (
+        {mediaSource === 'upload' && items.length > 0 && (mode === 'post' || items.length > 1) && (
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span data-testid="text-media-count">{items.length}/{MAX_POST_MEDIA} · fotos y videos MP4/WebM</span>
@@ -356,7 +357,7 @@ export default function CreatePage() {
 
         <button
           type="submit"
-          disabled={!image || busy || tooManyForStory || storyVideo || musicPartial}
+          disabled={mediaSource === 'ai' || !image || busy || tooManyForStory || storyVideo || musicPartial}
           className="tap mt-6 h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground disabled:opacity-40"
           data-testid="button-publish"
         >
