@@ -41,3 +41,29 @@ test('marks an ambiguous provider failure as unknown', async () => {
   await assert.rejects(orchestrateImageGeneration(deps, input), /TIMEOUT/);
   assert.equal(settled, 'unknown');
 });
+
+test('rejects malformed requests before reserving any funds', async () => {
+  let reserved = false;
+  const deps: GenerationDependencies = {
+    reserve: async () => { reserved = true; return { id: 'job' }; },
+    generate: async () => result,
+    store: async () => '/objects/uploads/mock',
+    settle: async () => {},
+  };
+  await assert.rejects(orchestrateImageGeneration(deps, { ...input, prompt: ' ' }), /PROMPT/);
+  assert.equal(reserved, false);
+});
+
+test('rejects a provider result from an unexpected model without storing it', async () => {
+  let stored = false;
+  let outcome = '';
+  const deps: GenerationDependencies = {
+    reserve: async () => ({ id: 'job' }),
+    generate: async () => ({ ...result, model: 'unexpected-model' }),
+    store: async () => { stored = true; return '/objects/uploads/mock'; },
+    settle: async (_, value) => { outcome = value.status; },
+  };
+  await assert.rejects(orchestrateImageGeneration(deps, input), /IMAGE_COST_EXCEEDS_RESERVATION_OR_UNKNOWN/);
+  assert.equal(stored, false);
+  assert.equal(outcome, 'unknown');
+});
