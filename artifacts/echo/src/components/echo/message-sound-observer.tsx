@@ -6,7 +6,7 @@ import { playMessageSound, unlockMessageAudio } from '@/lib/message-sounds';
 /** Watch newly synchronized messages, never play historical messages on mount. */
 export function MessageSoundObserver() {
   const { state } = useSocial();
-  const previous = useRef<{ universe: string; identity: string; ids: Set<string> } | null>(null);
+  const previous = useRef<{ universe: string; identity: string; ids: Set<string>; notificationIds: Set<string> } | null>(null);
   const universe = getActiveUniverseId() ?? '';
   const identity = state.currentCharacterId;
   useEffect(() => {
@@ -20,11 +20,14 @@ export function MessageSoundObserver() {
   }, []);
   useEffect(() => {
     const ids = new Set(state.messages.map(m => m.id));
+    const notificationIds = new Set(state.notifications.map(n => n.id));
     const old = previous.current;
-    previous.current = { universe, identity, ids };
+    previous.current = { universe, identity, ids, notificationIds };
     if (!old || old.universe !== universe || old.identity !== identity) return;
     if (state.messages.some(m => !old.ids.has(m.id) && m.recipientId === identity && m.senderId !== identity))
       playMessageSound('incoming');
-  }, [state.messages, universe, identity]);
+    else if (state.notifications.some(n => !old.notificationIds.has(n.id) && n.recipientId === identity))
+      playMessageSound('notification');
+  }, [state.messages, state.notifications, universe, identity]);
   return null;
 }
