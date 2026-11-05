@@ -1,0 +1,29 @@
+name: ECHO image generation offline checks
+
+on:
+  pull_request:
+    paths:
+      - 'artifacts/api-server/src/lib/imageGeneration*.ts'
+      - 'artifacts/api-server/src/lib/openRouterImage*.ts'
+      - 'artifacts/api-server/tests/image-generation-offline.test.ts'
+      - 'artifacts/api-server/package.json'
+      - '.github/workflows/image-generation-offline.yml'
+  workflow_dispatch:
+
+jobs:
+  image-offline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Offline image generation tests (no API keys or network provider calls)
+        run: pnpm --filter @workspace/api-server test:image-offline

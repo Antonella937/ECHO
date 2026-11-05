@@ -30,6 +30,10 @@ export function imageGenerationAvailability() {
   return {
     enabled: false as const,
     reason: 'PAID_IMAGE_GENERATION_DISABLED' as const,
+    // Model capability verified against public docs; production contract and
+    // per-account data-transfer consent still require separate approval.
+    providerDocumentationChecked: true as const,
+    externalReferenceTransferApproved: false as const,
     model: IMAGE_GENERATION_MODEL,
     maximumReferences: MAX_IMAGE_REFERENCE_COUNT,
     monthlySpendingLimitUsd: 0,

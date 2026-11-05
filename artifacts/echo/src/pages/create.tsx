@@ -33,6 +33,7 @@ export default function CreatePage() {
   const [aiPrepared, setAiPrepared] = useState<{ preparedPrompt: string; referenceCount: number; style: string } | null>(null);
   const [aiPreparing, setAiPreparing] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiTransferAcknowledged, setAiTransferAcknowledged] = useState(false);
   const [aiGeneratedPath, setAiGeneratedPath] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } } | null>(null);
   const [items, setItems] = useState<PostMedia[]>([]);
@@ -149,14 +150,14 @@ export default function CreatePage() {
   };
 
   const generateAi = async () => {
-    if (!aiPrepared || !aiStatus?.enabled || aiGenerating || !aiPrompt.trim()) return;
+    if (!aiPrepared || !aiStatus?.enabled || !aiTransferAcknowledged || aiGenerating || !aiPrompt.trim()) return;
     setAiGenerating(true);
     setAiGeneratedPath(null);
     setError(null);
     try {
       const result = await customFetch<{ objectPath: string }>('/api/ai-engine/images/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim() }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1' }), responseType: 'json',
       });
       if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error('El generador devolvió una imagen inválida.');
       setAiGeneratedPath(result.objectPath);
@@ -259,7 +260,7 @@ export default function CreatePage() {
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
-          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); }}
+          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
             rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
             data-testid="input-ai-image-prompt" />
@@ -279,6 +280,10 @@ export default function CreatePage() {
           <button type="button" disabled={!aiPrompt.trim() || aiPreparing} onClick={() => void prepareAi()}
             className="mt-3 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40"
             data-testid="button-ai-image-preview">{aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis'}</button>
+          <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-xs leading-relaxed" data-testid="label-ai-transfer-acknowledgement">
+            <input type="checkbox" className="mt-0.5" checked={aiTransferAcknowledged} onChange={e => setAiTransferAcknowledged(e.target.checked)} data-testid="checkbox-ai-transfer-acknowledgement" />
+            <span>Entiendo que, si activo una generación real, ECHO enviará mi descripción de la escena y hasta cuatro imágenes privadas de referencia del personaje a OpenRouter y al proveedor del modelo para crear la imagen. No debo incluir fotografías ajenas sin autorización ni datos sensibles. Esta confirmación es específica de la prueba de imágenes, no reemplaza los documentos legales definitivos ni habilita por sí sola el servicio.</span>
+          </label>
           {aiPreview && aiPrepared && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
             <div className="text-sm font-semibold">Vista previa de la solicitud</div>
             <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrepared.preparedPrompt}</p><p className="mt-2 text-xs text-muted-foreground">Referencias privadas seleccionadas: {aiPrepared.referenceCount} · Estilo: {aiPrepared.style}</p>
@@ -289,7 +294,7 @@ export default function CreatePage() {
                 <button type="button" onClick={() => setAiGeneratedPath(null)} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-discard">Descartar imagen</button>
               </div>
             </div> : <div className="mt-3 space-y-2">
-              <button type="button" disabled={!aiStatus?.enabled || aiGenerating} onClick={() => void generateAi()}
+              <button type="button" disabled={!aiStatus?.enabled || !aiTransferAcknowledged || aiGenerating} onClick={() => void generateAi()}
                 className="h-11 w-full rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-ai-generate">
                 {aiGenerating ? 'Generando…' : aiStatus?.enabled ? 'Generar imagen' : 'Generación pendiente de activación'}
               </button>
