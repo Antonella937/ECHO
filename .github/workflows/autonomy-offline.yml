@@ -17,4 +17,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run autonomous worker regression tests (no database or AI calls)
-        run: pnpm --filter @workspace/api-server exec tsx --test tests/autonomy-worker-offline.test.ts
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/autonomy-worker-offline.test.ts tests/autonomy-social-offline.test.ts
