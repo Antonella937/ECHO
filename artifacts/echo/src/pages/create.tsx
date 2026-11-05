@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { useUser } from '@clerk/react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Music2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
 import { AccountMultiPicker } from '@/components/echo/account-multi-picker';
@@ -22,6 +23,7 @@ export default function CreatePage() {
   const search = useSearch();
   const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
   const { me, state, actions } = useSocial();
+  const { user } = useUser();
   const [, navigate] = useLocation();
   const back = useBack();
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -125,7 +127,7 @@ export default function CreatePage() {
     try {
       const result = await customFetch<{ preparedPrompt: string; referenceCount: number; style: string; generationEnabled: boolean }>('/api/ai-engine/images/prepare', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(), characterId: me.id, prompt: aiPrompt.trim() }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim() }), responseType: 'json',
       });
       if (result.generationEnabled) throw new Error('La preparación no debe generar imágenes.');
       setAiPrepared(result);
