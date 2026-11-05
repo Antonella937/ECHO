@@ -37,7 +37,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
           </div>
         );
       })}
-      {isMe && own.length > 0 && (
+      {isMe && (
         <>
           <div className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
             <button onClick={() => setEditing('new')} className="tap grid h-16 w-16 place-items-center rounded-full border border-dashed border-border" aria-label="Nueva destacada" data-testid="button-highlight-new"><Plus className="h-5 w-5" /></button>
