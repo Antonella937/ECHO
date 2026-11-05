@@ -9,6 +9,7 @@ import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
 import { UniverseSelector } from '@/components/echo/universe-selector';
 import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
+import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -82,6 +83,8 @@ export default function SettingsPage() {
         <ImageGenerationStyleSection />
 
         <AutonomySettingsSection />
+
+        <MessageSoundSettings />
 
         <section className="mt-9" aria-labelledby="support-h">
           <h2 id="support-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Ayuda y seguridad</h2>
