@@ -75,7 +75,7 @@ function result(input: {
     runId: input.runId,
     characterId: input.characterId,
     status: input.status,
-    liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
+    liveExecutionEnabled: false,
     liveEligible: input.liveEligible,
     socialActionsExecuted: false,
     reason: input.reason.slice(0, 300),
