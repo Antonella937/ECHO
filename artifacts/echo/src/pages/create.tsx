@@ -143,7 +143,7 @@ export default function CreatePage() {
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (result.generationEnabled) throw new Error('La preparación no debe generar imágenes.');
-      setAiPrepared(result);
+      setAiPrepared({ preparedPrompt: result.preparedPrompt, referenceCount: result.referenceCount ?? (aiEditSource ? 1 : 0), style: result.style });
       setAiPreview(true);
       void checkAiStatus();
     } catch (err) { setError((err as Error).message || 'No se pudo preparar la imagen.'); }
