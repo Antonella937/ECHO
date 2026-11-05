@@ -162,12 +162,36 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     .sort((a, b) => b.score - a.score || b.item.occurredAt.getTime() - a.item.occurredAt.getTime())
     .slice(0, 3).map(entry => ({ sourceId: entry.item.sourceId, kind: entry.item.kind,
       targetId: entry.item.targetId, text: entry.item.content.slice(0, 400), createdAt: entry.item.occurredAt })) : [];
+  // Relationship evolution begins with verifiable, actor-visible interaction
+  // evidence, not guessed affection or automatic changes to trust/closeness.
+  const relationshipEvidence = (c?.relationships ?? []).map(relationship => {
+    const targetId = relationship.targetId;
+    const sharedMessages = state.messages.filter(m =>
+      !m.hiddenForIds?.includes(actor.id) &&
+      ((m.senderId === actor.id && m.recipientId === targetId) ||
+       (m.recipientId === actor.id && m.senderId === targetId)));
+    const sharedComments = state.comments.filter(m => {
+      const p = state.posts.find(post => post.id === m.postId);
+      return (m.authorId === actor.id && p?.authorId === targetId) ||
+        (m.authorId === targetId && p?.authorId === actor.id);
+    });
+    const visibleEvents = [
+      ...sharedMessages.map(m => ({ id: m.id, at: m.createdAt, kind: 'dm' })),
+      ...sharedComments.map(m => ({ id: m.id, at: m.createdAt, kind: 'comment' })),
+    ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return { target: identityOf(targetId),
+      dmCount: sharedMessages.length, commentCount: sharedComments.length,
+      latestInteractions: visibleEvents.slice(0, 5),
+      interpretation: 'observed_contact_only_not_proof_of_affection_or_trust',
+      relationshipScoresChanged: false };
+  });
   const data = {
     identity: { id: actor.id, name: actor.name, handle: actor.handle, bio: actor.bio, occupation: actor.occupation, location: actor.location,
       accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null },
     personality: c?.personality ?? null,
     voice: c?.voice ?? null,
     relationships: c?.relationships.map(r => ({ ...r, target: identityOf(r.targetId) })) ?? null,
+    relationshipEvidence: c ? relationshipEvidence : null,
     routine: c ? { ...c.routine, localNow: localTime(now, c.routine.timezone), interpretation: 'probabilistic_context_not_commands' } : null,
     social: c?.social ?? null,
     memory: c ? { permanent: c.memory.permanent, relationships: c.memory.relationships,
