@@ -25,7 +25,7 @@ export const MAX_IMAGE_REFERENCE_COUNT = 4;
 export const MAX_IMAGE_COST_USD = 0.10;
 // Paid generation remains disabled until provider validation and owner approval.
 
-/** Explicitly disabled until a persistent atomic spending ledger is deployed. */
+/** Conservative status: no API key or feature flag alone proves that a production budget is active. */
 export function imageGenerationAvailability() {
   return {
     enabled: false as const,
@@ -37,7 +37,9 @@ export function imageGenerationAvailability() {
     prerequisites: {
       openRouterKeyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
       privateStorageConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
-      providerValidated: false,
+      providerValidated: process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED === 'true',
+      paidFeatureFlagEnabled: process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED === 'true',
+      ownerAllowlistConfigured: Boolean(process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS?.trim()),
       budgetActivated: false,
     },
   };
