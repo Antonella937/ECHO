@@ -217,6 +217,8 @@ export interface StoryHighlight {
      * @nullable
      */
   coverStoryId?: string | null;
+  /** Optional separately uploaded private cover image. */
+  coverImage?: string;
 }
 
 export type CreatorSetupPlan = typeof CreatorSetupPlan[keyof typeof CreatorSetupPlan];
@@ -889,6 +891,8 @@ export type StoryDisplayMetrics = {
 };
 
 export interface Story {
+  closeFriendsOnly?: boolean;
+  allowedViewerIds?: string[];
   displayMetrics?: StoryDisplayMetrics;
   /** @maxItems 50 */
   mentionedAccountIds?: string[];
@@ -965,6 +969,7 @@ export interface SocialState {
   appearance?: Appearance;
   /** @maxItems 200 */
   highlights?: StoryHighlight[];
+  closeFriends?: Record<string, string[]>;
   /** @minimum 0 */
   accountCatalogVersion?: number;
   creatorSetup?: CreatorSetup;
