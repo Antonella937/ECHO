@@ -114,7 +114,7 @@ export function createSupabaseStorageRouter(): IRouter {
       const viewer = viewerUniverseId && viewerCharacterId ? { universeId: viewerUniverseId, characterId: viewerCharacterId } : undefined;
       const source = sourceUniverseId && sourceCharacterId && sourceContentId &&
         (sourceType === "post" || sourceType === "story" || sourceType === "avatar" || sourceType === "message")
-        ? { universeId: sourceUniverseId, characterId: sourceCharacterId, contentId: sourceContentId, contentType: sourceType } : undefined;
+        ? { universeId: sourceUniverseId, characterId: sourceCharacterId, contentId: sourceContentId, contentType: sourceType as "post" | "story" | "avatar" | "message" } : undefined;
       if (Boolean(viewerUniverseId) !== Boolean(viewerCharacterId) ||
         [sourceUniverseId, sourceCharacterId, sourceType, sourceContentId].filter(Boolean).length % 4 !== 0) {
         res.status(400).end(); return;
