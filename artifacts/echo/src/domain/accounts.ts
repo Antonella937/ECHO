@@ -117,7 +117,8 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       verified: formField(now.verified, wanted.verified, before.verified),
       occupation: formField(now.occupation, input.occupation ?? now.occupation, expected.occupation ?? now.occupation),
       location: formField(now.location, input.location ?? now.location, expected.location ?? now.location),
-      identity: sameCharacterValue(input.identity, expected.identity) ? current.identity :
+      identity: input.identity === undefined ? current.identity :
+        sameCharacterValue(input.identity, expected.identity) ? current.identity :
         sameCharacterValue(current.identity, expected.identity) || sameCharacterValue(current.identity, input.identity)
           ? input.identity : (() => { throw Error('La identidad visual cambió en otro dispositivo. Volvé a abrir el editor.'); })(),
       configuration: input.configuration
