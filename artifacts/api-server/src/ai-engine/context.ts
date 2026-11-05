@@ -110,7 +110,16 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   });
   const latest = <T extends { createdAt: Date }>(items: T[], n: number) =>
     [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, n).reverse();
-  const relevantPosts = latest(state.posts.filter(p => p.authorId === actor.id || p.taggedAccountIds?.includes(actor.id) || p.id === post?.id), 6);
+  // Narrative continuity includes the recent feed of characters this actor actually
+  // follows or knows, not just their own posts and explicit tags. This stays inside
+  // the owner-scoped universe and never broadens private DM visibility.
+  const knownAuthors = new Set([
+    ...(state.follows[actor.id] ?? []),
+    ...(c?.relationships ?? []).map(r => r.targetId).filter(id => id !== 'owner'),
+  ]);
+  const relevantPosts = latest(state.posts.filter(p =>
+    p.authorId === actor.id || knownAuthors.has(p.authorId) ||
+    p.taggedAccountIds?.includes(actor.id) || p.id === post?.id), 6);
   const relevantIds = new Set(relevantPosts.map(p => p.id));
   const dmTargetId = input.situation === 'dm'
     ? recipient!.id
