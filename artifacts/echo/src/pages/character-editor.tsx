@@ -88,7 +88,7 @@ export default function CharacterEditorPage() {
       if (isNew && !savingConfig.basic.name.trim()) savingConfig.basic.name = form.name.trim();
       validateCharacterConfig(savingConfig, state, account?.id);
       const base = account ? accountFormValues(account) : accountFormValues({ ...form, accountType: 'personal' });
-      const input: AccountInput = { ...base, name: form.name, handle: form.handle.toLowerCase(), bio: form.bio, avatar: form.avatar, occupation: form.occupation, location: form.location, configuration: savingConfig, identity };
+      const input: AccountInput = { ...base, name: form.name, handle: form.handle.toLowerCase(), bio: form.bio, avatar: form.avatar, occupation: form.occupation, location: form.location, configuration: savingConfig, identity: identity ?? EMPTY_IDENTITY };
       if (account) {
         actions.updateAccount(account.id, input, original.current);
         original.current = structuredClone(input);
