@@ -1,7 +1,7 @@
 /** Short original, iPhone-style chimes synthesized locally (no copyrighted audio assets). */
 const KEY = 'echo:message-sounds';
-export type SoundPreferences = { incoming: boolean; outgoing: boolean };
-const defaults: SoundPreferences = { incoming: true, outgoing: true };
+export type SoundPreferences = { incoming: boolean; outgoing: boolean; notification: boolean };
+const defaults: SoundPreferences = { incoming: true, outgoing: true, notification: true };
 export function getSoundPreferences(): SoundPreferences {
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
   catch { return defaults; }
@@ -17,7 +17,7 @@ export function unlockMessageAudio() {
     if (context.state === 'suspended') void context.resume().catch(() => undefined);
   } catch { /* browser does not support Web Audio */ }
 }
-export function playMessageSound(kind: 'incoming' | 'outgoing') {
+export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification') {
   if (!getSoundPreferences()[kind]) return;
   try {
     unlockMessageAudio();
@@ -25,7 +25,9 @@ export function playMessageSound(kind: 'incoming' | 'outgoing') {
     const now = context.currentTime;
     const notes = kind === 'incoming'
       ? [{ f: 880, t: 0, d: 0.16 }, { f: 1318.5, t: 0.11, d: 0.27 }]
-      : [{ f: 1046.5, t: 0, d: 0.095 }];
+      : kind === 'notification'
+        ? [{ f: 1174.66, t: 0, d: 0.14 }, { f: 1567.98, t: 0.13, d: 0.22 }]
+        : [{ f: 1046.5, t: 0, d: 0.095 }];
     for (const note of notes) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
