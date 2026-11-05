@@ -16,10 +16,12 @@ import {
   echoAutonomyOwnersTable,
   echoAutonomyRunsTable,
   echoUniversesTable,
+  echoMemoryArchiveTable,
 } from "@workspace/db";
 import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
 import type { Opportunity } from "./policy";
 import { recordAutonomyEvent } from "./event-memory";
+import { displacedMemories } from "../lib/memoryArchive";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ALLOWED_REACTIONS = new Set(["❤", "😂", "😮", "😢", "🔥", "👏"]);
@@ -445,6 +447,15 @@ export async function executeAutonomyDecision(input: {
       eq(echoUniversesTable.revision, input.sourceRevision),
     )).returning({ revision: echoUniversesTable.revision });
     if (!saved) throw new SocialExecutionError("UNIVERSE_REVISION_CHANGED");
+
+    // The autonomy executor writes directly to the universe table, bypassing
+    // writeUniverse. Archive evicted memories in this same transaction.
+    if (process.env.ECHO_MEMORY_ARCHIVE_ENABLED === "true") {
+      const events = displacedMemories(state, mutation.state);
+      if (events.length) await tx.insert(echoMemoryArchiveTable)
+        .values(events.map(event => ({ ownerId: input.ownerId, universeId, ...event })))
+        .onConflictDoNothing();
+    }
 
     await tx.update(echoAutonomyRunsTable).set({
       status: "executed",
