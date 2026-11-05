@@ -11,6 +11,8 @@ import type { Character } from '@/domain/types';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { BasicFields, type BasicForm } from '@/components/characters/basic-fields';
+import { VisualIdentity } from '@/components/characters/visual-identity';
+import type { IdentityReference } from '@/domain/types';
 import { IdentitySection } from '@/components/characters/identity-section';
 import { PersonalitySection } from '@/components/characters/personality-section';
 import { RelationshipsSection } from '@/components/characters/relationships-section';
@@ -28,6 +30,7 @@ const SECTIONS = [
   ['social', 'Comportamiento social'], ['memory', 'Memoria'], ['state', 'Estado actual'],
 ] as const;
 type SectionKey = typeof SECTIONS[number][0];
+const EMPTY_IDENTITY: IdentityReference = { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date(0).toISOString() };
 const EMPTY: BasicForm = { name: '', handle: '', bio: '', avatar: 'asset:account-default', occupation: '', location: '' };
 
 export default function CharacterEditorPage() {
@@ -41,6 +44,7 @@ export default function CharacterEditorPage() {
   const [mode, setMode] = useState<Mode>(isNew ? 'quick' : 'advanced');
   const [open, setOpen] = useState<SectionKey | null>('identity');
   const [form, setFormRaw] = useState<BasicForm>(EMPTY);
+  const [identity, setIdentityRaw] = useState<IdentityReference>(EMPTY_IDENTITY);
   const [config, setConfigRaw] = useState<CharacterConfig>(() => defaultCharacterConfig());
   const [dirty, setDirty] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -61,10 +65,12 @@ export default function CharacterEditorPage() {
       original.current = { ...accountFormValues(account), occupation: account.occupation, location: account.location, configuration: structuredClone(cfg) };
       setFormRaw({ name: account.name, handle: account.handle, bio: account.bio, avatar: account.avatar, occupation: account.occupation, location: account.location });
       setConfigRaw(cfg);
+      setIdentityRaw(structuredClone(account.identity ?? EMPTY_IDENTITY));
     } else {
       original.current = undefined;
       setFormRaw(EMPTY);
       setConfigRaw(defaultCharacterConfig());
+      setIdentityRaw(structuredClone(EMPTY_IDENTITY));
     }
     setDirty(false); setError(null); setMode(isNew ? 'quick' : 'advanced');
   }, [key, isNew, account]);
@@ -82,7 +88,7 @@ export default function CharacterEditorPage() {
       if (isNew && !savingConfig.basic.name.trim()) savingConfig.basic.name = form.name.trim();
       validateCharacterConfig(savingConfig, state, account?.id);
       const base = account ? accountFormValues(account) : accountFormValues({ ...form, accountType: 'personal' });
-      const input: AccountInput = { ...base, name: form.name, handle: form.handle.toLowerCase(), bio: form.bio, avatar: form.avatar, occupation: form.occupation, location: form.location, configuration: savingConfig };
+      const input: AccountInput = { ...base, name: form.name, handle: form.handle.toLowerCase(), bio: form.bio, avatar: form.avatar, occupation: form.occupation, location: form.location, configuration: savingConfig, identity };
       if (account) {
         actions.updateAccount(account.id, input, original.current);
         original.current = structuredClone(input);
@@ -131,6 +137,8 @@ export default function CharacterEditorPage() {
 
         {mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
+          <VisualIdentity avatar={form.avatar} identity={identity} onBusy={setUploading}
+            onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
             <div className="grid grid-cols-2 gap-3">
               <NumberInput id="character-quick-age" label="Edad (opcional)" value={config.basic.age} onChange={(age) => set((c) => ({ ...c, basic: { ...c.basic, age } }))} min={0} max={150} />
