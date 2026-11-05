@@ -236,6 +236,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             <span className="text-sm text-foreground/60">{timeAgo(story.createdAt)}</span>
           </button>
           {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground" data-testid="badge-close-friends-story">★ Mejores amigos</span>}
+          {isMine && <button type="button" onClick={() => setConfirmDelete(true)} aria-label="Eliminar historia" title="Eliminar historia" className="tap grid h-11 w-11 place-items-center rounded-full text-foreground" data-testid="button-story-delete"><Trash2 className="h-5 w-5" /></button>}
           <button
             onClick={onClose}
             className="tap grid h-11 w-11 place-items-center rounded-full"
