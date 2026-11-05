@@ -144,7 +144,11 @@ export interface Notification {
   read: boolean;
 }
 
+export type ImageStyle = 'natural' | 'phone' | 'analog' | 'editorial' | 'cinematic';
+
 export interface SocialState {
+  /** Default photographic style for manual and future autonomous AI images. */
+  imageStyle?: ImageStyle;
   appearance?: Appearance;
   highlights?: StoryHighlight[];
   /** Beta product selection saved with a newly-created private universe. */
