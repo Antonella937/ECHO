@@ -27,7 +27,7 @@ import { previewDecision } from "../src/ai-engine/engine";
 import { postMedia } from "../../echo/src/domain/post-media";
 import type { AutonomyRepository, LiveAutonomyRepository } from "../src/autonomy/service";
 import { EngineError, type TextProvider } from "../src/ai-engine/contracts";
-import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL } from "../src/autonomy/constants";
+import { AUTONOMY_LIVE_EXECUTION_ENABLED, DEFAULT_CHARACTER_CONTROL, autonomyProductionGate } from "../src/autonomy/constants";
 import {
   claimAutonomyWorkerLease,
   completeDryRun,
@@ -1472,4 +1472,13 @@ test("live cycle recovers stuck runs only after the current threshold and attemp
   assert.equal(providerCalls, 0);
   assert.equal(executorCalls, 0);
   assert.equal(state.posts.length, 0);
+});
+
+
+test("production autonomy requires explicit flag AND available legal documents", () => {
+  assert.equal(autonomyProductionGate({ NODE_ENV: "production", ECHO_AUTONOMY_LIVE_ENABLED: "true" }, false), false);
+  assert.equal(autonomyProductionGate({ NODE_ENV: "production" }, true), false);
+  assert.equal(autonomyProductionGate({ NODE_ENV: "development", ECHO_AUTONOMY_LIVE_ENABLED: "true" }, true), false);
+  assert.equal(autonomyProductionGate({ NODE_ENV: "production", ECHO_AUTONOMY_LIVE_ENABLED: "true" }, true), true);
+  assert.equal(AUTONOMY_LIVE_EXECUTION_ENABLED, false);
 });
