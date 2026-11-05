@@ -296,7 +296,7 @@ export function chooseAutonomyOpportunity(input: {
   const weights = [
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency) }] : []),
     ...(comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
-    ...(social?.initiatesDMs !== "never" && recipients.length && dmCount < 1
+    ...(social?.initiatesDMs !== "rare" && recipients.length && dmCount < 1
       ? [{ situation: "dm" as const, weight: frequencyWeight(social?.initiatesDMs) }]
       : []),
     ...(targetPost && actionCount("like_post") < 3
