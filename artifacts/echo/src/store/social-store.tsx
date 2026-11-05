@@ -243,7 +243,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           highlights: (s.highlights ?? []).flatMap(h => {
             if (!h.storyIds.includes(storyId)) return [h];
             const storyIds = h.storyIds.filter(id => id !== storyId);
-            return storyIds.length ? [{ ...h, storyIds, coverStoryId: h.coverStoryId === storyId ? null : h.coverStoryId }] : [];
+            return [{ ...h, storyIds, coverStoryId: h.coverStoryId === storyId ? null : h.coverStoryId }];
           }),
           notifications: s.notifications.filter(n => n.storyId !== storyId),
           messages: s.messages.map(m => m.storyId === storyId ? { ...m, storyId: null } : m),

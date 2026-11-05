@@ -16,7 +16,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
   const { openStoryList } = useStoryViewer();
   const [editing, setEditing] = useState<StoryHighlight | 'new' | null>(null);
   const [unavailable, setUnavailable] = useState<Record<string, string[]>>({});
-  const highlights = getOrderedHighlights(state, authorId).filter(h => h.storyIds.some(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }));
+  const highlights = getOrderedHighlights(state, authorId).filter(h => isMe || h.storyIds.some(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }));
   const own = state.stories.filter((s) => s.authorId === authorId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!isMe && !highlights.length) return null;
 
@@ -37,7 +37,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
           </div>
         );
       })}
-      {isMe && own.length > 0 && (
+      {isMe && (
         <>
           <div className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
             <button onClick={() => setEditing('new')} className="tap grid h-16 w-16 place-items-center rounded-full border border-dashed border-border" aria-label="Nueva destacada" data-testid="button-highlight-new"><Plus className="h-5 w-5" /></button>
@@ -97,7 +97,7 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
       ) : (
         <div className="flex gap-2">
           {initial && <button onClick={() => setConfirm(true)} aria-label="Eliminar destacada" className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-destructive" data-testid="button-highlight-delete"><Trash2 className="h-5 w-5" /></button>}
-          <button onClick={save} disabled={!title.trim() || !ids.length || uploadingCover} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-highlight-save">Guardar</button>
+          <button onClick={save} disabled={!title.trim() || (!ids.length && !coverImage) || uploadingCover} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-highlight-save">Guardar</button>
         </div>
       )}>
       {confirm ? <p className="pb-2 text-sm text-muted-foreground">Se quita la destacada del perfil. Las historias no se borran.</p> : (

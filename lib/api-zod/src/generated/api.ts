@@ -1085,7 +1085,7 @@ export const GetUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(getUniverseResponseStateOneHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax),
+  "storyIds": zod.array(zod.string()).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(getUniverseResponseStateOneHighlightsItemOrderMin).max(getUniverseResponseStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
   "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
   "coverImage": zod.string().max(300).optional()
@@ -1606,7 +1606,7 @@ export const SaveUniverseBody = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(saveUniverseBodyStateHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseBodyStateHighlightsItemStoryIdsMax),
+  "storyIds": zod.array(zod.string()).max(saveUniverseBodyStateHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(saveUniverseBodyStateHighlightsItemOrderMin).max(saveUniverseBodyStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
   "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
   "coverImage": zod.string().max(300).optional()
@@ -2115,7 +2115,7 @@ export const SaveUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(saveUniverseResponseStateOneHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax),
+  "storyIds": zod.array(zod.string()).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(saveUniverseResponseStateOneHighlightsItemOrderMin).max(saveUniverseResponseStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
   "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
   "coverImage": zod.string().max(300).optional()
@@ -2674,7 +2674,7 @@ export const VerifyUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(verifyUniverseResponseOneStateOneHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax),
+  "storyIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(verifyUniverseResponseOneStateOneHighlightsItemOrderMin).max(verifyUniverseResponseOneStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
   "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
   "coverImage": zod.string().max(300).optional()
@@ -3505,7 +3505,7 @@ export const CreateCreatorUniverseBody = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(createCreatorUniverseBodyStateHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseBodyStateHighlightsItemStoryIdsMax),
+  "storyIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(createCreatorUniverseBodyStateHighlightsItemOrderMin).max(createCreatorUniverseBodyStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
   "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
   "coverImage": zod.string().max(300).optional()
@@ -4014,7 +4014,7 @@ export const CreateCreatorUniverseResponse = zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(createCreatorUniverseResponseStateHighlightsItemTitleMax),
-  "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseResponseStateHighlightsItemStoryIdsMax),
+  "storyIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(createCreatorUniverseResponseStateHighlightsItemOrderMin).max(createCreatorUniverseResponseStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
   "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
   "coverImage": zod.string().max(300).optional()

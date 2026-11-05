@@ -35,6 +35,7 @@ export default function CreatePage() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiTransferAcknowledged, setAiTransferAcknowledged] = useState(false);
   const [aiGeneratedPath, setAiGeneratedPath] = useState<string | null>(null);
+  const [aiEditSource, setAiEditSource] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } } | null>(null);
   const [items, setItems] = useState<PostMedia[]>([]);
   const [caption, setCaption] = useState('');
@@ -138,12 +139,12 @@ export default function CreatePage() {
     setAiPrepared(null);
     setError(null);
     try {
-      const result = await customFetch<{ preparedPrompt: string; referenceCount: number; style: string; generationEnabled: boolean }>('/api/ai-engine/images/prepare', {
+      const result = await customFetch<{ preparedPrompt: string; referenceCount?: number; style: string; generationEnabled: boolean }>(aiEditSource ? '/api/ai-engine/images/prepare-edit' : '/api/ai-engine/images/prepare', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim() }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (result.generationEnabled) throw new Error('La preparación no debe generar imágenes.');
-      setAiPrepared(result);
+      setAiPrepared({ preparedPrompt: result.preparedPrompt, referenceCount: result.referenceCount ?? (aiEditSource ? 1 : 0), style: result.style });
       setAiPreview(true);
       void checkAiStatus();
     } catch (err) { setError((err as Error).message || 'No se pudo preparar la imagen.'); }
@@ -158,7 +159,7 @@ export default function CreatePage() {
     try {
       const result = await customFetch<{ objectPath: string }>('/api/ai-engine/images/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1' }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1', ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error('El generador devolvió una imagen inválida.');
       setAiGeneratedPath(result.objectPath);
@@ -250,14 +251,6 @@ export default function CreatePage() {
           </Link>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label="Origen de imagen">
-          <button type="button" role="tab" aria-selected={mediaSource === 'upload'} onClick={() => setMediaSource('upload')}
-            className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'upload' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
-            data-testid="tab-media-upload"><ImagePlus className="h-4 w-4" /> Subir foto o video</button>
-          <button type="button" role="tab" aria-selected={mediaSource === 'ai'} onClick={() => setMediaSource('ai')}
-            className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'ai' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
-            data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> Generar con IA</button>
-        </div>
         {mode === 'story' && <div className="mb-4 rounded-2xl border border-border bg-card/60 p-4" data-testid="story-audience">
           <p className="text-sm font-semibold">¿Quién puede ver esta historia?</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -266,9 +259,18 @@ export default function CreatePage() {
           </div>
           {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} mejores amigos seleccionados. Podés editarlos en Ajustes.</p>}
         </div>}
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label="Origen de imagen">
+          <button type="button" role="tab" aria-selected={mediaSource === 'upload'} onClick={() => setMediaSource('upload')}
+            className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'upload' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
+            data-testid="tab-media-upload"><ImagePlus className="h-4 w-4" /> Subir foto o video</button>
+          <button type="button" role="tab" aria-selected={mediaSource === 'ai'} onClick={() => setMediaSource('ai')}
+            className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'ai' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
+            data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> Generar con IA</button>
+        </div>
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
+          {aiEditSource && <div className="mt-3 rounded-xl border border-border p-3 text-xs" data-testid="ai-edit-source"><p className="font-semibold">Modo edición · vista previa gratuita</p><img src={resolveMedia(aiEditSource)} alt="Imagen original para editar" className="mt-2 max-h-44 w-full rounded-lg object-contain" /><button type="button" className="mt-2 underline" onClick={() => { setAiEditSource(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }}>Volver a imagen nueva</button></div>}
           <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
             rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
@@ -295,17 +297,18 @@ export default function CreatePage() {
           </label>
           {aiPreview && aiPrepared && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
             <div className="text-sm font-semibold">Vista previa de la solicitud</div>
-            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrepared.preparedPrompt}</p><p className="mt-2 text-xs text-muted-foreground">Referencias privadas seleccionadas: {aiPrepared.referenceCount} · Estilo: {aiPrepared.style}</p>
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrepared.preparedPrompt}</p><p className="mt-2 text-xs text-muted-foreground">Referencias privadas seleccionadas: {aiPrepared.referenceCount ?? (aiEditSource ? 1 : 0)} · Estilo: {aiPrepared.style}</p>
             {aiGeneratedPath ? <div className="mt-3 space-y-3" data-testid="ai-generated-result">
               <img src={resolveMedia(aiGeneratedPath)} alt="Imagen generada para revisar" className="mx-auto max-h-80 w-full rounded-xl object-contain" />
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={acceptAi} className="h-11 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground" data-testid="button-ai-accept">Aprobar y continuar</button>
-                <button type="button" onClick={() => setAiGeneratedPath(null)} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-discard">Descartar imagen</button>
+                <button type="button" onClick={() => { setAiEditSource(aiGeneratedPath); setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-edit">Editar esta imagen</button>
+                <button type="button" onClick={() => { setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-regenerate">Otra versión</button>
               </div>
             </div> : <div className="mt-3 space-y-2">
-              <button type="button" disabled={!aiStatus?.enabled || !aiTransferAcknowledged || aiGenerating} onClick={() => void generateAi()}
+              <button type="button" disabled={!aiStatus?.enabled || !!aiEditSource || !aiTransferAcknowledged || aiGenerating} onClick={() => void generateAi()}
                 className="h-11 w-full rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-ai-generate">
-                {aiGenerating ? 'Generando…' : aiStatus?.enabled ? 'Generar imagen' : 'Generación pendiente de activación'}
+                {aiGenerating ? 'Generando…' : aiEditSource ? 'Edición pendiente de activación' : aiStatus?.enabled ? 'Generar imagen' : 'Generación pendiente de activación'}
               </button>
               <p className="text-xs text-muted-foreground">{aiStatus?.enabled ? 'Generar puede consumir créditos. Revisá el presupuesto antes de continuar.' : 'Todavía no se envían solicitudes pagas. Podés subir una foto desde la otra pestaña.'}</p>
             </div>}

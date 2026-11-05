@@ -23,6 +23,7 @@ const Input = z.object({
 }).strict();
 const GenerateInput = Input.extend({
   imageTransferAcknowledgement: z.literal('image-transfer-preview-v1'),
+  sourceObjectPath: z.string().regex(/^\/objects\/uploads\/[0-9a-f-]{36}$/i).optional(),
 });
 const router: IRouter = Router();
 
@@ -74,6 +75,35 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
   } catch (error) {
     req.log.error({ err: error }, 'Image preparation failed');
     res.status(503).json({ error: 'IMAGE_PREPARATION_UNAVAILABLE' });
+  }
+});
+
+const EditPreviewInput = Input.extend({
+  sourceObjectPath: z.string().min(20).max(100).refine(value => value.startsWith('/objects/uploads/')),
+});
+router.post('/ai-engine/images/prepare-edit', requireAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const input = EditPreviewInput.safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: 'INVALID_IMAGE_EDIT_REQUEST' }); return; }
+  try {
+    const { state } = await readUniverse(req.userId!, input.data.universeId);
+    if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
+    const character = (Array.isArray(state.characters) ? state.characters : []).find((item: any) => item?.id === input.data.characterId && !item.archived);
+    if (!character || state.currentCharacterId !== character.id) { res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return; }
+    const owned = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+      .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, input.data.sourceObjectPath))).limit(1);
+    if (!owned.length) { res.status(403).json({ error: 'IMAGE_EDIT_SOURCE_NOT_OWNED' }); return; }
+    const style = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
+      ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
+    const preparedPrompt = buildCharacterImagePrompt({
+      name: String(character.name ?? ''), scene: input.data.prompt, style, identity: character.identity ?? {},
+    });
+    res.json({ status: 'preview_only', generationEnabled: false, paidCallsMade: 0,
+      sourceObjectPath: input.data.sourceObjectPath, preparedPrompt, style,
+      note: 'Edit preview only. No provider call or private image transfer.' });
+  } catch (error) {
+    req.log.error({ err: error }, 'Image edit preview failed');
+    res.status(503).json({ error: 'IMAGE_EDIT_PREPARATION_UNAVAILABLE' });
   }
 });
 
@@ -132,6 +162,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const result = await generateCharacterImage({
       ownerId: req.userId!, universeId: input.data.universeId,
       characterId: character.id, preparedPrompt, style: selected, referencePaths,
+      ...(input.data.sourceObjectPath ? { edit: { sourcePath: input.data.sourceObjectPath, instruction: input.data.prompt } } : {}),
     });
     res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId });
   } catch (error) {
