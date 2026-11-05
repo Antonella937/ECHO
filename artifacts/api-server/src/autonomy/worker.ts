@@ -89,13 +89,16 @@ export function startAutonomyWorker(input: {
   // The database lease independently prevents overlapping across processes.
   let running = false;
   let stopped = false;
-  const handle = setIntervalFn(() => {
+  const runTick = () => {
     if (stopped || running) return;
     running = true;
     void Promise.resolve().then(() => input.tick())
       .catch((error) => input.onError?.(safeErrorCode(error)))
       .finally(() => { running = false; });
-  }, input.intervalMs ?? AUTONOMY_WORKER_INTERVAL_MS);
+  };
+  // Evaluate once at startup; otherwise every deployment postpones the first check.
+  queueMicrotask(runTick);
+  const handle = setIntervalFn(runTick, input.intervalMs ?? AUTONOMY_WORKER_INTERVAL_MS);
   handle.unref?.();
   return { started: true, stop: () => { stopped = true; clearIntervalFn(handle); } };
 }
