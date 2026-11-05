@@ -1080,6 +1080,7 @@ export const GetUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(getUniverseResponseStateOneAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
@@ -1305,6 +1306,8 @@ export const GetUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -1598,6 +1601,7 @@ export const SaveUniverseBody = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(saveUniverseBodyStateAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
@@ -1823,6 +1827,8 @@ export const SaveUniverseBody = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2104,6 +2110,7 @@ export const SaveUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(saveUniverseResponseStateOneAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
@@ -2329,6 +2336,8 @@ export const SaveUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2660,6 +2669,7 @@ export const VerifyUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(verifyUniverseResponseOneStateOneAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
@@ -2885,6 +2895,8 @@ export const VerifyUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMin).max(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3488,6 +3500,7 @@ export const CreateCreatorUniverseBody = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(createCreatorUniverseBodyStateAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
@@ -3713,6 +3726,8 @@ export const CreateCreatorUniverseBody = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3994,6 +4009,7 @@ export const CreateCreatorUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(createCreatorUniverseResponseStateAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
@@ -4219,6 +4235,8 @@ export const CreateCreatorUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
