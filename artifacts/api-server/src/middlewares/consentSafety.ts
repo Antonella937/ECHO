@@ -3,6 +3,7 @@ import type { Request, RequestHandler } from "express";
 import { db, echoMediaTable, echoCharacterFollowRequestsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getOwnerConsent } from "../lib/ownerConsent";
+import { AUTONOMY_PRIVATE_BETA_ENABLED, isAutonomyOwnerAuthorized } from "../autonomy/constants";
 
 /**
  * Installed before production API routers, after Clerk. Synthetic router-unit tests do not
@@ -39,13 +40,15 @@ export function createConsentSafetyGate(
         if (!media || media.ownerId !== ownerId) return unavailable();
         // Existing storage authorization still checks exact association, privacy and archives.
       }
+      const authorizedPrivateAutonomy = AUTONOMY_PRIVATE_BETA_ENABLED &&
+        path.startsWith("/autonomy/") && isAutonomyOwnerAuthorized(ownerId);
       if ((/^\/universe\/[^/]+\/sharing$/.test(path) && req.body?.sharingEnabled === true) ||
-        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET")) {
+        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy)) {
         res.status(409).json({ error: "LEGAL_DOCUMENTS_UNAVAILABLE", externalUseAllowed: false });
         return;
       }
       // Always allow reading and reducing sharing, including legacy owners with no draft row.
-      if (["GET", "HEAD", "OPTIONS"].includes(req.method) ||
+      if (authorizedPrivateAutonomy || ["GET", "HEAD", "OPTIONS"].includes(req.method) ||
         (/^\/universe\/[^/]+\/sharing$/.test(path) && req.body?.sharingEnabled === false)) return next();
       if (!(await getOwnerConsent(ownerId)).draftAcknowledged) {
         res.status(403).json({ error: "ALPHA_ACKNOWLEDGEMENT_REQUIRED" });
