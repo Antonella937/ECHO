@@ -181,12 +181,12 @@ export default function CharacterEditorPage() {
         {account && <Link href={`/profile/${account.id}`} className="mt-4 grid h-11 place-items-center text-sm text-muted-foreground underline" data-testid="link-character-profile">Ver perfil</Link>}
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--nav-clearance)-0.5rem)] z-40 mx-auto max-w-[560px] px-4 pb-2 lg:bottom-4 lg:left-[248px] xl:right-[300px]">
+      {(isNew || dirty || busy || uploading || error) && <div className="fixed inset-x-0 bottom-[calc(var(--nav-clearance)-0.5rem)] z-40 mx-auto max-w-[560px] px-4 pb-2 lg:bottom-4 lg:left-[248px] xl:right-[300px]">
         {error && <p role="alert" className="mb-2 rounded-xl bg-destructive/15 p-3 text-sm text-destructive" data-testid="text-character-error">{error}</p>}
         <button onClick={save} disabled={busy || uploading || (!isNew && !dirty)} className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg disabled:opacity-60" data-testid="button-character-save">
           {uploading ? 'Esperando foto…' : busy ? 'Guardando…' : isNew ? 'Crear personaje' : dirty ? 'Guardar cambios' : 'Todo guardado'}
         </button>
-      </div>
+      </div>}
       {account && <AccountEditor open={profileOpen} accountId={account.id} onClose={() => setProfileOpen(false)} />}
     </>
   );
