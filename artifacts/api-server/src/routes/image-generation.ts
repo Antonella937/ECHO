@@ -77,6 +77,45 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * Offline edit preview. The source must be a private image registered to this owner.
+ * No image bytes leave ECHO, and no paid edit request is made.
+ */
+const EditPreviewInput = Input.extend({
+  sourceObjectPath: z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i),
+});
+router.post('/ai-engine/images/prepare-edit', requireAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const input = EditPreviewInput.safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: 'INVALID_IMAGE_EDIT_REQUEST' }); return; }
+  try {
+    const { state } = await readUniverse(req.userId!, input.data.universeId);
+    if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
+    const character = (Array.isArray(state.characters) ? state.characters : [])
+      .find((c: any) => c?.id === input.data.characterId && !c.archived);
+    if (!character || state.currentCharacterId !== character.id) {
+      res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
+    }
+    const owned = await db.select({ objectPath: echoMediaTable.objectPath })
+      .from(echoMediaTable).where(and(eq(echoMediaTable.ownerId, req.userId!),
+        eq(echoMediaTable.objectPath, input.data.sourceObjectPath))).limit(1);
+    if (!owned.length) { res.status(403).json({ error: 'IMAGE_EDIT_SOURCE_NOT_OWNED' }); return; }
+    const style = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
+      ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
+    const preparedPrompt = buildCharacterImagePrompt({
+      name: String(character.name ?? ''), scene: input.data.prompt, style, identity: character.identity ?? {},
+    }) + '\\nEdit the supplied source image, preserving its composition and character identity except for the requested changes.';
+    res.json({
+      status: 'preview_only', generationEnabled: false, paidCallsMade: 0,
+      sourceObjectPath: input.data.sourceObjectPath, preparedPrompt, style,
+      note: 'Edit preview only. Source image stays private; no provider call was made.',
+    });
+  } catch (error) {
+    req.log.error({ err: error }, 'Image edit preview failed');
+    res.status(503).json({ error: 'IMAGE_EDIT_PREPARATION_UNAVAILABLE' });
+  }
+});
+
 router.get('/ai-engine/images/status', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const access = imageGenerationAccessStatus(req.userId);
