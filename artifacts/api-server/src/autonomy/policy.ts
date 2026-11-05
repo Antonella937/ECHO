@@ -208,9 +208,6 @@ export function chooseAutonomyOpportunity(input: {
   const latestReplyAt = state.messages
     .filter((message) => message.senderId === character.id && message.origin === "autonomy")
     .reduce((latest, message) => Math.max(latest, asTime(message.createdAt) ?? 0), 0);
-  const recentReplies = state.messages.filter((message) =>
-    message.senderId === character.id && message.origin === "autonomy" &&
-    (asTime(message.createdAt) ?? 0) > now.getTime() - DAY_MS).length;
   if (unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
       now.getTime() - latestReplyAt >= replyDelayMs) {
     return { situation: "dm", recipientId: unanswered.senderId,
