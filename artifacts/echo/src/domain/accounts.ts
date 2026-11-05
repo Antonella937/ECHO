@@ -2,7 +2,7 @@ import type { Character, Post, Story, SocialState } from './types';
 import { characterConfig, sameCharacterValue, validateCharacterConfig } from './character-core';
 
 export type AccountInput = Pick<Character, 'name' | 'handle' | 'bio' | 'avatar'> &
-  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration'>>;
+  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity'>>;
 export const accountTypes = { personal: 'Personal', band: 'Banda', venue: 'Lugar', organization: 'Organización' } as const;
 const catalog = [
   ['pretty-violence', 'Pretty Violence', 'prettyviolence', 'band'],
@@ -42,6 +42,13 @@ export function validateAccount(input: AccountInput, state: SocialState, id?: st
     throw Error('Ese @username ya existe en tu universo, incluso entre las cuentas archivadas.');
   if (input.accountType && !Object.hasOwn(accountTypes, input.accountType)) throw Error('Tipo de cuenta inválido.');
   validateMetrics(input.displayMetrics);
+  if (input.identity) {
+    const identity = input.identity;
+    if (identity.referenceImages.length > 5 || identity.referenceImages.some(ref => typeof ref !== 'string' || !ref || ref.length > 2048))
+      throw Error('Podés guardar hasta 5 referencias visuales válidas.');
+    if ((identity.facialDescription ?? '').length > 4000 || (identity.bodyDescription ?? '').length > 4000)
+      throw Error('Las descripciones visuales admiten hasta 4000 caracteres.');
+  }
   if (input.configuration) validateCharacterConfig(input.configuration, state, id);
   return { ...input, name, handle };
 }
@@ -74,7 +81,7 @@ export function formatCount(value: number) {
 }
 export function accountFormValues(c: AccountInput): AccountInput {
   return { name: c.name, handle: c.handle, bio: c.bio, avatar: c.avatar,
-    occupation: c.occupation ?? '', location: c.location ?? '', configuration: c.configuration,
+    occupation: c.occupation ?? '', location: c.location ?? '', configuration: c.configuration, identity: c.identity,
     accountType: c.accountType ?? 'personal', verified: c.verified ?? false,
     displayMetrics: { followers: c.displayMetrics?.followers ?? null, following: c.displayMetrics?.following ?? null } };
 }
@@ -110,6 +117,9 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       verified: formField(now.verified, wanted.verified, before.verified),
       occupation: formField(now.occupation, input.occupation ?? now.occupation, expected.occupation ?? now.occupation),
       location: formField(now.location, input.location ?? now.location, expected.location ?? now.location),
+      identity: sameCharacterValue(input.identity, expected.identity) ? current.identity :
+        sameCharacterValue(current.identity, expected.identity) || sameCharacterValue(current.identity, input.identity)
+          ? input.identity : (() => { throw Error('La identidad visual cambió en otro dispositivo. Volvé a abrir el editor.'); })(),
       configuration: input.configuration
         ? configField(characterConfig(current), input.configuration, expected.configuration ?? characterConfig({ ...current, configuration: undefined })) as Character['configuration']
         : current.configuration,
