@@ -105,7 +105,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
     const candidates = [character.avatar, ...(Array.isArray(identity.referenceImages) ? identity.referenceImages : [])];
     const referencePaths = [...new Set(candidates.filter((v): v is string =>
-      typeof v === 'string' && /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(v)))].slice(0, 4);
+      typeof v === 'string' && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(v)))].slice(0, 4);
     const preparedPrompt = buildCharacterImagePrompt({
       name: String(character.name ?? ''), scene: input.data.prompt, style: selected, identity,
     });
