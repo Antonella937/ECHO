@@ -37,7 +37,7 @@ export interface AutonomyRepository {
     characters: Map<string, { enabled: boolean; maxActionsPerDay: number; minCooldownMinutes: number }>;
   }>;
   getExecutedHistory(ownerId: string, characterId: string, since: Date, universeId?: string): Promise<ExecutedAutonomyAction[]>;
-  reserve(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number, universeId?: string): Promise<
+  reserve(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number, universeId?: string, lane?: "dm" | "social"): Promise<
     | { kind: "created"; runId: string }
     | { kind: "duplicate"; runId: string; status: string; characterId: string }
     | { kind: "idempotency_conflict"; runId: string; characterId: string }
@@ -257,6 +257,7 @@ export async function runAutonomyLiveCycle(
     liveExecutionEnabled?: boolean;
     now?: Date;
     random?: () => number;
+    lane?: "dm" | "social";
   },
 ): Promise<{ status: string; reasonCode: string; characterId: string; runId: string | null; model: string | null }> {
   const liveEnabled = dependencies.liveExecutionEnabled ?? isAutonomyLiveExecutionEnabled();
@@ -281,7 +282,7 @@ export async function runAutonomyLiveCycle(
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
-  const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision, universeId);
+  const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision, universeId, dependencies.lane ?? "social");
   if (reservation.kind === "rate_limited") {
     return { status: "rate_limited", reasonCode: "RUN_RATE_LIMIT", characterId: character.id, runId: null, model: null };
   }
@@ -305,6 +306,10 @@ export async function runAutonomyLiveCycle(
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: control.maxActionsPerDay,
     });
+    if (dependencies.lane === "dm" && opportunity.situation !== "dm") {
+      await dependencies.repository.complete(ownerId, runId, { status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null }, universeId);
+      return { status: "no_action", reasonCode: "NO_PENDING_DM", characterId: character.id, runId, model: null };
+    }
     if (!opportunity.situation) {
       const status = opportunity.reasonCode === "COOLDOWN"
         ? "cooldown" : opportunity.reasonCode === "DAILY_CAP" ? "rate_limited" : "no_action";
