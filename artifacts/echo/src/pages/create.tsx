@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
-import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Music2, Plus, RefreshCw, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Music2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
 import { AccountMultiPicker } from '@/components/echo/account-multi-picker';
 import { MentionSuggestions } from '@/components/echo/mention-suggestions';
 import { MAX_POST_MEDIA, validatePostMedia } from '@/domain/post-media';
@@ -19,10 +19,13 @@ export default function CreatePage() {
   const resolveMedia = useMediaResolver();
   const search = useSearch();
   const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
-  const { me, actions } = useSocial();
+  const { me, state, actions } = useSocial();
   const [, navigate] = useLocation();
   const back = useBack();
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [mediaSource, setMediaSource] = useState<'upload' | 'ai'>('upload');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiPreview, setAiPreview] = useState(false);
   const [items, setItems] = useState<PostMedia[]>([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -174,8 +177,38 @@ export default function CreatePage() {
           </Link>
         </div>
 
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label="Origen de imagen">
+          <button type="button" role="tab" aria-selected={mediaSource === 'upload'} onClick={() => setMediaSource('upload')}
+            className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'upload' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
+            data-testid="tab-media-upload"><ImagePlus className="h-4 w-4" /> Subir foto o video</button>
+          <button type="button" role="tab" aria-selected={mediaSource === 'ai'} onClick={() => setMediaSource('ai')}
+            className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'ai' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
+            data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> Generar con IA</button>
+        </div>
+        {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
+          <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
+          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); }}
+            rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
+            className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
+            data-testid="input-ai-image-prompt" />
+          <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-xs">
+            <div className="font-semibold">Estilo: {({ natural: 'Realismo natural', phone: 'Cámara de celular', analog: 'Analógica / 35 mm', editorial: 'Editorial', cinematic: 'Cinematográfica' } as const)[state.imageStyle ?? 'natural']}</div>
+            <div className="mt-1 text-muted-foreground">Referencia facial: {me.avatar ? 'foto de perfil' : 'sin foto'} · Referencias adicionales: {me.identity?.referenceImages?.length ?? 0}/5</div>
+            <div className="mt-1 text-muted-foreground">Descripciones: {me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente'} · {me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente'}</div>
+            <Link href={`/characters/${me.id}/edit`} className="mt-2 inline-block text-primary underline">Editar identidad visual</Link>
+          </div>
+          <button type="button" disabled={!aiPrompt.trim()} onClick={() => setAiPreview(true)}
+            className="mt-3 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40"
+            data-testid="button-ai-image-preview">Preparar vista previa · gratis</button>
+          {aiPreview && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
+            <div className="text-sm font-semibold">Vista previa de la solicitud</div>
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrompt.trim()}</p>
+            <p className="mt-2 text-xs text-muted-foreground">El generador real todavía no está conectado. No se creó ninguna imagen ni se gastaron créditos. Para publicar ahora, subí una foto desde la otra pestaña.</p>
+          </div>}
+        </section>}
         <input ref={fileRef} type="file" accept={mode === 'post' ? 'image/*,video/mp4,video/webm' : 'image/*'} multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
-        {image ? (
+        {mediaSource === 'upload' && (image ? (
           <div className="relative overflow-hidden rounded-[22px] bg-card py-0">
             {firstIsVideo ? (
               <video src={resolveMedia(image)} controls playsInline preload="metadata" className="mx-auto block h-[min(240px,34dvh)] w-full bg-black object-contain" data-testid="video-preview" />
@@ -206,9 +239,9 @@ export default function CreatePage() {
             <span className="font-display text-lg font-light">{busy ? 'Procesando…' : mode === 'post' ? 'Elige fotos o videos' : 'Elige una foto'}</span>
             <span className="px-4 text-center text-xs text-muted-foreground">{busy ? progress ?? 'Subiendo de forma privada…' : mode === 'post' ? `Fotos o videos, hasta ${MAX_POST_MEDIA}. Se guardan en privado.` : 'JPG, PNG o HEIC compatible. Se guardará en tu cuenta.'}</span>
           </button>
-        )}
+        ))}
 
-        {(mode === 'post' || mode === 'story') && items.length === 0 && !busy && (
+        {mediaSource === 'upload' && (mode === 'post' || mode === 'story') && items.length === 0 && !busy && (
           <button
             type="button"
             onClick={() => {
