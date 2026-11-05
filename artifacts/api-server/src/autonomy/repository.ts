@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import {
   db,
   echoAutonomyWorkerLeasesTable,
@@ -178,20 +178,28 @@ export async function reserveDryRun(
       eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.characterId, characterId),
       gte(echoAutonomyRunsTable.createdAt, hourAgo),
+      eq(echoAutonomyRunsTable.status, "executed"),
+      ne(echoAutonomyRunsTable.situation, "dm"),
     ));
     const [ownerHour] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
       gte(echoAutonomyRunsTable.createdAt, hourAgo),
+      eq(echoAutonomyRunsTable.status, "executed"),
+      ne(echoAutonomyRunsTable.situation, "dm"),
     ));
     const [perCharacterDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
       eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.characterId, characterId),
       gte(echoAutonomyRunsTable.createdAt, dayAgo),
+      eq(echoAutonomyRunsTable.status, "executed"),
+      ne(echoAutonomyRunsTable.situation, "dm"),
     ));
     const [ownerDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, ownerId),
       gte(echoAutonomyRunsTable.createdAt, dayAgo),
+      eq(echoAutonomyRunsTable.status, "executed"),
+      ne(echoAutonomyRunsTable.situation, "dm"),
     ));
     if (lane === "social" && ((perCharacterHour?.value ?? 0) >= 3 || (perCharacterDay?.value ?? 0) >= 10 ||
       (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
