@@ -53,7 +53,9 @@ export async function runAutonomyWorkerTick(input: {
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
     for (const target of targets) {
       const characterHash = createHash("sha256").update(`${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
-      const idempotencyKey = `worker:${slot}:${characterHash}`;
+      const digest = createHash("sha256").update(`worker:${slot}:${characterHash}`).digest("hex");
+      // Deterministic RFC 4122 UUID: the API requires UUID keys, including worker runs.
+      const idempotencyKey = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
       evaluated += 1;
       try {
         const result = await input.processCharacter(
