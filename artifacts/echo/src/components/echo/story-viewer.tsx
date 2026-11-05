@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AtSign, ChevronLeft, ChevronRight, Eye, Music2, Send, Trash2, X } from 'lucide-react';
-import { isStoryActive } from '@/domain/social-features';
+import { canViewStory, isStoryActive } from '@/domain/social-features';
 import { storyViewCount, storyViewerIds, formatCount } from '@/domain/accounts';
 import { StoryMetricsEditor } from './story-metrics-editor';
 import { SocialText } from './social-text';
@@ -50,7 +50,7 @@ export function StoryViewerProvider({ children }: { children: ReactNode }) {
     if (!session) return [];
     if (session.kind === 'rail') return session.ids.map((id) => groups.find((g) => g.author.id === id)).filter((g): g is StoryGroup => !!g);
     const author = character(session.authorId);
-    const stories = session.storyIds.map((id) => state.stories.find((s) => s.id === id)).filter((s): s is NonNullable<typeof s> => !!s);
+    const stories = session.storyIds.map((id) => state.stories.find((s) => s.id === id)).filter((s): s is NonNullable<typeof s> => !!s && canViewStory(s, state.currentCharacterId, state));
     return author && stories.length ? [{ author, stories, allSeen: true }] : [];
   }, [session, groups, state.stories, character]);
   const startIndex = session?.kind === 'rail' ? session.index : 0;
@@ -235,9 +235,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             <span className="truncate text-sm font-semibold">{group.author.handle}</span><VerifiedBadge account={group.author} className="h-3.5 w-3.5" />
             <span className="text-sm text-foreground/60">{timeAgo(story.createdAt)}</span>
           </button>
+          {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-green-700 px-2 py-1 text-[10px] font-semibold text-white" data-testid="badge-close-friends-story">★ Mejores amigos</span>}
           <button
             onClick={onClose}
-            className="tap ml-auto grid h-11 w-11 place-items-center rounded-full"
+            className="tap grid h-11 w-11 place-items-center rounded-full"
             aria-label="Cerrar historias"
             data-testid="button-story-close"
           >
