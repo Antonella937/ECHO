@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
+import { submitSupportTicket } from '@/lib/support-tickets';
 import { ArrowLeft, Bug, ShieldAlert, CreditCard, LockKeyhole, LifeBuoy } from 'lucide-react';
 
 const email = 'echoverse.support.n@gmail.com';
@@ -16,12 +17,24 @@ export default function HelpCenterPage() {
   const [area, setArea] = useState('');
   const [description, setDescription] = useState('');
   const [consent, setConsent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState('');
   const selected = categories.find(item => item.value === category) ?? categories[0];
-  const send = () => {
-    if (!description.trim() || !consent) return;
-    const subject = `ECHO · ${selected.label}`;
-    const body = `Tipo: ${selected.label}\nSección afectada: ${area || 'No indicada'}\n\nDescripción:\n${description.trim()}\n\nNo se adjuntaron datos privados automáticamente.`;
-    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const send = async () => {
+    if (!description.trim() || !consent || sending) return;
+    setSending(true);
+    setFeedback('');
+    try {
+      const id = await submitSupportTicket(category, area, description.trim());
+      setFeedback('Reporte recibido. Número de seguimiento: ' + id);
+      setDescription('');
+      setArea('');
+      setConsent(false);
+    } catch {
+      setFeedback('No pudimos guardar el reporte. Intentá nuevamente o escribinos a ' + email);
+    } finally {
+      setSending(false);
+    }
   };
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 text-foreground">
@@ -42,10 +55,11 @@ export default function HelpCenterPage() {
         <textarea id="echo-report-description" required maxLength={4000} value={description} onChange={e => setDescription(e.target.value)} rows={6} placeholder="¿Qué estabas haciendo? ¿Qué esperabas que pasara? ¿Qué pasó realmente?" className="mt-2 w-full resize-y rounded-xl border border-border bg-background p-3 text-sm" />
         <label className="mt-5 flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
           <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-primary" />
-          Entiendo que se abrirá mi aplicación de correo para revisar y enviar este reporte. ECHO no adjunta automáticamente conversaciones, imágenes ni datos de sesión.
+          Autorizo enviar esta descripción al equipo de soporte. No se adjuntan automáticamente conversaciones, imágenes ni datos de sesión.
         </label>
-        <button type="button" onClick={send} disabled={!description.trim() || !consent} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40">Preparar correo de soporte</button>
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Versión beta: este formulario todavía no genera tickets ni los guarda en un panel administrativo. Tu correo se enviará solamente si lo confirmás en tu aplicación de email.</p>
+        <button type="button" onClick={() => void send()} disabled={!description.trim() || !consent || sending} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40">{sending ? 'Enviando…' : 'Enviar reporte'}</button>
+        {feedback && <p role="status" className="mt-3 break-words text-xs text-muted-foreground">{feedback}</p>}
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Los reportes quedan asociados a tu cuenta. Para soporte alternativo: {email}</p>
       </div>
     </div>
   );
