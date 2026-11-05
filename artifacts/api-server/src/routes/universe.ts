@@ -6,8 +6,8 @@ import {
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse, writeUniverse, StructuralLimitError } from "../lib/universeRepository";
-import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { db, echoMediaTable, echoUniversesTable, echoMemoryArchiveTable } from "@workspace/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { universeAccountError } from "../lib/universeValidation";
@@ -25,6 +25,36 @@ router.get("/universe", async (req, res): Promise<void> => {
     res.status(409).json({ error: "UNIVERSE_UNAVAILABLE", ownerId: req.userId!, fallbackUniverseId: available.find(row => !row.archivedAt && !row.deletedAt)?.universeId ?? null }); return;
   }
   res.json(GetUniverseResponse.parse(await readUniverse(req.userId!, universeId)));
+});
+
+// Private historical lookup, never exposed across owners or universes.
+router.get("/universe/memory-archive", async (req, res): Promise<void> => {
+  if (process.env.ECHO_MEMORY_ARCHIVE_ENABLED !== "true") {
+    res.status(503).json({ error: "MEMORY_ARCHIVE_NOT_ENABLED" }); return;
+  }
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const characterId = typeof req.query.characterId === "string" ? req.query.characterId : "";
+  if (!characterId || characterId.length > 100) {
+    res.status(400).json({ error: "CHARACTER_ID_REQUIRED" }); return;
+  }
+  const envelope = await readUniverse(req.userId!, universeId);
+  const state = SaveUniverseBody.shape.state.safeParse(envelope.state);
+  if (!state.success || !state.data.characters.some(c => c.id === characterId && !c.archived)) {
+    res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
+  }
+  const memories = await db.select({
+    memoryId: echoMemoryArchiveTable.memoryId,
+    sourceId: echoMemoryArchiveTable.sourceId,
+    kind: echoMemoryArchiveTable.kind,
+    targetId: echoMemoryArchiveTable.targetId,
+    content: echoMemoryArchiveTable.content,
+    occurredAt: echoMemoryArchiveTable.occurredAt,
+  }).from(echoMemoryArchiveTable).where(and(
+    eq(echoMemoryArchiveTable.ownerId, req.userId!),
+    eq(echoMemoryArchiveTable.universeId, universeId),
+    eq(echoMemoryArchiveTable.characterId, characterId),
+  )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(50);
+  res.json({ memories });
 });
 
 router.put("/universe", async (req, res): Promise<void> => {
