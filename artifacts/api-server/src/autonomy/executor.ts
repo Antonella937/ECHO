@@ -19,6 +19,7 @@ import {
 } from "@workspace/db";
 import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled } from "./constants";
 import type { Opportunity } from "./policy";
+import { recordAutonomyEvent } from "./event-memory";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ALLOWED_REACTIONS = new Set(["❤", "😂", "😮", "😢", "🔥", "👏"]);
@@ -87,7 +88,8 @@ export function applyAutonomyDecision(
       id: idFactory(), authorId: characterId, image: "", caption: text, location: "",
       createdAt: now, likes: [], savedBy: [], origin: "autonomy", illustrative: false, commentsEnabled: true,
     };
-    return { state: { ...state, posts: [...state.posts, post] }, changed: true, targetId: post.id };
+    return { state: recordAutonomyEvent({ ...state, posts: [...state.posts, post] }, characterId,
+      { sourceId: post.id, kind: "post", text: `Publicado: ${text}` }, now), changed: true, targetId: post.id };
   }
 
   if (decision.action === "draft" && decision.situation === "comment") {
@@ -119,7 +121,8 @@ export function applyAutonomyDecision(
       idFactory(), recipientId, characterId, parent ? "reply" : "comment", text, now, post.id, comment.id,
     );
     return {
-      state: { ...state, comments: [...state.comments, comment], notifications: [...state.notifications, notification] },
+      state: recordAutonomyEvent({ ...state, comments: [...state.comments, comment], notifications: [...state.notifications, notification] },
+        characterId, { sourceId: comment.id, kind: "interaction", text: `Comenté en una publicación: ${text}`, targetId: post.authorId }, now),
       changed: true, targetId: comment.id,
     };
   }
@@ -142,7 +145,8 @@ export function applyAutonomyDecision(
     };
     const notification = actionNotification(idFactory(), recipientId, characterId, "message", text, now);
     return {
-      state: { ...state, messages: [...state.messages, message], notifications: [...state.notifications, notification] },
+      state: recordAutonomyEvent({ ...state, messages: [...state.messages, message], notifications: [...state.notifications, notification] },
+        characterId, { sourceId: message.id, kind: "conversation", text: `Envié un mensaje: ${text}`, targetId: recipientId }, now),
       changed: true, targetId: recipientId,
     };
   }
