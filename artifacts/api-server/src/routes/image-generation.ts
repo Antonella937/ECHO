@@ -9,6 +9,7 @@ import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imageP
 import { imageGenerationAccessStatus } from '../lib/imageGenerationAccess';
 import { paidImageGenerationActivated } from '../lib/imageGenerationActivation';
 import { generateCharacterImage } from '../lib/imageGenerationService';
+import { readImageBudgetReadiness } from '../lib/imageBudgetReadiness';
 
 /**
  * Image generation preparation. Strictly NO provider calls, no paid operations.
@@ -73,9 +74,25 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/ai-engine/images/status', requireAuth, (req, res) => {
+router.get('/ai-engine/images/status', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
-  res.json({ ...imageGenerationAvailability(), access: imageGenerationAccessStatus(req.userId) });
+  const access = imageGenerationAccessStatus(req.userId);
+  const availability = imageGenerationAvailability();
+  try {
+    const budget = await readImageBudgetReadiness();
+    // Conservative public readiness: provider contract and production
+    // activation still require explicit owner validation and approval.
+    res.json({
+      ...availability,
+      access,
+      monthlySpendingLimitUsd: budget.ceilingUsd,
+      prerequisites: { ...availability.prerequisites, budgetActivated: budget.canReserveOneImage },
+      budget: access.allowed ? budget : undefined,
+    });
+  } catch (error) {
+    req.log.warn({ err: error }, 'Image budget readiness unavailable');
+    res.json({ ...availability, access, budgetStatus: 'unavailable' });
+  }
 });
 
 router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
