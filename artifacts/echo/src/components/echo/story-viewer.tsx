@@ -235,7 +235,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             <span className="truncate text-sm font-semibold">{group.author.handle}</span><VerifiedBadge account={group.author} className="h-3.5 w-3.5" />
             <span className="text-sm text-foreground/60">{timeAgo(story.createdAt)}</span>
           </button>
-          {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-green-700 px-2 py-1 text-[10px] font-semibold text-white" data-testid="badge-close-friends-story">★ Mejores amigos</span>}
+          {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground" data-testid="badge-close-friends-story">★ Mejores amigos</span>}
           <button
             onClick={onClose}
             className="tap grid h-11 w-11 place-items-center rounded-full"
