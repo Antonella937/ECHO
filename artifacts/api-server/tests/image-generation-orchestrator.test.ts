@@ -67,3 +67,43 @@ test('rejects a provider result from an unexpected model without storing it', as
   assert.equal(stored, false);
   assert.equal(outcome, 'unknown');
 });
+
+test('never stores an image when provider cost exceeds the reserved maximum', async () => {
+  let stored = false;
+  let settlement = '';
+  const deps: GenerationDependencies = {
+    reserve: async () => ({ id: 'job' }),
+    generate: async () => ({ ...result, billedUsd: 0.11 }),
+    store: async () => { stored = true; return '/objects/uploads/mock'; },
+    settle: async (_, outcome) => { settlement = outcome.status; },
+  };
+  await assert.rejects(orchestrateImageGeneration(deps, input), /IMAGE_COST_EXCEEDS_RESERVATION_OR_UNKNOWN/);
+  assert.equal(stored, false);
+  assert.equal(settlement, 'unknown');
+});
+
+test('records actual provider charge when private storage fails', async () => {
+  const settlements: Array<{ status: string; reportedCostUsd?: number }> = [];
+  const deps: GenerationDependencies = {
+    reserve: async () => ({ id: 'job' }),
+    generate: async () => result,
+    store: async () => { throw Error('STORAGE_DOWN'); },
+    settle: async (_, outcome) => { settlements.push(outcome); },
+  };
+  await assert.rejects(orchestrateImageGeneration(deps, input), /STORAGE_DOWN/);
+  assert.deepEqual(settlements, [{ status: 'failed', reportedCostUsd: 0.02 }]);
+});
+
+test('never reserves when the maximum per-image cost is zero or invalid', async () => {
+  let reserved = false;
+  const deps: GenerationDependencies = {
+    reserve: async () => { reserved = true; return { id: 'job' }; },
+    generate: async () => result,
+    store: async () => '/objects/uploads/mock',
+    settle: async () => {},
+  };
+  for (const maximumUsd of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    await assert.rejects(orchestrateImageGeneration(deps, { ...input, maximumUsd }), /INVALID_IMAGE_BUDGET/);
+  }
+  assert.equal(reserved, false);
+});
