@@ -260,7 +260,7 @@ export default function CreatePage() {
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
-          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); }}
+          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
             rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
             data-testid="input-ai-image-prompt" />
