@@ -213,10 +213,6 @@ export function chooseAutonomyOpportunity(input: {
   if (recentSocial.length > 0) opportunityChance *= 0.55;
   opportunityChance = Math.max(0.04, Math.min(0.65, opportunityChance));
 
-  if (random() >= opportunityChance) {
-    return { situation: null, reasonCode: "SILENCE_SELECTED", reason: "Current activity and configured social pace favor doing nothing.", localHour: local.hour, timezone };
-  }
-
   // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
   // Only conversations represented by real character accounts are eligible.
   const incoming = [...state.messages]
@@ -240,6 +236,10 @@ export function chooseAutonomyOpportunity(input: {
       reasonCode: "OPPORTUNITY_SELECTED",
       reason: "A recent incoming direct message is awaiting a reply.",
       localHour: local.hour, timezone };
+  }
+
+  if (random() >= opportunityChance) {
+    return { situation: null, reasonCode: "SILENCE_SELECTED", reason: "Current activity and configured social pace favor doing nothing.", localHour: local.hour, timezone };
   }
 
   const comment = commentTarget(state, character, now);
