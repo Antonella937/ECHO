@@ -2,6 +2,7 @@ import { PreviewCharacterDecisionBody, PreviewCharacterDecisionResponse, type Ch
 import { buildCharacterContext } from './context';
 import { decisionSchema, EngineError, unknownUsage, type DecisionRejectionDiagnostic, type TextProvider } from './contracts';
 import type { VisionContext } from '../vision/contracts';
+import type { HistoricalRecall } from './context';
 
 const instructions = `You are ECHO's manual character-preview engine. Return ONLY one JSON object matching the supplied schema.
 Nothing will be executed or published. Choose action "none" whenever silence, delay, boundaries, lack of context or routine makes that appropriate. For none, text and reaction MUST be null.
@@ -16,10 +17,10 @@ Allowed reaction values: ❤, 😂, 😮, 😢, 🔥, 👏. For draft and like a
 
 /** Pure orchestration: no repositories, events, schedulers or write functions. */
 export async function previewDecision(provider: TextProvider, state: SocialState, input: CharacterDecisionInput, sourceRevision: number,
-  now = new Date(), source: 'provided_snapshot' | 'persisted_owner_universe' = 'provided_snapshot', vision: VisionContext = { analyses: {}, postSummaries: {} }) {
+  now = new Date(), source: 'provided_snapshot' | 'persisted_owner_universe' = 'provided_snapshot', vision: VisionContext = { analyses: {}, postSummaries: {} }, historical: HistoricalRecall[] = []) {
   const parsedInput = PreviewCharacterDecisionBody.strict().safeParse(input);
   if (!parsedInput.success) throw new EngineError('INVALID_PREVIEW_INPUT');
-  const context = buildCharacterContext(state, parsedInput.data, now, vision);
+  const context = buildCharacterContext(state, parsedInput.data, now, vision, historical);
   function validateDecision(text: string) {
     let raw: unknown;
     try {
