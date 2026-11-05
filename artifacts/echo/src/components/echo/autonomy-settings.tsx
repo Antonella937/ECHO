@@ -57,7 +57,11 @@ export function AutonomySettingsSection() {
       { data: { characterId, idempotencyKey: globalThis.crypto.randomUUID(), universeId } },
       {
         onSuccess: setLatest,
-        onError: () => toast({ title: "No se pudo completar la simulación", description: "No se ejecutó ninguna acción social.", variant: "destructive" }),
+        onError: (error) => {
+          const detail = error && typeof error === "object" ? error as { error?: string; message?: string; response?: { data?: { error?: string }; status?: number } } : null;
+          const code = detail?.response?.data?.error ?? detail?.error ?? detail?.message ?? "Error no identificado";
+          toast({ title: "No se pudo completar la simulación", description: `Código: ${String(code).slice(0, 120)}. No se ejecutó ninguna acción social.`, variant: "destructive" });
+        },
       },
     );
   };
