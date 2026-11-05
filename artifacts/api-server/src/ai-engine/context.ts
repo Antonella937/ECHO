@@ -136,7 +136,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     post?.caption, comment?.text, story?.caption, message?.text,
     ...messages.slice(-3).map(item => item.text),
   ].filter((value): value is string => !!value?.trim()).join(' ').toLocaleLowerCase();
-  const queryTerms = new Set((memoryQuery.match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+  const queryTerms = new Set((memoryQuery.match(/[\p{L}\p{N}]{4,}/gu) ?? [])
     .filter(term => !['para', 'como', 'esta', 'este', 'pero', 'sobre', 'porque'].includes(term)));
   const memoryRecent = c?.memory.recent ?? [];
   const chronological = latest(memoryRecent, 10);
@@ -145,7 +145,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     .filter(item => !chronologicalIds.has(item.id))
     .map(item => ({
       item,
-      score: (item.text.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+      score: (item.text.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
         .filter(term => queryTerms.has(term)).length,
     }))
     .filter(entry => entry.score > 0)
