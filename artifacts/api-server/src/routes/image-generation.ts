@@ -21,6 +21,9 @@ const Input = z.object({
   characterId: z.string().min(1).max(120),
   prompt: z.string().trim().min(3).max(2000),
 }).strict();
+const GenerateInput = Input.extend({
+  imageTransferAcknowledgement: z.literal('image-transfer-preview-v1'),
+});
 const router: IRouter = Router();
 
 router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
@@ -107,8 +110,8 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     res.status(503).json({ error: 'IMAGE_GENERATION_DISABLED', generationEnabled: false });
     return;
   }
-  const input = Input.safeParse(req.body);
-  if (!input.success) { res.status(400).json({ error: 'INVALID_IMAGE_REQUEST' }); return; }
+  const input = GenerateInput.safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: 'IMAGE_TRANSFER_ACKNOWLEDGEMENT_REQUIRED_OR_INVALID_REQUEST' }); return; }
   try {
     const { state } = await readUniverse(req.userId!, input.data.universeId);
     if (!state) { res.status(404).json({ error: 'UNIVERSE_NOT_FOUND' }); return; }
