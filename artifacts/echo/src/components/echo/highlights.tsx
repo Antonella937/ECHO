@@ -3,7 +3,7 @@ import { Archive, ArrowDown, ArrowUp, Check, Pencil, Plus, Trash2 } from 'lucide
 import { useSocial } from '@/store/social-store';
 import { uid } from '@/domain/events';
 import { compressImage, uploadPrivateImage, useMediaResolver, timeAgo } from '@/lib/media';
-import { getOrderedHighlights, highlightCover, isStoryActive } from '@/domain/social-features';
+import { getOrderedHighlights, highlightCover, isStoryActive, canViewStory } from '@/domain/social-features';
 import { Sheet } from './sheet';
 import { useStoryViewer } from './story-viewer';
 import { toast } from '@/hooks/use-toast';
@@ -12,11 +12,11 @@ import type { StoryHighlight } from '@/domain/types';
 
 export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: boolean }) {
   const resolveMedia = useMediaResolver();
-  const { state } = useSocial();
+  const { state, me } = useSocial();
   const { openStoryList } = useStoryViewer();
   const [editing, setEditing] = useState<StoryHighlight | 'new' | null>(null);
   const [unavailable, setUnavailable] = useState<Record<string, string[]>>({});
-  const highlights = getOrderedHighlights(state, authorId);
+  const highlights = getOrderedHighlights(state, authorId).filter(h => h.storyIds.some(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }));
   const own = state.stories.filter((s) => s.authorId === authorId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!isMe && !highlights.length) return null;
 
@@ -27,7 +27,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
         const customCover = h.coverImage;
         return (
           <div key={h.id} className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
-            <button onClick={() => openStoryList(authorId, h.storyIds)} className="tap h-16 w-16 overflow-hidden rounded-full border border-border bg-card p-[3px]" aria-label={`Ver destacada ${h.title}`} data-testid={`button-highlight-${h.id}`}>
+            <button onClick={() => openStoryList(authorId, h.storyIds.filter(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }))} className="tap h-16 w-16 overflow-hidden rounded-full border border-border bg-card p-[3px]" aria-label={`Ver destacada ${h.title}`} data-testid={`button-highlight-${h.id}`}>
               {(customCover || cover) && <img src={customCover ? resolveMedia(customCover) : resolveMedia(cover!.image, { sourceType: 'story', sourceContentId: cover!.id })} alt="" className="h-full w-full rounded-full object-cover"
                 onError={() => { if (cover && !customCover) setUnavailable(previous => ({ ...previous, [h.id]: [...new Set([...(previous[h.id] ?? []), cover.id])] })); }} />}
             </button>
