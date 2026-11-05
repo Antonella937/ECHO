@@ -2,6 +2,9 @@ import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/requireAuth';
 import { readUniverse } from '../lib/universeRepository';
+import { db, echoMediaTable } from '@workspace/db';
+import { and, eq, inArray } from 'drizzle-orm';
+import { imageGenerationAvailability, MAX_IMAGE_REFERENCE_COUNT } from '../lib/imageGenerationProvider';
 
 /**
  * Image generation preparation. Strictly NO provider calls, no paid operations.
@@ -56,10 +59,12 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
       status: 'preview_only',
       generationEnabled: false,
       paidCallsMade: 0,
+      provider: imageGenerationAvailability(),
       characterId: character.id,
       characterName: character.name,
       style: selected,
-      referenceCount: references.length,
+      referenceCount: verifiedReferenceCount,
+      ignoredUnverifiedReferences: references.length - verifiedReferenceCount,
       hasFacialDescription: Boolean(identity.facialDescription),
       hasBodyDescription: Boolean(identity.bodyDescription),
       preparedPrompt,
@@ -69,6 +74,11 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
     req.log.error({ err: error }, 'Image preparation failed');
     res.status(503).json({ error: 'IMAGE_PREPARATION_UNAVAILABLE' });
   }
+});
+
+router.get('/ai-engine/images/status', requireAuth, (_req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json(imageGenerationAvailability());
 });
 
 router.post('/ai-engine/images/generate', requireAuth, (_req, res) => {
