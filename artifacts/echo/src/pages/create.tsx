@@ -251,6 +251,14 @@ export default function CreatePage() {
           </Link>
         </div>
 
+        {mode === 'story' && <div className="mb-4 rounded-2xl border border-border bg-card/60 p-4" data-testid="story-audience">
+          <p className="text-sm font-semibold">¿Quién puede ver esta historia?</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" aria-pressed={!closeFriendsOnly} onClick={() => setCloseFriendsOnly(false)} className={cn('h-11 rounded-xl text-sm', !closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-everyone">Todos</button>
+            <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ Mejores amigos</button>
+          </div>
+          {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} mejores amigos seleccionados. Podés editarlos en Ajustes.</p>}
+        </div>}
         <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label="Origen de imagen">
           <button type="button" role="tab" aria-selected={mediaSource === 'upload'} onClick={() => setMediaSource('upload')}
             className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'upload' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
