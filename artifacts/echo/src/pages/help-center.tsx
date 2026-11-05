@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
-import { submitSupportTicket } from '@/lib/support-tickets';
+import { getSupportTickets, submitSupportTicket, type Ticket } from '@/lib/support-tickets';
 import { ArrowLeft, Bug, ShieldAlert, CreditCard, LockKeyhole, LifeBuoy } from 'lucide-react';
 
 const email = 'echoverse.support.n@gmail.com';
@@ -19,7 +19,13 @@ export default function HelpCenterPage() {
   const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState('');
-  const selected = categories.find(item => item.value === category) ?? categories[0];
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketsError, setTicketsError] = useState(false);
+  const refreshTickets = async () => {
+    try { setTickets(await getSupportTickets()); setTicketsError(false); }
+    catch { setTicketsError(true); }
+  };
+  useEffect(() => { void refreshTickets(); }, []);
   const send = async () => {
     if (!description.trim() || !consent || sending) return;
     setSending(true);
@@ -27,6 +33,7 @@ export default function HelpCenterPage() {
     try {
       const id = await submitSupportTicket(category, area, description.trim());
       setFeedback('Reporte recibido. Número de seguimiento: ' + id);
+      void refreshTickets();
       setDescription('');
       setArea('');
       setConsent(false);
@@ -61,6 +68,18 @@ export default function HelpCenterPage() {
         {feedback && <p role="status" className="mt-3 break-words text-xs text-muted-foreground">{feedback}</p>}
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Los reportes quedan asociados a tu cuenta. Para soporte alternativo: {email}</p>
       </div>
+      <section className="mt-7" aria-label="Mis reportes">
+        <h2 className="text-lg font-semibold">Mis reportes</h2>
+        {ticketsError && <p className="mt-2 text-sm text-muted-foreground">No pudimos cargar tus reportes.</p>}
+        {!ticketsError && tickets.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Todavía no enviaste reportes.</p>}
+        <div className="mt-3 space-y-3">
+          {tickets.map(ticket => <article key={ticket.id} className="rounded-xl border border-border bg-card/60 p-4">
+            <div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold">{ticket.category}</span><span className="text-xs text-muted-foreground">{ticket.status}</span></div>
+            <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">{ticket.description}</p>
+            <p className="mt-2 break-all text-xs text-muted-foreground">{ticket.id}</p>
+          </article>)}
+        </div>
+      </section>
     </div>
   );
 }
