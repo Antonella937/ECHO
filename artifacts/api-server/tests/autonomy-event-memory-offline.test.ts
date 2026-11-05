@@ -9,7 +9,7 @@ function fixture() {
   const state = createSeedState();
   const actor = state.characters.find(c => c.id === "mar")!;
   actor.configuration = defaultCharacterConfig(actor);
-  actor.configuration.memory.recentLimit = 2;
+  actor.configuration.memory.recentLimit = 10;
   return SaveUniverseBody.parse({ state, expectedRevision: 1 }).state;
 }
 
@@ -28,13 +28,13 @@ test("records a verified event exactly once and preserves the input", () => {
 
 test("bounds recent memories and does not write to other characters", () => {
   let state = fixture();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 11; i++) {
     state = recordAutonomyEvent(state, "mar", {
       sourceId: "event-" + i, kind: "interaction", text: "Comentario verificable sobre el ensayo de hoy " + i,
     }, new Date("2026-11-05T12:00:00Z"));
   }
   const recent = state.characters.find(c => c.id === "mar")!.configuration!.memory.recent;
-  assert.deepEqual(recent.map(m => m.sourceId), ["event-1", "event-2"]);
+  assert.deepEqual(recent.map(m => m.sourceId), Array.from({ length: 10 }, (_, i) => "event-" + (i + 1)));
   assert.equal(state.characters.find(c => c.id === "noah")?.configuration?.memory.recent.length ?? 0, 0);
 });
 
