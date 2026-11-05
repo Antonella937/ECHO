@@ -13,6 +13,7 @@ import {
   AUTONOMY_LIVE_EXECUTION_ENABLED,
   DEFAULT_CHARACTER_CONTROL,
   isAutonomyLiveExecutionEnabled,
+  isAutonomyOwnerAuthorized,
 } from "./constants";
 import type { LiveExecutionOutcome } from "./executor";
 
@@ -249,7 +250,7 @@ export async function runAutonomyLiveCycle(
   },
 ): Promise<{ status: string; reasonCode: string; characterId: string; runId: string | null; model: string | null }> {
   const liveEnabled = dependencies.liveExecutionEnabled ?? isAutonomyLiveExecutionEnabled();
-  if (!liveEnabled) {
+  if (!liveEnabled || !isAutonomyOwnerAuthorized(ownerId)) {
     return { status: "disabled", reasonCode: "LIVE_EXECUTION_DISABLED", characterId: input.characterId, runId: null, model: null };
   }
   if (!ownerId) throw new EngineError("AUTHENTICATION_REQUIRED", 401);

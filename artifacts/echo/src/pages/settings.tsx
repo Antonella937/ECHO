@@ -95,7 +95,7 @@ export default function SettingsPage() {
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
             <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
               <span>Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.</span></p>
-            <p className="mt-2.5 pl-[26px]">La IA de texto solo genera previews manuales; la autonomía y las acciones en vivo están desactivadas.</p>
+            <p className="mt-2.5 pl-[26px]">La autonomía de texto puede habilitarse para cuentas autorizadas de la beta privada, con controles individuales y pausa general. La generación de imágenes IA sigue desactivada.</p>
             <p className="mt-2.5 pl-[26px]">Las fotos de ejemplo son ilustrativas y no muestran a personas reales.</p>
             <p className="mt-2.5 pl-[26px]">Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.</p>
           </div>

@@ -10,7 +10,16 @@ export function autonomyProductionGate(env: {
     legalDocumentsAvailable;
 }
 
-export const AUTONOMY_LIVE_EXECUTION_ENABLED = autonomyProductionGate();
+/** Private beta requires an explicit server-only flag and a nonempty exact Clerk owner allowlist. */
+const privateBetaOwners = new Set((process.env.ECHO_AUTONOMY_PRIVATE_BETA_OWNER_IDS ?? "")
+  .split(",").map((id) => id.trim()).filter((id) => /^user_[A-Za-z0-9]{15,64}$/.test(id)));
+export const AUTONOMY_PRIVATE_BETA_ENABLED = process.env.NODE_ENV === "production" &&
+  process.env.ECHO_AUTONOMY_PRIVATE_BETA_ENABLED === "true" &&
+  privateBetaOwners.size > 0;
+export function isAutonomyOwnerAuthorized(ownerId: string): boolean {
+  return autonomyProductionGate() || (AUTONOMY_PRIVATE_BETA_ENABLED && privateBetaOwners.has(ownerId));
+}
+export const AUTONOMY_LIVE_EXECUTION_ENABLED = autonomyProductionGate() || AUTONOMY_PRIVATE_BETA_ENABLED;
 export const DEFAULT_CHARACTER_CONTROL = {
   enabled: false,
   maxActionsPerDay: 2,
