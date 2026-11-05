@@ -217,6 +217,8 @@ export interface StoryHighlight {
      * @nullable
      */
   coverStoryId?: string | null;
+  /** Optional separately uploaded private cover image. */
+  coverImage?: string;
 }
 
 export type CreatorSetupPlan = typeof CreatorSetupPlan[keyof typeof CreatorSetupPlan];
