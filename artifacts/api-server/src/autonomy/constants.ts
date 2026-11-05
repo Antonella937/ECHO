@@ -1,5 +1,16 @@
-/** This build has no scheduler, executor, or route capable of live social writes. */
-export const AUTONOMY_LIVE_EXECUTION_ENABLED = false as const;
+/** Live autonomy requires explicit deployment opt-in and real legal documents. */
+import { LEGAL_DOCUMENTS_AVAILABLE } from "../lib/ownerConsent";
+
+export function autonomyProductionGate(env: {
+  ECHO_AUTONOMY_LIVE_ENABLED?: string;
+  NODE_ENV?: string;
+} = process.env, legalDocumentsAvailable = LEGAL_DOCUMENTS_AVAILABLE): boolean {
+  return env.NODE_ENV === "production" &&
+    env.ECHO_AUTONOMY_LIVE_ENABLED === "true" &&
+    legalDocumentsAvailable;
+}
+
+export const AUTONOMY_LIVE_EXECUTION_ENABLED = autonomyProductionGate();
 export const DEFAULT_CHARACTER_CONTROL = {
   enabled: false,
   maxActionsPerDay: 2,
