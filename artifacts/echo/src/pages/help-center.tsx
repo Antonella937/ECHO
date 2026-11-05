@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUser } from '@clerk/react';
 import { Link } from 'wouter';
 import { getSupportTickets, submitSupportTicket, type Ticket } from '@/lib/support-tickets';
 import { ArrowLeft, Bug, ShieldAlert, CreditCard, LockKeyhole, LifeBuoy } from 'lucide-react';
@@ -13,6 +14,7 @@ const categories = [
 ] as const;
 
 export default function HelpCenterPage() {
+  const { user } = useUser();
   const [category, setCategory] = useState<string>('technical');
   const [area, setArea] = useState('');
   const [description, setDescription] = useState('');
@@ -23,9 +25,13 @@ export default function HelpCenterPage() {
   const [ticketsError, setTicketsError] = useState(false);
   const refreshTickets = async () => {
     try { setTickets(await getSupportTickets()); setTicketsError(false); }
-    catch { setTicketsError(true); }
+    catch { setTickets([]); setTicketsError(true); }
   };
-  useEffect(() => { void refreshTickets(); }, []);
+  useEffect(() => {
+    setTickets([]);
+    setTicketsError(false);
+    if (user?.id) void refreshTickets();
+  }, [user?.id]);
   const send = async () => {
     if (!description.trim() || !consent || sending) return;
     setSending(true);
