@@ -46,10 +46,14 @@ router.patch("/support/admin/tickets/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "INVALID_UPDATE" }); return;
   }
   const { status, adminNote } = req.body;
+  const ticketId = req.params.id;
+  if (typeof ticketId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ticketId)) {
+    res.status(400).json({ error: "INVALID_TICKET_ID" }); return;
+  }
   try {
     const result = await pool.query(
-      "UPDATE echo_support_tickets SET status=$1,admin_note=$2,updated_at=now() WHERE id=$3 RETURNING id,status,admin_note,updated_at",
-      [status, adminNote ?? "", req.params.id]);
+      "UPDATE echo_support_tickets SET status=$1,admin_note=COALESCE($2,admin_note),updated_at=now() WHERE id=$3 RETURNING id,status,admin_note,updated_at",
+      [status, adminNote ?? null, ticketId]);
     if (!result.rowCount) { res.status(404).json({ error: "NOT_FOUND" }); return; }
     res.json({ ticket: result.rows[0] });
   } catch { res.status(503).json({ error: "SUPPORT_UNAVAILABLE" }); }
