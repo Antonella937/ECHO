@@ -1081,6 +1081,7 @@ components:
         storyIds: { type: array, minItems: 1, maxItems: 100, items: { type: string } }
         order: { type: integer, minimum: 0, maximum: 199, description: "Optional identity-scoped manual order; legacy collections retain their stored order." }
         coverStoryId: { type: [string, "null"], description: "A Story in this collection, or null for an automatic cover." }
+        coverImage: { type: string, maxLength: 300, description: "Optional separately uploaded private cover image." }
     StoryMusic:
       type: object
       description: Metadata only; no music provider, audio stream or playback is connected.
