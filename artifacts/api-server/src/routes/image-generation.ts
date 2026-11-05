@@ -4,7 +4,8 @@ import { requireAuth } from '../middlewares/requireAuth';
 import { readUniverse } from '../lib/universeRepository';
 import { db, echoMediaTable } from '@workspace/db';
 import { and, eq, inArray } from 'drizzle-orm';
-import { imageGenerationAvailability, MAX_IMAGE_REFERENCE_COUNT } from '../lib/imageGenerationProvider';
+import { imageGenerationAvailability } from '../lib/imageGenerationProvider';
+import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imagePromptBuilder';
 
 /**
  * Image generation preparation. Strictly NO provider calls, no paid operations.
@@ -16,13 +17,6 @@ const Input = z.object({
   characterId: z.string().min(1).max(120),
   prompt: z.string().trim().min(3).max(2000),
 }).strict();
-const styles = {
-  natural: 'Natural candid photorealism, realistic skin texture, pores, natural imperfections, believable lighting.',
-  phone: 'Photorealistic smartphone snapshot, spontaneous framing, realistic flash or ambient light, subtle digital noise.',
-  analog: 'Photorealistic 35mm film photography, fine film grain, organic colors, authentic analog exposure.',
-  editorial: 'Photorealistic editorial fashion photography, professional but believable lighting, realistic skin and anatomy.',
-  cinematic: 'Photorealistic cinematic still, dramatic naturalistic light, deep shadows, realistic proportions.',
-} as const;
 const router: IRouter = Router();
 
 router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
@@ -38,11 +32,8 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
       res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
     }
     const identity = character.identity ?? {};
-    const selected = typeof state.imageStyle === 'string' && state.imageStyle in styles
-      ? state.imageStyle as keyof typeof styles : 'natural';
-    const descriptions = [identity.facialDescription, identity.bodyDescription, identity.appearance, identity.styleNotes]
-      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-      .map(v => v.slice(0, 4000));
+    const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
+      ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
     const candidates = [character.avatar, ...(Array.isArray(identity.referenceImages) ? identity.referenceImages : [])];
     const references = [...new Set(candidates.filter((v): v is string =>
       typeof v === 'string' && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(v)))].slice(0, 4);
@@ -54,15 +45,9 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
         inArray(echoMediaTable.objectPath, references),
       )) : [];
     const verifiedReferenceCount = owned.length;
-    const preparedPrompt = [
-      'Create a believable real photograph, not an illustration, doll, render or beauty-filtered image.',
-      styles[selected],
-      'Keep the same character identity, facial proportions, distinctive marks and physical details as the provided references.',
-      `Character: ${String(character.name ?? '').slice(0, 160)}.`,
-      ...descriptions,
-      `Scene: ${input.data.prompt}.`,
-      'Avoid waxy/plastic skin, artificial symmetry, airbrushing and uncanny facial features.',
-    ].join('\n');
+    const preparedPrompt = buildCharacterImagePrompt({
+      name: String(character.name ?? ''), scene: input.data.prompt, style: selected, identity,
+    });
     res.json({
       status: 'preview_only',
       generationEnabled: false,
