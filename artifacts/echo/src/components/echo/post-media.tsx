@@ -37,7 +37,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   if (count <= 1) {
     return (
       <button onClick={onTap} className="relative block w-full overflow-hidden bg-card sm:rounded-[22px]" aria-label="Doble toque para indicar que te gusta" data-testid={`button-image-${postId}`}>
-        <GracefulImage key={resolveMedia(media[0]?.url ?? '')} src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} draggable={false} containerClassName="aspect-[4/5] w-full" className="absolute inset-0 h-full w-full object-cover" fallback={imageFallback} data-testid={`img-post-${postId}`} />
+        <GracefulImage key={resolveMedia(media[0]?.url ?? '')} src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} draggable={false} containerClassName="aspect-[4/5] w-full" className="absolute inset-0 h-full w-full object-cover" fallback={<span className="absolute inset-0 animate-pulse bg-card" />} errorFallback={imageFallback} data-testid={`img-post-${postId}`} />
         {overlay}
       </button>
     );
