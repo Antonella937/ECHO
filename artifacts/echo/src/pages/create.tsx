@@ -12,6 +12,8 @@ import { Switch } from '@/components/ui/switch';
 import { compressImage, useMediaResolver, uploadPrivateFile, uploadPrivateImage } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { customFetch } from '@workspace/api-client-react';
+import { getActiveUniverseId } from '@/store/persistence';
 
 type Mode = 'post' | 'story';
 
@@ -26,6 +28,8 @@ export default function CreatePage() {
   const [mediaSource, setMediaSource] = useState<'upload' | 'ai'>('upload');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiPreview, setAiPreview] = useState(false);
+  const [aiPrepared, setAiPrepared] = useState<{ preparedPrompt: string; referenceCount: number; style: string } | null>(null);
+  const [aiPreparing, setAiPreparing] = useState(false);
   const [items, setItems] = useState<PostMedia[]>([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -101,6 +105,23 @@ export default function CreatePage() {
       setBusy(false);
       setProgress(null);
     }
+  };
+
+  const prepareAi = async () => {
+    if (!aiPrompt.trim() || aiPreparing) return;
+    setAiPreparing(true);
+    setAiPrepared(null);
+    setError(null);
+    try {
+      const result = await customFetch<{ preparedPrompt: string; referenceCount: number; style: string; generationEnabled: boolean }>('/api/ai-engine/images/prepare', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(), characterId: me.id, prompt: aiPrompt.trim() }), responseType: 'json',
+      });
+      if (result.generationEnabled) throw new Error('La preparación no debe generar imágenes.');
+      setAiPrepared(result);
+      setAiPreview(true);
+    } catch (err) { setError((err as Error).message || 'No se pudo preparar la imagen.'); }
+    finally { setAiPreparing(false); }
   };
 
   const move = (i: number, d: -1 | 1) =>
@@ -189,7 +210,7 @@ export default function CreatePage() {
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
-          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); }}
+          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); }}
             rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
             data-testid="input-ai-image-prompt" />
@@ -199,12 +220,12 @@ export default function CreatePage() {
             <div className="mt-1 text-muted-foreground">Descripciones: {me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente'} · {me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente'}</div>
             <Link href={`/characters/${me.id}/edit`} className="mt-2 inline-block text-primary underline">Editar identidad visual</Link>
           </div>
-          <button type="button" disabled={!aiPrompt.trim()} onClick={() => setAiPreview(true)}
+          <button type="button" disabled={!aiPrompt.trim() || aiPreparing} onClick={() => void prepareAi()}
             className="mt-3 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40"
-            data-testid="button-ai-image-preview">Preparar vista previa · gratis</button>
-          {aiPreview && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
+            data-testid="button-ai-image-preview">{aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis'}</button>
+          {aiPreview && aiPrepared && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
             <div className="text-sm font-semibold">Vista previa de la solicitud</div>
-            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrompt.trim()}</p>
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrepared.preparedPrompt}</p><p className="mt-2 text-xs text-muted-foreground">Referencias privadas seleccionadas: {aiPrepared.referenceCount} · Estilo: {aiPrepared.style}</p>
             <p className="mt-2 text-xs text-muted-foreground">El generador real todavía no está conectado. No se creó ninguna imagen ni se gastaron créditos. Para publicar ahora, subí una foto desde la otra pestaña.</p>
           </div>}
         </section>}
