@@ -10,6 +10,7 @@ export function applyApprovedClosenessProgression(
   actorId: string,
   targetId: string,
   now: Date,
+  guard: { lastAppliedAt: Date | null; consumedMessageIds: readonly string[] },
 ): { state: SocialState; applied: boolean; reason: string } {
   if (!actorId || !targetId || actorId === targetId) {
     return { state, applied: false, reason: "INVALID_PAIR" };
@@ -19,10 +20,17 @@ export function applyApprovedClosenessProgression(
   if (!actor?.configuration || !target) return { state, applied: false, reason: "CHARACTER_NOT_FOUND" };
   const relationship = actor.configuration.relationships.find(r => r.targetId === targetId);
   if (!relationship) return { state, applied: false, reason: "RELATIONSHIP_NOT_CONFIGURED" };
+  // The caller must load these values from an owner-scoped durable ledger
+  // under the same transaction as the universe update. Never trust client JSON.
+  const lastApplied = guard.lastAppliedAt?.getTime() ?? null;
+  if (lastApplied !== null && (!Number.isFinite(lastApplied) ||
+    lastApplied > now.getTime() || now.getTime() - lastApplied < 7 * 24 * 60 * 60_000))
+    return { state, applied: false, reason: "RELATIONSHIP_COOLDOWN" };
+  const consumed = new Set(guard.consumedMessageIds);
   const cutoff = now.getTime() - 30 * 24 * 60 * 60_000;
   const messages = state.messages.filter(m => {
     const at = new Date(m.createdAt).getTime();
-    return !m.hiddenForIds?.includes(actorId) &&
+    return !consumed.has(m.id) && !m.hiddenForIds?.includes(actorId) &&
       Number.isFinite(at) && at >= cutoff && at <= now.getTime() &&
       ((m.senderId === actorId && m.recipientId === targetId) ||
         (m.senderId === targetId && m.recipientId === actorId));
