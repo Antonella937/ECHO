@@ -21,7 +21,8 @@ function fixture() {
       const id = `msg-${day}-${senderId}`;
       ids.push(id);
       seed.messages.push({
-        id, senderId, recipientId, text: "Checking in after rehearsal",
+        id, threadId: "mar-nela", senderId, recipientId, text: "Checking in after rehearsal",
+        storyId: null, postId: null, readBy: [], origin: "manual",
         createdAt: new Date(`2026-11-0${day}T12:00:00Z`),
       } as typeof seed.messages[number]);
     }
