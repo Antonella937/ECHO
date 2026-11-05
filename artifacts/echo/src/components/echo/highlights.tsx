@@ -97,7 +97,7 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
       ) : (
         <div className="flex gap-2">
           {initial && <button onClick={() => setConfirm(true)} aria-label="Eliminar destacada" className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-destructive" data-testid="button-highlight-delete"><Trash2 className="h-5 w-5" /></button>}
-          <button onClick={save} disabled={!title.trim() || uploadingCover} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-highlight-save">Guardar</button>
+          <button onClick={save} disabled={!title.trim() || (!ids.length && !coverImage) || uploadingCover} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-highlight-save">Guardar</button>
         </div>
       )}>
       {confirm ? <p className="pb-2 text-sm text-muted-foreground">Se quita la destacada del perfil. Las historias no se borran.</p> : (
