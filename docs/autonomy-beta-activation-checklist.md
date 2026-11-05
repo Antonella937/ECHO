@@ -8,7 +8,7 @@ Status: preparation only. This document does not authorize live execution or cha
 - Owner-specific, universe-specific, opt-in character controls and global emergency stop.
 
 ## Before enabling production
-1. Publish reviewed, accessible Terms of Use and Privacy Policy with a version and effective date. Identify the actual controller/operator and contact; describe AI text providers, data transfers, retention, user rights, account deletion, minors, and automated fictional content. Obtain appropriate legal review for the applicable jurisdictions.
+1. Publish reviewed, accessible Terms of Use and Privacy Policy with a version and effective date. Identify ECHO as an individual creator's personal project (not a company), with the creator as the responsible operator; confirm the appropriate public legal identity and contact without inventing a company; describe AI text providers, data transfers, retention, user rights, account deletion, minors, and automated fictional content. Obtain appropriate legal review for the applicable jurisdictions.
 2. Implement server-side, versioned acceptance of those specific published documents for each owner. The existing `alpha-draft-1` acknowledgement is not legal consent.
 3. Enforce valid acceptance in the backend for every live autonomous cycle, not only the frontend switch; refuse execution on withdrawal or superseded terms.
 4. Verify provider budget protection, free-only text models, idempotency, cooldown, daily caps, ownership and universe isolation, lease recovery, and immediate kill-switch effect.
