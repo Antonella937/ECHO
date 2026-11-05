@@ -23,6 +23,7 @@ export interface ImageGenerationResult {
 export const IMAGE_GENERATION_MODEL = 'qwen/qwen-image-2.1-turbo';
 export const MAX_IMAGE_REFERENCE_COUNT = 4;
 export const MAX_IMAGE_COST_USD = 0.10;
+// Paid generation remains disabled until provider validation and owner approval.
 
 /** Explicitly disabled until a persistent atomic spending ledger is deployed. */
 export function imageGenerationAvailability() {
