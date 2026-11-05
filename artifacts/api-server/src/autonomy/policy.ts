@@ -185,6 +185,43 @@ export function chooseAutonomyOpportunity(input: {
     ...history.map((event) => event.createdAt.getTime()),
     0,
   );
+  // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
+  // Only conversations represented by real character accounts are eligible.
+  const incoming = [...state.messages]
+    .filter((message) => message.recipientId === character.id &&
+      message.senderId !== character.id &&
+      !message.hiddenForIds?.includes(character.id) &&
+      !!message.text.trim() &&
+      state.characters.some((candidate) => candidate.id === message.senderId && !candidate.archived) &&
+      (asTime(message.createdAt) ?? 0) <= now.getTime() &&
+      now.getTime() - (asTime(message.createdAt) ?? 0) < DAY_MS)
+    .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
+  const unanswered = incoming.slice(0, 1).find((message) => {
+    const sentAt = asTime(message.createdAt) ?? 0;
+    const latestOwnReply = state.messages
+      .filter((item) => item.senderId === character.id && item.recipientId === message.senderId)
+      .reduce((latest, item) => Math.max(latest, asTime(item.createdAt) ?? 0), 0);
+    return latestOwnReply < sentAt;
+  });
+  // Incoming replies use a short independent delay, not the 6-hour posting cooldown.
+  // A per-character daily ceiling still prevents unbounded conversations.
+  const replyDelayMs = 2 * 60_000;
+  const latestReplyAt = state.messages
+    .filter((message) => message.senderId === character.id && message.origin === "autonomy")
+    .reduce((latest, message) => Math.max(latest, asTime(message.createdAt) ?? 0), 0);
+  const recentReplies = state.messages.filter((message) =>
+    message.senderId === character.id && message.origin === "autonomy" &&
+    (asTime(message.createdAt) ?? 0) > now.getTime() - DAY_MS).length;
+  if (unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
+      now.getTime() - latestReplyAt >= replyDelayMs && recentReplies < 12 &&
+      !/\b(sleep|sleeping|dormir|durmiendo|descansando)\b/.test(
+        `${config?.currentState?.activity ?? ""}`.toLowerCase())) {
+    return { situation: "dm", recipientId: unanswered.senderId,
+      reasonCode: "OPPORTUNITY_SELECTED",
+      reason: "A recent incoming direct message is awaiting a reply.",
+      localHour: local.hour, timezone };
+  }
+
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
   if (latestActivity > 0 && now.getTime() - latestActivity < cooldownMs) {
     return { situation: null, reasonCode: "COOLDOWN", reason: "Minimum cooldown has not elapsed.", localHour: local.hour, timezone };
