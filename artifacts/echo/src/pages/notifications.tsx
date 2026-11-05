@@ -46,7 +46,49 @@ export default function NotificationsPage() {
     else navigate(`/profile/${n.actorId}`);
   };
 
-  const Row = ({ n }: { n: Group }) => {
+
+
+  return (
+    <div>
+      <TopBar
+        title="Avisos"
+        right={
+          unread.length > 0 && (
+            <button onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary" data-testid="button-mark-all-read">
+              Marcar todo como leído
+            </button>
+          )
+        }
+      />
+      {list.length === 0 ? (
+        <EmptyState title="Todo en calma" body="Cuando alguien comente, responda o te escriba, aparecerá aquí." />
+      ) : (
+        <div className="px-1 pt-3">
+          {unread.length > 0 && (
+            <>
+              <h2 className="px-4 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Nuevas</h2>
+              <ul>{unread.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} open={open} resolveMedia={resolveMedia} />)}</ul>
+            </>
+          )}
+          {read.length > 0 && (
+            <>
+              <h2 className="px-4 pb-1 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Anteriores</h2>
+              <ul className="opacity-80">{read.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} open={open} resolveMedia={resolveMedia} />)}</ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotificationRow({ n, character, state, open, resolveMedia }: {
+  n: Group;
+  character: ReturnType<typeof useSocial>['character'];
+  state: ReturnType<typeof useSocial>['state'];
+  open: (n: Group) => void;
+  resolveMedia: ReturnType<typeof useMediaResolver>;
+}) {
     const actor = character(n.actorId);
     const others = n.actorIds.filter((a) => a !== n.actorId).map(character).filter(Boolean);
     const post = n.postId ? state.posts.find((p) => p.id === n.postId) : undefined;
@@ -70,38 +112,4 @@ export default function NotificationsPage() {
         </button>
       </li>
     );
-  };
-
-  return (
-    <div>
-      <TopBar
-        title="Avisos"
-        right={
-          unread.length > 0 && (
-            <button onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary" data-testid="button-mark-all-read">
-              Marcar todo como leído
-            </button>
-          )
-        }
-      />
-      {list.length === 0 ? (
-        <EmptyState title="Todo en calma" body="Cuando alguien comente, responda o te escriba, aparecerá aquí." />
-      ) : (
-        <div className="px-1 pt-3">
-          {unread.length > 0 && (
-            <>
-              <h2 className="px-4 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Nuevas</h2>
-              <ul>{unread.map((n) => <Row key={n.id} n={n} />)}</ul>
-            </>
-          )}
-          {read.length > 0 && (
-            <>
-              <h2 className="px-4 pb-1 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Anteriores</h2>
-              <ul className="opacity-80">{read.map((n) => <Row key={n.id} n={n} />)}</ul>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
