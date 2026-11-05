@@ -9,7 +9,8 @@ export const isStoryActive = (s: Story, now = Date.now()) => {
 };
 export function canViewStory(story: Story, viewerId: string, state: SocialState): boolean {
   if (story.authorId === viewerId || !story.closeFriendsOnly) return true;
-  return (story.allowedViewerIds ?? state.closeFriends?.[story.authorId] ?? []).includes(viewerId);
+  const current = state.closeFriends?.[story.authorId] ?? [];
+  return current.includes(viewerId) && (story.allowedViewerIds ?? current).includes(viewerId);
 }
 export function mentionIds(text: string, accounts: Character[]): string[] {
   const handles = [...text.matchAll(/(?:^|[^a-zA-Z0-9_])@([a-zA-Z0-9_][a-zA-Z0-9_.]{0,29})/g)].map(m => m[1].replace(/\.+$/, '').toLowerCase());
