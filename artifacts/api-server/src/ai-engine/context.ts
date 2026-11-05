@@ -179,10 +179,28 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       ...sharedMessages.map(m => ({ id: m.id, at: m.createdAt, kind: 'dm' })),
       ...sharedComments.map(m => ({ id: m.id, at: m.createdAt, kind: 'comment' })),
     ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    // A cautious, reversible suggestion only: reciprocal contact on separate
+    // days can indicate familiarity, never trust, attraction or a new preset.
+    const cutoff = now.getTime() - 30 * 24 * 60 * 60_000;
+    const recentMessages = sharedMessages.filter(m => {
+      const at = new Date(m.createdAt).getTime();
+      return Number.isFinite(at) && at >= cutoff && at <= now.getTime();
+    });
+    const distinctDays = new Set(recentMessages.map(m => new Date(m.createdAt).toISOString().slice(0, 10))).size;
+    const sent = recentMessages.filter(m => m.senderId === actor.id).length;
+    const received = recentMessages.filter(m => m.senderId === targetId).length;
+    const reciprocal = sent >= 3 && received >= 3 && distinctDays >= 3;
+    const suggestedClosenessDelta = reciprocal ? 1 : 0;
     return { target: identityOf(targetId),
       dmCount: sharedMessages.length, commentCount: sharedComments.length,
       latestInteractions: visibleEvents.slice(0, 5),
-      interpretation: 'observed_contact_only_not_proof_of_affection_or_trust',
+      progression: { periodDays: 30, distinctConversationDays: distinctDays,
+        messagesSent: sent, messagesReceived: received, reciprocal,
+        suggestedClosenessDelta, applied: false,
+        reason: reciprocal ? 'sustained_reciprocal_contact' : 'insufficient_reciprocal_evidence',
+        trustDelta: 0, attractionDelta: 0, tensionDelta: 0,
+        presetChange: false },
+      interpretation: 'contact_is_not_proof_of_affection_or_trust',
       relationshipScoresChanged: false };
   });
   const data = {
