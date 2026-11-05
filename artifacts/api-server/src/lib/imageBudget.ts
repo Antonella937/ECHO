@@ -53,8 +53,8 @@ export async function settleImageBudget(id: string, outcome: {
     if (!job || job.status !== 'reserved') throw Error('IMAGE_JOB_NOT_RESERVABLE');
     const reported = outcome.reportedCostUsd === undefined ? undefined : toMicroUsd(outcome.reportedCostUsd);
     if (reported !== undefined && reported > job.reservedMicroUsd) throw Error('IMAGE_PROVIDER_COST_EXCEEDS_RESERVATION');
-    const charged = outcome.status === 'unknown' ? job.reservedMicroUsd :
-      outcome.status === 'failed' ? (reported ?? job.reservedMicroUsd) : (reported ?? job.reservedMicroUsd);
+    // A missing provider cost report is treated as the full reserved amount.
+    const charged = reported ?? job.reservedMicroUsd;
     await tx.update(echoImageBudgetMonthsTable).set({
       reservedMicroUsd: sql`${echoImageBudgetMonthsTable.reservedMicroUsd} - ${job.reservedMicroUsd}`,
       spentMicroUsd: sql`${echoImageBudgetMonthsTable.spentMicroUsd} + ${charged}`,
