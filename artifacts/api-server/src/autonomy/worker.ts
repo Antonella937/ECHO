@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 export const AUTONOMY_WORKER_INTERVAL_MS = 2 * 60_000;
 const WORKER_LEASE_MS = 10 * 60_000;
+const SOCIAL_INTERVAL_MS = 30 * 60_000;
 
 export interface AutonomyWorkerTarget {
   ownerId: string;
@@ -33,7 +34,7 @@ export async function runAutonomyWorkerTick(input: {
   repository: AutonomyWorkerRepository;
   processCharacter: (
     ownerId: string,
-    input: { universeId: string; characterId: string; idempotencyKey: string },
+    input: { universeId: string; characterId: string; idempotencyKey: string; lane?: "dm" | "social" },
     now: Date,
   ) => Promise<{ status: string }>;
   now?: Date;
@@ -51,15 +52,17 @@ export async function runAutonomyWorkerTick(input: {
   try {
     const targets = await input.repository.listLiveOptInTargets();
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
+    const socialSlot = Math.floor(now.getTime() / SOCIAL_INTERVAL_MS);
     for (const target of targets) {
       const characterHash = createHash("sha256").update(`${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
-      const digest = createHash("sha256").update(`worker:${slot}:${characterHash}`).digest("hex");
+      const lane: "dm" | "social" = "dm";
+      const digest = createHash("sha256").update(`dm:${slot}:${characterHash}`).digest("hex");
       // Deterministic RFC 4122 UUID: the API requires UUID keys, including worker runs.
       const idempotencyKey = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
       evaluated += 1;
       try {
         const result = await input.processCharacter(
-          target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey }, now,
+          target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane }, now,
         );
         if (result.status === "executed") executed += 1;
         else if (result.status === "no_action" || result.status === "disabled" ||
@@ -68,6 +71,20 @@ export async function runAutonomyWorkerTick(input: {
         else failed += 1;
       } catch {
         failed += 1;
+      }
+    }
+    // Spontaneous activity retains its slower cadence and separate idempotency namespace.
+    if (slot % (SOCIAL_INTERVAL_MS / AUTONOMY_WORKER_INTERVAL_MS) === 0) {
+      for (const target of targets) {
+        const hash = createHash("sha256").update(`social:${socialSlot}:${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex");
+        const idempotencyKey = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+        evaluated++;
+        try {
+          const result = await input.processCharacter(target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane: "social" }, now);
+          if (result.status === "executed") executed++;
+          else if (result.status === "failed") failed++;
+          else noAction++;
+        } catch { failed++; }
       }
     }
     return { status: "completed", evaluated, executed, noAction, failed };
