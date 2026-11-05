@@ -151,7 +151,7 @@ export async function moveLocalImagesToPrivateStorage(state: SocialState): Promi
   const refs = [
     ...state.characters.flatMap((character) => [
       character.avatar,
-      ...character.identity.referenceImages,
+      ...(character.identity?.referenceImages ?? []),
     ]),
     ...state.posts.flatMap((post) => [post.image, ...(post.media ?? []).map(item => item.url)]),
     ...state.stories.map((story) => story.image),
@@ -175,8 +175,9 @@ export async function moveLocalImagesToPrivateStorage(state: SocialState): Promi
       ...character,
       avatar: mapRef(character.avatar),
       identity: {
-        ...character.identity,
-        referenceImages: character.identity.referenceImages.map(mapRef),
+        provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date(0).toISOString(),
+        ...(character.identity ?? {}),
+        referenceImages: (character.identity?.referenceImages ?? []).map(mapRef),
       },
     })),
     posts: state.posts.map((post) => ({
