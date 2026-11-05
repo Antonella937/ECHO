@@ -41,6 +41,7 @@ export default function CreatePage() {
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [alsoStory, setAlsoStory] = useState(false);
+  const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [tagged, setTagged] = useState<string[]>([]);
   const [mentioned, setMentioned] = useState<string[]>([]);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
@@ -201,7 +202,7 @@ export default function CreatePage() {
         }
         if (storyVideo) { setError('Las historias admiten solo fotos.'); return; }
         if (musicPartial) { setError('Completá título y artista de la música, o dejá ambos vacíos.'); return; }
-        actions.createStory({ image, caption, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
+        actions.createStory({ image, caption, closeFriendsOnly, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: 'Historia publicada', description: `Como ${me.name}` });
         navigate('/');
