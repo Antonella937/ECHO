@@ -1351,6 +1351,48 @@ test("background scheduler is wired but globally disabled; timer lifecycle is co
   assert.equal(cleared, 1);
 });
 
+test("scheduler skips overlapping ticks, reports failures, and never restarts after stop", async () => {
+  let trigger: (() => void) | undefined;
+  let calls = 0;
+  let cleared = 0;
+  let finishFirst: (() => void) | undefined;
+  const firstPending = new Promise<void>((resolve) => { finishFirst = resolve; });
+  const failures: string[] = [];
+  const fakeTimer = { unref() {} } as unknown as ReturnType<typeof setInterval>;
+  const scheduler = startAutonomyWorker({
+    enabled: true,
+    tick: async () => {
+      calls++;
+      if (calls === 1) await firstPending;
+      else throw new Error("SYNTHETIC_TICK_FAILURE");
+      return { status: "completed", evaluated: 0, executed: 0, noAction: 0, failed: 0 };
+    },
+    setIntervalFn: ((callback: () => void) => {
+      trigger = callback;
+      return fakeTimer;
+    }) as typeof setInterval,
+    clearIntervalFn: (() => { cleared++; }) as typeof clearInterval,
+    onError: (code) => failures.push(code),
+  });
+  assert.ok(trigger);
+  trigger();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(calls, 1);
+  trigger();
+  assert.equal(calls, 1, "overlapping interval must not launch a second tick");
+  finishFirst!();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  trigger();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(calls, 2);
+  assert.deepEqual(failures, ["SYNTHETIC_TICK_FAILURE"]);
+  scheduler.stop();
+  assert.equal(cleared, 1);
+  trigger();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(calls, 2, "stopped scheduler must never restart");
+});
+
 test("PostgreSQL worker lease is exclusive, token-owned, and restores the prior singleton row", async () => {
   const name = "autonomy-live-worker";
   const [previous] = await db.select().from(echoAutonomyWorkerLeasesTable)

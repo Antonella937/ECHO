@@ -85,9 +85,17 @@ export function startAutonomyWorker(input: {
   if (!input.enabled) return { started: false, stop: () => undefined };
   const setIntervalFn = input.setIntervalFn ?? setInterval;
   const clearIntervalFn = input.clearIntervalFn ?? clearInterval;
+  // Never overlap ticks within a process, even if a tick outlasts its interval.
+  // The database lease independently prevents overlapping across processes.
+  let running = false;
+  let stopped = false;
   const handle = setIntervalFn(() => {
-    void input.tick().catch((error) => input.onError?.(safeErrorCode(error)));
+    if (stopped || running) return;
+    running = true;
+    void Promise.resolve().then(() => input.tick())
+      .catch((error) => input.onError?.(safeErrorCode(error)))
+      .finally(() => { running = false; });
   }, input.intervalMs ?? AUTONOMY_WORKER_INTERVAL_MS);
   handle.unref?.();
-  return { started: true, stop: () => clearIntervalFn(handle) };
+  return { started: true, stop: () => { stopped = true; clearIntervalFn(handle); } };
 }
