@@ -1,4 +1,7 @@
 import { VerifiedBadge } from '@/components/echo/verified-badge';
+import { customFetch } from '@workspace/api-client-react';
+import { useUser } from '@clerk/react';
+import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
 import { ChevronLeft, CornerUpLeft, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
@@ -21,6 +24,8 @@ interface Pending { key: string; kind: MessageAttachment['type']; preview: strin
 
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useUser();
+  const [otherTyping, setOtherTyping] = useState(false);
   const { me, character, actions, state } = useSocial();
   const other = character(id);
   const messages = useThreadMessages(id);
@@ -45,6 +50,21 @@ export default function ConversationPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!id || !user?.id) { setOtherTyping(false); return; }
+    let active = true;
+    const check = async () => {
+      try {
+        const universeId = getActiveUniverseId(user.id);
+        const result = await customFetch<{ typing: boolean }>(`/api/autonomy/typing?${new URLSearchParams({ universeId, characterId: id })}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
+        if (active) setOtherTyping(result.typing);
+      } catch { if (active) setOtherTyping(false); }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 2000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [id, user?.id]);
 
   // Revoke local previews on unmount / route change.
   useEffect(() => () => pendingRef.current.forEach(p => URL.revokeObjectURL(p.preview)), [id]);
@@ -169,6 +189,14 @@ export default function ConversationPage() {
             />
           ))}
         </ul>
+        {otherTyping && (
+          <div className="mt-2 flex items-center gap-2" role="status" aria-label={`${other.name} está escribiendo`} data-testid="dm-typing-indicator">
+            <CharacterAvatar character={other} size={26} />
+            <div className="flex items-center gap-1 rounded-[20px] rounded-bl-md bg-secondary px-4 py-3" aria-hidden="true">
+              {[0, 1, 2].map(i => <span key={i} className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 160}ms`, animationDuration: "900ms" }} />)}
+            </div>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
