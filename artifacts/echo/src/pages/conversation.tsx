@@ -127,7 +127,7 @@ export default function ConversationPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] min-w-0 flex-col overflow-x-hidden">
+    <div className="flex min-h-[100dvh] min-w-0 flex-col overflow-x-clip">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="flex h-16 items-center gap-2 px-2">
           <button onClick={back} aria-label="Volver" className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
@@ -143,7 +143,7 @@ export default function ConversationPage() {
         </div>
       </header>
 
-      <div className="min-w-0 flex-1 overflow-x-hidden px-3 pb-4 pt-6 sm:px-4" data-testid="list-conversation-messages">
+      <div className="min-w-0 flex-1 overflow-x-clip px-3 pb-4 pt-6 sm:px-4" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
