@@ -46,6 +46,14 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
     const candidates = [character.avatar, ...(Array.isArray(identity.referenceImages) ? identity.referenceImages : [])];
     const references = [...new Set(candidates.filter((v): v is string =>
       typeof v === 'string' && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(v)))].slice(0, 4);
+    // Only count reference objects registered to the authenticated owner.
+    // Actual bytes will be fetched server-side when paid generation is enabled.
+    const owned = references.length ? await db.select({ objectPath: echoMediaTable.objectPath })
+      .from(echoMediaTable).where(and(
+        eq(echoMediaTable.ownerId, req.userId!),
+        inArray(echoMediaTable.objectPath, references),
+      )) : [];
+    const verifiedReferenceCount = owned.length;
     const preparedPrompt = [
       'Create a believable real photograph, not an illustration, doll, render or beauty-filtered image.',
       styles[selected],
