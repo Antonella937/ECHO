@@ -127,7 +127,7 @@ export default function ConversationPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    <div className="flex min-h-[100dvh] min-w-0 flex-col overflow-x-hidden">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="flex h-16 items-center gap-2 px-2">
           <button onClick={back} aria-label="Volver" className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
@@ -143,7 +143,7 @@ export default function ConversationPage() {
         </div>
       </header>
 
-      <div className="flex-1 px-4 pb-4 pt-6" data-testid="list-conversation-messages">
+      <div className="min-w-0 flex-1 overflow-x-hidden px-3 pb-4 pt-6 sm:px-4" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
@@ -269,7 +269,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const reactions = m.reactions ?? [];
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
   return (
-    <li className={cn('fade-up group flex flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
+    <li className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
@@ -302,11 +302,11 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
         </div>
       ) : null}
-      <div className={cn('flex max-w-full items-center gap-1', mine ? 'flex-row-reverse' : 'flex-row')}>
+      <div className={cn('flex w-full min-w-0 max-w-full items-center gap-1', mine ? 'flex-row-reverse' : 'flex-row')}>
         {m.text && (
           <p
             className={cn(
-              'max-w-[78%] whitespace-pre-wrap break-words rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
+              'min-w-0 max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
               mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-secondary text-foreground',
             )}
           >
