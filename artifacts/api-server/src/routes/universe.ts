@@ -12,6 +12,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { universeAccountError } from "../lib/universeValidation";
 import { recordIncomingConversationEvents } from "../ai-engine/incoming-memory";
+import { approveRelationshipProgression } from "../lib/relationshipApproval";
 
 const router: IRouter = Router();
 
@@ -55,6 +56,29 @@ router.get("/universe/memory-archive", async (req, res): Promise<void> => {
     eq(echoMemoryArchiveTable.characterId, characterId),
   )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(50);
   res.json({ memories });
+});
+
+// This endpoint is intentionally user-triggered; no autonomous worker calls it.
+router.post("/universe/relationships/approve", async (req, res): Promise<void> => {
+  const body = req.body as Record<string, unknown> | null;
+  const actorId = body?.actorId;
+  const targetId = body?.targetId;
+  const expectedRevision = body?.expectedRevision;
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  if (typeof actorId !== "string" || !actorId || actorId.length > 100 ||
+      typeof targetId !== "string" || !targetId || targetId.length > 100 ||
+      !Number.isSafeInteger(expectedRevision) || (expectedRevision as number) < 1 ||
+      universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_RELATIONSHIP_APPROVAL" }); return;
+  }
+  const result = await approveRelationshipProgression(
+    req.userId!, universeId, actorId, targetId, expectedRevision as number,
+  );
+  if (!result.applied) {
+    const conflict = result.reason === "REVISION_CONFLICT" || result.reason === "UNIVERSE_UNAVAILABLE";
+    res.status(conflict ? 409 : 422).json(result); return;
+  }
+  res.json(result);
 });
 
 router.put("/universe", async (req, res): Promise<void> => {
