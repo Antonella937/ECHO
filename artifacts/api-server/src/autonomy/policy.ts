@@ -196,7 +196,7 @@ export function chooseAutonomyOpportunity(input: {
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
       now.getTime() - (asTime(message.createdAt) ?? 0) < DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
-  const unanswered = incoming.find((message) => {
+  const unanswered = incoming.slice(0, 1).find((message) => {
     const sentAt = asTime(message.createdAt) ?? 0;
     const latestOwnReply = state.messages
       .filter((item) => item.senderId === character.id && item.recipientId === message.senderId)
@@ -214,7 +214,7 @@ export function chooseAutonomyOpportunity(input: {
     (asTime(message.createdAt) ?? 0) > now.getTime() - DAY_MS).length;
   if (unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
       now.getTime() - latestReplyAt >= replyDelayMs && recentReplies < 12 &&
-      !/\\b(sleep|sleeping|dormir|durmiendo|descansando)\\b/.test(
+      !/\b(sleep|sleeping|dormir|durmiendo|descansando)\b/.test(
         `${config?.currentState?.activity ?? ""}`.toLowerCase())) {
     return { situation: "dm", recipientId: unanswered.senderId,
       reasonCode: "OPPORTUNITY_SELECTED",
