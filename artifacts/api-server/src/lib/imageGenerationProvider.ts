@@ -34,6 +34,12 @@ export function imageGenerationAvailability() {
     maximumReferences: MAX_IMAGE_REFERENCE_COUNT,
     monthlySpendingLimitUsd: 0,
     paidCallsMade: 0,
+    prerequisites: {
+      openRouterKeyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+      privateStorageConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+      providerValidated: false,
+      budgetActivated: false,
+    },
   };
 }
 
