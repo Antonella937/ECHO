@@ -24,7 +24,7 @@ export function StoryRail() {
             aria-label={mine ? 'Ver tu historia' : 'Crear historia'}
             data-testid="button-story-own"
           >
-            <CharacterAvatar character={me} size={66} ring={mine ? 'seen' : 'none'} className={mine ? '' : 'p-[5px]'} />
+            <CharacterAvatar character={me} size={66} ring={mine ? (mine.stories.some(s => s.closeFriendsOnly) ? 'close-friends' : 'seen') : 'none'} className={mine ? '' : 'p-[5px]'} />
           </button>
           <button
             onClick={() => navigate('/create?mode=story')}
@@ -45,7 +45,7 @@ export function StoryRail() {
           className="tap flex w-[74px] shrink-0 flex-col items-center gap-1.5"
           data-testid={`button-story-${g.author.id}`}
         >
-          <CharacterAvatar character={g.author} size={66} ring={g.allSeen ? 'seen' : 'unseen'} />
+          <CharacterAvatar character={g.author} size={66} ring={g.stories.some(s => s.closeFriendsOnly) ? 'close-friends' : (g.allSeen ? 'seen' : 'unseen')} />
           <span className={`w-full truncate text-center text-[11.5px] ${g.allSeen ? 'text-muted-foreground' : 'text-foreground'}`}>
             {g.author.name.split(' ')[0].toLowerCase()}<VerifiedBadge account={g.author} className="ml-0.5 h-3 w-3 align-[-1px]" />
           </span>
