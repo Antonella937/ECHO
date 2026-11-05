@@ -168,3 +168,22 @@ test('adaptador solo permite modelos gratis; errores y respuestas truncadas no s
     if (original === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = original;
   }
 });
+
+test('narrative context sees known characters posts but not unrelated feeds or private DMs', () => {
+  const s = fixture();
+  const mar = s.characters.find(c => c.id === 'mar')!;
+  const noah = s.characters.find(c => c.id === 'noah')!;
+  const unrelated = s.characters.find(c => c.id !== 'mar' && c.id !== 'noah')!;
+  s.posts = [];
+  const post = (id: string, authorId: string, caption: string) => ({
+    id, authorId, image: '', caption, location: '', createdAt: new Date(),
+    likes: [], savedBy: [], commentsEnabled: true,
+  });
+  s.posts.push(post('known-post', noah.id, 'KNOWN_FRIEND_POST'));
+  s.posts.push(post('unrelated-post', unrelated.id, 'UNRELATED_FEED_SENTINEL'));
+  s.follows[mar.id] = [noah.id];
+  const context = JSON.parse(buildCharacterContext(s, { characterId: mar.id, situation: 'post' }).serialized);
+  assert.ok(context.recentSocial.posts.some((p: { id: string }) => p.id === 'known-post'));
+  assert.ok(!context.recentSocial.posts.some((p: { id: string }) => p.id === 'unrelated-post'));
+  assert.ok(!JSON.stringify(context).includes('UNRELATED_PRIVATE_SENTINEL'));
+});
