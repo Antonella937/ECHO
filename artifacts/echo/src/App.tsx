@@ -20,6 +20,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { SocialStoreProvider } from '@/store/social-store';
 import { StoryViewerProvider } from '@/components/echo/story-viewer';
 import { Shell } from '@/components/echo/shell';
+import { MessageSoundObserver } from '@/components/echo/message-sound-observer';
 import { FounderSurprise } from '@/components/echo/founder-surprise';
 import { AppearanceSync } from '@/components/echo/appearance-sync';
 import HashtagPage from '@/pages/hashtag';
@@ -123,6 +124,7 @@ function ProtectedRouter() {
   }, [location]);
   return (
     <Shell>
+      <MessageSoundObserver />
       <FounderSurprise />
       <RoutedErrorBoundary>
         <Switch>
