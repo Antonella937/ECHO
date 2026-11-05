@@ -2,7 +2,7 @@ import { buildOpenRouterImageRequest, parseOpenRouterImageResponse } from './ope
 import type { ImageGenerationReference } from './imageGenerationPayload';
 import type { ImageGenerationResult } from './imageGenerationProvider';
 
-const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations';
+const ENDPOINT = 'https://openrouter.ai/api/v1/images';
 const MAX_RESPONSE_BYTES = 24_000_000;
 
 /**
