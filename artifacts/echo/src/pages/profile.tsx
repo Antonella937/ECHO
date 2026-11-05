@@ -79,7 +79,7 @@ export default function ProfilePage() {
             disabled={!stories.length}
             data-testid="button-profile-avatar"
           >
-            <CharacterAvatar character={person} size={88} ring={stories.length ? (unseen ? 'unseen' : 'seen') : 'none'} />
+            <CharacterAvatar character={person} size={88} ring={stories.length ? (stories.some(s => s.closeFriendsOnly) ? 'close-friends' : (unseen ? 'unseen' : 'seen')) : 'none'} />
           </button>
           <dl className="grid flex-1 grid-cols-3 text-center">
             <Stat value={posts.length} label={posts.length === 1 ? "publicación" : "publicaciones"} testId="text-count-posts" />
