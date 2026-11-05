@@ -1080,13 +1080,15 @@ export const GetUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(getUniverseResponseStateOneAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(getUniverseResponseStateOneHighlightsItemTitleMax),
   "storyIds": zod.array(zod.string()).min(1).max(getUniverseResponseStateOneHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(getUniverseResponseStateOneHighlightsItemOrderMin).max(getUniverseResponseStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
-  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
+  "coverImage": zod.string().max(300).optional()
 })).max(getUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(getUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -1304,6 +1306,8 @@ export const GetUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -1597,13 +1601,15 @@ export const SaveUniverseBody = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(saveUniverseBodyStateAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(saveUniverseBodyStateHighlightsItemTitleMax),
   "storyIds": zod.array(zod.string()).min(1).max(saveUniverseBodyStateHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(saveUniverseBodyStateHighlightsItemOrderMin).max(saveUniverseBodyStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
-  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
+  "coverImage": zod.string().max(300).optional()
 })).max(saveUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseBodyStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -1821,6 +1827,8 @@ export const SaveUniverseBody = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2102,13 +2110,15 @@ export const SaveUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(saveUniverseResponseStateOneAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(saveUniverseResponseStateOneHighlightsItemTitleMax),
   "storyIds": zod.array(zod.string()).min(1).max(saveUniverseResponseStateOneHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(saveUniverseResponseStateOneHighlightsItemOrderMin).max(saveUniverseResponseStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
-  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
+  "coverImage": zod.string().max(300).optional()
 })).max(saveUniverseResponseStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(saveUniverseResponseStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -2326,6 +2336,8 @@ export const SaveUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2657,13 +2669,15 @@ export const VerifyUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(verifyUniverseResponseOneStateOneAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(verifyUniverseResponseOneStateOneHighlightsItemTitleMax),
   "storyIds": zod.array(zod.string()).min(1).max(verifyUniverseResponseOneStateOneHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(verifyUniverseResponseOneStateOneHighlightsItemOrderMin).max(verifyUniverseResponseOneStateOneHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
-  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
+  "coverImage": zod.string().max(300).optional()
 })).max(verifyUniverseResponseOneStateOneHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(verifyUniverseResponseOneStateOneAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -2881,6 +2895,8 @@ export const VerifyUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMin).max(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3484,13 +3500,15 @@ export const CreateCreatorUniverseBody = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(createCreatorUniverseBodyStateAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(createCreatorUniverseBodyStateHighlightsItemTitleMax),
   "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseBodyStateHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(createCreatorUniverseBodyStateHighlightsItemOrderMin).max(createCreatorUniverseBodyStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
-  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
+  "coverImage": zod.string().max(300).optional()
 })).max(createCreatorUniverseBodyStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(createCreatorUniverseBodyStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -3708,6 +3726,8 @@ export const CreateCreatorUniverseBody = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3989,13 +4009,15 @@ export const CreateCreatorUniverseResponse = zod.object({
   "theme": zod.enum(['dark', 'light', 'system']),
   "accent": zod.string().regex(createCreatorUniverseResponseStateAppearanceAccentRegExp)
 }).optional(),
+  "closeFriends": zod.record(zod.string(), zod.array(zod.string())).optional(),
   "highlights": zod.array(zod.object({
   "id": zod.string(),
   "authorId": zod.string(),
   "title": zod.string().min(1).max(createCreatorUniverseResponseStateHighlightsItemTitleMax),
   "storyIds": zod.array(zod.string()).min(1).max(createCreatorUniverseResponseStateHighlightsItemStoryIdsMax),
   "order": zod.number().int().min(createCreatorUniverseResponseStateHighlightsItemOrderMin).max(createCreatorUniverseResponseStateHighlightsItemOrderMax).optional().describe('Optional identity-scoped manual order; legacy collections retain their stored order.'),
-  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.')
+  "coverStoryId": zod.string().nullish().describe('A Story in this collection, or null for an automatic cover.'),
+  "coverImage": zod.string().max(300).optional()
 })).max(createCreatorUniverseResponseStateHighlightsMax).optional(),
   "accountCatalogVersion": zod.number().int().min(createCreatorUniverseResponseStateAccountCatalogVersionMin).optional(),
   "creatorSetup": zod.object({
@@ -4213,6 +4235,8 @@ export const CreateCreatorUniverseResponse = zod.object({
   "displayMetrics": zod.object({
   "views": zod.number().int().min(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
+  "closeFriendsOnly": zod.boolean().optional(),
+  "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
