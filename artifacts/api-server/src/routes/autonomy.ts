@@ -162,7 +162,7 @@ router.post("/autonomy/dry-run", requireAuth, async (req, res): Promise<void> =>
     res.json(report);
   } catch (error) {
     const safe = error instanceof EngineError ? error : new EngineError("AUTONOMY_DRY_RUN_FAILED", 502);
-    req.log.warn({ code: safe.code }, "Text autonomy dry run failed");
+    req.log.warn({ code: safe.code, status: safe.status, cause: error instanceof Error ? error.message : String(error) }, "Text autonomy dry run failed");
     if (safe.retryAfterMs) res.setHeader("Retry-After", String(Math.ceil(safe.retryAfterMs / 1000)));
     res.status(safe.status).json({ error: safe.code, socialActionsExecuted: false });
   } finally {
