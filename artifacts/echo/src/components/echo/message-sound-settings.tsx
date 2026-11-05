@@ -18,7 +18,7 @@ export function MessageSoundSettings() {
       </h2>
       <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
         <p className="mb-3 text-xs text-muted-foreground">Tonos suaves estilo iPhone, exclusivos de ECHO.</p>
-        {([{ key: 'incoming', label: 'Mensajes recibidos' }, { key: 'outgoing', label: 'Mensajes enviados' }] as const).map(({ key, label }) => (
+        {([{ key: 'incoming', label: 'Mensajes recibidos' }, { key: 'outgoing', label: 'Mensajes enviados' }, { key: 'notification', label: 'Notificaciones' }] as const).map(({ key, label }) => (
           <label key={key} className="flex min-h-12 items-center justify-between gap-3 border-b border-border/50 text-sm last:border-0">
             <span>{label}</span>
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={prefs[key]} onChange={e => update(key, e.target.checked)} />
