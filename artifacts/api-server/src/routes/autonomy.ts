@@ -108,6 +108,7 @@ router.get("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
     res.json(await ownerSettings(req.userId!, universeId));
   } catch (error) {
     const safe = error instanceof EngineError ? error : new EngineError("AUTONOMY_SETTINGS_FAILED", 500);
+    req.log.error({ code: safe.code, cause: error instanceof Error ? error.message : String(error) }, "Autonomy settings GET failed");
     res.status(safe.status).json({ error: safe.code });
   }
 });
