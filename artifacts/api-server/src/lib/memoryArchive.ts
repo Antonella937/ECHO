@@ -11,8 +11,15 @@ export function displacedMemories(previous: SocialState, incoming: SocialState) 
     const next = nextById.get(character.id);
     if (!next || next.archived || !next.configuration) return [];
     const retained = new Set(next.configuration.memory.recent.map(m => m.id));
+    const nextRecent = next.configuration.memory.recent;
+    // Only a full, advancing recent window is a rollover. Removing memories
+    // manually or shrinking the window must not manufacture archive events.
+    const limit = Math.max(0, Math.min(next.configuration.memory.recentLimit, 50));
+    if (limit === 0 || nextRecent.length < limit) return [];
+    const oldestRetainedAt = Math.min(...nextRecent.map(m => new Date(m.createdAt).getTime()));
     return character.configuration.memory.recent
-      .filter(m => !retained.has(m.id) && !!m.sourceId && m.id.startsWith("autonomy-event:"))
+      .filter(m => !retained.has(m.id) && !!m.sourceId && m.id === `autonomy-event:${m.sourceId}` &&
+        new Date(m.createdAt).getTime() <= oldestRetainedAt)
       .map(m => ({
         characterId: character.id,
         memoryId: m.id,
