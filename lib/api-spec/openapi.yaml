@@ -630,6 +630,7 @@ components:
       properties:
         appearance: { $ref: "#/components/schemas/Appearance" }
         highlights: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/StoryHighlight" } }
+        closeFriends: { type: object, additionalProperties: { type: array, items: { type: string } } }
         accountCatalogVersion: { type: integer, minimum: 0 }
         creatorSetup: { $ref: "#/components/schemas/CreatorSetup" }
         version: { type: integer }
@@ -1081,6 +1082,7 @@ components:
         storyIds: { type: array, minItems: 1, maxItems: 100, items: { type: string } }
         order: { type: integer, minimum: 0, maximum: 199, description: "Optional identity-scoped manual order; legacy collections retain their stored order." }
         coverStoryId: { type: [string, "null"], description: "A Story in this collection, or null for an automatic cover." }
+        coverImage: { type: string, maxLength: 300, description: "Optional separately uploaded private cover image." }
     StoryMusic:
       type: object
       description: Metadata only; no music provider, audio stream or playback is connected.
@@ -1154,6 +1156,8 @@ components:
           properties:
             views: { type: [integer, "null"], minimum: 0, maximum: 1000000000000, description: "Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers." }
         mentionedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
+        closeFriendsOnly: { type: boolean }
+        allowedViewerIds: { type: array, maxItems: 500, items: { type: string } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         music: { $ref: "#/components/schemas/StoryMusic" }
         id: { type: string }
