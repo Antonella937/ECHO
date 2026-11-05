@@ -23,7 +23,8 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
   return (
     <div className="no-scrollbar mt-5 flex gap-4 overflow-x-auto" data-testid="row-highlights">
       {highlights.map((h) => {
-        const cover = highlightCover(state, h, unavailable[h.id]);
+        const hidden = state.stories.filter(s => h.storyIds.includes(s.id) && !canViewStory(s, me.id, state)).map(s => s.id);
+        const cover = highlightCover(state, h, [...(unavailable[h.id] ?? []), ...hidden]);
         const customCover = h.coverImage;
         return (
           <div key={h.id} className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
