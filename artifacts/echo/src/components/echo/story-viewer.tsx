@@ -18,7 +18,7 @@ import { CharacterAvatar } from './avatar';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const DURATION = 5500;
+const DURATION = 10000;
 
 interface ViewerCtx {
   openStories(authorId: string, onlyAuthor?: boolean): void;
@@ -86,6 +86,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     return g.author.id !== me.id && firstUnseen >= 0 ? firstUnseen : 0;
   });
   const [paused, setPaused] = useState(false);
+  const [replyFocused, setReplyFocused] = useState(false);
   const [reply, setReply] = useState('');
   const [showViewers, setShowViewers] = useState(false);
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
@@ -139,7 +140,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     };
   }, [next, prev, onClose, editingMetrics]);
 
-  const isPaused = paused || reply.length > 0 || showViewers || editingMetrics;
+  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || editingMetrics;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -147,6 +148,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     actions.sendMessage(group.author.id, reply, { storyId: story.id });
     setReply('');
     inputRef.current?.blur();
+    setReplyFocused(false);
     toast({ title: `Respuesta enviada a ${group.author.name.split(' ')[0]}`, description: 'La encontrarás en Mensajes.' });
   };
 
@@ -329,6 +331,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 ref={inputRef}
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
+                onFocus={() => setReplyFocused(true)}
+                onBlur={() => setReplyFocused(false)}
                 placeholder={`Responder a ${group.author.name.split(' ')[0]}…`}
                 className="h-12 min-w-0 flex-1 rounded-full border border-[hsl(0_0%_100%/0.3)] bg-transparent px-5 text-[15px] text-foreground placeholder:text-foreground/60 focus:border-foreground/70 focus:outline-none"
                 data-testid="input-story-reply"
