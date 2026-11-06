@@ -156,7 +156,7 @@ export function createCreatorHubSocialRouter(): IRouter {
       const canSend = accepted.rowCount || (target.rows[0].message_privacy === "everyone" && !previouslyConnected.rowCount);
       // Existing conversations continue unless blocked, except when recipient
       // has explicitly disabled all messages.
-      const allowed = target.rows[0].message_privacy !== "nobody" && (canSend || previouslyConnected.rowCount);
+      const allowed = Boolean(canSend || previouslyConnected.rowCount);
       if (!allowed) {
         await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGE_REQUEST_REQUIRED" }); return;
       }
