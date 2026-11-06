@@ -36,8 +36,8 @@ export default function SettingsPage() {
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
-            <div className="text-sm font-semibold">{user?.fullName || 'Cuenta ECHO'}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || 'Sesión protegida'}</div>
+            <div className="text-sm font-semibold">{user?.fullName || st('Cuenta ECHO')}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || st('Sesión protegida')}</div>
             <button
               type="button"
               onClick={() => void signOut({ redirectUrl: basePath || '/' })}
@@ -60,7 +60,7 @@ export default function SettingsPage() {
         <section className="mt-9" aria-labelledby="identity-h">
           <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Cuentas e identidad activa")}</h2>
           <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
-            Todo lo que publiques, comentes o envíes saldrá con este perfil.
+            {st('Todo lo que publiques, comentes o envíes saldrá con este perfil.')}
           </p>
           <AccountManager />
         </section>
@@ -74,7 +74,7 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-9" aria-labelledby="close-friends-h" data-testid="section-close-friends">
-          <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> Mejores amigos · {me.name}</h2>
+          <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> {st('Mejores amigos · ')}{me.name}</h2>
           <p className="mt-2 px-1 text-xs text-muted-foreground">{st("Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.")}</p>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-3">
             {state.characters.filter(c => c.id !== me.id && !c.archived).map(c => {
@@ -158,14 +158,14 @@ function AppearanceSection() {
   const current = state.appearance ?? DEFAULT_APPEARANCE;
   const [custom, setCustom] = useState(current.accent);
   const set = (next: Appearance) => {
-    try { actions.setAppearance(next); } catch (e) { toast({ title: 'No se pudo aplicar', description: (e as Error).message }); }
+    try { actions.setAppearance(next); } catch (e) { toast({ title: st('No se pudo aplicar'), description: (e as Error).message }); }
   };
   const themes = [['dark', 'Oscuro', Moon], ['light', 'Claro', Sun], ['system', 'Sistema', Monitor]] as const;
   return (
     <section className="mt-9" aria-labelledby="appearance-h">
       <h2 id="appearance-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Apariencia")}</h2>
       <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1" role="radiogroup" aria-label="Tema">
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1" role="radiogroup" aria-label={st("Tema")}>
           {themes.map(([k, label, Icon]) => (
             <button key={k} type="button" role="radio" aria-checked={current.theme === k} onClick={() => set({ ...current, theme: k })}
               className={cn('flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold', current.theme === k ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
@@ -175,11 +175,11 @@ function AppearanceSection() {
           ))}
         </div>
         <div className="mt-4 text-xs text-muted-foreground">{st("Color de acento")}</div>
-        <div className="mt-2 flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Color de acento">
+        <div className="mt-2 flex flex-wrap items-center gap-2" role="radiogroup" aria-label={st("Color de acento")}>
           {ACCENT_PRESETS.map((hex) => {
             const on = current.accent.toLowerCase() === hex;
             return (
-              <button key={hex} type="button" role="radio" aria-checked={on} aria-label={`Acento ${hex}`} onClick={() => { setCustom(hex); set({ ...current, accent: hex }); }}
+              <button key={hex} type="button" role="radio" aria-checked={on} aria-label={`${st("Acento ")}${hex}`} onClick={() => { setCustom(hex); set({ ...current, accent: hex }); }}
                 className={cn('grid h-11 w-11 place-items-center rounded-full ring-offset-2 ring-offset-card', on && 'ring-2 ring-foreground/70')} style={{ backgroundColor: hex }}
                 data-testid={`button-accent-${hex.slice(1)}`}>
                 {on && <Check className="h-4 w-4 text-[#1a1418]" strokeWidth={2.4} />}
@@ -188,7 +188,7 @@ function AppearanceSection() {
           })}
           <label className="flex h-11 items-center gap-2 rounded-full border border-border pl-1.5 pr-3 text-xs" data-testid="label-accent-custom">
             <input type="color" value={custom} onChange={(e) => setCustom(e.target.value)} onBlur={() => custom !== current.accent && set({ ...current, accent: custom })}
-              aria-label="Acento personalizado" className="h-8 w-8 cursor-pointer rounded-full border-0 bg-transparent p-0" data-testid="input-accent-custom" />
+              aria-label={st("Acento personalizado")} className="h-8 w-8 cursor-pointer rounded-full border-0 bg-transparent p-0" data-testid="input-accent-custom" />
             {st("Personalizado")}
           </label>
           {custom.toLowerCase() !== current.accent.toLowerCase() && (
@@ -196,7 +196,7 @@ function AppearanceSection() {
           )}
         </div>
         <button type="button" onClick={() => { setCustom(DEFAULT_APPEARANCE.accent); set(DEFAULT_APPEARANCE); }} className="mt-4 text-xs font-semibold text-muted-foreground hover:text-foreground" data-testid="button-appearance-reset">
-          Restablecer (oscuro · rosa)
+          {st('Restablecer (oscuro · rosa)')}
         </button>
         <p className="mt-2 text-xs text-muted-foreground">{st("Se sincroniza con tu universo en todos tus dispositivos.")}</p>
         <div className="mt-5 border-t border-border pt-5">
