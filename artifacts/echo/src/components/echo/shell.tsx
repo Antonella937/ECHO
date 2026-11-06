@@ -1,3 +1,4 @@
+import { useSharedShellText } from '@/lib/shared-shell-translations';
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useUnreadCounts } from '@/hooks/use-social-selectors';
 export function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const t = useTranslation();
+  const shared = useSharedShellText();
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
   const inConversation = /^\/messages\/.+/.test(location);
@@ -80,7 +82,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {/* Desktop right column */}
       <aside className="sticky top-0 hidden h-[100dvh] min-h-0 flex-col gap-6 overflow-y-auto px-6 py-10 xl:flex">
         <div className="rounded-3xl border border-card-border bg-card p-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Publicando como</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{shared("Publicando como")}</div>
           <Link href={`/profile/${me.id}`} className="mt-3 flex items-center gap-3" data-testid="link-current-identity">
             <CharacterAvatar character={me} size={44} />
             <div className="min-w-0">
@@ -93,7 +95,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </Link>
         </div>
         <div>
-          <div className="mb-3 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Amistades</div>
+          <div className="mb-3 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{shared("Amistades")}</div>
           <div className="flex flex-col gap-1">
             {friends.map((f) =>
               f ? (
@@ -110,7 +112,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
         <div className="mt-auto space-y-4 pt-6">
         <p className="px-1 text-[11px] leading-relaxed text-muted-foreground/70">
-          {state.creatorSetup ? `Universo privado: ${state.creatorSetup.universeName}.` : 'Universo privado.'} Los personajes y sus respuestas todavía son simulados.
+          {state.creatorSetup ? `${shared('Universo privado: ')}${state.creatorSetup.universeName}.` : shared('Universo privado.')} {shared('Los personajes y sus respuestas todavía son simulados.')}
         </p>
         <Link href="/creator-hub" aria-label="Creator Hub" className="flex min-h-11 items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 text-xs font-semibold text-primary transition-colors hover:bg-primary/20" data-testid="link-aside-creator-hub"><Palette className="h-5 w-5" strokeWidth={1.7} /><span>Creator Hub</span></Link>
         </div>
@@ -118,7 +120,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       {!inConversation && (
-        <nav className="echo-dark-surface fixed inset-x-0 bottom-0 z-40 px-3 pb-safe lg:hidden" aria-label="Navegación principal" data-testid="nav-mobile">
+        <nav className="echo-dark-surface fixed inset-x-0 bottom-0 z-40 px-3 pb-safe lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
           <div className="mx-auto mb-1 flex h-[var(--nav-height)] max-w-[440px] items-center justify-around rounded-[26px] border border-border/80 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
             {items.map((it) => {
               const active = it.match(location);
@@ -138,7 +140,7 @@ export function Shell({ children }: { children: ReactNode }) {
             })}
             <Link
               href={`/profile/${me.id}`}
-              aria-label="Perfil"
+              aria-label={t('profile')}
               className="tap grid h-12 w-12 place-items-center"
               data-testid="link-nav-profile"
             >
