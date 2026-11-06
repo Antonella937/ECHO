@@ -75,7 +75,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
       await onComplete(input);
       setComplete(true);
     } catch (cause) {
-      setSubmitError(cause instanceof Error ? cause.message : 'No se pudo guardar. Inténtalo de nuevo.');
+      setSubmitError(cause instanceof Error ? cause.message : t('No se pudo guardar. Inténtalo de nuevo.'));
     }
   };
 
@@ -96,7 +96,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
             <span className="ep-complete-icon"><Check size={24} /></span>
             <span className="ep-eyebrow">{t("Bienvenido a ECHO")}</span>
             <h1>{t("Ya puedes entrar.")}</h1>
-            <p>{t('Tu universo')} <strong>{form.getValues('universeName')}</strong> y el perfil de <strong>{form.getValues('displayName')}</strong> están preparados. Lo que ocurra después, lo decides tú.</p>
+            <p>{t('Tu universo')} <strong>{form.getValues('universeName')}</strong> {t("y el perfil de")} <strong>{form.getValues('displayName')}</strong> {t("están preparados. Lo que ocurra después, lo decides tú.")}</p>
             <button type="button" className="ep-button" onClick={onEnter} data-testid="button-enter-echo">{t("Entrar a ECHO")} <ArrowRight size={16} /></button>
           </div>
         </section>
@@ -149,7 +149,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
               {step === 1 && (
                 <section aria-labelledby="step-universe-heading">
                   <h2 className="ep-step-title" id="step-universe-heading">{t("Ponle nombre a tu universo")}</h2>
-                  <p className="ep-step-caption">Será el lugar privado donde empieza tu mundo. Puedes afinarlo más adelante.</p>
+                  <p className="ep-step-caption">{t("Será el lugar privado donde empieza tu mundo. Puedes afinarlo más adelante.")}</p>
                   <FormField control={form.control} name="universeName" render={({ field }) => (
                     <FormItem className="ep-field">
                       <FormLabel className="ep-field-label">{t("Nombre del universo")}</FormLabel>
@@ -163,7 +163,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
               {step === 2 && (
                 <section aria-labelledby="step-character-heading">
                   <h2 className="ep-step-title" id="step-character-heading">{t("Crea tu primer personaje")}</h2>
-                  <p className="ep-step-caption">Una identidad inicial, lista para que la sigas desarrollando.</p>
+                  <p className="ep-step-caption">{t("Una identidad inicial, lista para que la sigas desarrollando.")}</p>
                   <FormField control={form.control} name="displayName" render={({ field }) => (
                     <FormItem className="ep-field">
                       <FormLabel className="ep-field-label">{t("Nombre visible")}</FormLabel>
@@ -178,7 +178,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
                         <span aria-hidden="true" style={{ color: 'var(--ep-rose)' }}>@</span>
                         <input {...field} className="ep-field-control" style={{ border: 0, background: 'transparent' }} placeholder="nombre.de.usuario" autoComplete="off" maxLength={30} data-testid="input-username" />
                       </div></FormControl>
-                      <span className="ep-field-hint">Se guardará sin @. Letras, números, puntos o guiones bajos.</span>
+                      <span className="ep-field-hint">{t("Se guardará sin @. Letras, números, puntos o guiones bajos.")}</span>
                       <FormMessage />
                     </FormItem>
                   )} />
