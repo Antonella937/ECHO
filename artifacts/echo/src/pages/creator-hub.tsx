@@ -15,6 +15,35 @@ import { Link } from 'wouter';
 export default function CreatorHubPage() {
   const { user } = useUser();
   const [hubTab, setHubTab] = useState<'perfil' | 'explorar' | 'mensajes' | 'ajustes'>('perfil');
+  type Publication = {id:string;kind:'character'|'world'|'update'|'post';title:string;body:string;visibility:'public'|'followers'|'private';pinned:boolean;createdAt:string};
+  const [publications,setPublications] = useState<Publication[]>([]);
+  const [publicationKind,setPublicationKind] = useState<Publication['kind']>('update');
+  const [publicationTitle,setPublicationTitle] = useState('');
+  const [publicationBody,setPublicationBody] = useState('');
+  const [publicationVisibility,setPublicationVisibility] = useState<Publication['visibility']>('public');
+  const [publicationPinned,setPublicationPinned] = useState(false);
+  const [publicationComposer,setPublicationComposer] = useState(false);
+  const [publicationBusy,setPublicationBusy] = useState(false);
+  const [publicationError,setPublicationError] = useState('');
+  const [publicationFilter,setPublicationFilter] = useState<'all'|Publication['kind']>('all');
+  async function refreshPublications() {
+    try {
+      const result=await customFetch<{publications:Publication[]}>('/api/creator-hub/social/publications/me',{responseType:'json'});
+      setPublications(result.publications);
+    } catch { setPublicationError('No pudimos cargar las publicaciones.'); }
+  }
+  async function publishCreatorContent() {
+    if (!publicationTitle.trim() || publicationBusy) return;
+    setPublicationBusy(true);setPublicationError('');
+    try {
+      await customFetch('/api/creator-hub/social/publications',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:publicationKind,title:publicationTitle.trim(),body:publicationBody,visibility:publicationVisibility,pinned:publicationPinned})});
+      setPublicationComposer(false);setPublicationTitle('');setPublicationBody('');setPublicationPinned(false);
+      await refreshPublications();
+    } catch {setPublicationError('No se pudo publicar. Revisá tu perfil y volvé a intentar.');}
+    finally {setPublicationBusy(false);}
+  }
+  useEffect(()=>{if(user?.id)void refreshPublications();},[user?.id]);
+
   const customName = typeof user?.unsafeMetadata?.creatorHubDisplayName === 'string' ? user.unsafeMetadata.creatorHubDisplayName : '';
   const alias = customName || user?.fullName?.trim() || user?.firstName?.trim() || user?.username || 'Tu espacio Creator';
   const resolveImage = useMediaResolver();
@@ -461,6 +490,23 @@ export default function CreatorHubPage() {
             </div>
             </div>}
             {hubTab === 'perfil' && <>
+            <section className="space-y-5">
+              <button type="button" onClick={()=>setPublicationComposer(value=>!value)} className="flex w-full items-center justify-center gap-2 rounded-full border border-primary/70 bg-primary/10 px-4 py-3 font-semibold text-primary hover:bg-primary/20"><span className="text-xl">＋</span> Crear publicación</button>
+              {publicationComposer && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/30 p-4">
+                <h3 className="font-semibold">Compartir en ECHO</h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{([{id:'update',label:'📣 Actualización de ECHO'},{id:'character',label:'♙ Personaje'},{id:'world',label:'⬡ Mundo'},{id:'post',label:'▧ Publicación'}] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationKind(option.id)} className={`rounded-xl border px-2 py-3 text-xs ${publicationKind===option.id?'border-primary bg-primary/15 text-primary':'border-border'}`}>{option.label}</button>)}</div>
+                <input aria-label="Título de publicación" maxLength={120} value={publicationTitle} onChange={event=>setPublicationTitle(event.target.value)} placeholder="Título" className="w-full rounded-xl border border-border bg-background p-3 text-sm"/>
+                <textarea aria-label="Descripción de publicación" maxLength={5000} value={publicationBody} onChange={event=>setPublicationBody(event.target.value)} placeholder="Contá la historia, describí tu personaje o compartí novedades…" rows={5} className="w-full resize-y rounded-xl border border-border bg-background p-3 text-sm"/>
+                <div className="flex flex-wrap items-center justify-between gap-3"><select aria-label="Privacidad de publicación" value={publicationVisibility} onChange={event=>setPublicationVisibility(event.target.value as Publication['visibility'])} className="rounded-full border border-border bg-background px-3 py-2 text-sm"><option value="public">🌐 Público</option><option value="followers">Seguidores</option><option value="private">Solo yo</option></select><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={publicationPinned} onChange={event=>setPublicationPinned(event.target.checked)}/> Fijar en mi perfil</label></div>
+                <div className="flex justify-end gap-2"><button type="button" onClick={()=>setPublicationComposer(false)} className="rounded-full border border-border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={publicationBusy||!publicationTitle.trim()} onClick={()=>void publishCreatorContent()} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{publicationBusy?'Publicando…':'Publicar'}</button></div>
+              </div>}
+              {publicationError && <p role="alert" className="text-sm text-destructive">{publicationError}</p>}
+              {publications.some(item=>item.pinned)&&<div className="space-y-2"><h3 className="font-semibold text-primary">📌 Destacados</h3><div className="grid grid-cols-3 gap-2">{publications.filter(item=>item.pinned).slice(0,3).map(item=><div key={item.id} className="min-w-0 rounded-xl border border-border bg-secondary/40 p-3"><p className="text-xs text-primary">{item.kind==='character'?'Personaje':item.kind==='world'?'Mundo':item.kind==='update'?'Actualización':'Publicación'}</p><p className="mt-1 break-words text-sm font-medium">{item.title}</p></div>)}</div></div>}
+              <div className="flex flex-wrap gap-2">{([{id:'all',label:'Todo'},{id:'update',label:'Actualizaciones'},{id:'character',label:'Personajes'},{id:'world',label:'Mundos'},{id:'post',label:'Publicaciones'}] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationFilter(option.id)} className={`rounded-full px-3 py-2 text-xs ${publicationFilter===option.id?'bg-primary text-primary-foreground':'bg-secondary text-muted-foreground'}`}>{option.label}</button>)}</div>
+              {publications.filter(item=>publicationFilter==='all'||item.kind===publicationFilter).map(item=><article key={item.id} className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-primary">{item.kind==='character'?'♙ Personaje':item.kind==='world'?'⬡ Mundo':item.kind==='update'?'📣 Actualización de ECHO':'Publicación'} {item.pinned?'· 📌':''}</span><span className="text-xs text-muted-foreground">{item.visibility==='public'?'Público':item.visibility==='followers'?'Seguidores':'Solo yo'}</span></div><h3 className="text-lg font-semibold">{item.title}</h3>{item.body&&<p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{item.body}</p>}<p className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('es-AR')}</p></article>)}
+              {publications.length===0&&<div className="rounded-2xl border border-dashed border-border px-5 py-10 text-center"><p className="font-semibold">Tu historia empieza acá</p><p className="mt-2 text-sm text-muted-foreground">Publicá un personaje, un mundo o una actualización de ECHO.</p></div>}
+            </section>
+
             <div className="border-t border-border pt-5">
               <div className="rounded-2xl bg-secondary/70 px-5 py-8 text-center sm:py-10">
                 <LockKeyhole size={23} className="mx-auto mb-3 text-muted-foreground" />
