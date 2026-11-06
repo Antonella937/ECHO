@@ -55,8 +55,8 @@ export default function CreatePage() {
   const replaceAt = useRef<number | null>(null);
   const image = items[0]?.url ?? null;
   const previewUrl = image ? resolveMedia(image) : '';
-  const [previewLoaded, setPreviewLoaded] = useState(false);
-  useEffect(() => { setPreviewLoaded(false); }, [previewUrl]);
+  const [loadedPreviewUrl, setLoadedPreviewUrl] = useState<string | null>(null);
+  const previewLoaded = Boolean(previewUrl && loadedPreviewUrl === previewUrl);
   const firstIsVideo = items[0]?.type === 'video';
   const tooManyForStory = mode === 'story' && items.length > 1;
   const storyVideo = mode === 'story' && items.some((m) => m.type === 'video');
@@ -319,17 +319,18 @@ export default function CreatePage() {
         </section>}
         <input ref={fileRef} type="file" accept={mode === 'post' ? 'image/*,video/mp4,video/webm' : 'image/*'} multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
         {mediaSource === 'upload' && (image ? (
-          <div className="relative overflow-hidden rounded-[22px] bg-card py-0">\n            {!previewLoaded && <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center bg-secondary/60" aria-label="Cargando vista previa"><div className="h-9 w-9 animate-pulse rounded-full border-2 border-primary/40 border-t-primary" /></div>}
+          <div className="relative overflow-hidden rounded-[22px] bg-card py-0">
+            {!previewLoaded && <div className="absolute inset-0 z-10 flex items-center justify-center bg-card" role="status" aria-label="Procesando vista previa"><span className="text-sm text-muted-foreground">Procesando…</span></div>}
             {firstIsVideo ? (
-              <video src={previewUrl} onLoadedData={() => setPreviewLoaded(true)} controls playsInline preload="metadata" className="mx-auto block h-[min(240px,34dvh)] w-full bg-black object-contain" data-testid="video-preview" />
+              <video src={previewUrl} onLoadedData={() => setLoadedPreviewUrl(previewUrl)} controls playsInline preload="metadata" className="mx-auto block h-[min(240px,34dvh)] w-full bg-black object-contain" data-testid="video-preview" />
             ) : (
-              <img src={previewUrl} onLoad={() => setPreviewLoaded(true)} alt={items.length > 1 ? `Vista previa, elemento 1 de ${items.length}` : 'Vista previa'} className={cn('mx-auto block object-cover', mode === 'story' ? 'aspect-[9/16] h-[min(240px,34dvh)] rounded-[18px]' : 'h-[min(240px,34dvh)] w-full')} data-testid="img-preview" />
+              <img src={previewUrl} onLoad={() => setLoadedPreviewUrl(previewUrl)} alt={items.length > 1 ? `Vista previa, elemento 1 de ${items.length}` : 'Vista previa'} className={cn('mx-auto block object-cover', mode === 'story' ? 'aspect-[9/16] h-[min(240px,34dvh)] rounded-[18px]' : 'h-[min(240px,34dvh)] w-full')} data-testid="img-preview" />
             )}
             <button
               type="button"
               disabled={busy}
               onClick={() => pick(0)}
-              className="absolute bottom-3 right-3 h-11 rounded-full bg-[hsl(240_8%_3%/0.7)] px-4 text-xs font-semibold backdrop-blur disabled:opacity-50"
+              className="absolute bottom-3 right-3 z-20 h-11 rounded-full bg-[hsl(240_8%_3%/0.7)] px-4 text-xs font-semibold backdrop-blur disabled:opacity-50"
               data-testid="button-change-image"
             >
               {busy ? 'Procesando…' : 'Cambiar foto'}
