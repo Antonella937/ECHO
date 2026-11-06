@@ -33,12 +33,14 @@ export function TensionReview({ actorId, targetId }: { actorId: string; targetId
   async function approve(item: Candidate) {
     if (revision === null || !selected[item.sourceId] || busy) return;
     if (!window.confirm('¿Confirmás «' + (types[selected[item.sourceId] as keyof typeof types] ?? selected[item.sourceId]) + '»? Esto modificará la tensión y guardará el acontecimiento.')) return;
+    let committed = false;
     setBusy(true);
     try {
       const approved = await customFetch<{ applied: boolean; delta: number }>('/api/universe/relationships/tension/approve?' + new URLSearchParams({ universeId }), {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actorId, targetId, sourceId: item.sourceId, kind: selected[item.sourceId], expectedRevision: revision }),
       });
+      committed = true;
       setRevision(null); setItems([]);
       setMessage('Confirmado en el servidor (tensión ' + (approved.delta > 0 ? '+' : '') + approved.delta + '). Actualizando…');
       await actions.refreshAfterApproval();
@@ -46,7 +48,7 @@ export function TensionReview({ actorId, targetId }: { actorId: string; targetId
       const past = await customFetch<{ entries: Entry[] }>('/api/universe/relationships/tension/history?' + query, { method: 'GET', responseType: 'json', cache: 'no-store' });
       setItems(latest.candidates); setRevision(latest.revision); setHistory(past.entries);
       setMessage('Acontecimiento confirmado. tensión ' + (approved.delta > 0 ? '+' : '') + approved.delta + '.');
-    } catch { setRevision(null); setMessage('No se pudo confirmar. Sincronizá y volvé a consultar.'); }
+    } catch { setRevision(null); setMessage(committed ? 'Confirmado en el servidor, pero la pantalla no se actualizó. Sincronizá y volvé a consultar.' : 'No se pudo confirmar. Sincronizá y volvé a consultar.'); }
     finally { setBusy(false); }
   }
   if (targetId === 'owner') return null;
