@@ -42,13 +42,13 @@ export default function SettingsPage() {
               <LogOut className="h-4 w-4" /> Cerrar sesión
             </button>
           </div>
+        <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">Tu perfil de creador ›</span></Link>
+
           <UniverseSelector />
           <Link href="/search" className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-sm font-semibold">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> Buscar en este universo
           </Link>
         </section>
-
-        <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">Tu perfil de creador ›</span></Link>
 
         <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">Mi plan y suscripciones <span className="text-xs text-muted-foreground">Ver planes y complementos ›</span></Link>
 
