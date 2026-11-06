@@ -232,3 +232,12 @@
 .echo-public .epc-account-return { display: flex; justify-content: flex-start; margin: 24px 0 38px; }
 .echo-public .epc-account-return button { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 4px; font: inherit; cursor: pointer; }
 @media (max-width: 760px) { .echo-public .epc-private-nav { display: none; } .echo-public .epc-account-return { margin-top: 28px; } }
+
+/* Signed-in preview screens: keep navigation visible and below the iOS status bar. */
+.echo-public .epc-private-back { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; color: var(--ep-text); font: inherit; cursor: pointer; padding: 9px 3px; }
+@media (max-width: 760px) {
+  .echo-public .epc-private-nav { display: flex; min-height: 56px; padding-top: max(env(safe-area-inset-top, 0px), 12px); box-sizing: content-box; }
+  .echo-public .epc-private-nav .ep-brand { display: none; }
+  .echo-public .epc-heading { padding-top: 24px; }
+  .echo-public .epc-private-back { min-height: 44px; }
+}
