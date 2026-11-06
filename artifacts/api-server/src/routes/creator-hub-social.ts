@@ -63,7 +63,7 @@ export function createCreatorHubSocialRouter(): IRouter {
       `SELECT p.owner_id AS "ownerId", p.display_name AS "displayName", p.username, p.visibility,
         EXISTS(SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$1 AND f.followed_owner_id=p.owner_id) AS "following",
         EXISTS(SELECT 1 FROM echo_creator_follow_requests r WHERE r.requester_owner_id=$1 AND r.recipient_owner_id=p.owner_id AND r.status='pending') AS "requested"
-       FROM echo_creator_profiles p WHERE p.owner_id<>$1
+       FROM echo_creator_profiles p WHERE p.owner_id<>$1 AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b WHERE (b.blocker_owner_id=$1 AND b.blocked_owner_id=p.owner_id) OR (b.blocker_owner_id=p.owner_id AND b.blocked_owner_id=$1))
          AND (p.display_name ILIKE $2 ESCAPE '\\' OR p.username ILIKE $2 ESCAPE '\\')
        ORDER BY p.username_key LIMIT 20`,
       [req.userId, `%${q}%`],
@@ -84,6 +84,8 @@ export function createCreatorHubSocialRouter(): IRouter {
         [parsed.data.targetOwnerId],
       );
       if (!target.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+      const blocked = await client.query("SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)", [req.userId, parsed.data.targetOwnerId]);
+      if (blocked.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
       const already = await client.query(
         "SELECT 1 FROM echo_creator_follows WHERE follower_owner_id=$1 AND followed_owner_id=$2",
         [req.userId, parsed.data.targetOwnerId],
@@ -105,6 +107,67 @@ export function createCreatorHubSocialRouter(): IRouter {
         await client.query("COMMIT");
         res.json({ status: "requested" });
       }
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  });
+
+  // A recipient-scoped inbox: never return another user's requests.
+  router.get("/creator-hub/social/message-requests", async (req, res) => {
+    const result = await pool.query(
+      `SELECT r.id, r.sender_owner_id AS "senderOwnerId",
+       p.display_name AS "displayName", p.username, r.created_at AS "createdAt"
+       FROM echo_creator_message_requests r
+       JOIN echo_creator_profiles p ON p.owner_id=r.sender_owner_id
+       WHERE r.recipient_owner_id=$1 AND r.status='pending'
+       ORDER BY r.created_at DESC LIMIT 100`,
+      [req.userId],
+    );
+    res.json({ requests: result.rows });
+  });
+
+  router.post("/creator-hub/social/message-requests/:requestId/:action", async (req, res) => {
+    const parsed = requestSchema.safeParse(req.params);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_REQUEST" }); return; }
+    const result = await pool.query(
+      `UPDATE echo_creator_message_requests SET status=$3, updated_at=now()
+       WHERE id=$1 AND recipient_owner_id=$2 AND status='pending'
+       RETURNING id`,
+      [parsed.data.requestId, req.userId, parsed.data.action === "accept" ? "accepted" : "rejected"],
+    );
+    if (!result.rowCount) { res.status(404).json({ error: "REQUEST_NOT_FOUND" }); return; }
+    res.json({ status: parsed.data.action === "accept" ? "accepted" : "rejected" });
+  });
+
+  router.post("/creator-hub/social/blocks", async (req, res) => {
+    const parsed = targetSchema.safeParse(req.body);
+    if (!parsed.success || parsed.data.targetOwnerId === req.userId) {
+      res.status(400).json({ error: "INVALID_TARGET" }); return;
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "INSERT INTO echo_creator_blocks(blocker_owner_id,blocked_owner_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      await client.query(
+        `UPDATE echo_creator_message_requests SET status='rejected',updated_at=now()
+         WHERE recipient_owner_id=$1 AND sender_owner_id=$2 AND status='pending'`,
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      await client.query(
+        `UPDATE echo_creator_follow_requests SET status='rejected',updated_at=now()
+         WHERE recipient_owner_id=$1 AND requester_owner_id=$2 AND status='pending'`,
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      await client.query(
+        `DELETE FROM echo_creator_follows WHERE
+         (follower_owner_id=$1 AND followed_owner_id=$2)
+         OR (follower_owner_id=$2 AND followed_owner_id=$1)`,
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      await client.query("COMMIT");
+      res.json({ blocked: true });
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
   });
