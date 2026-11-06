@@ -105,7 +105,7 @@ export function createCreatorHubSocialRouter(): IRouter {
     const result = await pool.query(
       `SELECT p.display_name AS "displayName", p.username, p.visibility, p.bio,
          EXISTS (SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$1 AND f.followed_owner_id=$2) AS following,
-         EXISTS (SELECT 1 FROM echo_creator_follow_requests r WHERE r.requester_owner_id=$1 AND r.target_owner_id=$2 AND r.status='pending') AS requested
+         EXISTS (SELECT 1 FROM echo_creator_follow_requests r WHERE r.requester_owner_id=$1 AND r.recipient_owner_id=$2 AND r.status='pending') AS requested
        FROM echo_creator_profiles p WHERE p.owner_id=$2
        AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b WHERE
          (b.blocker_owner_id=$1 AND b.blocked_owner_id=$2) OR
