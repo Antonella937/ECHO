@@ -328,34 +328,35 @@ export function CreatorStorePreview() {
 }
 
 export function CreatorPrivacyPreview() {
+  const t = useCreatorPreviewText();
   return (
     <PreviewShell>
       <PreviewHeading
-        eyebrow="Privacidad · controles"
-        title="Cada personaje,"
-        accent="sus propios límites."
-        description="Una representación estática de los controles de privacidad que pueden acompañar cada identidad."
+        eyebrow={t("Privacidad · controles")}
+        title={t("Cada personaje,")}
+        accent={t("sus propios límites.")}
+        description={t("Una representación estática de los controles de privacidad que pueden acompañar cada identidad.")}
       />
-      <PreviewNotice>Los controles están desactivados. No se cambia ninguna preferencia ni estado social.</PreviewNotice>
-      <section className="epc-privacy-layout" aria-label="Ilustración de privacidad por personaje">
+      <PreviewNotice>{t("Los controles están desactivados. No se cambia ninguna preferencia ni estado social.")}</PreviewNotice>
+      <section className="epc-privacy-layout" aria-label={t("Ilustración de privacidad por personaje")}>
         <div className="epc-privacy-rail">
-          <div className="epc-privacy-rail-top"><Shield size={17} /><span>PRIVACIDAD</span></div>
-          <h2>Elige cómo<br />aparece cada personaje.</h2>
-          <p>Los perfiles y las relaciones se ilustran por personaje, no como un estado global.</p>
+          <div className="epc-privacy-rail-top"><Shield size={17} /><span>{t("PRIVACIDAD")}</span></div>
+          <h2>{t('Elige cómo')}<br />{t('aparece cada personaje.')}</h2>
+          <p>{t("Los perfiles y las relaciones se ilustran por personaje, no como un estado global.")}</p>
           <div className="epc-profile-types">
-            <div><span className="epc-privacy-dot public" /><span><strong>Público</strong><small>Visible para explorar</small></span></div>
-            <div><span className="epc-privacy-dot private" /><span><strong>Privado</strong><small>Acceso bajo solicitud</small></span></div>
+            <div><span className="epc-privacy-dot public" /><span><strong>{t("Público")}</strong><small>{t("Visible para explorar")}</small></span></div>
+            <div><span className="epc-privacy-dot private" /><span><strong>{t("Privado")}</strong><small>{t("Acceso bajo solicitud")}</small></span></div>
           </div>
         </div>
         <div className="epc-privacy-content">
-          <div className="epc-privacy-toolbar"><div><span className="ep-overline">AJUSTES POR PERSONAJE</span><h2>Perfiles de muestra</h2></div><span className="epc-example-tag">ILUSTRATIVO</span></div>
+          <div className="epc-privacy-toolbar"><div><span className="ep-overline">{t("AJUSTES POR PERSONAJE")}</span><h2>{t("Perfiles de muestra")}</h2></div><span className="epc-example-tag">{t("ILUSTRATIVO")}</span></div>
           <article className="epc-privacy-card">
-            <div className="epc-privacy-character"><span className="epc-character-avatar rose">A</span><div><strong>Personaje de muestra A</strong><small>Perfil público · ejemplo</small></div><button className="epc-toggle is-on" type="button" disabled aria-label="Privacidad pública, control ilustrativo"><i /></button></div>
-            <div className="epc-privacy-controls"><div className="epc-setting-line"><span><UsersRound size={15} /> Solicitudes para seguir</span><span className="epc-state-pill">Requiere solicitud</span></div><div className="epc-setting-line"><span><LockKeyhole size={15} /> Bloqueo por personaje</span><button className="epc-text-control" type="button" disabled>Bloquear <ChevronRight size={14} /></button></div></div>
+            <div className="epc-privacy-character"><span className="epc-character-avatar rose">A</span><div><strong>{t("Personaje de muestra A")}</strong><small>{t("Perfil público · ejemplo")}</small></div><button className="epc-toggle is-on" type="button" disabled aria-label={t("Privacidad pública, control ilustrativo")}><i /></button></div>
+            <div className="epc-privacy-controls"><div className="epc-setting-line"><span><UsersRound size={15} /> Solicitudes para seguir</span><span className="epc-state-pill">{t("Requiere solicitud")}</span></div><div className="epc-setting-line"><span><LockKeyhole size={15} /> Bloqueo por personaje</span><button className="epc-text-control" type="button" disabled>{t('Bloquear')} <ChevronRight size={14} /></button></div></div>
           </article>
           <article className="epc-privacy-card">
-            <div className="epc-privacy-character"><span className="epc-character-avatar lilac">B</span><div><strong>Personaje de muestra B</strong><small>Perfil privado · ejemplo</small></div><button className="epc-toggle" type="button" disabled aria-label="Privacidad privada, control ilustrativo"><i /></button></div>
-            <div className="epc-privacy-controls"><div className="epc-setting-line"><span><UsersRound size={15} /> Solicitudes para seguir</span><span className="epc-state-pill">2 ilustrativas</span></div><div className="epc-setting-line"><span><LockKeyhole size={15} /> Bloqueo por personaje</span><button className="epc-text-control" type="button" disabled>Desbloquear <ChevronRight size={14} /></button></div></div>
+            <div className="epc-privacy-character"><span className="epc-character-avatar lilac">B</span><div><strong>{t("Personaje de muestra B")}</strong><small>{t("Perfil privado · ejemplo")}</small></div><button className="epc-toggle" type="button" disabled aria-label={t("Privacidad privada, control ilustrativo")}><i /></button></div>
+            <div className="epc-privacy-controls"><div className="epc-setting-line"><span><UsersRound size={15} /> Solicitudes para seguir</span><span className="epc-state-pill">{t("2 ilustrativas")}</span></div><div className="epc-setting-line"><span><LockKeyhole size={15} /> Bloqueo por personaje</span><button className="epc-text-control" type="button" disabled>{t('Desbloquear')} <ChevronRight size={14} /></button></div></div>
           </article>
           <div className="epc-privacy-foot"><CircleHelp size={14} /> Solicitudes y bloqueos mostrados como ejemplos sin estado real.</div>
         </div>
@@ -371,10 +372,10 @@ export function CreatorLimitPreview() {
   const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? live.data : undefined;
   const heading = <PreviewHeading
-        eyebrow="Estado · capacidad"
-        title="Una pausa antes"
-        accent="de seguir."
-        description="Así podría verse una orientación cuando un espacio conceptual llega a su capacidad."
+        eyebrow={t("Estado · capacidad")}
+        title={t("Una pausa antes")}
+        accent={t("de seguir.")}
+        description={t("Así podría verse una orientación cuando un espacio conceptual llega a su capacidad.")}
       />;
   if (!isLoaded || (isSignedIn && !account)) {
     return <PreviewShell>{heading}<OwnerAccountPending loading={!live.isError} onRetry={() => void live.refetch()} /></PreviewShell>;
@@ -391,13 +392,13 @@ export function CreatorLimitPreview() {
           <div className="epc-modal-backdrop" aria-hidden="true" />
           <section className="epc-limit-dialog" role="dialog" aria-labelledby="epc-limit-title" aria-describedby="epc-limit-description">
             <div className="epc-limit-symbol"><UsersRound size={20} /></div>
-            <span className="ep-overline">TU CUENTA · PLAN {String(account.plan).toUpperCase()}</span>
-            <h2 id="epc-limit-title">{full ? <>Has llegado al límite<br />de personajes.</> : <>Aún tienes espacio<br />para crear.</>}</h2>
-            <p id="epc-limit-description" data-testid="text-limit-usage">Usas {used} de {max} personajes y {account.universeCount} de {account.maxUniverses} universos. Las ampliaciones todavía no están a la venta.</p>
-            <div className="epc-limit-meter"><div><span>{t("Personajes")}</span><strong>{used} <small>/ {max}</small></strong></div><div className="epc-meter-track"><i style={{ transform: `scaleX(${ratio})`, transformOrigin: 'left' }} /></div><small>Capacidad real de tu cuenta</small></div>
+            <span className="ep-overline">{t('TU CUENTA · PLAN')} {String(account.plan).toUpperCase()}</span>
+            <h2 id="epc-limit-title">{full ? <>{t('Has llegado al límite')}<br />{t('de personajes.')}</> : <>{t('Aún tienes espacio')}<br />{t('para crear.')}</>}</h2>
+            <p id="epc-limit-description" data-testid="text-limit-usage">{t('Usas')} {used} {t('de')} {max} {t('personajes y')} {account.universeCount} {t('de')} {account.maxUniverses} {t('universos. Las ampliaciones todavía no están a la venta.')}</p>
+            <div className="epc-limit-meter"><div><span>{t("Personajes")}</span><strong>{used} <small>/ {max}</small></strong></div><div className="epc-meter-track"><i style={{ transform: `scaleX(${ratio})`, transformOrigin: 'left' }} /></div><small>{t("Capacidad real de tu cuenta")}</small></div>
             <div className="epc-limit-actions">
               <Link href="/creator-preview/universes" className="ep-button">Ver mis personajes <ArrowRight size={15} /></Link>
-              <span className="epc-secondary-link" aria-disabled="true">Ampliaciones pendientes · sin pago</span>
+              <span className="epc-secondary-link" aria-disabled="true">{t("Ampliaciones pendientes · sin pago")}</span>
             </div>
             <p className="epc-dialog-footnote"><Eye size={13} /> No hay checkout ni cobros conectados.</p>
           </section>
@@ -413,10 +414,10 @@ export function CreatorLimitPreview() {
         <div className="epc-modal-backdrop" aria-hidden="true" />
         <section className="epc-limit-dialog" role="dialog" aria-labelledby="epc-limit-title" aria-describedby="epc-limit-description">
           <div className="epc-limit-symbol"><UsersRound size={20} /></div>
-          <span className="ep-overline">EJEMPLO · PLAN FREE</span>
-          <h2 id="epc-limit-title">Has llegado al límite<br />de este universo.</h2>
-          <p id="epc-limit-description">En este ejemplo, los 5 espacios de personaje están ocupados. Puedes revisar cómo se vería la siguiente opción.</p>
-          <div className="epc-limit-meter"><div><span>{t("Personajes")}</span><strong>5 <small>/ 5</small></strong></div><div className="epc-meter-track"><i /></div><small>Capacidad conceptual de Free</small></div>
+          <span className="ep-overline">{t("EJEMPLO · PLAN FREE")}</span>
+          <h2 id="epc-limit-title">{t('Has llegado al límite')}<br />{t('de este universo.')}</h2>
+          <p id="epc-limit-description">{t('En este ejemplo, los 5 espacios de personaje están ocupados. Puedes revisar cómo se vería la siguiente opción.')}</p>
+          <div className="epc-limit-meter"><div><span>{t("Personajes")}</span><strong>5 <small>/ 5</small></strong></div><div className="epc-meter-track"><i /></div><small>{t("Capacidad conceptual de Free")}</small></div>
           <div className="epc-limit-actions">
             <Link href="/creator-preview/universes" className="ep-button">Vista de añadir personaje <ArrowRight size={15} /></Link>
             <Link href="/creator-preview/store" className="epc-secondary-link">Explorar Creator <ArrowRight size={14} /></Link>
