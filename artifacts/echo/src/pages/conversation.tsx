@@ -254,14 +254,6 @@ export default function ConversationPage() {
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
           <div className="text-xs text-muted-foreground">{other.occupation} · {other.location}</div>
         </div>
-        {canTestFreeVoice && (
-          <div className="mb-4 rounded-xl border border-border bg-card p-3 text-center" data-testid="free-voice-demo">
-            <p className="mb-2 text-xs text-muted-foreground">Prueba gratuita: nota de voz genérica con la voz seleccionada (Eric). No usa conversaciones privadas.</p>
-            <button type="button" onClick={sendVoiceDemo} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" data-testid="button-send-voice-demo">
-              Enviar audio de prueba de Dante
-            </button>
-          </div>
-        )}
         {messages.length === 0 && <p className="text-center text-sm text-muted-foreground" data-testid="text-conversation-empty">Todavía no os habéis escrito. Envía el primer mensaje para empezar.</p>}
         <ul className="flex flex-col gap-1.5">
           {messages.map((m, i) => (
@@ -293,6 +285,17 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
+      {canTestFreeVoice && (
+        <div className="sticky bottom-[calc(5.5rem+var(--echo-keyboard-inset,0px))] z-40 mx-3 mb-2 rounded-xl border border-primary/40 bg-background p-3 shadow-lg" data-testid="free-voice-demo">
+          <button type="button" onClick={() => {
+            try { sendVoiceDemo(); setError(null); }
+            catch (e) { setError((e as Error).message || 'No se pudo agregar la nota de voz.'); }
+          }} className="relative z-50 flex min-h-12 w-full touch-manipulation items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" data-testid="button-send-voice-demo">
+            <Mic className="mr-2 h-4 w-4" /> Enviar audio de prueba de Dante
+          </button>
+          <p className="mt-1 text-center text-[11px] text-muted-foreground">Audio público de prueba · voz Eric · sin datos privados</p>
+        </div>
+      )}
       <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
