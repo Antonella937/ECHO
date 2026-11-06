@@ -49,7 +49,7 @@ export async function approveTensionEvent(
     };
     const actorName = parsed.data.characters.find(c => c.id === actorId)?.name ?? actorId;
     const targetName = parsed.data.characters.find(c => c.id === targetId)?.name ?? targetId;
-    const summary = `Evento confirmado por el propietario: ${eventLabels[kind]} entre ${actorName} y ${targetName}. Confianza ${result.delta > 0 ? "+" : ""}${result.delta}. Evidencia: mensaje ${sourceId}.`;
+    const summary = `Evento confirmado por el propietario: ${eventLabels[kind]} entre ${actorName} y ${targetName}. Tensión ${result.delta > 0 ? "+" : ""}${result.delta}. Evidencia: mensaje ${sourceId}.`;
     const withMemory = recordAutonomyEvent(result.state, actorId, {
       sourceId: key, kind: "interaction", text: summary, targetId,
     }, now);
