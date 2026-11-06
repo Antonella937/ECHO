@@ -24,6 +24,8 @@ export interface SocialActions {
   deleteHighlight(id: string): void;
   reactMessage(id: string, value: string): void;
   hideMessage(id: string): void;
+  editMessage(id: string, text: string): void;
+  toggleSaveMessage(id: string): void;
   setAppearance(appearance: Appearance): void;
   setImageStyle(style: ImageStyle): void;
   createAccount(input: AccountInput): string;
@@ -230,6 +232,17 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       reactMessage(id, value) {
         coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
           (m.senderId === myId() || m.recipientId === myId()) ? { ...m, reactions: toggleReaction(m.reactions, myId(), value) } : m) }));
+      },
+      editMessage(id, text) {
+        const message = cur().messages.find(m => m.id === id);
+        if (!message || message.senderId !== myId()) throw new Error('Solo podés editar tus propios mensajes.');
+        if (!text.trim() || text.length > 10000) throw new Error('El mensaje debe tener entre 1 y 10000 caracteres.');
+        coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id ? { ...m, text: text.trim(), editedAt: new Date().toISOString() } : m) }));
+      },
+      toggleSaveMessage(id) {
+        const message = cur().messages.find(m => m.id === id);
+        if (!message || ![message.senderId, message.recipientId].includes(myId())) throw new Error('Mensaje no disponible.');
+        coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id ? { ...m, savedByIds: (m.savedByIds ?? []).includes(myId()) ? (m.savedByIds ?? []).filter(x => x !== myId()) : [...(m.savedByIds ?? []), myId()] } : m) }));
       },
       hideMessage(id) {
         coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
