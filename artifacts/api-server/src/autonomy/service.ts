@@ -36,7 +36,7 @@ export interface AutonomyRepository {
   readControls(ownerId: string, universeId?: string): Promise<{
     globalKillSwitchEngaged: boolean;
     liveExecutionEnabled: boolean;
-    characters: Map<string, { enabled: boolean; dmEnabled?: boolean; maxActionsPerDay: number; minCooldownMinutes: number }>;
+    characters: Map<string, { enabled: boolean; dmEnabled?: boolean; dmFrequency?: "rarely" | "sometimes" | "frequently"; dmMediaPreference?: "text" | "mixed" | "voice"; dmInstructions?: string; maxActionsPerDay: number; minCooldownMinutes: number }>;
   }>;
   getExecutedHistory(ownerId: string, characterId: string, since: Date, universeId?: string): Promise<ExecutedAutonomyAction[]>;
   reserve(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number, universeId?: string, lane?: "dm" | "social"): Promise<
@@ -292,6 +292,16 @@ export async function runAutonomyLiveCycle(
   const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
   if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged || !(dependencies.lane === "dm" ? control.dmEnabled : control.enabled)) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
+  }
+
+  // Separate per-character DM cadence and deterministic phase: avoids synchronized bursts.
+  if (dependencies.lane === "dm") {
+    const cadence = control.dmFrequency === "frequently" ? 60 : control.dmFrequency === "rarely" ? 360 : 180;
+    const phase = [...character.id].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) % cadence, 0);
+    const minute = Math.floor(now.getTime() / 60_000);
+    if ((minute - phase + cadence) % cadence >= 2) {
+      return { status: "no_action", reasonCode: "DM_FREQUENCY_WINDOW", characterId: character.id, runId: null, model: null };
+    }
   }
 
   const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision, universeId, dependencies.lane ?? "social");
