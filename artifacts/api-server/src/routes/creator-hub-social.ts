@@ -153,7 +153,7 @@ export function createCreatorHubSocialRouter(): IRouter {
 
   const voiceSchema = z.object({
     targetOwnerId: z.string().min(1).max(255),
-    objectPath: z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i),
+    objectPath: z.string().regex(new RegExp('^/objects/uploads/[0-9a-f-]{36}$', 'i')),
     durationSeconds: z.number().int().min(1).max(120),
   }).strict();
   router.post("/creator-hub/social/voice-messages", async (req, res) => {
