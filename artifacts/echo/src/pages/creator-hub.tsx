@@ -83,19 +83,19 @@ export default function CreatorHubPage() {
     ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
     : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground">
-      <header className="absolute left-0 right-0 top-0 z-20 flex items-center gap-3 px-4 pb-4 pt-safe text-foreground">
+    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
+      <header className="relative z-20 flex shrink-0 items-center gap-3 px-4 py-4 pt-safe text-foreground lg:px-8">
         <Link href="/" aria-label="Volver al inicio" className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/45 backdrop-blur-md hover:bg-black/65"><ArrowLeft size={19} /></Link>
         <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-foreground/70">ECHO</p><h1 className="text-lg font-semibold">Creator Hub</h1></div>
       </header>
-      <div className="px-4">
-        <section className="overflow-hidden rounded-[28px] border border-border bg-card" aria-label="Perfil Creator Hub">
-          <div className="relative flex h-56 flex-col items-center justify-center gap-2 pt-12 sm:h-72 lg:h-80 bg-[linear-gradient(130deg,hsl(263_18%_19%),hsl(336_15%_16%))] text-muted-foreground">
+      <div className="flex w-full flex-1 flex-col justify-center px-0 pb-6 lg:py-8">
+        <section className="w-full overflow-hidden bg-card lg:mx-auto lg:max-w-6xl lg:rounded-[28px] lg:border lg:border-border" aria-label="Perfil Creator Hub">
+          <div className="relative flex h-48 flex-col items-center justify-center gap-2 sm:h-60 lg:h-64 bg-[linear-gradient(130deg,hsl(263_18%_19%),hsl(336_15%_16%))] text-muted-foreground">
             {bannerImage ? <img src={bannerImage} alt="Banner de Creator Hub" className="absolute inset-0 h-full w-full object-cover" /> : <span className="select-none text-[clamp(4rem,14vw,9rem)] font-black tracking-[-0.08em] text-white/20" aria-hidden="true">{initials}</span>}
             <input ref={bannerInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Seleccionar banner" onChange={e => void uploadPhoto(e, 'banner')} />
             <button type="button" disabled={uploading !== null} onClick={() => bannerInput.current?.click()} className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full bg-black/65 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Camera size={15}/>{uploading === 'banner' ? 'Subiendo…' : 'Editar banner'}</button>
           </div>
-          <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-10">
+          <div className="mx-auto w-full max-w-5xl space-y-5 px-5 py-6 sm:px-10 lg:py-7">
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
                 <span className="grid h-20 w-20 overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}`}>{avatarImage ? <img src={avatarImage} alt="" className="h-full w-full object-cover" /> : initials}</span>
@@ -117,7 +117,7 @@ export default function CreatorHubPage() {
                 <button type="button" disabled title="Las solicitudes de acceso todavía no están habilitadas" className="rounded-full bg-secondary px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70">Solicitar acceso</button>
                 <button type="button" disabled title="Los mensajes Creator Hub todavía no están habilitados" className="flex items-center justify-center gap-2 rounded-full border border-border px-3 py-3 text-sm text-muted-foreground opacity-60"><MessageCircle size={16} /> Mensaje privado</button>
               </div>
-              <div className="mt-6 rounded-2xl bg-secondary/70 px-5 py-12 text-center sm:py-16">
+              <div className="mt-5 rounded-2xl bg-secondary/70 px-5 py-8 text-center sm:py-10">
                 <LockKeyhole size={23} className="mx-auto mb-3 text-muted-foreground" />
                 <h3 className="font-semibold">Contenido privado</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Los personajes y universos compartidos solo serán visibles después de que el creador autorice el acceso.</p>
@@ -125,7 +125,7 @@ export default function CreatorHubPage() {
             </div>
           </div>
         </section>
-        <p className="mx-auto mt-6 flex max-w-5xl items-start gap-2 px-6 pb-12 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. La edición del perfil, las solicitudes y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
+        <p className="mx-auto mt-4 flex max-w-5xl items-start gap-2 px-6 pb-4 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. La edición del perfil, las solicitudes y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
       </div>
     </div>
   );
