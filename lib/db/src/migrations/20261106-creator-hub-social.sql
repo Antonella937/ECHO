@@ -70,3 +70,20 @@ CREATE TABLE IF NOT EXISTS echo_creator_direct_messages (
 );
 CREATE INDEX IF NOT EXISTS echo_creator_direct_messages_sender_idx ON echo_creator_direct_messages(sender_owner_id,recipient_owner_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS echo_creator_direct_messages_recipient_idx ON echo_creator_direct_messages(recipient_owner_id,sender_owner_id,created_at DESC);
+
+-- Reactions are bound to actual messages; users may react once per emoji.
+CREATE TABLE IF NOT EXISTS echo_creator_message_reactions (
+  message_id uuid NOT NULL REFERENCES echo_creator_direct_messages(id) ON DELETE CASCADE,
+  reactor_owner_id text NOT NULL,
+  emoji text NOT NULL CHECK (emoji IN ('❤️','😂','🥹','😍','👍','🔥','😮','😢')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(message_id,reactor_owner_id,emoji)
+);
+-- Ephemeral typing presence: expires even if the browser closes unexpectedly.
+CREATE TABLE IF NOT EXISTS echo_creator_typing_presence (
+  sender_owner_id text NOT NULL,
+  recipient_owner_id text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY(sender_owner_id,recipient_owner_id),
+  CONSTRAINT echo_creator_typing_no_self CHECK(sender_owner_id <> recipient_owner_id)
+);
