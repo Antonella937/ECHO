@@ -59,7 +59,7 @@ export function createCreatorHubSocialRouter(): IRouter {
   router.get("/creator-hub/social/search", async (req, res) => {
     const parsed = searchSchema.safeParse(req.query);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_SEARCH" }); return; }
-    const q = parsed.data.q.replace(/[\\%_]/g, "\\$&");
+    const q = parsed.data.q.replace(/^@+/, "").replace(/[\\%_]/g, "\\$&");
     const result = await pool.query(
       `SELECT p.owner_id AS "ownerId", p.display_name AS "displayName", p.username, p.visibility,
         EXISTS(SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$1 AND f.followed_owner_id=p.owner_id) AS "following",
