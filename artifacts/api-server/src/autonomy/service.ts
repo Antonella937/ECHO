@@ -36,7 +36,7 @@ export interface AutonomyRepository {
   readControls(ownerId: string, universeId?: string): Promise<{
     globalKillSwitchEngaged: boolean;
     liveExecutionEnabled: boolean;
-    characters: Map<string, { enabled: boolean; maxActionsPerDay: number; minCooldownMinutes: number }>;
+    characters: Map<string, { enabled: boolean; dmEnabled?: boolean; maxActionsPerDay: number; minCooldownMinutes: number }>;
   }>;
   getExecutedHistory(ownerId: string, characterId: string, since: Date, universeId?: string): Promise<ExecutedAutonomyAction[]>;
   reserve(ownerId: string, characterId: string, idempotencyKey: string, sourceRevision: number, universeId?: string, lane?: "dm" | "social"): Promise<
@@ -290,7 +290,7 @@ export async function runAutonomyLiveCycle(
 
   const controls = await dependencies.repository.readControls(ownerId, universeId);
   const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
-  if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged || !control.enabled) {
+  if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged || !(dependencies.lane === "dm" ? control.dmEnabled : control.enabled)) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
