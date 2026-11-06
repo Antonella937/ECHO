@@ -19,11 +19,13 @@ export default function MessagesPage() {
   const { me } = useSocial();
   const threads = useThreads();
   const [composing, setComposing] = useState(false);
+  const [, navigate] = useLocation();
 
   return (
     <div>
       <TopBar
         title={t("Mensajes")}
+        onBack={() => navigate("/")}
         sub={`${t("Bandeja de")} ${me.name}`}
         right={
           <button
