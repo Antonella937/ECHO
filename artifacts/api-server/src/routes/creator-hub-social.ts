@@ -383,6 +383,30 @@ export function createCreatorHubSocialRouter(): IRouter {
   });
 
   // A recipient-scoped inbox: never return another user's requests.
+  router.get("/creator-hub/social/conversations", async (req, res) => {
+    const result = await pool.query(
+      `WITH peers AS (
+        SELECT CASE WHEN sender_owner_id=$1 THEN recipient_owner_id ELSE sender_owner_id END AS peer_id
+          FROM echo_creator_message_requests WHERE status='accepted' AND (sender_owner_id=$1 OR recipient_owner_id=$1)
+        UNION
+        SELECT CASE WHEN sender_owner_id=$1 THEN recipient_owner_id ELSE sender_owner_id END
+          FROM echo_creator_direct_messages WHERE sender_owner_id=$1 OR recipient_owner_id=$1
+        UNION
+        SELECT CASE WHEN sender_owner_id=$1 THEN recipient_owner_id ELSE sender_owner_id END
+          FROM echo_creator_voice_messages WHERE sender_owner_id=$1 OR recipient_owner_id=$1
+      )
+      SELECT p.owner_id AS "ownerId", p.display_name AS "displayName", p.username
+      FROM peers JOIN echo_creator_profiles p ON p.owner_id=peers.peer_id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM echo_creator_blocks b WHERE
+        (b.blocker_owner_id=$1 AND b.blocked_owner_id=p.owner_id)
+        OR (b.blocker_owner_id=p.owner_id AND b.blocked_owner_id=$1)
+      ) ORDER BY p.display_name LIMIT 100`,
+      [req.userId],
+    );
+    res.json({ conversations: result.rows });
+  });
+
   router.get("/creator-hub/social/message-requests", async (req, res) => {
     const result = await pool.query(
       `SELECT r.id, r.sender_owner_id AS "senderOwnerId",
