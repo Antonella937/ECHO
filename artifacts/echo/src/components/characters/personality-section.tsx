@@ -1,3 +1,4 @@
+import { BASIC_VOICES } from '@/lib/basic-voices';
 import { Area, ListInput, Note, Select, SubHead, Text, level, type SectionProps } from './ui';
 
 const STARTERS = ['curiosa', 'irónica', 'leal', 'impulsiva', 'reservada', 'cálida', 'perfeccionista', 'nocturna', 'competitiva', 'soñadora'];
@@ -36,6 +37,20 @@ export function PersonalitySection({ config, set }: SectionProps) {
       <ListInput id="character-topics" label="Temas recurrentes" value={p.commonTopics} onChange={(commonTopics) => upP({ commonTopics })} />
       <ListInput id="character-boundaries" label="Límites" value={p.boundaries} onChange={(boundaries) => upP({ boundaries })} comma={false} />
 
+      <SubHead>Voz de audio · Catálogo gratuito</SubHead>
+      <Note>Elegí una voz para futuras notas de voz. La generación de audio todavía no está conectada. Estas voces Kokoro son en inglés.</Note>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Voz básica del personaje" data-testid="basic-voice-catalog">
+        {BASIC_VOICES.map(voice => (
+          <button key={voice.id} type="button" role="radio" aria-checked={v.basicVoiceId === voice.id}
+            onClick={() => upV({ basicVoiceId: voice.id })}
+            className={`min-h-16 rounded-xl border p-3 text-left text-sm ${v.basicVoiceId === voice.id ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card'}`}
+            data-testid={`basic-voice-${voice.id}`}>
+            <span className="block font-semibold">{voice.label}</span>
+            <span className="text-xs text-muted-foreground">{voice.gender === 'female' ? 'Femenina' : 'Masculina'} · {voice.language}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className="mt-2 text-xs text-muted-foreground underline" onClick={() => upV({ basicVoiceId: undefined })}>Sin voz seleccionada</button>
       <SubHead>Voz y conducta online</SubHead>
       <Note>Cómo escribe en posts, comentarios y mensajes. Sirve de guía, no de guion.</Note>
       <Area id="character-speaking" label="Forma de hablar" value={v.speakingStyle} onChange={(speakingStyle) => upV({ speakingStyle })} max={4000} rows={3} />
