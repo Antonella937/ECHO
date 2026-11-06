@@ -26,6 +26,29 @@ export default function CreatorHubPage() {
   const [nameDraft, setNameDraft] = useState('');
   const [uploading, setUploading] = useState<'avatar' | 'banner' | null>(null);
   const [profileError, setProfileError] = useState('');
+  const externalLink = typeof user?.unsafeMetadata?.creatorHubExternalLink === 'string' ? user.unsafeMetadata.creatorHubExternalLink : '';
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkDraft, setLinkDraft] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
+  async function saveLink() {
+    if (!user) return;
+    const raw = linkDraft.trim();
+    let normalized = raw;
+    if (raw && !/^https?:\/\//i.test(raw)) normalized = 'https://' + raw;
+    if (normalized) {
+      try {
+        const parsed = new URL(normalized);
+        if (parsed.protocol !== 'https:' || !parsed.hostname.includes('.') || parsed.username || parsed.password || normalized.length > 500) throw new Error('invalid');
+      } catch { setProfileError('Ingresá un enlace HTTPS válido, por ejemplo instagram.com/tuusuario.'); return; }
+    }
+    setSavingLink(true); setProfileError('');
+    try {
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubExternalLink: normalized } });
+      await user.reload();
+      setEditingLink(false);
+    } catch { setProfileError('No pudimos guardar el enlace. Probá de nuevo.'); }
+    finally { setSavingLink(false); }
+  }
   async function saveName() {
     const next = nameDraft.trim();
     if (next.length < 2 || next.length > 80) { setProfileError('El nombre debe tener entre 2 y 80 caracteres.'); return; }
@@ -112,7 +135,9 @@ export default function CreatorHubPage() {
             </div>
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
             <p className="text-sm leading-relaxed text-muted-foreground">Tu espacio para presentar los mundos, personajes e historias que creás.</p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} /><span>Enlace externo opcional</span></div>
+            <div className="space-y-2">
+              {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline underline-offset-4 hover:text-foreground">{externalLink.replace(/^https?:\/\//, '')}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
+            </div>
             <div className="border-t border-border pt-5">
               <div className="grid grid-cols-2 gap-3">
                 <button type="button" disabled title="Las solicitudes de acceso todavía no están habilitadas" className="rounded-full bg-secondary px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70">Solicitar acceso</button>
@@ -126,7 +151,7 @@ export default function CreatorHubPage() {
             </div>
           </div>
         </section>
-        <p className="mx-auto mt-4 flex max-w-5xl items-start gap-2 px-6 pb-4 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. La edición del perfil, las solicitudes y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
+        <p className="mx-auto mt-4 flex max-w-5xl items-start gap-2 px-6 pb-4 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. Las solicitudes de acceso y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
       </div>
     </div>
   );
