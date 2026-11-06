@@ -1,3 +1,4 @@
+import { usePostComposeText } from '@/lib/post-compose-translations';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { Link, useLocation, useSearch } from 'wouter';
@@ -19,6 +20,7 @@ import { getActiveUniverseId } from '@/store/persistence';
 type Mode = 'post' | 'story';
 
 export default function CreatePage() {
+  const t = usePostComposeText();
   const resolveMedia = useMediaResolver();
   const search = useSearch();
   const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
@@ -95,7 +97,7 @@ export default function CreatePage() {
           const mid = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
           let item: PostMedia;
           if (files[i].type.startsWith('video/')) {
-            if (mode === 'story') throw new Error('Las historias admiten solo fotos.');
+            if (mode === 'story') throw new Error(t('Las historias admiten solo fotos.'));
             const att = await uploadPrivateFile(files[i]);
             item = { id: mid, type: 'video', url: att.url, ...(att.mimeType ? { mimeType: att.mimeType } : {}) };
           } else {
@@ -194,7 +196,7 @@ export default function CreatePage() {
     if (busy) return;
     if (mediaSource === 'ai') { setError('La generación IA está en modo preparación. Cambiá a Subir foto o video para publicar.'); return; }
     if (!image) {
-      setError('Elige una foto para continuar.');
+      setError(t('Elige una foto para continuar.'));
       return;
     }
     try {
@@ -203,11 +205,11 @@ export default function CreatePage() {
           setError('Las historias admiten una sola foto. Quitá fotos hasta dejar una.');
           return;
         }
-        if (storyVideo) { setError('Las historias admiten solo fotos.'); return; }
+        if (storyVideo) { setError(t('Las historias admiten solo fotos.')); return; }
         if (musicPartial) { setError('Completá título y artista de la música, o dejá ambos vacíos.'); return; }
         actions.createStory({ image, caption, closeFriendsOnly, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
-        toast({ title: 'Historia publicada', description: `Como ${me.name}` });
+        toast({ title: t('Historia publicada'), description: `${t('Como')} ${me.name}` });
         navigate('/');
         return;
       }
@@ -215,18 +217,18 @@ export default function CreatePage() {
       const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), commentsEnabled });
       const cover = items.find((m) => m.type === 'image');
       if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
-      toast({ title: 'Publicado', description: `Como ${me.name}` });
+      toast({ title: t('Publicado'), description: `${t('Como')} ${me.name}` });
       navigate(`/p/${id}`);
     } catch (err) {
-      setError((err as Error).message || 'No se pudo publicar.');
+      setError((err as Error).message || t('No se pudo publicar.'));
     }
   };
 
   return (
     <div>
-      <TopBar title={mode === 'story' ? 'Nueva historia' : 'Nueva publicación'} onBack={back} />
+      <TopBar title={t(mode === 'story' ? 'Nueva historia' : 'Nueva publicación')} onBack={back} />
       <form onSubmit={submit} className="px-4 pb-6 pt-4">
-        <div className="mb-5 grid grid-cols-2 rounded-2xl bg-card p-1" role="tablist" aria-label="Tipo de contenido">
+        <div className="mb-5 grid grid-cols-2 rounded-2xl bg-card p-1" role="tablist" aria-label={t("Tipo de contenido")}>
           {(['post', 'story'] as Mode[]).map((m) => (
             <button
               key={m}
@@ -238,7 +240,7 @@ export default function CreatePage() {
               className={cn('h-11 rounded-xl text-sm font-semibold transition-colors', mode === m ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
               data-testid={`tab-mode-${m}`}
             >
-              {m === 'post' ? 'Publicación' : 'Historia'}
+              {t(m === 'post' ? 'Publicación' : 'Historia')}
             </button>
           ))}
         </div>
@@ -246,7 +248,7 @@ export default function CreatePage() {
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-border p-3">
           <CharacterAvatar character={me} size={40} className="shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Publicando como</div>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{t("Publicando como")}</div>
             <div className="truncate text-sm font-semibold" data-testid="text-posting-as">{me.name} · @{me.handle}</div>
           </div>
           <Link href="/settings" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-4 text-xs font-semibold" data-testid="link-create-switch">
@@ -255,20 +257,20 @@ export default function CreatePage() {
         </div>
 
         {mode === 'story' && <div className="mb-4 rounded-2xl border border-border bg-card/60 p-4" data-testid="story-audience">
-          <p className="text-sm font-semibold">¿Quién puede ver esta historia?</p>
+          <p className="text-sm font-semibold">{t("¿Quién puede ver esta historia?")}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" aria-pressed={!closeFriendsOnly} onClick={() => setCloseFriendsOnly(false)} className={cn('h-11 rounded-xl text-sm', !closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-everyone">Todos</button>
-            <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ Mejores amigos</button>
+            <button type="button" aria-pressed={!closeFriendsOnly} onClick={() => setCloseFriendsOnly(false)} className={cn('h-11 rounded-xl text-sm', !closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-everyone">{t("Todos")}</button>
+            <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ {t("Mejores amigos")}</button>
           </div>
           {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} mejores amigos seleccionados. Podés editarlos en Ajustes.</p>}
         </div>}
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label="Origen de imagen">
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label={t("Origen de imagen")}>
           <button type="button" role="tab" aria-selected={mediaSource === 'upload'} onClick={() => setMediaSource('upload')}
             className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'upload' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
-            data-testid="tab-media-upload"><ImagePlus className="h-4 w-4" /> Subir foto o video</button>
+            data-testid="tab-media-upload"><ImagePlus className="h-4 w-4" /> {t("Subir foto o video")}</button>
           <button type="button" role="tab" aria-selected={mediaSource === 'ai'} onClick={() => setMediaSource('ai')}
             className={cn('flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-semibold', mediaSource === 'ai' ? 'bg-secondary text-foreground' : 'text-muted-foreground')}
-            data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> Generar con IA</button>
+            data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> {t("Generar con IA")}</button>
         </div>
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
@@ -333,7 +335,7 @@ export default function CreatePage() {
               className="absolute bottom-3 right-3 z-20 h-11 rounded-full bg-[hsl(240_8%_3%/0.7)] px-4 text-xs font-semibold backdrop-blur disabled:opacity-50"
               data-testid="button-change-image"
             >
-              {busy ? 'Procesando…' : 'Cambiar foto'}
+              {t(busy ? 'Procesando…' : 'Cambiar foto')}
             </button>
           </div>
         ) : (
@@ -347,7 +349,7 @@ export default function CreatePage() {
             <span className="grid h-12 w-12 place-items-center rounded-full bg-accent text-accent-foreground">
               <ImagePlus className="h-6 w-6" strokeWidth={1.5} />
             </span>
-            <span className="font-display text-lg font-light">{busy ? 'Procesando…' : mode === 'post' ? 'Elige fotos o videos' : 'Elige una foto'}</span>
+            <span className="font-display text-lg font-light">{t(busy ? 'Procesando…' : mode === 'post' ? 'Elige fotos o videos' : 'Elige una foto')}</span>
             <span className="px-4 text-center text-xs text-muted-foreground">{busy ? progress ?? 'Subiendo de forma privada…' : mode === 'post' ? `Fotos o videos, hasta ${MAX_POST_MEDIA}. Se guardan en privado.` : 'JPG, PNG o HEIC compatible. Se guardará en tu cuenta.'}</span>
           </button>
         ))}
