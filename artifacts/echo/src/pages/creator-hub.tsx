@@ -255,15 +255,15 @@ export default function CreatorHubPage() {
     try {
       const data = await customFetch<{conversations: typeof conversations}>('/api/creator-hub/social/conversations', {responseType:'json'});
       setConversations(data.conversations);
-    } catch { setInboxError('No pudimos cargar las conversaciones.'); }
+    } catch { setInboxError(ht("No pudimos cargar las conversaciones.")); }
   }
   async function followPerson(ownerId: string) {
     setPeopleBusy(true); setPeopleFeedback('');
     try {
       const result = await customFetch<{status:string}>('/api/creator-hub/social/follow', {method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetOwnerId:ownerId})});
-      setPeopleFeedback(result.status === 'following' ? '¡Ahora seguís a esta persona!' : 'Solicitud para seguir enviada.');
+      setPeopleFeedback(result.status === 'following' ? ht("¡Ahora seguís a esta persona!") : ht("Solicitud para seguir enviada."));
       setPeopleResults(previous => previous.map(person => person.ownerId === ownerId ? {...person, following: result.status === 'following',requested:result.status !== 'following'} : person));
-    } catch { setPeopleFeedback('No pudimos enviar la solicitud para seguir.'); }
+    } catch { setPeopleFeedback(ht("No pudimos enviar la solicitud para seguir.")); }
     finally { setPeopleBusy(false); }
   }
   const [peopleBusy, setPeopleBusy] = useState(false);
@@ -274,7 +274,7 @@ export default function CreatorHubPage() {
     try {
       const data = await customFetch<{ profiles: typeof peopleResults }>('/api/creator-hub/social/search?q=' + encodeURIComponent(peopleQuery.trim()), { responseType: 'json' });
       setPeopleResults(data.profiles);
-    } catch { setPeopleFeedback('No pudimos buscar personas.'); }
+    } catch { setPeopleFeedback(ht("No pudimos buscar personas.")); }
     finally { setPeopleBusy(false); }
   }
   async function requestMessage(ownerId: string) {
@@ -284,9 +284,9 @@ export default function CreatorHubPage() {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetOwnerId: ownerId }),
       });
-      if (result.status === 'requested') setPeopleFeedback('Solicitud enviada. Aparecerá en la bandeja de esa persona.');
-      else { setHubTab('mensajes'); setPeopleFeedback('Podés escribirle.'); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? 'esta persona'); }
-    } catch { setPeopleFeedback('No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.'); }
+      if (result.status === 'requested') setPeopleFeedback(ht("Solicitud enviada. Aparecerá en la bandeja de esa persona."));
+      else { setHubTab('mensajes'); setPeopleFeedback(ht("Podés escribirle.")); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? ht("esta persona")); }
+    } catch { setPeopleFeedback(ht("No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.")); }
     finally { setPeopleBusy(false); }
   }
   const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
@@ -327,7 +327,7 @@ export default function CreatorHubPage() {
     try {
       await customFetch('/api/creator-hub/social/reactions', { method: alreadyReacted ? 'DELETE' : 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, emoji }) });
       await refreshHumanChat(activeChat.ownerId);
-    } catch { setChatError('No pudimos guardar la reacción.'); }
+    } catch { setChatError(ht("No pudimos guardar la reacción.")); }
   }
 
   const [chatBusy, setChatBusy] = useState(false);
@@ -337,7 +337,7 @@ export default function CreatorHubPage() {
     try {
       const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
       setChatMessages(result.messages); setOtherTyping(false);
-    } catch { setChatError('No pudimos abrir esta conversación.'); }
+    } catch { setChatError(ht("No pudimos abrir esta conversación.")); }
   }
   async function sendHumanMessage() {
     if (!activeChat || !chatDraft.trim() || chatBusy) return;
@@ -346,7 +346,7 @@ export default function CreatorHubPage() {
       await customFetch('/api/creator-hub/social/messages', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, body: chatDraft.trim() }) });
       setChatDraft('');
       await openHumanChat(activeChat.ownerId, activeChat.name);
-    } catch { setChatError('No se pudo enviar. Puede que necesites una solicitud aceptada.'); }
+    } catch { setChatError(ht("No se pudo enviar. Puede que necesites una solicitud aceptada.")); }
     finally { setChatBusy(false); }
   }
   const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
@@ -360,7 +360,7 @@ export default function CreatorHubPage() {
         customFetch<{ requests: typeof messageInbox }>('/api/creator-hub/social/message-requests', { responseType: 'json' }),
       ]);
       setFollowInbox(follows.requests); setMessageInbox(messages.requests); setInboxError('');
-    } catch { setInboxError('No se pudieron cargar las solicitudes.'); }
+    } catch { setInboxError(ht("No se pudieron cargar las solicitudes.")); }
   }
   useEffect(() => {
     if (socialReady && user?.id) { void refreshInbox(); void refreshConversations(); }
@@ -375,7 +375,7 @@ export default function CreatorHubPage() {
         await refreshConversations();
         if (accepted?.senderOwnerId) { setHubTab('mensajes'); await openHumanChat(accepted.senderOwnerId, accepted.displayName); }
       }
-    } catch { setInboxError('No se pudo actualizar la solicitud.'); }
+    } catch { setInboxError(ht("No se pudo actualizar la solicitud.")); }
     finally { setInboxBusy(false); }
   }
   const nameParts = alias.split(/\s+/).filter(Boolean);
