@@ -412,6 +412,7 @@ export const UpdateAutonomySettingsResponse = zod.object({
   "displayName": zod.string(),
   "username": zod.string(),
   "enabled": zod.boolean(),
+  "dmEnabled": zod.boolean(),
   "maxActionsPerDay": zod.number().int().min(1).max(updateAutonomySettingsResponseCharactersItemMaxActionsPerDayMax),
   "minCooldownMinutes": zod.number().int().min(updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMin).max(updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMax)
 }))
