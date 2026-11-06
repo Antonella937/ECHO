@@ -55,6 +55,24 @@ export default function CreatorHubPage() {
     } catch { setProfileError('No pudimos guardar el encuadre. Intentá nuevamente.'); }
     finally { setSavingPosition(false); }
   }
+  const defaultBio = 'Tu espacio para presentar los mundos, personajes e historias que creás.';
+  const savedBio = typeof user?.unsafeMetadata?.creatorHubBio === 'string' ? user.unsafeMetadata.creatorHubBio : '';
+  const bio = savedBio || defaultBio;
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioDraft, setBioDraft] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
+  async function saveBio() {
+    if (!user) return;
+    const next = bioDraft.trim();
+    if (next.length > 500) { setProfileError('La biografía puede tener hasta 500 caracteres.'); return; }
+    setSavingBio(true); setProfileError('');
+    try {
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubBio: next } });
+      await user.reload();
+      setEditingBio(false);
+    } catch { setProfileError('No pudimos guardar la biografía. Intentá nuevamente.'); }
+    finally { setSavingBio(false); }
+  }
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [uploading, setUploading] = useState<'avatar' | 'banner' | null>(null);
@@ -167,7 +185,7 @@ export default function CreatorHubPage() {
               <span className="hidden shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground sm:inline-flex">Perfil privado</span>
             </div>
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
-            <p className="text-sm leading-relaxed text-muted-foreground">Tu espacio para presentar los mundos, personajes e historias que creás.</p>
+            {editingBio ? <div className="space-y-2"><textarea aria-label="Biografía de Creator Hub" value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder="Contá algo sobre vos…" className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 caracteres</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">Cancelar</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{savingBio ? 'Guardando…' : 'Guardar biografía'}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{bio}</p><button type="button" aria-label="Editar biografía" title="Editar biografía" onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
             <div className="space-y-2">
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline underline-offset-4 hover:text-foreground">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
             </div>
