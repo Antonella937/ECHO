@@ -32,9 +32,6 @@ export function AccountManager() {
             </button>
           ))}
         </div>
-        <button onClick={() => setEditing(null)} className="flex h-12 items-center gap-1.5 rounded-2xl border border-border px-3 text-xs font-semibold" data-testid="button-create-account">
-          <Plus className="h-4 w-4" strokeWidth={2.4} /> Cuenta
-        </button>
       </div>
       <Link href="/characters/new" className="mt-3 flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground" data-testid="button-create-character">
         <Plus className="h-4 w-4" /> Crear personaje
