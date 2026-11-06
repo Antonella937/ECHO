@@ -223,9 +223,32 @@ export default function CreatorHubPage() {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetOwnerId: ownerId }),
       });
-      setPeopleFeedback(result.status === 'requested' ? 'Solicitud enviada. Aparecerá en la bandeja de esa persona.' : 'Esta persona permite mensajes. El chat se habilitará cuando esté lista la mensajería.');
+      if (result.status === 'requested') setPeopleFeedback('Solicitud enviada. Aparecerá en la bandeja de esa persona.');
+      else { setPeopleFeedback('Podés escribirle.'); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? 'esta persona'); }
     } catch { setPeopleFeedback('No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.'); }
     finally { setPeopleBusy(false); }
+  }
+  const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string }>>([]);
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState('');
+  async function openHumanChat(ownerId: string, name: string) {
+    setActiveChat({ ownerId, name }); setChatError('');
+    try {
+      const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
+      setChatMessages(result.messages);
+    } catch { setChatError('No pudimos abrir esta conversación.'); }
+  }
+  async function sendHumanMessage() {
+    if (!activeChat || !chatDraft.trim() || chatBusy) return;
+    setChatBusy(true); setChatError('');
+    try {
+      await customFetch('/api/creator-hub/social/messages', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, body: chatDraft.trim() }) });
+      setChatDraft('');
+      await openHumanChat(activeChat.ownerId, activeChat.name);
+    } catch { setChatError('No se pudo enviar. Puede que necesites una solicitud aceptada.'); }
+    finally { setChatBusy(false); }
   }
   const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
   const [messageInbox, setMessageInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
@@ -315,6 +338,15 @@ export default function CreatorHubPage() {
                 </div>
               ))}
             </div>
+            {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between"><h3 className="font-semibold">Chat con {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">Actualizar</button></div>
+              <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
+                {chatMessages.length === 0 && <p className="text-xs text-muted-foreground">Todavía no hay mensajes.</p>}
+                {chatMessages.map(message => <p key={message.id} className="rounded-lg bg-background px-3 py-2 text-sm break-words">{message.body}</p>)}
+              </div>
+              {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
+              <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => setChatDraft(e.target.value)} placeholder="Escribí un mensaje…" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Enviar</button></div>
+            </div>}
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Bandeja de solicitudes</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">Actualizar</button></div>
               {inboxError && <p role="alert" className="text-xs text-destructive">{inboxError}</p>}
