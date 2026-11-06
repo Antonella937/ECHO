@@ -4,7 +4,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'wouter';
+import { Link, useLocation, useParams } from 'wouter';
 import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
