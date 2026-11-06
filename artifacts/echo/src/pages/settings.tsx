@@ -7,6 +7,7 @@ import type { Appearance, ImageStyle } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
+import { PlanAndQuotaSettings } from '@/components/echo/plan-and-quota-settings';
 import { UniverseSelector } from '@/components/echo/universe-selector';
 import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
 import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
@@ -47,6 +48,8 @@ export default function SettingsPage() {
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> Buscar en este universo
           </Link>
         </section>
+
+        <PlanAndQuotaSettings />
 
         <section className="mt-9" aria-labelledby="identity-h">
           <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cuentas e identidad activa</h2>
