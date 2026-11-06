@@ -12,7 +12,7 @@ import {
   MAX_AUTONOMY_RESERVE_PERCENT,
 } from "../lib/ai-usage";
 import {
-  createAdditionalUniverse, creatorEntitlements, listUniverses, StructuralLimitError,
+  createAdditionalUniverse, creatorEntitlements, creatorCapacity, listUniverses, StructuralLimitError,
 } from "../lib/universeRepository";
 import { universeAccountError } from "../lib/universeValidation";
 import { SaveUniverseBody } from "@workspace/api-zod";
@@ -53,8 +53,8 @@ router.get("/creator/account", async (req, res): Promise<void> => {
     billingExempt: lifetimeAccessForOwner(ownerId) !== null,
     billingStatus: "not_connected",
     betaAccess: process.env.ECHO_BETA_ACCESS_MODE === "three_seats",
-    maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
-    maxCharacters: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
+    maxUniverses: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxUniverses,
+    maxCharacters: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxCharacters,
     addonUniverses: entitlements.addonUniverses,
     addonCharacters: entitlements.addonCharacters,
     universeCount: universes.length,
@@ -100,8 +100,8 @@ router.put("/creator/ai-budget", async (req, res): Promise<void> => {
   res.json({
     plan: entitlements.plan, lifetimeAccess: lifetimeAccessForOwner(ownerId),
     billingExempt: lifetimeAccessForOwner(ownerId) !== null, billingStatus: "not_connected",
-    maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 5 : 1) + entitlements.addonUniverses,
-    maxCharacters: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || entitlements.plan === "creator" ? 25 : 5) + entitlements.addonCharacters,
+    maxUniverses: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxUniverses,
+    maxCharacters: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxCharacters,
     addonUniverses: entitlements.addonUniverses, addonCharacters: entitlements.addonCharacters,
     universeCount: universes.length, characterCount, usage,
   });
