@@ -7,6 +7,7 @@ import storageRouter from "./storage";
 import { createSupabaseStorageRouter } from "./supabase-storage";
 import charactersRouter from "./characters";
 import aiEngineRouter from "./ai-engine";
+import basicVoiceRouter from "./basic-voice";
 import autonomyRouter from "./autonomy";
 import creatorRouter from "./creator";
 import { characterPrivacyRouter } from "./character-privacy";
@@ -27,6 +28,7 @@ router.use(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createSupabaseStorageRouter() : storageRouter);
 router.use(charactersRouter);
 router.use(aiEngineRouter);
+router.use(basicVoiceRouter);
 router.use(autonomyRouter);
 router.use(creatorRouter);
 router.use(characterPrivacyRouter);
