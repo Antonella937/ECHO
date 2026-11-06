@@ -51,7 +51,7 @@ export function PlanAndQuotaSettings() {
           <div className="mt-3 flex justify-between gap-2"><span>{t("Mensajes de voz últimas 24 h")}</span><strong>{data.voice.usedMessagesToday} / {data.voice.maxDailyMessages}</strong></div>
         </div>
       </> : null}
-      <button type="button" onClick={() => setDetails(details === 'plans' ? null : 'plans')} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">Ver planes Free, Plus y Premium <ChevronRight className="h-4 w-4" /></button>
+      <button type="button" onClick={() => setDetails(details === 'plans' ? null : 'plans')} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">{t("Ver planes Free, Plus y Premium")} <ChevronRight className="h-4 w-4" /></button>
       <button type="button" onClick={load} disabled={loading} className="mt-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" /> {t("Actualizar estado")}</button>
     </div>
     <div className="mt-3 grid grid-cols-2 gap-3">
@@ -61,11 +61,11 @@ export function PlanAndQuotaSettings() {
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <h3 className="text-sm font-semibold">{t("Ampliar mi universo")}</h3>
       <p className="mt-1 text-xs text-muted-foreground">{complimentary ? t("Tus espacios de personajes y mundos están incluidos de por vida. No necesitás comprar ampliaciones.") : t("Espacios adicionales mensuales, independientes del plan principal.")}</p>
-      {([['character', t("+1 personaje")], ['world', t("+1 mundo")]] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="mt-3 flex min-h-14 w-full items-center justify-between rounded-xl border border-border px-3 text-left text-sm font-semibold"><span><Plus className="mr-2 inline h-4 w-4" /{t(label)}</span>{complimentary && <span className="ml-auto mr-2 text-[11px] text-primary">{t("Incluido")}</span>}<ChevronRight className="h-4 w-4" /></button>)}
+      {([['character', t("+1 personaje")], ['world', t("+1 mundo")]] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="mt-3 flex min-h-14 w-full items-center justify-between rounded-xl border border-border px-3 text-left text-sm font-semibold"><span><Plus className="mr-2 inline h-4 w-4" /> {label}</span>{complimentary && <span className="ml-auto mr-2 text-[11px] text-primary">{t("Incluido")}</span>}<ChevronRight className="h-4 w-4" /></button>)}
     </div>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <h3 className="text-sm font-semibold">{t("Complementos independientes")}</h3>
-      {([['music', 'ECHO Music', Music2], ['video', 'ECHO Video', Clapperboard]] as const).map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="mt-3 flex min-h-14 w-full items-center justify-between rounded-xl border border-border px-3 text-left text-sm font-semibold"><span className="flex items-center gap-2"><Icon className="h-4 w-4" /{t(label)}</span>{complimentary && <span className="ml-auto mr-2 text-[11px] text-primary">{t("Incluido al lanzarse")}</span>}<ChevronRight className="h-4 w-4" /></button>)}
+      {([['music', 'ECHO Music', Music2], ['video', 'ECHO Video', Clapperboard]] as const).map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="mt-3 flex min-h-14 w-full items-center justify-between rounded-xl border border-border px-3 text-left text-sm font-semibold"><span className="flex items-center gap-2"><Icon className="h-4 w-4" /> {label}</span>{complimentary && <span className="ml-auto mr-2 text-[11px] text-primary">{t("Incluido al lanzarse")}</span>}<ChevronRight className="h-4 w-4" /></button>)}
     </div>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <button type="button" onClick={() => setDetails(details === 'billing' ? null : 'billing')} className="flex min-h-10 w-full items-center justify-between text-sm font-semibold"><span className="flex items-center gap-2"><CreditCard className="h-4 w-4" />{t("Mis suscripciones y facturación")}</span><ChevronRight className="h-4 w-4" /></button>
