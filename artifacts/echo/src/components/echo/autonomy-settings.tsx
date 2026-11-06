@@ -40,14 +40,14 @@ export function AutonomySettingsSection() {
 
   const setKillSwitch = (engaged: boolean) => update.mutate(
     { data: { globalKillSwitchEngaged: engaged, universeId } },
-    { onSuccess: updateCache, onError: () => toast({ title: "No se pudo guardar el bloqueo global", variant: "destructive" }) },
+    { onSuccess: updateCache, onError: () => toast({ title: t("No se pudo guardar el bloqueo global"), variant: "destructive" }) },
   );
 
   const setCharacter = (characterId: string, enabled: boolean) => update.mutate(
     { data: { characterId, enabled, universeId } },
     {
       onSuccess: updateCache,
-      onError: () => toast({ title: "No se pudo guardar el control del personaje", variant: "destructive" }),
+      onError: () => toast({ title: t("No se pudo guardar el control del personaje"), variant: "destructive" }),
     },
   );
 
@@ -55,7 +55,7 @@ export function AutonomySettingsSection() {
     setLatest(null);
     setPreviewError(null);
     if (!globalThis.crypto?.randomUUID) {
-      toast({ title: "Este navegador no permite iniciar una simulación segura", variant: "destructive" });
+      toast({ title: t("Este navegador no permite iniciar una simulación segura"), variant: "destructive" });
       return;
     }
     dryRun.mutate(
@@ -67,7 +67,7 @@ export function AutonomySettingsSection() {
           const code = candidate.data?.error ?? candidate.response?.data?.error;
           const safeCode = typeof code === "string" && /^[A-Z][A-Z0-9_]{2,80}$/.test(code) ? code : "AUTONOMY_PREVIEW_UNAVAILABLE";
           setPreviewError(safeCode);
-          toast({ title: "No se pudo completar la simulación", description: `Código: ${safeCode}. No se ejecutó ninguna acción social.`, variant: "destructive" });
+          toast({ title: t("No se pudo completar la simulación"), description: `${t("Código:")} ${safeCode}. ${t("No se ejecutó ninguna acción social.")}`, variant: "destructive" });
         },
       },
     );
@@ -79,14 +79,14 @@ export function AutonomySettingsSection() {
         Autonomía de texto
       </h2>
       <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
-        {settings?.liveExecutionEnabled ? "Beta privada: los personajes habilitados pueden actuar solos con IA de texto. Las imágenes IA permanecen apagadas." : "La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales."}
+        {settings?.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar solos con IA de texto. Las imágenes IA permanecen apagadas.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
       </p>
       <div className="mt-3 divide-y divide-border rounded-2xl border border-border bg-card/60">
         <div className="flex items-center gap-3 p-4">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">{t("Bloqueo global")}</div>
             <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {settings?.globalKillSwitchEngaged === false ? settings.liveExecutionEnabled ? "Pausa general desactivada; los personajes habilitados pueden actuar." : "Pausa general desactivada; el motor en vivo sigue apagado." : "Pausa general activa para todas las cuentas."}
+              {settings?.globalKillSwitchEngaged === false ? settings.liveExecutionEnabled ? t("Pausa general desactivada; los personajes habilitados pueden actuar.") : t("Pausa general desactivada; el motor en vivo sigue apagado.") : t("Pausa general activa para todas las cuentas.")}
             </div>
           </div>
           <Switch
@@ -110,7 +110,7 @@ export function AutonomySettingsSection() {
               <div className="truncate text-sm font-semibold">{character.displayName}</div>
               <div className="mt-1 text-xs text-muted-foreground">@{character.username}</div>
               <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                {character.enabled ? settings.liveExecutionEnabled ? "Puede actuar automáticamente si el bloqueo global está desactivado" : "Designada para autonomía futura" : "Solo se opera manualmente"}
+                {character.enabled ? settings.liveExecutionEnabled ? t("Puede actuar automáticamente si el bloqueo global está desactivado") : t("Designada para autonomía futura") : t("Solo se opera manualmente")}
               </div>
             </div>
             <Switch
@@ -133,17 +133,17 @@ export function AutonomySettingsSection() {
         ))}
       </div>
 
-      {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">La simulación no se completó.</p><p className="mt-1">{t('Código:')} <code>{previewError}</code>. No se ejecutó ninguna acción social.</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>{t("Copiar código de error")}</button></div>}
+      {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">{t("La simulación no se completó.")}</p><p className="mt-1">{t('Código:')} <code>{previewError}</code>. {t("No se ejecutó ninguna acción social.")}</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>{t("Copiar código de error")}</button></div>}
       {latest && (
         <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4" aria-live="polite" data-testid="autonomy-dry-run-result">
           <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-semibold">
               {t(labels[latest.status])} · {latest.preview
-                ? latest.preview.decision.action === "draft" ? "borrador de texto"
-                  : latest.preview.decision.action === "like" ? "me gusta propuesto"
-                    : latest.preview.decision.action === "react" ? `reacción propuesta ${latest.preview.decision.reaction ?? ""}`
-                      : "no actuar"
-                : "sin llamada al modelo"}
+                ? latest.preview.decision.action === "draft" ? t("borrador de texto")
+                  : latest.preview.decision.action === "like" ? t("me gusta propuesto")
+                    : latest.preview.decision.action === "react" ? `${t("reacción propuesta")} ${latest.preview.decision.reaction ?? ""}`
+                      : t("no actuar")
+                : t("sin llamada al modelo")}
             </div>
             <span className={cn("rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground")}>
               Solo preview
