@@ -319,6 +319,7 @@ export default function CreatorHubPage() {
   }
   const [peopleBusy, setPeopleBusy] = useState(false);
   const [peopleFeedback, setPeopleFeedback] = useState('');
+  const [profileMessageFeedback, setProfileMessageFeedback] = useState('');
   async function searchPeople() {
     if (peopleQuery.trim().length < 2) return;
     setPeopleBusy(true); setPeopleFeedback(''); setPeopleResults([]); setSelectedPersonId(null);
@@ -331,15 +332,15 @@ export default function CreatorHubPage() {
     finally { setPeopleBusy(false); }
   }
   async function requestMessage(ownerId: string) {
-    setPeopleBusy(true); setPeopleFeedback('');
+    setPeopleBusy(true); setPeopleFeedback(''); setProfileMessageFeedback('');
     try {
       const result = await customFetch<{ status: 'requested' | 'allowed' | 'accepted' }>('/api/creator-hub/social/message-requests', {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetOwnerId: ownerId }),
       });
-      if (result.status === 'requested') setPeopleFeedback(ht("Solicitud enviada. Aparecerá en la bandeja de esa persona."));
-      else { setHubTab('mensajes'); setPeopleFeedback(ht("Podés escribirle.")); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? ht("esta persona")); }
-    } catch { setPeopleFeedback(ht("No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.")); }
+      if (result.status === 'requested') { const notice = ht("Solicitud enviada. Aparecerá en la bandeja de esa persona."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); }
+      else { setSelectedPersonId(null); setHubTab('mensajes'); setPeopleFeedback(ht("Podés escribirle.")); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? ht("esta persona")); }
+    } catch { const notice = ht("No se pudo enviar la solicitud. Puede que la persona no acepte mensajes."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); }
     finally { setPeopleBusy(false); }
   }
   const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
@@ -437,25 +438,26 @@ export default function CreatorHubPage() {
     : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
   if (selectedPersonId) {
     const person = viewedProfile ?? selectedPerson;
-    return <div className="min-h-[100dvh] bg-background text-foreground">
+    return <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-background text-foreground" style={{ WebkitTextSizeAdjust: '100%' }}>
       <header className="flex items-center gap-4 border-b border-border px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]">
-        <button type="button" onClick={() => setSelectedPersonId(null)} aria-label={ct("back")} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-secondary"><ArrowLeft size={22}/></button>
+        <button type="button" onClick={() => { setSelectedPersonId(null); setProfileMessageFeedback(''); }} aria-label={ct("back")} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-secondary"><ArrowLeft size={22}/></button>
         <span className="text-lg font-semibold">{ht("Perfil")}</span>
       </header>
-      <main className="mx-auto max-w-2xl px-5 py-8">
+      <main className="mx-auto w-full max-w-2xl min-w-0 px-5 py-8">
         {profileLoading && <p className="text-muted-foreground">{ht("Cargando…")}</p>}
         {!profileLoading && !person && <p className="text-muted-foreground">{ht("No encontramos perfiles con ese nombre. La otra persona debe abrir Creator Hub al menos una vez.")}</p>}
-        {person && <div className="space-y-7">
+        {person && <div className="min-w-0 space-y-7">
           <div className="h-40 rounded-3xl bg-[linear-gradient(125deg,hsl(263_18%_19%),hsl(336_15%_16%))] sm:h-52"/>
           <div className="flex items-center gap-4">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-background bg-secondary text-2xl font-semibold">{person.displayName.split(/\\s+/).map(n=>n[0]).slice(0,2).join('').toUpperCase()}</div>
             <div className="min-w-0"><h1 className="text-2xl font-semibold">{person.displayName}</h1><p className="break-all text-muted-foreground">@{person.username}</p></div>
           </div>
           {'bio' in person && person.bio && <p className="whitespace-pre-wrap text-sm leading-relaxed">{person.bio}</p>}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex min-w-0 flex-wrap gap-3">
             <button type="button" disabled={peopleBusy || person.following || person.requested} onClick={() => void followPerson(selectedPersonId)} className="rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-60">{ht(person.following ? 'Siguiendo' : person.requested ? 'Solicitado' : person.visibility === 'private' ? 'Solicitar seguir' : 'Seguir')}</button>
-            <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPersonId)} className="flex items-center gap-2 rounded-full border border-primary/40 px-5 py-3 text-primary"><MessageCircle size={18}/>{ht("Mensaje privado")}</button>
+            <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPersonId)} className="flex min-h-11 items-center gap-2 rounded-full border border-primary/40 px-5 py-3 text-primary active:opacity-70"><MessageCircle size={18}/>{ht("Mensaje privado")}</button>
           </div>
+          {profileMessageFeedback && <p role="status" aria-live="polite" className="rounded-xl border border-primary/30 p-3 text-sm text-primary">{profileMessageFeedback}</p>}
           {person.visibility === 'private' && !person.following && <div className="rounded-2xl border border-border px-5 py-8 text-center"><LockKeyhole className="mx-auto mb-3 text-muted-foreground"/><p className="font-semibold">{ht("Perfil privado")}</p><p className="mt-2 text-sm text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p></div>}
           {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="rounded-2xl border border-border p-5"><h3 className="font-semibold">{post.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{post.body}</p></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
         </div>}
