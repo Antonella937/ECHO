@@ -17,7 +17,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run autonomous worker regression tests (no database or AI calls)
-        run: pnpm --filter @workspace/api-server exec tsx --test tests/autonomy-worker-offline.test.ts tests/autonomy-social-offline.test.ts tests/autonomy-event-memory-offline.test.ts tests/incoming-memory-offline.test.ts tests/memory-archive-offline.test.ts tests/relationship-progression-offline.test.ts tests/relationship-trust-offline.test.ts tests/relationship-trust-candidates-offline.test.ts tests/relationship-tension-offline.test.ts tests/relationship-trust-context-offline.test.ts tests/relationship-attraction-offline.test.ts tests/relationship-transitions-offline.test.ts tests/relationship-transition-integration-offline.test.ts
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/autonomy-worker-offline.test.ts tests/autonomy-social-offline.test.ts tests/autonomy-event-memory-offline.test.ts tests/incoming-memory-offline.test.ts tests/memory-archive-offline.test.ts tests/relationship-progression-offline.test.ts tests/relationship-trust-offline.test.ts tests/relationship-trust-candidates-offline.test.ts tests/relationship-tension-offline.test.ts tests/relationship-trust-context-offline.test.ts tests/relationship-attraction-offline.test.ts tests/relationship-transitions-offline.test.ts tests/relationship-transition-integration-offline.test.ts tests/media-safety-offline.test.ts
         env:
           # Offline tests import the executor, which initializes a lazy pg Pool.
           # This is a non-routable placeholder; no SQL calls are made.
