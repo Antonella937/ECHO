@@ -252,7 +252,7 @@ export default function ConversationPage() {
                 {p.kind === 'video' && <video src={p.preview} muted playsInline preload="metadata" className="h-20 w-20 object-cover" />}
                 {p.kind === 'audio' && <VoicePreview src={p.preview} durationSeconds={p.durationSeconds} uploading={p.uploading} error={p.error} onRetry={() => retryUpload(p.key)} onDiscard={() => remove(p.key)} />}
                 {p.kind !== 'audio' && p.error && <button type="button" onClick={() => retryUpload(p.key)} className="mx-2 mb-1 rounded-md bg-secondary px-2 py-1 text-xs font-semibold" data-testid={`button-retry-attachment-${p.key}`}>Reintentar subida</button>}
-                {(p.uploading || p.error) && (
+                {p.kind !== 'audio' && (p.uploading || p.error) && (
                   <span className={cn('absolute inset-x-0 bottom-0 px-1.5 py-0.5 text-[10px]', p.error ? 'bg-destructive text-destructive-foreground' : 'bg-background/80 text-muted-foreground')}>
                     {p.error ? 'Error al subir' : 'Subiendo…'}
                   </span>
@@ -263,6 +263,11 @@ export default function ConversationPage() {
               </li>
             ))}
           </ul>
+        )}
+        {pending.some(p => p.error) && (
+          <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="attachment-upload-error">
+            {pending.filter(p => p.error).map(p => <p key={p.key} className="break-words">{p.error}</p>)}
+          </div>
         )}
         {recorder.status !== 'idle' ? (
           <div className="flex items-center gap-2 pb-1" data-testid="status-recording">
