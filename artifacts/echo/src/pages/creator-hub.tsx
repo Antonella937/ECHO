@@ -1,6 +1,6 @@
 import { HumanVoicePlayback, HumanVoiceRecorder } from '@/components/echo/human-voice-note';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
+import { compressImage, uploadPrivateImage, uploadPublicationImage, useMediaResolver } from '@/lib/media';
 import { BadgeCheck, Camera, Check, Pencil, X, Compass, Settings2, MessagesSquare, UserRound } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
@@ -15,9 +15,14 @@ import { Link } from 'wouter';
 export default function CreatorHubPage() {
   const { user } = useUser();
   const [hubTab, setHubTab] = useState<'perfil' | 'explorar' | 'mensajes' | 'ajustes'>('perfil');
-  type Publication = {id:string;kind:'character'|'world'|'update'|'post';title:string;body:string;visibility:'public'|'followers'|'private';pinned:boolean;createdAt:string};
+  type Publication = {id:string;kind:'character'|'world'|'update'|'post';title:string;body:string;visibility:'public'|'followers'|'private';pinned:boolean;coverPath?:string|null;createdAt:string};
   const [publications,setPublications] = useState<Publication[]>([]);
-  const [publicationKind,setPublicationKind] = useState<Publication['kind']>('update');
+  const canPostOfficialUpdates = user?.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ';
+  const resolvePublicationMedia = useMediaResolver();
+  const [publicationFile,setPublicationFile] = useState<File|null>(null);
+  const [publicationPreview,setPublicationPreview] = useState<string|null>(null);
+  useEffect(()=>{if (!publicationFile) {setPublicationPreview(null);return;} const url=URL.createObjectURL(publicationFile);setPublicationPreview(url);return ()=>URL.revokeObjectURL(url);},[publicationFile]);
+  const [publicationKind,setPublicationKind] = useState<Publication['kind']>('post');
   const [publicationTitle,setPublicationTitle] = useState('');
   const [publicationBody,setPublicationBody] = useState('');
   const [publicationVisibility,setPublicationVisibility] = useState<Publication['visibility']>('public');
@@ -38,8 +43,9 @@ export default function CreatorHubPage() {
     if (!publicationTitle.trim() || publicationBusy) return;
     setPublicationBusy(true);setPublicationError('');
     try {
-      await customFetch('/api/creator-hub/social/publications',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:publicationKind,title:publicationTitle.trim(),body:publicationBody,visibility:publicationVisibility,pinned:publicationPinned})});
-      setPublicationComposer(false);setPublicationTitle('');setPublicationBody('');setPublicationPinned(false);
+      const coverPath=publicationFile ? await uploadPublicationImage(publicationFile) : null;
+      await customFetch('/api/creator-hub/social/publications',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:publicationKind,title:publicationTitle.trim(),body:publicationBody,visibility:publicationVisibility,pinned:publicationPinned,coverPath})});
+      setPublicationComposer(false);setPublicationTitle('');setPublicationBody('');setPublicationPinned(false);setPublicationFile(null);
       await refreshPublications();
     } catch {setPublicationError('No se pudo publicar. Revisá tu perfil y volvé a intentar.');}
     finally {setPublicationBusy(false);}
@@ -496,8 +502,10 @@ export default function CreatorHubPage() {
               <button type="button" onClick={()=>setPublicationComposer(value=>!value)} className="flex w-full items-center justify-center gap-2 rounded-full border border-primary/70 bg-primary/10 px-4 py-3 font-semibold text-primary hover:bg-primary/20"><span className="text-xl">＋</span> Crear publicación</button>
               {publicationComposer && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/30 p-4">
                 <h3 className="font-semibold">Compartir en ECHO</h3>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{([{id:'update',label:'📣 Actualización de ECHO'},{id:'character',label:'♙ Personaje'},{id:'world',label:'⬡ Mundo'},{id:'post',label:'▧ Publicación'}] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationKind(option.id)} className={`rounded-xl border px-2 py-3 text-xs ${publicationKind===option.id?'border-primary bg-primary/15 text-primary':'border-border'}`}>{option.label}</button>)}</div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{([{id:'character',label:'♙ Personaje'},{id:'world',label:'⬡ Mundo'},{id:'post',label:'▧ Publicación'},...(canPostOfficialUpdates ? [{id:'update' as const,label:'📣 Actualización de ECHO'}] : [])] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationKind(option.id)} className={`rounded-xl border px-2 py-3 text-xs ${publicationKind===option.id?'border-primary bg-primary/15 text-primary':'border-border'}`}>{option.label}</button>)}</div>
                 <input aria-label="Título de publicación" maxLength={120} value={publicationTitle} onChange={event=>setPublicationTitle(event.target.value)} placeholder="Título" className="w-full rounded-xl border border-border bg-background p-3 text-sm"/>
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-4 text-sm text-primary"><Camera size={18}/> {publicationFile ? 'Cambiar foto o GIF' : 'Agregar foto o GIF'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={event=>{const file=event.target.files?.[0]??null;if(file&&(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)||file.size>15*1024*1024)){setPublicationError('Elegí JPG, PNG, WebP o GIF de hasta 15 MB.');return;}setPublicationError('');setPublicationFile(file);}}/></label>
+                {publicationPreview&&<div className="space-y-2"><img src={publicationPreview} alt="Vista previa de la publicación" className="max-h-80 w-full rounded-xl object-contain"/><button type="button" onClick={()=>setPublicationFile(null)} className="text-xs text-muted-foreground underline">Quitar imagen</button></div>}
                 <textarea aria-label="Descripción de publicación" maxLength={5000} value={publicationBody} onChange={event=>setPublicationBody(event.target.value)} placeholder="Contá la historia, describí tu personaje o compartí novedades…" rows={5} className="w-full resize-y rounded-xl border border-border bg-background p-3 text-sm"/>
                 <div className="flex flex-wrap items-center justify-between gap-3"><select aria-label="Privacidad de publicación" value={publicationVisibility} onChange={event=>setPublicationVisibility(event.target.value as Publication['visibility'])} className="rounded-full border border-border bg-background px-3 py-2 text-sm"><option value="public">🌐 Público</option><option value="followers">Seguidores</option><option value="private">Solo yo</option></select><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={publicationPinned} onChange={event=>setPublicationPinned(event.target.checked)}/> Fijar en mi perfil</label></div>
                 <div className="flex justify-end gap-2"><button type="button" onClick={()=>setPublicationComposer(false)} className="rounded-full border border-border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={publicationBusy||!publicationTitle.trim()} onClick={()=>void publishCreatorContent()} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{publicationBusy?'Publicando…':'Publicar'}</button></div>
@@ -506,7 +514,7 @@ export default function CreatorHubPage() {
               {publicationLoadError && <button type="button" onClick={()=>void refreshPublications()} className="text-xs text-muted-foreground underline underline-offset-4">No se pudo actualizar el contenido. Reintentar</button>}
               {publications.some(item=>item.pinned)&&<div className="space-y-2"><h3 className="font-semibold text-primary">📌 Destacados</h3><div className="grid grid-cols-3 gap-2">{publications.filter(item=>item.pinned).slice(0,3).map(item=><div key={item.id} className="min-w-0 rounded-xl border border-border bg-secondary/40 p-3"><p className="text-xs text-primary">{item.kind==='character'?'Personaje':item.kind==='world'?'Mundo':item.kind==='update'?'Actualización':'Publicación'}</p><p className="mt-1 break-words text-sm font-medium">{item.title}</p></div>)}</div></div>}
               <div className="flex flex-wrap gap-2">{([{id:'all',label:'Todo'},{id:'update',label:'Actualizaciones'},{id:'character',label:'Personajes'},{id:'world',label:'Mundos'},{id:'post',label:'Publicaciones'}] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationFilter(option.id)} className={`rounded-full px-3 py-2 text-xs ${publicationFilter===option.id?'bg-primary text-primary-foreground':'bg-secondary text-muted-foreground'}`}>{option.label}</button>)}</div>
-              {publications.filter(item=>publicationFilter==='all'||item.kind===publicationFilter).map(item=><article key={item.id} className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-primary">{item.kind==='character'?'♙ Personaje':item.kind==='world'?'⬡ Mundo':item.kind==='update'?'📣 Actualización de ECHO':'Publicación'} {item.pinned?'· 📌':''}</span><span className="text-xs text-muted-foreground">{item.visibility==='public'?'Público':item.visibility==='followers'?'Seguidores':'Solo yo'}</span></div><h3 className="text-lg font-semibold">{item.title}</h3>{item.body&&<p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{item.body}</p>}<p className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('es-AR')}</p></article>)}
+              {publications.filter(item=>publicationFilter==='all'||item.kind===publicationFilter).map(item=><article key={item.id} className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-primary">{item.kind==='character'?'♙ Personaje':item.kind==='world'?'⬡ Mundo':item.kind==='update'?'📣 Actualización de ECHO':'Publicación'} {item.pinned?'· 📌':''}</span><span className="text-xs text-muted-foreground">{item.visibility==='public'?'Público':item.visibility==='followers'?'Seguidores':'Solo yo'}</span></div><h3 className="text-lg font-semibold">{item.title}</h3>{item.coverPath&&<img src={resolvePublicationMedia(item.coverPath)} alt={`Portada de ${item.title}`} className="max-h-[440px] w-full rounded-xl bg-secondary object-contain" loading="lazy"/>}{item.body&&<p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{item.body}</p>}<p className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('es-AR')}</p></article>)}
               {publications.length===0&&!publicationLoadError&&<div className="rounded-2xl border border-dashed border-border px-5 py-10 text-center"><p className="font-semibold">Tu historia empieza acá</p><p className="mt-2 text-sm text-muted-foreground">Publicá un personaje, un mundo o una actualización de ECHO.</p></div>}
             </section>
 
