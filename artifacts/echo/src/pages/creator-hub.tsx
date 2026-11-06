@@ -84,9 +84,10 @@ export default function CreatorHubPage() {
     : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-      <header className="relative z-20 flex shrink-0 items-center gap-3 px-4 py-4 pt-safe text-foreground lg:px-8">
-        <Link href="/" aria-label="Volver al inicio" className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/45 backdrop-blur-md hover:bg-black/65"><ArrowLeft size={19} /></Link>
-        <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-foreground/70">ECHO</p><h1 className="text-lg font-semibold">Creator Hub</h1></div>
+      <header className="relative z-20 flex min-h-[76px] shrink-0 items-center justify-between gap-3 px-4 py-4 pt-safe text-foreground lg:min-h-[92px] lg:px-8 lg:pt-6">
+        <Link href="/" aria-label="Return to ECHO feed" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 text-sm font-medium backdrop-blur-md hover:bg-black/65"><ArrowLeft size={19} /><span className="hidden sm:inline">Return to ECHO feed</span><span className="sm:hidden">Volver</span></Link>
+        <Link href="/" aria-label="ECHO — ir al inicio" className="wordmark absolute left-1/2 -translate-x-1/2 text-[28px] leading-none text-foreground sm:text-[32px]">ECHO</Link>
+        <h1 className="text-sm font-semibold text-muted-foreground sm:text-base">Creator Hub</h1>
       </header>
       <div className="flex w-full flex-1 flex-col justify-center px-0 pb-6 lg:py-8">
         <section className="w-full overflow-hidden bg-card lg:mx-auto lg:max-w-6xl lg:rounded-[28px] lg:border lg:border-border" aria-label="Perfil Creator Hub">
@@ -98,7 +99,7 @@ export default function CreatorHubPage() {
           <div className="mx-auto w-full max-w-5xl space-y-5 px-5 py-6 sm:px-10 lg:py-7">
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
-                <span className="grid h-20 w-20 overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}`}>{avatarImage ? <img src={avatarImage} alt="" className="h-full w-full object-cover" /> : initials}</span>
+                <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold leading-none sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}`}>{avatarImage ? <img src={avatarImage} alt="" className="h-full w-full object-cover" /> : <span className="block text-center leading-none">{initials}</span>}</span>
                 <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Seleccionar foto de perfil" onChange={e => void uploadPhoto(e, 'avatar')} />
                 <button type="button" disabled={uploading !== null} onClick={() => avatarInput.current?.click()} aria-label="Cambiar foto de perfil" className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border border-border bg-card text-foreground disabled:opacity-50"><Camera size={15}/></button>
               </div>
