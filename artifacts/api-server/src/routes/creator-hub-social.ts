@@ -3,6 +3,8 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { clerkClient } from "@clerk/express";
+import { ensureCreatorProfile } from "../lib/creatorProfileBootstrap";
 
 // These are account profiles, not simulated characters. The authenticated Clerk
 // identity is always taken from the server, never from a request body.
@@ -60,6 +62,18 @@ export function createCreatorHubSocialRouter(): IRouter {
     const parsed = searchSchema.safeParse(req.query);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_SEARCH" }); return; }
     const q = parsed.data.q.replace(/^@+/, "").replace(/[\\%_]/g, "\\$&");
+    // Search Clerk as well as the social table: accounts are discoverable before
+    // they ever open Creator Hub. Only the minimal social profile is returned.
+    const lookup = parsed.data.q.replace(/^@+/, "").trim();
+    if (lookup.length >= 2) {
+      try {
+        const matches = await clerkClient.users.getUserList({ query: lookup, limit: 20 });
+        await Promise.all(matches.data.filter(user => user.id !== req.userId).map(user => ensureCreatorProfile(user.id)));
+      } catch (error) {
+        // A Clerk lookup outage must not hide already registered profiles.
+        console.warn('Creator Hub account discovery fallback unavailable', error instanceof Error ? error.message : 'unknown');
+      }
+    }
     const result = await pool.query(
       `SELECT p.owner_id AS "ownerId", p.display_name AS "displayName", p.username, p.visibility,
         EXISTS(SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$1 AND f.followed_owner_id=p.owner_id) AS "following",
