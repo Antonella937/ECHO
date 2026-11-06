@@ -23,6 +23,9 @@ export const AUTONOMY_LIVE_EXECUTION_ENABLED = autonomyProductionGate() || AUTON
 export const DEFAULT_CHARACTER_CONTROL = {
   enabled: false,
   dmEnabled: false,
+  dmFrequency: "sometimes",
+  dmMediaPreference: "text",
+  dmInstructions: "",
   maxActionsPerDay: 2,
   minCooldownMinutes: 360,
 };
