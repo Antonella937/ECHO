@@ -5,7 +5,7 @@ import { customFetch, useGetCreatorAccount } from '@workspace/api-client-react';
 
 type Entitlements = {
   plan: 'free' | 'plus' | 'premium';
-  lifetimeAccess?: 'owner_lifetime' | null;
+  lifetimeAccess?: 'owner_lifetime' | 'founder_lifetime' | null;
   billingExempt?: boolean;
   features: { basicVoices: boolean; customVoices: boolean; music: boolean; videos: boolean };
   voice: { enabled: boolean; engineConfigured: boolean; monthlyCharacterLimit: number; usedCharacters: number;
@@ -26,16 +26,19 @@ export function PlanAndQuotaSettings() {
   useEffect(() => { load(); }, []);
   const name = data?.plan === 'premium' ? 'ECHO Premium' : data?.plan === 'plus' ? 'ECHO Plus' : 'ECHO Free';
   const isOwner = data?.lifetimeAccess === 'owner_lifetime' && data?.billingExempt === true;
+  const isTester = data?.lifetimeAccess === 'founder_lifetime' && data?.billingExempt === true;
+  const complimentary = isOwner || isTester;
   const active = Boolean(data?.features.basicVoices && data.voice.enabled && data.voice.engineConfigured);
   return <section className="mt-9" aria-labelledby="plan-quota-h" data-testid="section-plan-quotas">
     <h2 id="plan-quota-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Mi plan y suscripciones</h2>
     {isOwner && <div className="mt-3 rounded-2xl border border-primary/40 bg-primary/10 p-5" data-testid="owner-founder-welcome"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">ECHO · Founder & Creator</div><h3 className="mt-2 text-xl font-semibold">Este universo empezó con vos, Nela. ♡</h3><p className="mt-2 text-sm text-muted-foreground">Como creadora de ECHO, tenés acceso vitalicio de cortesía a los planes de suscripción, sin pagar cuotas de membresía. Este espacio también es tuyo.</p><p className="mt-3 text-xs text-muted-foreground">Los servicios externos y el consumo de IA pueden generar costos por separado. Las herramientas que aún no se lanzaron se habilitarán cuando estén disponibles.</p></div>
+    {isTester && <div className="mt-3 rounded-2xl border border-primary/40 bg-primary/10 p-5" data-testid="founder-tester-welcome"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">ECHO · Founding Tester</div><h3 className="mt-2 text-xl font-semibold">Ala, gracias por ayudar a darle vida a ECHO. ♡</h3><p className="mt-2 text-sm text-muted-foreground">Por acompañar ECHO desde sus primeras pruebas, tenés acceso vitalicio de cortesía a todos los planes y complementos de suscripción, sin pagar membresías.</p><p className="mt-3 text-xs text-muted-foreground">La generación con IA y los servicios externos pueden tener costos de uso. Las funciones que aún no se lanzaron se habilitarán cuando estén disponibles.</p></div>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div><div className="text-xs text-muted-foreground">Tu suscripción actual</div><h3 className="mt-1 text-lg font-bold">{loading ? 'Consultando…' : error ? 'No disponible' : isOwner ? 'ECHO Founder · Premium incluido' : name}</h3></div>
+        <div><div className="text-xs text-muted-foreground">Tu suscripción actual</div><h3 className="mt-1 text-lg font-bold">{loading ? 'Consultando…' : error ? 'No disponible' : isOwner ? 'ECHO Founder · Premium incluido' : isTester ? 'ECHO Founding Tester · Premium incluido' : name}</h3></div>
         <ShieldCheck className="h-5 w-5 text-muted-foreground" />
       </div>
-      {isOwner && <p className="mt-2 text-xs font-medium text-primary">Membresía vitalicia · Sin cargos de suscripción</p>}
+      {complimentary && <p className="mt-2 text-xs font-medium text-primary">Membresía vitalicia · Sin cargos de suscripción</p>}
       {capacity.data && <p className="mt-2 text-xs text-muted-foreground">{capacity.data.characterCount} / {capacity.data.maxCharacters} personajes · {capacity.data.universeCount} / {capacity.data.maxUniverses} mundos</p>}
       {error ? <div role="alert" className="mt-3 text-xs text-destructive">No pudimos verificar tu plan. Las funciones de pago permanecen bloqueadas.</div> : data ? <>
         <div className="mt-4 flex items-center gap-2 text-sm font-semibold"><AudioLines className="h-4 w-4" /> Voces de personajes</div>
