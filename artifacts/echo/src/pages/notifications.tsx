@@ -1,3 +1,4 @@
+import { useNotificationsText } from '@/lib/notifications-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useMemo } from 'react';
 import { useLocation } from 'wouter';
@@ -26,6 +27,7 @@ const VERB: Record<Notification['kind'], string> = {
 };
 
 export default function NotificationsPage() {
+  const t = useNotificationsText();
   const resolveMedia = useMediaResolver();
   const { state, me, character, actions } = useSocial();
   const { openStoryList } = useStoryViewer();
@@ -51,7 +53,7 @@ export default function NotificationsPage() {
   return (
     <div>
       <TopBar
-        title="Avisos"
+        title={t("Avisos")}
         right={
           unread.length > 0 && (
             <button onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary" data-testid="button-mark-all-read">
@@ -61,18 +63,18 @@ export default function NotificationsPage() {
         }
       />
       {list.length === 0 ? (
-        <EmptyState title="Todo en calma" body="Cuando alguien comente, responda o te escriba, aparecerá aquí." />
+        <EmptyState title={t("Todo en calma")} body={t("Cuando alguien comente, responda o te escriba, aparecerá aquí.")} />
       ) : (
         <div className="px-1 pt-3">
           {unread.length > 0 && (
             <>
-              <h2 className="px-4 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Nuevas</h2>
+              <h2 className="px-4 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Nuevas")}</h2>
               <ul>{unread.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} open={open} resolveMedia={resolveMedia} />)}</ul>
             </>
           )}
           {read.length > 0 && (
             <>
-              <h2 className="px-4 pb-1 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Anteriores</h2>
+              <h2 className="px-4 pb-1 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Anteriores")}</h2>
               <ul className="opacity-80">{read.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} open={open} resolveMedia={resolveMedia} />)}</ul>
             </>
           )}
@@ -89,6 +91,7 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
   open: (n: Group) => void;
   resolveMedia: ReturnType<typeof useMediaResolver>;
 }) {
+    const t = useNotificationsText();
     const actor = character(n.actorId);
     const others = n.actorIds.filter((a) => a !== n.actorId).map(character).filter(Boolean);
     const post = n.postId ? state.posts.find((p) => p.id === n.postId) : undefined;
@@ -102,13 +105,13 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
           </span>
           <span className="min-w-0 flex-1 text-[14px] leading-snug">
             <span className="font-semibold">{actor.handle}</span><VerifiedBadge account={actor} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" />
-            {others.length > 0 && <span className="text-foreground/85" data-testid={`text-notification-group-${n.id}`}>{others.length === 1 ? ` y ${others[0]!.handle}` : ` y ${others.length} más`}</span>}
-            {others.length === 0 && n.count > 1 && <span className="text-muted-foreground"> ({n.count})</span>} <span className="text-foreground/85">{VERB[n.kind]}</span>
+            {others.length > 0 && <span className="text-foreground/85" data-testid={`text-notification-group-${n.id}`}>{others.length === 1 ? `${t(" y ")}${others[0]!.handle}` : `${t(" y ")}${others.length}${t(" más")}`}</span>}
+            {others.length === 0 && n.count > 1 && <span className="text-muted-foreground"> ({n.count})</span>} <span className="text-foreground/85">{t(VERB[n.kind])}</span>
             {n.excerpt && <span className="text-muted-foreground">: {n.excerpt}</span>}
             <span className="ml-1.5 text-xs text-muted-foreground/80">{timeAgo(n.createdAt)}</span>
           </span>
           {post && postMedia(post).length > 0 && post.media?.[0]?.type !== 'video' && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />}
-          <span className={cn('h-2 w-2 shrink-0 rounded-full', n.read ? 'bg-transparent' : 'bg-primary')} aria-label={n.read ? undefined : 'Sin leer'} />
+          <span className={cn('h-2 w-2 shrink-0 rounded-full', n.read ? 'bg-transparent' : 'bg-primary')} aria-label={n.read ? undefined : t('Sin leer')} />
         </button>
       </li>
     );
