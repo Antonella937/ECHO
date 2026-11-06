@@ -91,7 +91,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </div>
           </Link>
           <Link href="/settings" className="mt-3 inline-block text-xs text-primary hover:underline" data-testid="link-switch-identity-aside">
-            Cambiar identidad
+            {shared('Cambiar identidad')}
           </Link>
         </div>
         <div>
