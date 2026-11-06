@@ -87,3 +87,18 @@ CREATE TABLE IF NOT EXISTS echo_creator_typing_presence (
   PRIMARY KEY(sender_owner_id,recipient_owner_id),
   CONSTRAINT echo_creator_typing_no_self CHECK(sender_owner_id <> recipient_owner_id)
 );
+
+-- Audio messages reference private Supabase objects owned by the sender.
+-- They are never exposed through public bucket URLs.
+CREATE TABLE IF NOT EXISTS echo_creator_voice_messages (
+  message_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_owner_id text NOT NULL,
+  recipient_owner_id text NOT NULL,
+  object_path text NOT NULL,
+  duration_seconds integer NOT NULL CHECK (duration_seconds BETWEEN 1 AND 120),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT echo_creator_voice_messages_no_self CHECK(sender_owner_id <> recipient_owner_id),
+  CONSTRAINT echo_creator_voice_messages_path_unique UNIQUE(object_path),
+  CONSTRAINT echo_creator_voice_messages_path_format CHECK (object_path ~ '^/objects/uploads/[0-9a-f-]{36}$')
+);
+CREATE INDEX IF NOT EXISTS echo_creator_voice_messages_conversation_idx ON echo_creator_voice_messages(sender_owner_id,recipient_owner_id,created_at DESC);
