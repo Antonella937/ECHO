@@ -508,9 +508,9 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         )}
         <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
           {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
-          <button type="button" onClick={onReply} aria-label={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
-          <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
-          <button type="button" onClick={onToggleHiding} aria-label={t("Eliminar para mí")} aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
+          <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
+          <button type="button" onClick={onToggleHiding} aria-label={t("Eliminar para mí")} title={t("Eliminar para mí")} aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
       {menuOpen && (
