@@ -1,6 +1,6 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, Cloud, Info, LogOut, Monitor, Moon, Search, Sun, Star } from 'lucide-react';
+import { Check, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
@@ -47,6 +47,8 @@ export default function SettingsPage() {
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> Buscar en este universo
           </Link>
         </section>
+
+        <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">Tu perfil de creador ›</span></Link>
 
         <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">Mi plan y suscripciones <span className="text-xs text-muted-foreground">Ver planes y complementos ›</span></Link>
 
