@@ -4,10 +4,12 @@ import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucid
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 import { useUnreadCounts } from '@/hooks/use-social-selectors';
 
 export function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const t = useTranslation();
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
   const inConversation = /^\/messages\/.+/.test(location);
@@ -15,10 +17,10 @@ export function Shell({ children }: { children: ReactNode }) {
   if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
 
   const items = [
-    { href: '/', label: 'Inicio', icon: Home, match: (l: string) => l === '/' },
-    { href: '/messages', label: 'Mensajes', icon: Send, badge: messages, match: (l: string) => l.startsWith('/messages') },
-    { href: '/create', label: 'Crear', icon: PlusSquare, match: (l: string) => l.startsWith('/create') },
-    { href: '/notifications', label: 'Avisos', icon: Bell, badge: notifications, match: (l: string) => l.startsWith('/notifications') },
+    { href: '/', label: t('home'), icon: Home, match: (l: string) => l === '/' },
+    { href: '/messages', label: t('messages'), icon: Send, badge: messages, match: (l: string) => l.startsWith('/messages') },
+    { href: '/create', label: t('create'), icon: PlusSquare, match: (l: string) => l.startsWith('/create') },
+    { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications, match: (l: string) => l.startsWith('/notifications') },
   ];
   const profileActive = location === `/profile/${me.id}`;
   const friends = (state.follows[me.id] ?? []).map(character).filter(Boolean);
@@ -56,19 +58,19 @@ export function Shell({ children }: { children: ReactNode }) {
             className={cn('flex h-12 items-center gap-4 rounded-2xl px-3 text-[15px] hover:bg-secondary', location === '/saved' ? 'font-semibold' : 'text-muted-foreground')}
             data-testid="link-rail-saved"
           >
-            <Bookmark className="h-6 w-6" strokeWidth={1.6} /> Guardados
+            <Bookmark className="h-6 w-6" strokeWidth={1.6} /> {t('saved')}
           </Link>
           <Link
             href={`/profile/${me.id}`}
             className={cn('flex h-12 items-center gap-4 rounded-2xl px-3 text-[15px] hover:bg-secondary', profileActive ? 'font-semibold' : 'text-muted-foreground')}
             data-testid="link-rail-profile"
           >
-            <CharacterAvatar character={me} size={26} /> Perfil
+            <CharacterAvatar character={me} size={26} /> {t('profile')}
           </Link>
         </nav>
         <div className="mt-auto">
           <Link href="/settings" className="flex h-12 items-center gap-4 rounded-2xl px-3 text-[15px] text-muted-foreground hover:bg-secondary" data-testid="link-rail-settings">
-            <Settings className="h-6 w-6" strokeWidth={1.6} /> Ajustes
+            <Settings className="h-6 w-6" strokeWidth={1.6} /> {t('settings')}
           </Link>
         </div>
       </aside>
