@@ -4,7 +4,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Mic, Paperclip, Send, Smile, Square, Trash2, X, Pause, Play } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -34,6 +34,7 @@ export default function ConversationPage() {
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [recordingTip, setRecordingTip] = useState(false);
   const [reacting, setReacting] = useState<string | null>(null);
   const [hiding, setHiding] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -107,8 +108,8 @@ export default function ConversationPage() {
   }, []);
 
   const recorder = useVoiceRecorder(
-    (blob, secs) => addFiles([blob], { durationSeconds: secs }),
-    (msg) => setError(msg),
+    (blob, secs) => { setRecordingTip(false); addFiles([blob], { durationSeconds: secs }); },
+    (msg) => { setRecordingTip(false); setError(msg); },
   );
 
   const remove = (key: string) => setPending(p => {
@@ -217,6 +218,7 @@ export default function ConversationPage() {
             <button type="button" onClick={() => setQuoteId(null)} aria-label="Cancelar cita" className="tap grid h-8 w-8 place-items-center rounded-full hover:bg-background" data-testid="button-cancel-quote"><X className="h-4 w-4" /></button>
           </div>
         )}
+        {recorder.status === 'recording' && recordingTip && <p className="mb-2 text-center text-xs text-muted-foreground">Grabando… Tocá el cuadrado para terminar y escuchar antes de enviar. El tacho descarta la nota.</p>}
         {pending.length > 0 && (
           <ul className="mb-2 flex gap-2 overflow-x-auto pb-1" data-testid="list-pending-attachments">
             {pending.map(p => (
@@ -238,12 +240,12 @@ export default function ConversationPage() {
         )}
         {recorder.status !== 'idle' ? (
           <div className="flex items-center gap-2 pb-1" data-testid="status-recording">
-            <button type="button" onClick={recorder.cancel} aria-label="Descartar grabación" className="tap grid h-12 w-12 place-items-center rounded-full bg-secondary" data-testid="button-cancel-recording"><Trash2 className="h-5 w-5" /></button>
+            <button type="button" onClick={() => { recorder.cancel(); setRecordingTip(false); }} aria-label="Descartar grabación" className="tap grid h-12 w-12 place-items-center rounded-full bg-secondary" data-testid="button-cancel-recording"><Trash2 className="h-5 w-5" /></button>
             <div className="flex h-12 flex-1 items-center gap-2 rounded-full border border-primary/50 bg-card px-5 text-[15px]">
               <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-destructive" />
-              {recorder.status === 'requesting' ? 'Pidiendo micrófono…' : `${formatDuration(recorder.elapsed)} / ${formatDuration(MAX_RECORDING_MS / 1000)}`}
+              <span role="status" aria-live="off">{recorder.status === 'requesting' ? 'Pidiendo micrófono…' : `${formatDuration(recorder.elapsed)} / ${formatDuration(MAX_RECORDING_MS / 1000)}`}</span>
             </div>
-            <button type="button" onClick={recorder.stop} disabled={recorder.status !== 'recording'} aria-label="Detener grabación" className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-stop-recording"><Square className="h-4 w-4 fill-current" /></button>
+            <button type="button" onClick={() => { recorder.stop(); setRecordingTip(false); }} disabled={recorder.status !== 'recording'} aria-label="Detener grabación" className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-stop-recording"><Square className="h-4 w-4 fill-current" /></button>
           </div>
         ) : (
           <div className="flex items-center gap-2 pb-1">
@@ -261,7 +263,7 @@ export default function ConversationPage() {
               data-testid="input-message"
             />
             {!text.trim() && ready.length === 0 && !uploading ? (
-              <button type="button" onClick={() => void recorder.start()} aria-label="Grabar nota de voz" className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-secondary" data-testid="button-record-voice">
+              <button type="button" onClick={() => { setRecordingTip(true); void recorder.start(); }} aria-label="Grabar nota de voz" className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-secondary" data-testid="button-record-voice">
                 <Mic className="h-5 w-5" strokeWidth={1.8} />
               </button>
             ) : (
