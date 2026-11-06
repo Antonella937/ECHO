@@ -50,7 +50,7 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
       });
       setData(null);
       setHistory(null);
-      await actions.retrySync();
+      await actions.refreshAfterApproval();
       setNotice('Acontecimiento confirmado y guardado. Actualizá la lista para ver nuevos candidatos.');
     } catch {
       setData(null);
