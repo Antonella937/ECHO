@@ -1,3 +1,4 @@
+import { useAccountManagementText } from '@/lib/account-management-translations';
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
@@ -5,6 +6,7 @@ import { CharacterAvatar } from './avatar';
 
 /** Compact searchable multi-select of accounts (tags / story mentions). */
 export function AccountMultiPicker({ value, onChange, label, excludeId, max = 20, testId }: {
+  const t = useAccountManagementText();
   value: string[]; onChange(ids: string[]): void; label: string; excludeId?: string; max?: number; testId: string;
 }) {
   const { state, character } = useSocial();
@@ -20,8 +22,8 @@ export function AccountMultiPicker({ value, onChange, label, excludeId, max = 20
           {value.map((id) => {
             const c = character(id);
             return (
-              <button key={id} type="button" onClick={() => onChange(value.filter((v) => v !== id))} className="flex h-8 items-center gap-1.5 rounded-full bg-accent pl-1 pr-2.5 text-xs font-semibold text-accent-foreground" aria-label={`Quitar ${c?.handle ?? id}`} data-testid={`${testId}-remove-${id}`}>
-                {c && <CharacterAvatar character={c} size={22} />}@{c?.handle ?? 'cuenta'} <X className="h-3 w-3" />
+              <button key={id} type="button" onClick={() => onChange(value.filter((v) => v !== id))} className="flex h-8 items-center gap-1.5 rounded-full bg-accent pl-1 pr-2.5 text-xs font-semibold text-accent-foreground" aria-label={`${t('Quitar ')}${c?.handle ?? id}`} data-testid={`${testId}-remove-${id}`}>
+                {c && <CharacterAvatar character={c} size={22} />}@{c?.handle ?? t('cuenta')} <X className="h-3 w-3" />
               </button>
             );
           })}
@@ -29,7 +31,7 @@ export function AccountMultiPicker({ value, onChange, label, excludeId, max = 20
       )}
       {value.length < max && (
         <>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cuenta…" aria-label={label}
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar cuenta…")} aria-label={label}
             className="h-10 w-full bg-transparent text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid={`${testId}-search`} />
           {(query || value.length === 0) && options.length > 0 && (
             <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
