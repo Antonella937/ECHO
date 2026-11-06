@@ -61,6 +61,28 @@ export default function CreatorHubPage() {
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState('');
   const [savingBio, setSavingBio] = useState(false);
+  const bioInputRef = useRef<HTMLTextAreaElement>(null);
+  function formatBio(open: string, close: string) {
+    const field = bioInputRef.current;
+    if (!field) return;
+    const start = field.selectionStart;
+    const end = field.selectionEnd;
+    const selected = bioDraft.slice(start, end);
+    const replacement = open + (selected || 'texto') + close;
+    setBioDraft(bioDraft.slice(0, start) + replacement + bioDraft.slice(end));
+    requestAnimationFrame(() => {
+      field.focus();
+      field.setSelectionRange(start + open.length, start + replacement.length - close.length);
+    });
+  }
+  function renderBio(value: string) {
+    return value.split(/(\\*\\*[^*\\n]+\\*\\*|\\*[^*\\n]+\\*|__[^_\\n]+__)/g).map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
+      if (part.startsWith('__') && part.endsWith('__')) return <u key={index}>{part.slice(2, -2)}</u>;
+      if (part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
+      return part;
+    });
+  }
   async function saveBio() {
     if (!user) return;
     const next = bioDraft.trim();
@@ -185,7 +207,7 @@ export default function CreatorHubPage() {
               <span className="hidden shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground sm:inline-flex">Perfil privado</span>
             </div>
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
-            {editingBio ? <div className="space-y-2"><textarea aria-label="Biografía de Creator Hub" value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder="Contá algo sobre vos…" className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 caracteres</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">Cancelar</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{savingBio ? 'Guardando…' : 'Guardar biografía'}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{bio}</p><button type="button" aria-label="Editar biografía" title="Editar biografía" onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
+            {editingBio ? <div className="space-y-2"><div className="flex items-center gap-2" role="toolbar" aria-label="Formato de biografía"><button type="button" onClick={() => formatBio('**', '**')} aria-label="Negrita" title="Negrita" className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold">B</button><button type="button" onClick={() => formatBio('*', '*')} aria-label="Cursiva" title="Cursiva" className="rounded-lg border border-border px-3 py-1.5 text-sm italic">I</button><button type="button" onClick={() => formatBio('__', '__')} aria-label="Subrayado" title="Subrayado" className="rounded-lg border border-border px-3 py-1.5 text-sm underline">U</button></div><textarea ref={bioInputRef} aria-label="Biografía de Creator Hub" value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder="Contá algo sobre vos…" className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 caracteres</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">Cancelar</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{savingBio ? 'Guardando…' : 'Guardar biografía'}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 max-w-fit whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{renderBio(bio)}</p><button type="button" aria-label="Editar biografía" title="Editar biografía" onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
             <div className="space-y-2">
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline underline-offset-4 hover:text-foreground">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
             </div>
