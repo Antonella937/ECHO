@@ -274,7 +274,21 @@ export function createCreatorHubSocialRouter(): IRouter {
        ORDER BY created_at DESC, id DESC LIMIT 100`,
       [req.userId, target],
     );
-    res.json({ messages: messages.rows.reverse() });
+    const voices = await pool.query(
+      `SELECT message_id AS "id", sender_owner_id AS "senderOwnerId",
+       recipient_owner_id AS "recipientOwnerId", object_path AS "objectPath",
+       duration_seconds AS "durationSeconds", created_at AS "createdAt"
+       FROM echo_creator_voice_messages
+       WHERE (sender_owner_id=$1 AND recipient_owner_id=$2)
+          OR (sender_owner_id=$2 AND recipient_owner_id=$1)
+       ORDER BY created_at DESC, message_id DESC LIMIT 100`,
+      [req.userId, target],
+    );
+    const combined = [
+      ...messages.rows.map(message => ({ ...message, kind: "text" })),
+      ...voices.rows.map(message => ({ ...message, kind: "voice", body: "", reactions: [] })),
+    ].sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).slice(-100);
+    res.json({ messages: combined });
   });
 
   // Request initiation is separate from sending a message. No message body is
