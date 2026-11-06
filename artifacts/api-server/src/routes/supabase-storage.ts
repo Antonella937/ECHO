@@ -183,7 +183,18 @@ export function createSupabaseStorageRouter(): IRouter {
            ) LIMIT 1`,
         [objectPath, media.ownerId, req.userId],
       );
-      if (!voiceAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
+      const publicationAccess = await pool.query(
+        `SELECT 1 FROM echo_creator_publications p WHERE p.cover_path=$1 AND p.owner_id=$2
+         AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b WHERE
+           (b.blocker_owner_id=$3 AND b.blocked_owner_id=$2) OR
+           (b.blocker_owner_id=$2 AND b.blocked_owner_id=$3))
+         AND (p.owner_id=$3 OR p.visibility='public'
+           OR (p.visibility='followers' AND EXISTS (
+             SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$3 AND f.followed_owner_id=$2
+           ))) LIMIT 1`,
+        [objectPath,media.ownerId,req.userId],
+      );
+      if (!voiceAccess.rowCount && !publicationAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
         res.status(404).end(); return;
       }
       const { base, key } = config();
