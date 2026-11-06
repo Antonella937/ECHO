@@ -33,13 +33,13 @@ export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId, o
   useEffect(() => {
     const audio = audioRef.current;
     audio?.pause();
-    if (audio) { audio.currentTime = 0; audio.playbackRate = 1; }
+    if (audio) { audio.currentTime = 0; audio.playbackRate = 1; audio.load(); }
     setPlaying(false);
     setPosition(0);
     setDuration(durationSeconds ?? 0);
     setSpeed(1);
     setError(false);
-  }, [src, durationSeconds]);
+  }, [src]);
 
   const toggle = async () => {
     const audio = audioRef.current;
@@ -62,7 +62,7 @@ export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId, o
   return (
     <div className={cn('flex w-64 max-w-full flex-col gap-1 rounded-2xl border border-border px-3 py-2', mine ? 'bg-primary/10' : 'bg-secondary')}
       data-testid={`audio-attachment-${attachmentId}`}>
-      <audio ref={audioRef} src={src || undefined} preload="metadata"
+      <audio ref={audioRef} src={src || undefined} preload="auto"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => { setPlaying(false); setPosition(0); }}
