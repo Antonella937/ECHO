@@ -522,6 +522,56 @@ export function createCreatorHubSocialRouter(): IRouter {
     );
     res.json({ status: "not_following" });
   });
+  const publicationSchema = z.object({
+    kind: z.enum(["character","world","update","post"]),
+    title: z.string().trim().min(1).max(120),
+    body: z.string().max(5000).default(""),
+    visibility: z.enum(["public","followers","private"]).default("private"),
+    pinned: z.boolean().default(false),
+  }).strict();
+  router.post("/creator-hub/social/publications", async (req, res) => {
+    const parsed = publicationSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({error:"INVALID_PUBLICATION"}); return; }
+    const profile = await pool.query("SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1", [req.userId]);
+    if (!profile.rowCount) { res.status(409).json({error:"CREATOR_PROFILE_REQUIRED"}); return; }
+    const {kind,title,body,visibility,pinned} = parsed.data;
+    const result = await pool.query(
+      `INSERT INTO echo_creator_publications(owner_id,kind,title,body,visibility,pinned)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING id,kind,title,body,visibility,pinned,created_at AS "createdAt"`,
+      [req.userId,kind,title,body,visibility,pinned],
+    );
+    res.status(201).json({publication:result.rows[0]});
+  });
+  router.get("/creator-hub/social/publications/:ownerId", async (req, res) => {
+    const ownerId = req.params.ownerId === "me" ? req.userId : req.params.ownerId;
+    if (!ownerId || ownerId.length > 255) { res.status(400).json({error:"INVALID_OWNER"}); return; }
+    const result = await pool.query(
+      `SELECT p.id,p.kind,p.title,p.body,p.visibility,p.pinned,p.created_at AS "createdAt"
+       FROM echo_creator_publications p
+       WHERE p.owner_id=$2 AND NOT EXISTS (
+         SELECT 1 FROM echo_creator_blocks b WHERE
+           (b.blocker_owner_id=$1 AND b.blocked_owner_id=$2) OR
+           (b.blocker_owner_id=$2 AND b.blocked_owner_id=$1)
+       ) AND (p.owner_id=$1 OR p.visibility='public'
+         OR (p.visibility='followers' AND EXISTS (
+           SELECT 1 FROM echo_creator_follows f
+           WHERE f.follower_owner_id=$1 AND f.followed_owner_id=$2
+         )))
+       ORDER BY p.pinned DESC,p.created_at DESC LIMIT 100`,
+      [req.userId,ownerId],
+    );
+    res.json({publications:result.rows});
+  });
+  router.delete("/creator-hub/social/publications/:id", async (req, res) => {
+    if (!z.string().uuid().safeParse(req.params.id).success) { res.status(400).json({error:"INVALID_ID"}); return; }
+    const result = await pool.query(
+      "DELETE FROM echo_creator_publications WHERE id=$1 AND owner_id=$2 RETURNING id",
+      [req.params.id,req.userId],
+    );
+    if (!result.rowCount) { res.status(404).json({error:"PUBLICATION_NOT_FOUND"}); return; }
+    res.json({deleted:true});
+  });
   return router;
 }
 export const creatorHubSocialRouter = createCreatorHubSocialRouter();
