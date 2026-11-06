@@ -77,7 +77,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className={cn('mx-auto min-w-0 w-full max-w-[520px] lg:max-w-[600px]', !inConversation && 'pt-safe pb-nav lg:pt-0 lg:pb-10')}>{children}</main>
+      <main className={cn('mx-auto min-w-0 w-full max-w-[520px] lg:max-w-[600px]', !inConversation && 'pb-nav lg:pb-10')}>{children}</main>
 
       {/* Desktop right column */}
       <aside className="sticky top-0 hidden h-[100dvh] min-h-0 flex-col gap-6 overflow-y-auto px-6 py-10 xl:flex">
