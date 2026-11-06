@@ -5,7 +5,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronDown, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -252,7 +252,7 @@ export default function ConversationPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] min-w-0 flex-col overflow-x-clip">
+    <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="flex h-16 items-center gap-2 px-2">
           <button onClick={back} aria-label={t("Volver")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
@@ -265,11 +265,11 @@ export default function ConversationPage() {
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
-          <button type="button" onClick={() => endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })} aria-label={t("Ir al último mensaje")} title={t("Ir al último mensaje")} className="ml-auto tap grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-scroll-to-latest"><ChevronDown className="h-5 w-5" /></button>
+
         </div>
       </header>
 
-      <div className="min-w-0 flex-1 overflow-x-clip px-3 pb-4 pt-6 sm:px-4" data-testid="list-conversation-messages">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
