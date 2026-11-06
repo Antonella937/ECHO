@@ -4,7 +4,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -47,6 +47,7 @@ export default function ConversationPage() {
   const [pending, setPending] = useState<Pending[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [listeningId, setListeningId] = useState<string | null>(null);
+  const [voiceRequest, setVoiceRequest] = useState(false);
   const playbackRef = useRef<HTMLAudioElement | null>(null);
   const [recordingTip, setRecordingTip] = useState(false);
   const [reacting, setReacting] = useState<string | null>(null);
@@ -219,6 +220,13 @@ export default function ConversationPage() {
   const canSend = !uploading && !failed && recorder.status === 'idle' && (!!text.trim() || ready.length > 0);
   const quoted = quoteId ? byId.get(quoteId) : undefined;
 
+  const requestVoiceReply = (quote?: Message) => {
+    // Explicit request, not a fabricated audio reply. Production TTS is not connected yet.
+    setQuoteId(quote?.id ?? null);
+    setVoiceRequest(true);
+    setText('¿Me respondés con una nota de voz?');
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSend) return;
@@ -227,7 +235,7 @@ export default function ConversationPage() {
       const messageText = [text.trim(), spoken].filter(Boolean).join('\n\n');
       actions.sendMessage(other.id, messageText, { ...(quoted ? { quoteMessageId: quoted.id } : {}), ...(ready.length ? { attachments: ready } : {}) });
       pending.forEach(p => URL.revokeObjectURL(p.preview));
-      setText(''); setPending([]); setQuoteId(null); setError(null);
+      setText(''); setPending([]); setQuoteId(null); setVoiceRequest(false); setError(null);
     } catch (err) {
       setError((err as Error).message || 'No se pudo enviar. Tu borrador sigue aquí.');
     }
@@ -255,6 +263,7 @@ export default function ConversationPage() {
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
+          <button type="button" onClick={() => requestVoiceReply()} aria-label="Pedir una nota de voz" title="Pedir nota de voz" className="ml-auto tap grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-request-voice"><Mic className="h-5 w-5" /></button>
         </div>
       </header>
 
@@ -279,6 +288,7 @@ export default function ConversationPage() {
               canListen={m.senderId === other.id && !!other.configuration?.voice?.basicVoiceId && !!m.text.trim() && !m.attachments?.some(a => a.type === 'audio') && m.text.length <= 500}
               listening={listeningId === m.id}
               onListen={() => void listenToMessage(m.id)}
+              onRequestVoice={() => requestVoiceReply(m)}
               onReply={() => setQuoteId(m.id)}
               onJump={jumpTo}
               hiding={hiding === m.id}
@@ -305,6 +315,7 @@ export default function ConversationPage() {
             <button type="button" onClick={() => setError(null)} aria-label="Cerrar aviso" data-testid="button-dismiss-composer-error"><X className="h-3.5 w-3.5" /></button>
           </div>
         )}
+        {voiceRequest && <p className="mb-2 rounded-xl bg-secondary/70 px-3 py-2 text-xs text-muted-foreground">Petición de audio: se enviará como mensaje. La generación de voz todavía requiere conectar el motor.</p>}
         {quoteId && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border-l-2 border-primary bg-secondary/70 px-3 py-2" data-testid="composer-quote">
             <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -430,13 +441,17 @@ function summarize(m: Message): string {
   return 'Mensaje';
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
-  canListen: boolean; listening: boolean; onListen(): void;
+  canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearPress = () => { if (pressTimer.current) clearTimeout(pressTimer.current); pressTimer.current = null; };
+  useEffect(() => () => clearPress(), []);
   const resolveMedia = useMediaResolver();
   const story = m.storyId ? state.stories.find((s) => s.id === m.storyId) : undefined;
   const post = m.postId ? state.posts.find((p) => p.id === m.postId) : undefined;
@@ -444,7 +459,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   return (
-    <li className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
+    <li onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }} onTouchStart={() => { clearPress(); pressTimer.current = setTimeout(() => setMenuOpen(true), 550); }} onTouchEnd={clearPress} onTouchCancel={clearPress} onTouchMove={clearPress} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
@@ -495,6 +510,15 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           <button type="button" onClick={onToggleHiding} aria-label="Eliminar para mí" aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
+      {menuOpen && (
+        <div role="menu" aria-label="Opciones del mensaje" className="mt-1 flex max-w-[90vw] flex-wrap gap-1 rounded-2xl border border-border bg-card p-2 shadow-lg" data-testid={`menu-message-${m.id}`}>
+          {canListen && <button type="button" disabled={listening} onClick={() => { setMenuOpen(false); onListen(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Escuchar con su voz</button>}
+          {!mine && <button type="button" onClick={() => { setMenuOpen(false); onRequestVoice(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Pedir respuesta en audio</button>}
+          <button type="button" onClick={() => { setMenuOpen(false); onReply(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Responder</button>
+          <button type="button" onClick={() => { setMenuOpen(false); onToggleReacting(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Reaccionar</button>
+          <button type="button" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-xs">Cerrar</button>
+        </div>
+      )}
       {transcript && (
         <details className={cn('mt-1 max-w-[min(20rem,85vw)] rounded-xl border border-border/60 px-3 py-2 text-xs', mine ? 'bg-primary/5' : 'bg-secondary/50')}
           data-testid={`audio-transcript-${m.id}`}>
