@@ -1,3 +1,4 @@
+import { useStoryViewerText } from '@/lib/story-viewer-translations';
 import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -76,6 +77,7 @@ export function StoryViewerProvider({ children }: { children: ReactNode }) {
 }
 
 function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIndex: number; onClose(): void }) {
+  const t = useStoryViewerText();
   const resolveMedia = useMediaResolver();
   const { me, actions, state, character } = useSocial();
   const [, navigate] = useLocation();
@@ -150,7 +152,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     setReply('');
     inputRef.current?.blur();
     setReplyFocused(false);
-    toast({ title: `Respuesta enviada a ${group.author.name.split(' ')[0]}`, description: 'La encontrarás en Mensajes.' });
+    toast({ title: `${t('Respuesta enviada a')} ${group.author.name.split(' ')[0]}`, description: t('La encontrarás en Mensajes.') });
   };
 
   const viewers = storyViewerIds(liveStory).map(character).filter(Boolean);
@@ -161,8 +163,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const react = (value: string) => {
     try {
       actions.reactStory(story.id, value);
-      if (myReaction !== value) toast({ title: `Reacción enviada a ${group.author.name.split(' ')[0]}`, description: 'También llega como mensaje directo.' });
-    } catch (e) { toast({ title: 'No se pudo reaccionar', description: (e as Error).message }); }
+      if (myReaction !== value) toast({ title: `${t('Reacción enviada a')} ${group.author.name.split(' ')[0]}`, description: t('También llega como mensaje directo.') });
+    } catch (e) { toast({ title: t('No se pudo reaccionar'), description: (e as Error).message }); }
   };
 
   return (
@@ -173,12 +175,12 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22 }}
       role="dialog"
-      aria-label={`Historias de ${group.author.name}`}
+      aria-label={`${t("Historias de")} ${group.author.name}`}
       data-testid="story-viewer"
     >
       <button
         onClick={prev}
-        aria-label="Historia anterior"
+        aria-label={t("Historia anterior")}
         className="absolute left-[calc(50%-290px)] top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-secondary/80 hover:bg-secondary md:grid"
         data-testid="button-story-prev-desktop"
       >
@@ -186,7 +188,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       </button>
       <button
         onClick={next}
-        aria-label="Historia siguiente"
+        aria-label={t("Historia siguiente")}
         className="absolute right-[calc(50%-290px)] top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-secondary/80 hover:bg-secondary md:grid"
         data-testid="button-story-next-desktop"
       >
@@ -197,7 +199,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         <img
           key={story.id}
           src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })}
-          alt={story.caption || `Historia de ${group.author.name}`}
+          alt={story.caption || `${t("Historia de")} ${group.author.name}`}
           className="fade-up absolute inset-0 h-full w-full object-contain md:object-cover"
           draggable={false}
           data-testid={`img-story-${story.id}`}
@@ -235,25 +237,25 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             <span className="truncate text-sm font-semibold">{group.author.handle}</span><VerifiedBadge account={group.author} className="h-3.5 w-3.5" />
             <span className="text-sm text-foreground/60">{timeAgo(story.createdAt)}</span>
           </button>
-          {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground" data-testid="badge-close-friends-story">★ Mejores amigos</span>}
-          {isMine && <button type="button" onClick={() => setConfirmDelete(true)} aria-label="Eliminar historia" title="Eliminar historia" className="tap grid h-11 w-11 place-items-center rounded-full text-foreground" data-testid="button-story-delete"><Trash2 className="h-5 w-5" /></button>}
+          {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground" data-testid="badge-close-friends-story">★ {t("Mejores amigos")}</span>}
+          {isMine && <button type="button" onClick={() => setConfirmDelete(true)} aria-label={t("Eliminar historia")} title={t("Eliminar historia")} className="tap grid h-11 w-11 place-items-center rounded-full text-foreground" data-testid="button-story-delete"><Trash2 className="h-5 w-5" /></button>}
           <button
             onClick={onClose}
             className="tap grid h-11 w-11 place-items-center rounded-full"
-            aria-label="Cerrar historias"
+            aria-label={t("Cerrar historias")}
             data-testid="button-story-close"
           >
             <X className="h-6 w-6" strokeWidth={1.6} />
           </button>
         </div>
 
-        {confirmDelete && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 px-6" role="alertdialog" aria-modal="true" aria-label="Eliminar historia">
+        {confirmDelete && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 px-6" role="alertdialog" aria-modal="true" aria-label={t("Eliminar historia")}>
           <div className="w-full max-w-sm rounded-3xl bg-card p-5 text-foreground">
-            <h2 className="text-lg font-semibold">¿Eliminar esta historia?</h2>
-            <p className="mt-2 text-sm text-muted-foreground">También se quitará de las destacadas que la incluyan. No se puede deshacer.</p>
+            <h2 className="text-lg font-semibold">{t("¿Eliminar esta historia?")}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{t("También se quitará de las destacadas que la incluyan. No se puede deshacer.")}</p>
             <div className="mt-5 flex gap-2">
-              <button type="button" onClick={() => setConfirmDelete(false)} className="h-11 flex-1 rounded-xl bg-secondary text-sm" data-testid="button-story-delete-cancel">Cancelar</button>
-              <button type="button" onClick={() => { try { actions.deleteStory(story.id); toast({ title: 'Historia eliminada' }); onClose(); } catch (e) { toast({ title: 'No se pudo eliminar', description: (e as Error).message }); } }} className="h-11 flex-1 rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground" data-testid="button-story-delete-confirm">Eliminar</button>
+              <button type="button" onClick={() => setConfirmDelete(false)} className="h-11 flex-1 rounded-xl bg-secondary text-sm" data-testid="button-story-delete-cancel">{t("Cancelar")}</button>
+              <button type="button" onClick={() => { try { actions.deleteStory(story.id); toast({ title: t('Historia eliminada') }); onClose(); } catch (e) { toast({ title: t('No se pudo eliminar'), description: (e as Error).message }); } }} className="h-11 flex-1 rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground" data-testid="button-story-delete-confirm">{t("Eliminar")}</button>
             </div>
           </div>
         </div>}
@@ -261,7 +263,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         <div className="relative z-0 flex flex-1">
           <button
             className="h-full w-1/3"
-            aria-label="Anterior"
+            aria-label={t("Anterior")}
             onClick={prev}
             onPointerDown={() => setPaused(true)}
             onPointerUp={() => setPaused(false)}
@@ -270,7 +272,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           />
           <button
             className="h-full w-2/3"
-            aria-label="Siguiente"
+            aria-label={t("Siguiente")}
             onClick={next}
             onPointerDown={() => setPaused(true)}
             onPointerUp={() => setPaused(false)}
@@ -281,10 +283,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
         <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex flex-col items-center gap-2 px-6 text-center">
           {liveStory.music && (
-            <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 py-1.5 text-xs backdrop-blur" title="Solo metadatos: no se reproduce audio" data-testid={`text-story-music-${story.id}`}>
+            <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 py-1.5 text-xs backdrop-blur" title={t("Solo metadatos: no se reproduce audio")} data-testid={`text-story-music-${story.id}`}>
               <Music2 className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="truncate"><b className="font-semibold">{liveStory.music.title}</b> · {liveStory.music.artist}</span>
-              <span className="shrink-0 rounded-full bg-foreground/15 px-1.5 text-[10px] uppercase tracking-wider">sin audio</span>
+              <span className="shrink-0 rounded-full bg-foreground/15 px-1.5 text-[10px] uppercase tracking-wider">{t("sin audio")}</span>
             </span>
           )}
           {story.caption && (
@@ -299,7 +301,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
               ))}
             </div>
           )}
-          {!active && <span className="rounded-full bg-[hsl(240_8%_3%/0.6)] px-2.5 py-1 text-[11px] text-foreground/75" data-testid="status-story-archived">Archivada · ya no aparece en el carrusel</span>}
+          {!active && <span className="rounded-full bg-[hsl(240_8%_3%/0.6)] px-2.5 py-1 text-[11px] text-foreground/75" data-testid="status-story-archived">{t("Archivada · ya no aparece en el carrusel")}</span>}
         </div>
 
         <div className="relative z-10 px-3 pb-[max(env(safe-area-inset-bottom),14px)] pt-2">
@@ -311,7 +313,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 data-testid="button-story-viewers"
               >
                 <Eye className="h-5 w-5" strokeWidth={1.6} />
-                {totalViews === 0 ? 'Nadie la ha visto todavía' : `Vista por ${formatCount(totalViews)}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} reacción(es)` : ''}
+                {totalViews === 0 ? t('Nadie la ha visto todavía') : `${t('Vista por')} ${formatCount(totalViews)}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} ${t("reacción(es)")}` : ''}
               </button>
               <StoryMetricsEditor key={story.id} story={liveStory} onOpenChange={open => setEditingMetricsId(open ? story.id : null)} />
               {showViewers && viewers.length > 0 && (
@@ -330,7 +332,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           ) : (
             <div>
             {active && (
-              <div className="mb-2 flex justify-center gap-1" role="group" aria-label="Reaccionar a la historia">
+              <div className="mb-2 flex justify-center gap-1" role="group" aria-label={t("Reaccionar a la historia")}>
                 {STORY_REACTIONS.map((r, i) => (
                   <button key={r} type="button" onClick={() => react(r)} aria-pressed={myReaction === r}
                     className={cn('tap grid h-10 w-10 place-items-center rounded-full text-xl', myReaction === r ? 'bg-primary/30' : 'bg-[hsl(240_8%_3%/0.35)]')}
@@ -346,15 +348,15 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 onChange={(e) => setReply(e.target.value)}
                 onFocus={() => setReplyFocused(true)}
                 onBlur={() => setReplyFocused(false)}
-                placeholder={`Responder a ${group.author.name.split(' ')[0]}…`}
+                placeholder={`${t("Responder a")} ${group.author.name.split(' ')[0]}…`}
                 className="h-12 min-w-0 flex-1 rounded-full border border-[hsl(0_0%_100%/0.3)] bg-transparent px-5 text-[15px] text-foreground placeholder:text-foreground/60 focus:border-foreground/70 focus:outline-none"
                 data-testid="input-story-reply"
-                aria-label="Responder a la historia"
+                aria-label={t("Responder a la historia")}
               />
               <button
                 type="submit"
                 disabled={!reply.trim()}
-                aria-label="Enviar respuesta"
+                aria-label={t("Enviar respuesta")}
                 className={cn('tap grid h-12 w-12 place-items-center rounded-full transition-opacity', reply.trim() ? 'opacity-100' : 'opacity-40')}
                 data-testid="button-story-reply-send"
               >
