@@ -48,7 +48,7 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
     <main className="echo-public epc-shell">
       <div className="ep-wrap">
         {authenticated ? <header className="epc-private-nav">
-          <Link href="/" className="ep-brand" aria-label="ECHO"><span className="ep-mark" aria-hidden="true">e</span><span>ECHO</span></Link>
+          <Link href="/" className="ep-brand" aria-label="ECHO"><span className="ep-mark" aria-hidden="true"><span>e</span></span><span>ECHO</span></Link>
           <PublicLanguageSelector />
         </header> : <PublicHeader previewMode />}
         {children}
