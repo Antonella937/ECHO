@@ -13,6 +13,8 @@ import { ObjectPermission } from "../lib/objectAcl";
 import { universeAccountError } from "../lib/universeValidation";
 import { recordIncomingConversationEvents } from "../ai-engine/incoming-memory";
 import { approveRelationshipProgression } from "../lib/relationshipApproval";
+import { approveTrustEvent } from "../lib/relationshipTrustApproval";
+import type { TrustEventKind } from "../lib/relationshipTrust";
 import { sendNewOwnerPush } from "../lib/onesignal-push";
 
 const router: IRouter = Router();
@@ -78,6 +80,36 @@ router.post("/universe/relationships/approve", async (req, res): Promise<void> =
   if (!result.applied) {
     const conflict = result.reason === "REVISION_CONFLICT" || result.reason === "UNIVERSE_UNAVAILABLE";
     res.status(conflict ? 409 : 422).json(result); return;
+  }
+  res.json(result);
+});
+
+// A saved direct message is required as evidence; the authenticated owner
+// explicitly confirms its meaning. No AI-generated trust changes occur here.
+router.post("/universe/relationships/trust/approve", async (req, res): Promise<void> => {
+  const body = req.body as Record<string, unknown> | null;
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const kinds: readonly string[] = [
+    "promise_kept", "support_given", "boundary_respected", "lie_confirmed",
+    "promise_broken", "betrayal_confirmed", "repair_confirmed",
+  ];
+  const actorId = body?.actorId, targetId = body?.targetId;
+  const sourceId = body?.sourceId, kind = body?.kind, revision = body?.expectedRevision;
+  if (typeof actorId !== "string" || !actorId || actorId.length > 100 ||
+      typeof targetId !== "string" || !targetId || targetId.length > 100 ||
+      typeof sourceId !== "string" || !sourceId || sourceId.length > 200 ||
+      typeof kind !== "string" || !kinds.includes(kind) ||
+      !Number.isSafeInteger(revision) || (revision as number) < 1 ||
+      universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_TRUST_APPROVAL" }); return;
+  }
+  const result = await approveTrustEvent(
+    req.userId!, universeId, actorId, targetId, sourceId,
+    kind as TrustEventKind, revision as number,
+  );
+  if (!result.applied) {
+    res.status(["REVISION_CONFLICT", "UNIVERSE_UNAVAILABLE"].includes(result.reason) ? 409 : 422).json(result);
+    return;
   }
   res.json(result);
 });
