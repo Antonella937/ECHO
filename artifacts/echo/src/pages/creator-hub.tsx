@@ -416,43 +416,43 @@ export default function CreatorHubPage() {
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-medium text-primary underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary/80">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
             </div>
             <nav aria-label="Secciones de Creator Hub" className="grid grid-cols-4 gap-1 rounded-2xl border border-border bg-secondary/30 p-1.5">
-              {([{id:'perfil',label:'Perfil',Icon:UserRound},{id:'explorar',label:'Explorar',Icon:Compass},{id:'mensajes',label:'Mensajes',Icon:MessagesSquare},{id:'ajustes',label:'Ajustes',Icon:Settings2}] as const).map(tab => <button key={tab.id} type="button" aria-current={hubTab === tab.id ? 'page' : undefined} onClick={() => setHubTab(tab.id)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] sm:flex-row sm:gap-2 sm:text-sm ${hubTab === tab.id ? 'bg-primary/15 font-semibold text-primary' : 'text-muted-foreground hover:bg-secondary'}`}><tab.Icon size={17}/><span>{tab.label}</span></button>)}
+              {([{id:'perfil',label:'Perfil',Icon:UserRound},{id:'explorar',label:'Explorar',Icon:Compass},{id:'mensajes',label:'Mensajes',Icon:MessagesSquare},{id:'ajustes',label:'Ajustes',Icon:Settings2}] as const).map(tab => <button key={tab.id} type="button" aria-current={hubTab === tab.id ? 'page' : undefined} onClick={() => setHubTab(tab.id)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] sm:flex-row sm:gap-2 sm:text-sm ${hubTab === tab.id ? 'bg-primary/15 font-semibold text-primary' : 'text-muted-foreground hover:bg-secondary'}`}><tab.Icon size={17}/><span>{ht(tab.label)}</span></button>)}
             </nav>
             {hubTab === 'ajustes' && <div className="space-y-4">
             <div className="rounded-2xl border border-border p-4 space-y-4">
-              <h3 className="font-semibold">Privacidad de Creator Hub</h3>
-              {!socialReady ? <p className="text-sm text-muted-foreground">Los ajustes sociales estarán disponibles cuando se habilite el servidor de Creator Hub.</p> : <>
-                <label className="block space-y-2 text-sm"><span>Visibilidad del perfil</span>
-                  <select aria-label="Visibilidad del perfil" disabled={socialSaving} value={socialProfile?.visibility ?? 'private'} onChange={e => void saveSocialPreferences(e.target.value as 'private' | 'public', socialProfile?.messagePrivacy ?? 'requests')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
-                    <option value="private">Privado · aprobar seguidores</option><option value="public">Público · cualquiera puede seguirte</option>
+              <h3 className="font-semibold">{ht("Privacidad de Creator Hub")}</h3>
+              {!socialReady ? <p className="text-sm text-muted-foreground">{ht("Los ajustes sociales estarán disponibles cuando se habilite el servidor de Creator Hub.")}</p> : <>
+                <label className="block space-y-2 text-sm"><span>{ht("Visibilidad del perfil")}</span>
+                  <select aria-label={ht("Visibilidad del perfil")} disabled={socialSaving} value={socialProfile?.visibility ?? 'private'} onChange={e => void saveSocialPreferences(e.target.value as 'private' | 'public', socialProfile?.messagePrivacy ?? 'requests')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
+                    <option value="private">{ht("Privado · aprobar seguidores")}</option><option value="public">{ht("Público · cualquiera puede seguirte")}</option>
                   </select>
                 </label>
-                <label className="block space-y-2 text-sm"><span>Quién puede enviarte mensajes</span>
+                <label className="block space-y-2 text-sm"><span>{ht("Quién puede enviarte mensajes")}</span>
                   <select aria-label="Privacidad de mensajes" disabled={socialSaving} value={socialProfile?.messagePrivacy ?? 'requests'} onChange={e => void saveSocialPreferences(socialProfile?.visibility ?? 'private', e.target.value as 'everyone' | 'requests' | 'nobody')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
-                    <option value="everyone">Todos</option><option value="requests">Solicitudes · revisar antes de aceptar</option><option value="nobody">Nadie puede iniciar un chat</option>
+                    <option value="everyone">{ht("Todos")}</option><option value="requests">{ht("Solicitudes · revisar antes de aceptar")}</option><option value="nobody">{ht("Nadie puede iniciar un chat")}</option>
                   </select>
                 </label>
-                <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil.</p>
+                <p className="text-xs text-muted-foreground">{ht("La privacidad de mensajes es independiente de la visibilidad del perfil.")}</p>
               </>}
             </div>
             </div>}
             {hubTab === 'explorar' && <div className="space-y-4">
             <div className="rounded-2xl border border-border p-4 space-y-3">
               <h3 className="font-semibold">{ct("findPeople")}</h3>
-              <div className="flex gap-2"><input aria-label="Buscar por nombre o arroba" value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder="Nombre o @usuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">{ct("search")}</button></div>
+              <div className="flex gap-2"><input aria-label="Buscar por nombre o arroba" value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder={ht("Nombre o @usuario")} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">{ct("search")}</button></div>
               {peopleFeedback && <p role="status" className="text-xs text-muted-foreground">{peopleFeedback}</p>}
               {selectedPerson && <div className="rounded-2xl border border-primary/30 bg-secondary/30 p-4 space-y-4" aria-label="Perfil de otra persona">
-                <div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold">{selectedPerson.displayName}</h4><p className="text-sm text-muted-foreground">@{selectedPerson.username} · Perfil {selectedPerson.visibility === 'private' ? 'privado' : 'público'}</p></div><button type="button" onClick={() => setSelectedPersonId(null)} aria-label="Cerrar perfil" className="rounded-full p-2 text-muted-foreground"><X size={18}/></button></div>
+                <div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold">{selectedPerson.displayName}</h4><p className="text-sm text-muted-foreground">@{selectedPerson.username} · Perfil {ht(selectedPerson.visibility === 'private' ? 'Privado' : 'Público')}</p></div><button type="button" onClick={() => setSelectedPersonId(null)} aria-label="Cerrar perfil" className="rounded-full p-2 text-muted-foreground"><X size={18}/></button></div>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" disabled={peopleBusy || selectedPerson.following || selectedPerson.requested} onClick={() => void followPerson(selectedPerson.ownerId)} className="rounded-full bg-primary px-2 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{selectedPerson.following ? 'Siguiendo' : selectedPerson.requested ? 'Solicitado' : selectedPerson.visibility === 'private' ? 'Solicitar seguir' : 'Seguir'}</button>
+                  <button type="button" disabled={peopleBusy || selectedPerson.following || selectedPerson.requested} onClick={() => void followPerson(selectedPerson.ownerId)} className="rounded-full bg-primary px-2 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{ht(selectedPerson.following ? 'Siguiendo' : selectedPerson.requested ? 'Solicitado' : selectedPerson.visibility === 'private' ? 'Solicitar seguir' : 'Seguir')}</button>
                   <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPerson.ownerId)} className="flex items-center justify-center gap-2 rounded-full border border-primary/40 px-2 py-3 text-sm text-primary disabled:opacity-60"><MessageCircle size={16}/> Mensaje privado</button>
                 </div>
-                {selectedPerson.visibility === 'private' && !selectedPerson.following && <p className="text-xs text-muted-foreground">Este perfil es privado. El contenido requiere autorización de su creador.</p>}
+                {selectedPerson.visibility === 'private' && !selectedPerson.following && <p className="text-xs text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p>}
               </div>}
               {peopleResults.map(person => (
                 <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
-                  <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {person.visibility === 'private' ? 'Privado' : 'Público'}</p></div>
-                  <button type="button" onClick={() => setSelectedPersonId(person.ownerId)} className="rounded-full border border-primary/40 px-3 py-2 text-xs font-medium text-primary">Ver perfil</button>
+                  <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {ht(person.visibility === 'private' ? 'Privado' : 'Público')}</p></div>
+                  <button type="button" onClick={() => setSelectedPersonId(person.ownerId)} className="rounded-full border border-primary/40 px-3 py-2 text-xs font-medium text-primary">{ht("Ver perfil")}</button>
                 </div>
               ))}
             </div>
@@ -461,11 +461,11 @@ export default function CreatorHubPage() {
               <div className="flex items-center justify-between gap-2"><h3 className="text-lg font-semibold">{ct("yourMessages")}</h3><button type="button" className="text-xs text-primary" onClick={() => setHubTab('explorar')}>{ct("findPeople")}</button></div>
             <div className="rounded-2xl border border-border p-4 space-y-3">
               <div className="flex items-center justify-between"><h4 className="font-semibold">{ct("conversations")}</h4><button type="button" className="text-xs text-primary" onClick={() => void refreshConversations()}>{ct("refresh")}</button></div>
-              {conversations.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tenés conversaciones. Buscá una persona en Explorar para empezar.</p>}
+              {conversations.length === 0 && <p className="text-sm text-muted-foreground">{ht("Todavía no tenés conversaciones. Buscá una persona en Explorar para empezar.")}</p>}
               {conversations.map(person => <button key={person.ownerId} type="button" onClick={() => void openHumanChat(person.ownerId,person.displayName)} className="flex w-full items-center justify-between rounded-xl bg-secondary/50 px-4 py-3 text-left text-sm hover:bg-secondary"><span>{person.displayName} <span className="text-muted-foreground">@{person.username}</span></span><MessageCircle size={17} className="text-primary"/></button>)}
             </div>
             {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
-              <div className="flex items-center justify-between"><h3 className="font-semibold">Chat con {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">{ct("refresh")}</button></div>
+              <div className="flex items-center justify-between"><h3 className="font-semibold">{ht("Chat con")} {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">{ct("refresh")}</button></div>
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
                 {chatMessages.length === 0 && <p className="text-xs text-muted-foreground">{ct("noMessages")}</p>}
                 {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
@@ -478,18 +478,18 @@ export default function CreatorHubPage() {
                     {['❤️','😂','🥹','😍','👍','🔥','😮','😢'].map(emoji => <button type="button" key={emoji} onClick={() => { setReactingMessage(null); void toggleReaction(message.id, emoji, Boolean(message.reactions?.some(r => r.emoji === emoji && r.ownerId === user?.id))); }} className="rounded-lg p-1 hover:bg-secondary" aria-label={`Reaccionar con ${emoji}`}>{emoji}</button>)}
                   </div>}
                 </div>)}
-                {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} está escribiendo</span><span className="animate-pulse">● ● ●</span></div>}
+                {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} {ht("está escribiendo")}</span><span className="animate-pulse">● ● ●</span></div>}
               </div>
               {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
               <HumanVoiceRecorder key={activeChat.ownerId} targetOwnerId={activeChat.ownerId} onSent={() => refreshHumanChat(activeChat.ownerId)} />
-              <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder="Escribí un mensaje…" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{ct("send")}</button></div>
+              <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder={ht("Escribí un mensaje…")} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{ct("send")}</button></div>
             </div>}
             <div className="rounded-2xl border border-border p-4 space-y-4">
-              <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Bandeja de solicitudes</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">{ct("refresh")}</button></div>
+              <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{ht("Bandeja de solicitudes")}</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">{ct("refresh")}</button></div>
               {inboxError && <p role="alert" className="text-xs text-destructive">{inboxError}</p>}
               {([['Seguidores', followInbox, 'requests'], ['Mensajes', messageInbox, 'message-requests']] as const).map(([label, requests, kind]) => (
                 <div key={kind} className="space-y-2">
-                  <h4 className="text-sm font-medium">{label} · {requests.length}</h4>
+                  <h4 className="text-sm font-medium">{ht(label)} · {requests.length}</h4>
                   {requests.length === 0 ? <p className="text-xs text-muted-foreground">{ct("noRequests")}</p> : requests.map(request => (
                     <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
                       <div className="min-w-0"><p className="truncate text-sm font-medium">{request.displayName}</p><p className="truncate text-xs text-muted-foreground">@{request.username}</p></div>
@@ -498,7 +498,7 @@ export default function CreatorHubPage() {
                   ))}
                 </div>
               ))}
-              <p className="text-xs text-muted-foreground">Las solicitudes nuevas aparecen aquí.</p>
+              <p className="text-xs text-muted-foreground">{ht("Las solicitudes nuevas aparecen aquí.")}</p>
             </div>
             </div>}
             {hubTab === 'perfil' && <>
