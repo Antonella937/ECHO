@@ -1,3 +1,5 @@
+import { useMessagesText } from '@/lib/messages-translations';
+import { useLanguage } from '@/lib/i18n';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { PenSquare, Search } from 'lucide-react';
@@ -13,6 +15,7 @@ import { cn } from '@/lib/utils';
 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export default function MessagesPage() {
+  const t = useMessagesText();
   const { me } = useSocial();
   const threads = useThreads();
   const [composing, setComposing] = useState(false);
@@ -20,17 +23,17 @@ export default function MessagesPage() {
   return (
     <div>
       <TopBar
-        title="Mensajes"
-        sub={`Bandeja de ${me.name}`}
+        title={t("Mensajes")}
+        sub={`${t("Bandeja de")} ${me.name}`}
         right={
           <button
             onClick={() => setComposing(true)}
-            aria-label="Nueva conversación"
+            aria-label={t("Nueva conversación")}
             className="tap flex h-11 items-center gap-2 rounded-full bg-secondary px-4 text-sm font-semibold hover:bg-secondary/80"
             data-testid="button-new-conversation"
           >
             <PenSquare className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
-            <span className="hidden min-[380px]:inline">Nueva</span>
+            <span className="hidden min-[380px]:inline">{t("Nueva")}</span>
           </button>
         }
       />
@@ -39,7 +42,7 @@ export default function MessagesPage() {
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
           </div>
-          <p className="font-display text-xl font-light tracking-wide">Aún no hay mensajes</p>
+          <p className="font-display text-xl font-light tracking-wide">{t("Aún no hay mensajes")}</p>
           <p className="mt-2 max-w-[280px] text-sm leading-relaxed text-muted-foreground">
             Escribe a alguien de tu universo. La conversación aparecerá aquí cuando envíes el primer mensaje.
           </p>
@@ -64,7 +67,7 @@ export default function MessagesPage() {
                   </div>
                   <div className={cn('truncate text-[13.5px]', unread ? 'text-foreground' : 'text-muted-foreground')}>
                     {last
-                      ? `${last.senderId === me.id ? 'Tú: ' : ''}${last.storyId ? 'Respondió a una historia · ' : last.postId ? 'Compartió una foto · ' : ''}${last.text || (last.attachments?.length ? (last.attachments[0].type === 'image' ? 'Foto' : last.attachments[0].type === 'video' ? 'Video' : 'Nota de voz') : '')}`
+                      ? `${last.senderId === me.id ? t("Tú: ") : ''}${last.storyId ? t("Respondió a una historia · ") : last.postId ? t("Compartió una foto · ") : ''}${last.text || (last.attachments?.length ? (last.attachments[0].type === 'image' ? t("Foto") : last.attachments[0].type === 'video' ? t("Video") : t("Nota de voz")) : '')}`
                       : `@${other.handle}`}
                     {last && <span className="text-muted-foreground"> · {timeAgo(last.createdAt)}</span>}
                   </div>
@@ -88,6 +91,8 @@ export default function MessagesPage() {
 }
 
 function NewConversationSheet({ open, onClose }: { open: boolean; onClose(): void }) {
+  const t = useMessagesText();
+  const language = useLanguage();
   const { state, me } = useSocial();
   const [, navigate] = useLocation();
   const [q, setQ] = useState('');
@@ -96,7 +101,7 @@ function NewConversationSheet({ open, onClose }: { open: boolean; onClose(): voi
     return state.characters
       .filter((c) => c.id !== me.id && !c.archived)
       .filter((c) => !term || normalize(c.name).includes(term) || normalize(c.handle).includes(term))
-      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      .sort((a, b) => a.name.localeCompare(b.name, language));
   }, [state.characters, me.id, q]);
 
   const close = () => {
@@ -105,21 +110,21 @@ function NewConversationSheet({ open, onClose }: { open: boolean; onClose(): voi
   };
 
   return (
-    <Sheet open={open} onClose={close} title="Nueva conversación" testId="sheet-new-conversation">
+    <Sheet open={open} onClose={close} title={t("Nueva conversación")} testId="sheet-new-conversation">
       <label className="sticky top-0 z-10 -mx-1 mb-2 flex items-center gap-2 rounded-2xl border border-input bg-background px-4">
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre o @usuario"
-          aria-label="Buscar cuenta"
+          placeholder={t("Buscar por nombre o @usuario")}
+          aria-label={t("Buscar cuenta")}
           className="h-11 min-w-0 flex-1 bg-transparent text-[15px] placeholder:text-muted-foreground focus:outline-none"
           data-testid="input-search-accounts"
         />
       </label>
       {accounts.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground" data-testid="text-no-accounts">
-          {q ? 'Ninguna cuenta coincide con tu búsqueda.' : 'No hay otras cuentas activas.'}
+          {q ? t('Ninguna cuenta coincide con tu búsqueda.') : t('No hay otras cuentas activas.')}
         </p>
       ) : (
         <ul className="flex flex-col">
