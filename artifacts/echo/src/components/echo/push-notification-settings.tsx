@@ -32,21 +32,21 @@ export function PushNotificationSettings() {
     if (ownerId) localStorage.setItem('echo:push-preferences:' + ownerId, JSON.stringify(next));
   };
   const request = async () => {
-    if (!ownerId) { setNotice('Iniciá sesión para activar las notificaciones.'); return; }
-    if (!isOneSignalConfigured()) { setNotice('OneSignal todavía no está configurado.'); return; }
+    if (!ownerId) { setNotice(t("Iniciá sesión para activar las notificaciones.")); return; }
+    if (!isOneSignalConfigured()) { setNotice(t("OneSignal todavía no está configurado.")); return; }
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setNotice('En iPhone, abrí ECHO desde Safari y agregalo a la pantalla de inicio antes de activar los avisos.');
+      setNotice(t("En iPhone, abrí ECHO desde Safari y agregalo a la pantalla de inicio antes de activar los avisos."));
       return;
     }
     try {
-      setNotice('Conectando con OneSignal…');
+      setNotice(t("Conectando con OneSignal…"));
       await connectOneSignalOwner(ownerId);
       const client = await getOneSignal();
       const allowed = await client.Notifications.requestPermission();
-      if (!allowed) { setNotice('No se concedió permiso para notificaciones.'); return; }
+      if (!allowed) { setNotice(t("No se concedió permiso para notificaciones.")); return; }
       update({ ...prefs, enabled: true });
-      setNotice('Permiso activado. La entrega automática de eventos requiere conectar el servidor de ECHO.');
-    } catch (error) { setNotice(error instanceof Error ? error.message : 'No se pudo activar OneSignal.'); }
+      setNotice(t("Permiso activado. La entrega automática de eventos requiere conectar el servidor de ECHO."));
+    } catch (error) { setNotice(error instanceof Error ? error.message : t("No se pudo activar OneSignal.")); }
   };
   return <section className="mt-9" aria-labelledby="push-h">
     <h2 id="push-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Bell className="h-4 w-4" /> Notificaciones del celular</h2>
