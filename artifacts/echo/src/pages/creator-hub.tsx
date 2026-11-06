@@ -1,7 +1,7 @@
 import { HumanVoicePlayback, HumanVoiceRecorder } from '@/components/echo/human-voice-note';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
-import { BadgeCheck, Camera, Check, Pencil, X } from 'lucide-react';
+import { BadgeCheck, Camera, Check, Pencil, X, Compass, Settings2, MessagesSquare, UserRound } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { ArrowLeft, ExternalLink, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
@@ -14,6 +14,7 @@ import { Link } from 'wouter';
  */
 export default function CreatorHubPage() {
   const { user } = useUser();
+  const [hubTab, setHubTab] = useState<'perfil' | 'explorar' | 'mensajes' | 'ajustes'>('perfil');
   const customName = typeof user?.unsafeMetadata?.creatorHubDisplayName === 'string' ? user.unsafeMetadata.creatorHubDisplayName : '';
   const alias = customName || user?.fullName?.trim() || user?.firstName?.trim() || user?.username || 'Tu espacio Creator';
   const resolveImage = useMediaResolver();
@@ -350,6 +351,10 @@ export default function CreatorHubPage() {
             <div className="space-y-2">
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline underline-offset-4 hover:text-foreground">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
             </div>
+            <nav aria-label="Secciones de Creator Hub" className="grid grid-cols-4 gap-1 rounded-2xl border border-border bg-secondary/30 p-1.5">
+              {([{id:'perfil',label:'Perfil',Icon:UserRound},{id:'explorar',label:'Explorar',Icon:Compass},{id:'mensajes',label:'Mensajes',Icon:MessagesSquare},{id:'ajustes',label:'Ajustes',Icon:Settings2}] as const).map(tab => <button key={tab.id} type="button" aria-current={hubTab === tab.id ? 'page' : undefined} onClick={() => setHubTab(tab.id)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] sm:flex-row sm:gap-2 sm:text-sm ${hubTab === tab.id ? 'bg-primary/15 font-semibold text-primary' : 'text-muted-foreground hover:bg-secondary'}`}><tab.Icon size={17}/><span>{tab.label}</span></button>)}
+            </nav>
+            {hubTab === 'ajustes' && <div className="space-y-4">
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <h3 className="font-semibold">Privacidad de Creator Hub</h3>
               {!socialReady ? <p className="text-sm text-muted-foreground">Los ajustes sociales estarán disponibles cuando se habilite el servidor de Creator Hub.</p> : <>
@@ -363,9 +368,11 @@ export default function CreatorHubPage() {
                     <option value="everyone">Todos</option><option value="requests">Solicitudes · revisar antes de aceptar</option><option value="nobody">Nadie puede iniciar un chat</option>
                   </select>
                 </label>
-                <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil. Los mensajes estarán disponibles cuando se habilite su sistema de moderación.</p>
+                <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil.</p>
               </>}
             </div>
+            </div>}
+            {hubTab === 'explorar' && <div className="space-y-4">
             <div className="rounded-2xl border border-border p-4 space-y-3">
               <h3 className="font-semibold">Buscar personas</h3>
               <div className="flex gap-2"><input aria-label="Buscar por nombre o arroba" value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder="Nombre o @usuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">Buscar</button></div>
@@ -377,6 +384,9 @@ export default function CreatorHubPage() {
                 </div>
               ))}
             </div>
+            </div>}
+            {hubTab === 'mensajes' && <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2"><h3 className="text-lg font-semibold">Tus mensajes</h3><button type="button" className="text-xs text-primary" onClick={() => setHubTab('explorar')}>Buscar personas</button></div>
             {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
               <div className="flex items-center justify-between"><h3 className="font-semibold">Chat con {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">Actualizar</button></div>
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
@@ -411,8 +421,10 @@ export default function CreatorHubPage() {
                   ))}
                 </div>
               ))}
-              <p className="text-xs text-muted-foreground">La mensajería real se habilitará después de validar sus controles de privacidad.</p>
+              <p className="text-xs text-muted-foreground">Las solicitudes nuevas aparecen aquí.</p>
             </div>
+            </div>}
+            {hubTab === 'perfil' && <>
             <div className="border-t border-border pt-5">
               <div className="grid grid-cols-2 gap-3">
                 <button type="button" disabled title="Las solicitudes de acceso todavía no están habilitadas" className="rounded-full bg-secondary px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70">Solicitar acceso</button>
@@ -424,6 +436,7 @@ export default function CreatorHubPage() {
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Los personajes y universos compartidos solo serán visibles después de que el creador autorice el acceso.</p>
               </div>
             </div>
+            </>}
           </div>
         </section>
         <p className="mx-auto mt-4 flex max-w-5xl items-start gap-2 px-6 pb-4 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. Las solicitudes de acceso y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
