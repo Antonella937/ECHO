@@ -128,6 +128,7 @@ export function createSupabaseStorageRouter(): IRouter {
         "audio/webm": "webm", "audio/ogg": "ogg" } as Record<string, string>)[mime];
       form.append("file", new Blob([new Uint8Array(bytes)], { type: mime }), `voice.${ext}`);
       form.append("model", "whisper-large-v3-turbo");
+      form.append("language", "es");
       form.append("response_format", "json");
       const result = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
         method: "POST", headers: { Authorization: `Bearer ${groqKey}` }, body: form,
