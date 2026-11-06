@@ -13,6 +13,8 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
   const chunks = useRef<Blob[]>([]);
   const started = useRef(0);
   const cancelled = useRef(false);
+  const generation = useRef(0);
+  const mounted = useRef(true);
   const doneRef = useRef(onDone); doneRef.current = onDone;
   const errRef = useRef(onError); errRef.current = onError;
 
@@ -30,14 +32,20 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
     if (rec.current && rec.current.state !== 'inactive') rec.current.stop(); else cleanup();
   }, [cleanup]);
 
-  const cancel = useCallback(() => { cancelled.current = true; chunks.current = []; stop(); }, [stop]);
+  const cancel = useCallback(() => { generation.current += 1; cancelled.current = true; chunks.current = []; stop(); }, [stop]);
 
   const start = useCallback(async () => {
+    if (rec.current || stream.current) return;
+    const requestId = ++generation.current;
     const sup = recorderSupport();
     if (!sup.ok) { errRef.current(sup.reason); return; }
     setStatus('requesting');
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mounted.current || requestId !== generation.current) {
+        s.getTracks().forEach(track => track.stop());
+        return;
+      }
       stream.current = s;
       const r = new MediaRecorder(s, { mimeType: sup.mimeType });
       rec.current = r; chunks.current = []; cancelled.current = false;
@@ -57,6 +65,7 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
       timers.current.push(window.setInterval(() => setElapsed((Date.now() - started.current) / 1000), 250));
       timers.current.push(window.setTimeout(() => { if (r.state !== 'inactive') r.stop(); }, MAX_RECORDING_MS));
     } catch (e) {
+      if (!mounted.current || requestId !== generation.current) return;
       cleanup();
       const name = (e as DOMException)?.name;
       errRef.current(name === 'NotAllowedError' || name === 'SecurityError' ? 'Permiso de micrófono denegado. Activalo en los ajustes del navegador.'
@@ -65,6 +74,8 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
   }, [cleanup]);
 
   useEffect(() => () => {
+    mounted.current = false;
+    generation.current += 1;
     cancelled.current = true;
     if (rec.current && rec.current.state !== 'inactive') { rec.current.onstop = null; rec.current.stop(); }
     timers.current.forEach(t => { window.clearInterval(t); window.clearTimeout(t); });
