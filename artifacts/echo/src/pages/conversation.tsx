@@ -250,8 +250,8 @@ export default function ConversationPage() {
               <li key={p.key} className={cn('relative shrink-0 overflow-hidden rounded-xl border bg-card', p.error ? 'border-destructive' : 'border-border')} data-testid={`pending-attachment-${p.key}`}>
                 {p.kind === 'image' && <img src={p.preview} alt="" className="h-20 w-20 object-cover" />}
                 {p.kind === 'video' && <video src={p.preview} muted playsInline preload="metadata" className="h-20 w-20 object-cover" />}
-                {p.kind === 'audio' && <VoicePreview src={p.preview} durationSeconds={p.durationSeconds} uploading={p.uploading} error={p.error} onDiscard={() => remove(p.key)} />}
-                {p.error && <button type="button" onClick={() => retryUpload(p.key)} className="mx-2 mb-1 rounded-md bg-secondary px-2 py-1 text-xs font-semibold" data-testid={`button-retry-attachment-${p.key}`}>Reintentar subida</button>}
+                {p.kind === 'audio' && <VoicePreview src={p.preview} durationSeconds={p.durationSeconds} uploading={p.uploading} error={p.error} onRetry={() => retryUpload(p.key)} onDiscard={() => remove(p.key)} />}
+                {p.kind !== 'audio' && p.error && <button type="button" onClick={() => retryUpload(p.key)} className="mx-2 mb-1 rounded-md bg-secondary px-2 py-1 text-xs font-semibold" data-testid={`button-retry-attachment-${p.key}`}>Reintentar subida</button>}
                 {(p.uploading || p.error) && (
                   <span className={cn('absolute inset-x-0 bottom-0 px-1.5 py-0.5 text-[10px]', p.error ? 'bg-destructive text-destructive-foreground' : 'bg-background/80 text-muted-foreground')}>
                     {p.error ? 'Error al subir' : 'Subiendo…'}
