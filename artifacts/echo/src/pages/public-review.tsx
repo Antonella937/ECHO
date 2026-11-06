@@ -21,7 +21,7 @@ export function PublicReviewHub() {
     <main className="echo-public ep-review-hub">
       <div className="ep-wrap">
         <header className="ep-nav">
-          <span className="ep-brand"><span className="ep-mark" aria-hidden="true">e</span><span>ECHO</span></span>
+          <span className="ep-brand"><span className="ep-mark" aria-hidden="true"><span>e</span></span><span>ECHO</span></span>
           <span className="ep-review-badge"><Eye size={14} /> Modo revisión</span>
         </header>
         <section className="ep-review-intro">
