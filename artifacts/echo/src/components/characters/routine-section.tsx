@@ -1,3 +1,4 @@
+import { useCharacterOptionText } from '@/lib/character-option-translations';
 import { useCharacterActivityText } from '@/lib/character-activity-translations';
 import { Plus, Trash2 } from 'lucide-react';
 import { Field, inputCls } from '@/components/echo/field';
@@ -10,6 +11,7 @@ const ACTIVITIES = { sleep: 'Dormir', work: 'Trabajo', study: 'Estudio', meal: '
 
 export function RoutineSection({ config, set }: SectionProps) {
   const t = useCharacterActivityText();
+  const optionText = useCharacterOptionText();
   const r = config.routine;
   const upR = (patch: Partial<typeof r>) => set((c) => ({ ...c, routine: { ...c.routine, ...patch } }));
   const up = (id: string, patch: Partial<Entry>) => set((c) => ({ ...c, routine: { ...c.routine, entries: c.routine.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) } }));
@@ -59,7 +61,7 @@ export function RoutineSection({ config, set }: SectionProps) {
           {e.end <= e.start && <p className="mt-1.5 px-1 text-xs text-primary">{t("Termina al día siguiente (horario nocturno).")}</p>}
           <div className="grid grid-cols-2 gap-3">
             <Text id={`rt-loc-${e.id}`} label={t("Lugar")} value={e.location} onChange={(location) => up(e.id, { location })} max={500} testId={`input-routine-location-${e.id}`} />
-            <Select id={`rt-flex-${e.id}`} label={t("Flexibilidad")} value={e.flexibility} onChange={(flexibility) => up(e.id, { flexibility })} options={level} />
+            <Select id={`rt-flex-${e.id}`} label={t("Flexibilidad")} value={e.flexibility} onChange={(flexibility) => up(e.id, { flexibility })} options={Object.fromEntries(Object.entries(level).map(([key, value]) => [key, optionText(value)])) as typeof level} />
           </div>
         </div>
       ))}
