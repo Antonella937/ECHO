@@ -28,9 +28,9 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
   const voice = voices[input.voiceId];
   if (!voice || !input.text.trim() || input.text.length > 500) return;
   const endpoint = process.env.ECHO_KOKORO_TTS_URL;
-  const base = process.env.SUPABASE_URL?.replace(/\\/$/, "");
+  const base = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!endpoint || !base || !key || !/^https:\/\/[a-z0-9-]+\\.supabase\\.co$/.test(base)) return;
+  if (!endpoint || !base || !key || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base)) return;
   const url = new URL(endpoint);
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return;
   const reserved = await db.transaction(async tx => {
