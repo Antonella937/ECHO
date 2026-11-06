@@ -1,5 +1,5 @@
 import { Link } from 'wouter';
-import { Bell, Send, Palette } from 'lucide-react';
+import { Bell, Send } from 'lucide-react';
 import { StoryRail } from '@/components/echo/story-rail';
 import { PostCard } from '@/components/echo/post-card';
 import { EmptyState } from '@/components/echo/skeletons';
@@ -14,7 +14,6 @@ export default function HomePage() {
       <header className="sticky top-0 z-30 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="relative flex h-16 items-center justify-center px-3">
           <h1 className="wordmark text-[30px] leading-none text-foreground" data-testid="text-wordmark">ECHO</h1>
-          <Link href="/creator-hub" aria-label="Creator Hub" className="absolute left-2 inline-flex h-11 items-center gap-1.5 rounded-full px-2 text-xs font-semibold text-primary hover:bg-secondary" data-testid="link-home-creator-hub"><Palette className="h-5 w-5" strokeWidth={1.7} /><span className="hidden sm:inline">Creator Hub</span></Link>
           <div className="absolute right-2 flex items-center lg:hidden">
             <Link href="/notifications" aria-label="Avisos" className="tap relative grid h-11 w-11 place-items-center rounded-full" data-testid="link-header-notifications">
               <Bell className="h-6 w-6" strokeWidth={1.5} />
