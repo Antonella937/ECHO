@@ -106,6 +106,8 @@ export interface Story {
 }
 
 export interface Message {
+  editedAt?: ISODate;
+  savedByIds?: string[];
   /** Per-character visibility only. Never removes the other participant's copy. */
   hiddenForIds?: string[];
   quoteMessageId?: string;
