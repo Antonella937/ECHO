@@ -49,16 +49,6 @@ export function PlanAndQuotaSettings() {
       <Link href="/creator-preview/universes" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card/60 p-3 text-center text-xs font-semibold"><Plus className="h-4 w-4" /> Crear universo</Link>
     </div>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
-      <h3 className="text-sm font-semibold">Ampliar tu capacidad</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Próximamente podrás sumar espacios mensuales sin cambiar de plan. Todavía no hay compras ni cobros habilitados.</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" disabled className="rounded-xl border border-border px-3 py-3 text-xs font-semibold opacity-60">+1 espacio de personaje · Próximamente</button>
-        <button type="button" disabled className="rounded-xl border border-border px-3 py-3 text-xs font-semibold opacity-60">+1 espacio de mundo · Próximamente</button>
-      </div>
-      <p className="mt-3 text-[11px] text-muted-foreground">Los espacios adicionales se podrán archivar al vencer, sin borrar inmediatamente los personajes ni sus recuerdos.</p>
-    </div>
-  </section>;
-}    <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <h3 className="text-sm font-semibold">Ampliar mi universo</h3>
       <p className="mt-1 text-xs text-muted-foreground">Espacios adicionales mensuales, independientes del plan principal.</p>
       {([['character', '+1 personaje'], ['world', '+1 mundo']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="mt-3 flex min-h-14 w-full items-center justify-between rounded-xl border border-border px-3 text-left text-sm font-semibold"><span><Plus className="mr-2 inline h-4 w-4" />{label}</span><ChevronRight className="h-4 w-4" /></button>)}
