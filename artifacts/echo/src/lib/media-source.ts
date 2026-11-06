@@ -8,7 +8,7 @@ export type MediaSource = {
 };
 export type MediaScope = { universeId: string; state: SocialState };
 export type MediaHint = Pick<MediaSource, 'sourceType' | 'sourceContentId'> &
-  Partial<Pick<MediaSource, 'sourceCharacterId'>>;
+  Partial<Pick<MediaSource, 'sourceUniverseId' | 'sourceCharacterId'>>;
 
 /** Only local protected references receive context; never send identities to third parties. */
 export function objectPathForMedia(ref: string): string | null {
@@ -21,7 +21,7 @@ export function objectPathForMedia(ref: string): string | null {
 /** Resolve actual associations from the currently loaded universe, never a global ID lookup. */
 export function mediaSourceFor(scope: MediaScope | null, ref: string, hint?: MediaHint): MediaSource | undefined {
   const path = objectPathForMedia(ref);
-  if (!scope || !path) return undefined;
+  if (!scope || !path || (hint?.sourceUniverseId && hint.sourceUniverseId !== scope.universeId)) return undefined;
   const matches = (value: string | undefined) => value !== undefined && objectPathForMedia(value) === path;
   const make = (sourceType: MediaSource['sourceType'], sourceCharacterId: string, sourceContentId: string): MediaSource =>
     ({ sourceUniverseId: scope.universeId, sourceCharacterId, sourceType, sourceContentId });
