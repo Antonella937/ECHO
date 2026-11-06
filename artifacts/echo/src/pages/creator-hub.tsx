@@ -263,7 +263,7 @@ export default function CreatorHubPage() {
         }
         throw new Error('Unable to register a unique Creator Hub username');
       })
-      .catch(() => { if (active) setSocialReady(false); });
+      .catch(() => { if (active) { setSocialReady(false); setProfileError(ht('No pudimos registrar el perfil para que aparezca en las búsquedas. Intentá recargar Creator Hub.')); } });
     return () => { active = false; };
   }, [user?.id]);
   async function saveSocialPreferences(visibility: 'private' | 'public', messagePrivacy: 'everyone' | 'requests' | 'nobody') {
@@ -305,7 +305,8 @@ export default function CreatorHubPage() {
     if (peopleQuery.trim().length < 2) return;
     setPeopleBusy(true); setPeopleFeedback(''); setPeopleResults([]); setSelectedPersonId(null);
     try {
-      const data = await customFetch<{ profiles: typeof peopleResults }>('/api/creator-hub/social/search?q=' + encodeURIComponent(peopleQuery.trim()), { responseType: 'json' });
+      const normalizedQuery = peopleQuery.trim().replace(/^@+/, '');
+      const data = await customFetch<{ profiles: typeof peopleResults }>('/api/creator-hub/social/search?q=' + encodeURIComponent(normalizedQuery), { responseType: 'json' });
       setPeopleResults(data.profiles);
       if (data.profiles.length === 0) setPeopleFeedback(ht("No encontramos perfiles con ese nombre. La otra persona debe abrir Creator Hub al menos una vez."));
     } catch { setPeopleFeedback(ht("No pudimos buscar personas.")); }
