@@ -304,7 +304,7 @@ export async function runAutonomyLiveCycle(
     );
     const opportunity = chooseAutonomyOpportunity({
       state, character, history, now, random: dependencies.random,
-      minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: control.maxActionsPerDay,
+      minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: control.maxActionsPerDay, lane: dependencies.lane,
     });
     if (dependencies.lane === "dm" && opportunity.situation !== "dm") {
       await dependencies.repository.complete(ownerId, runId, { status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null }, universeId);
