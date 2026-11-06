@@ -158,3 +158,16 @@ test('catálogo gratuito: guarda voz elegida en el contrato sin alterar personal
   invalid.characters.find(c => c.id === character.id)!.configuration!.voice.basicVoiceId = 'unknown-provider-voice';
   assert.equal(SaveUniverseBody.safeParse({ state: invalid, expectedRevision: 0 }).success, false);
 });
+
+test('identidad visual: conserva descripciones y cambios independientes entre editores', () => {
+  let state = fixture();
+  const character = row(state, 'mar');
+  const original = accountFormValues(character);
+  const first = { ...original, identity: { ...character.identity, facialDescription: 'Ojos verdes', updatedAt: '2026-11-06T12:00:00.000Z' } };
+  state = editAccount(state, character.id, first, original);
+  const second = { ...original, identity: { ...character.identity, bodyDescription: 'Cabello oscuro', updatedAt: '2026-11-06T12:01:00.000Z' } };
+  state = editAccount(state, character.id, second, original);
+  assert.equal(row(state, 'mar').identity.facialDescription, 'Ojos verdes');
+  assert.equal(row(state, 'mar').identity.bodyDescription, 'Cabello oscuro');
+  assert.equal(SaveUniverseBody.parse({ state, expectedRevision: 1 }).state.characters.find(c => c.id === 'mar')!.identity.bodyDescription, 'Cabello oscuro');
+});
