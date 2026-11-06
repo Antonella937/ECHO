@@ -229,7 +229,40 @@ export default function CreatorHubPage() {
     if (!user?.id) return;
     let active = true;
     void customFetch<{ profile: { visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null }>('/api/creator-hub/social/me', { responseType: 'json' })
-      .then(data => { if (active) { setSocialProfile(data.profile); if (data.profile && 'username' in data.profile && typeof data.profile.username === 'string') setRegisteredUsername(data.profile.username); setSocialReady(true); } })
+      .then(async data => {
+        if (!active) return;
+        if (data.profile) {
+          setSocialProfile(data.profile);
+          if ('username' in data.profile && typeof data.profile.username === 'string') setRegisteredUsername(data.profile.username);
+          setSocialReady(true);
+          return;
+        }
+        // An existing ECHO account must be discoverable without manually saving
+        // Creator Hub settings. Keep new profiles private by default.
+        const base = (savedUsername || user.username || defaultUsername)
+          .toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 30);
+        const candidate = /^[a-z0-9._]{3,30}$/.test(base) ? base : 'creator';
+        const suffix = user.id.replace(/[^a-z0-9]/gi, '').slice(-8).toLowerCase();
+        const candidates = [candidate, (candidate.slice(0, 21) + '_' + suffix).slice(0, 30)];
+        for (const next of candidates) {
+          try {
+            const registered = await customFetch<{ profile: { username: string; visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } }>('/api/creator-hub/social/me', {
+              method: 'PUT', responseType: 'json',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ displayName: alias, username: next, visibility: 'private', messagePrivacy: 'requests', bio: savedBio }),
+            });
+            if (active) {
+              setSocialProfile(registered.profile);
+              setRegisteredUsername(registered.profile.username);
+              setSocialReady(true);
+            }
+            return;
+          } catch (cause) {
+            if (!String(cause).includes('409') && !String(cause).includes('USERNAME_ALREADY_IN_USE')) throw cause;
+          }
+        }
+        throw new Error('Unable to register a unique Creator Hub username');
+      })
       .catch(() => { if (active) setSocialReady(false); });
     return () => { active = false; };
   }, [user?.id]);
@@ -274,6 +307,7 @@ export default function CreatorHubPage() {
     try {
       const data = await customFetch<{ profiles: typeof peopleResults }>('/api/creator-hub/social/search?q=' + encodeURIComponent(peopleQuery.trim()), { responseType: 'json' });
       setPeopleResults(data.profiles);
+      if (data.profiles.length === 0) setPeopleFeedback(ht("No encontramos perfiles con ese nombre. La otra persona debe abrir Creator Hub al menos una vez."));
     } catch { setPeopleFeedback(ht("No pudimos buscar personas.")); }
     finally { setPeopleBusy(false); }
   }
