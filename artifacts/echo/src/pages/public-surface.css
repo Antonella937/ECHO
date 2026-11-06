@@ -251,3 +251,7 @@ textarea.ep-field-control { resize: vertical; min-height: 92px; }
 @media (prefers-reduced-motion: reduce) {
   .echo-public *, .echo-public *::before, .echo-public *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Optically center Instrument Serif's lowercase e inside the ECHO mark. */
+.ep-mark { line-height: 1; padding-top: 0; }
+.ep-mark { text-indent: 0; }
