@@ -364,6 +364,7 @@ export const GetAutonomySettingsResponse = zod.object({
   "displayName": zod.string(),
   "username": zod.string(),
   "enabled": zod.boolean(),
+  "dmEnabled": zod.boolean(),
   "maxActionsPerDay": zod.number().int().min(1).max(getAutonomySettingsResponseCharactersItemMaxActionsPerDayMax),
   "minCooldownMinutes": zod.number().int().min(getAutonomySettingsResponseCharactersItemMinCooldownMinutesMin).max(getAutonomySettingsResponseCharactersItemMinCooldownMinutesMax)
 }))
@@ -389,6 +390,7 @@ export const UpdateAutonomySettingsBody = zod.union([zod.object({
 }),zod.object({
   "characterId": zod.string().min(1).max(updateAutonomySettingsBodyTwoCharacterIdMax),
   "enabled": zod.boolean(),
+  "lane": zod.enum(["social", "dm"]).optional(),
   "universeId": zod.string().min(1).max(updateAutonomySettingsBodyTwoUniverseIdMax).default(updateAutonomySettingsBodyTwoUniverseIdDefault)
 })])
 
