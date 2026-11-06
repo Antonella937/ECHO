@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, echoMediaTable, echoVoiceBudgetsTable, echoVoiceUsageTable, echoUniversesTable } from "@workspace/db";
 import { SaveUniverseBody } from "@workspace/api-zod";
+import { canUseBasicVoices } from "../lib/entitlements";
 
 const voices: Record<string, string> = {
   "echo-f-01": "af_heart", "echo-f-02": "af_bella", "echo-f-03": "af_nicole",
@@ -11,6 +12,7 @@ const voices: Record<string, string> = {
 const month = () => new Date().toISOString().slice(0, 7);
 
 export async function getVoiceOwnerControls(ownerId: string) {
+  if (!await canUseBasicVoices(ownerId)) return null;
   const [row] = await db.select().from(echoVoiceBudgetsTable).where(eq(echoVoiceBudgetsTable.ownerId, ownerId)).limit(1);
   const enabled = row?.enabled === true && !!process.env.ECHO_KOKORO_TTS_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!enabled) return null;
@@ -25,6 +27,7 @@ export async function getVoiceOwnerControls(ownerId: string) {
 
 /** Atomic reservation before any provider request; failed jobs retain their reservation to avoid retry charges. */
 export async function dispatchAutonomousVoice(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }) {
+  if (!await canUseBasicVoices(input.ownerId)) return;
   const voice = voices[input.voiceId];
   if (!voice || !input.text.trim() || input.text.length > 500) return;
   const endpoint = process.env.ECHO_KOKORO_TTS_URL;
