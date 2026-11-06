@@ -4,6 +4,7 @@ import { formatDuration } from '@/lib/dm-attachments';
 import { cn } from '@/lib/utils';
 
 const SPEEDS = [1, 1.5, 2] as const;
+const AUDIO_PLAY_EVENT = 'echo:audio-message-play';
 
 /** Browser-native audio playback; the source is resolved through authenticated private media. */
 export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId }: {
@@ -18,6 +19,15 @@ export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId }:
   const [duration, setDuration] = useState(durationSeconds ?? 0);
   const [speed, setSpeed] = useState<number>(1);
   const [error, setError] = useState(false);
+  const playerId = useRef(crypto.randomUUID());
+
+  useEffect(() => {
+    const pauseOther = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== playerId.current) audioRef.current?.pause();
+    };
+    window.addEventListener(AUDIO_PLAY_EVENT, pauseOther);
+    return () => { audioRef.current?.pause(); window.removeEventListener(AUDIO_PLAY_EVENT, pauseOther); };
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -34,7 +44,11 @@ export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId }:
     const audio = audioRef.current;
     if (!audio || !src) return;
     if (!audio.paused) { audio.pause(); return; }
-    try { setError(false); await audio.play(); }
+    try {
+      setError(false);
+      window.dispatchEvent(new CustomEvent(AUDIO_PLAY_EVENT, { detail: playerId.current }));
+      await audio.play();
+    }
     catch { setError(true); setPlaying(false); }
   };
 
