@@ -1,5 +1,5 @@
 import { useUser } from '@clerk/react';
-import { ArrowLeft, ExternalLink, ImagePlus, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ExternalLink, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
 import { Link } from 'wouter';
 
 /**
@@ -11,8 +11,10 @@ export default function CreatorHubPage() {
   const { user } = useUser();
   const alias = user?.fullName?.trim() || user?.firstName?.trim() || user?.username || 'Tu espacio Creator';
   const username = user?.username || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'creator';
-  const initials = alias.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || 'E';
-  const avatar = user?.imageUrl;
+  const nameParts = alias.split(/\s+/).filter(Boolean);
+  const initials = nameParts.length > 1
+    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+    : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
       <header className="absolute left-0 right-0 top-0 z-20 flex items-center gap-3 px-4 pb-4 pt-safe text-foreground">
@@ -22,12 +24,11 @@ export default function CreatorHubPage() {
       <div className="px-4">
         <section className="overflow-hidden rounded-[28px] border border-border bg-card" aria-label="Perfil Creator Hub">
           <div className="flex h-56 flex-col items-center justify-center gap-2 pt-12 sm:h-72 lg:h-80 bg-[linear-gradient(130deg,hsl(263_18%_19%),hsl(336_15%_16%))] text-muted-foreground">
-            <ImagePlus size={27} strokeWidth={1.5} />
-            <span className="text-sm">Banner opcional</span>
+            <span className="select-none text-[clamp(4rem,14vw,9rem)] font-black tracking-[-0.08em] text-white/20" aria-hidden="true">{initials}</span>
           </div>
           <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-10">
             <div className="flex items-center gap-3">
-              {avatar ? <img src={avatar} alt="" className="h-20 w-20 shrink-0 rounded-full border-4 border-background object-cover sm:h-28 sm:w-28" /> : <span className="grid h-20 w-20 shrink-0 place-items-center rounded-full border-4 border-background bg-secondary text-2xl font-semibold sm:h-28 sm:w-28">{initials}</span>}
+              <span className="grid h-20 w-20 shrink-0 place-items-center rounded-full border-4 border-background bg-secondary text-2xl font-semibold sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}: ${initials}`}>{initials}</span>
               <div className="min-w-0 flex-1"><h2 className="truncate text-2xl font-semibold sm:text-3xl">{alias}</h2><p className="truncate text-sm text-muted-foreground">@{username}</p></div>
               <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">Perfil privado</span>
             </div>
