@@ -8,6 +8,7 @@ import { createSupabaseStorageRouter } from "./supabase-storage";
 import charactersRouter from "./characters";
 import aiEngineRouter from "./ai-engine";
 import basicVoiceRouter from "./basic-voice";
+import entitlementsRouter from "./entitlements";
 import autonomyRouter from "./autonomy";
 import creatorRouter from "./creator";
 import { characterPrivacyRouter } from "./character-privacy";
@@ -29,6 +30,7 @@ router.use(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
 router.use(charactersRouter);
 router.use(aiEngineRouter);
 router.use(basicVoiceRouter);
+router.use(entitlementsRouter);
 router.use(autonomyRouter);
 router.use(creatorRouter);
 router.use(characterPrivacyRouter);
