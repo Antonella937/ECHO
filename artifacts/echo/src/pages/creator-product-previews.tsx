@@ -148,6 +148,7 @@ export function CreatorAccountPreview() {
 }
 
 export function CreatorUniversePreview() {
+  const t = useCreatorPreviewText();
   const { isLoaded, isSignedIn, user } = useUser();
   const accountQuery = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? accountQuery.data : undefined;
@@ -161,7 +162,7 @@ export function CreatorUniversePreview() {
   const universes = universesQuery.data ?? [];
   const activeUniverse = isSignedIn ? activeUniverseQuery.data?.state ?? null : null;
   const universeMetadata = universes.find(universe => universe.universeId === activeUniverseId);
-  const universeName = universeMetadata?.name ?? activeUniverse?.creatorSetup?.universeName ?? (account ? '' : 'Casa de papel');
+  const universeName = universeMetadata?.name ?? activeUniverse?.creatorSetup?.universeName ?? (account ? '' : t('Casa de papel'));
   const slots = account ? Array.from({ length: Math.min(account.maxCharacters, 25) },
     (_, index) => index < account.characterCount) : [true, true, true, false, false];
   const createUniverse = useCreateCreatorUniverse();
@@ -176,7 +177,7 @@ export function CreatorUniversePreview() {
   const addUniverse = async () => {
     if (!isSignedIn || !user) return;
     if (account && account.universeCount >= account.maxUniverses) { navigate('/creator-preview/limit'); return; }
-    const name = window.prompt('Nombre del nuevo universo');
+    const name = window.prompt(t('Nombre del nuevo universo'));
     if (!name?.trim()) return;
     setActionError(null);
     try {
@@ -202,33 +203,33 @@ export function CreatorUniversePreview() {
   return (
     <PreviewShell>
       <PreviewHeading
-        eyebrow="Tu universo · personajes"
-        title="Un lugar para"
-        accent="cada personaje."
-        description={account ? 'Tus universos y personajes, con capacidad sincronizada desde tu cuenta.' : 'Una composición de muestra para visualizar cómo se organiza un universo y sus personajes.'}
+        eyebrow={t("Tu universo · personajes")}
+        title={t("Un lugar para")}
+        accent={t("cada personaje.")}
+        description={account ? t("Tus universos y personajes, con capacidad sincronizada desde tu cuenta.") : t("Una composición de muestra para visualizar cómo se organiza un universo y sus personajes.")}
       />
-      <PreviewNotice>{account ? 'Datos privados de tu cuenta. Los extras mostrados no están disponibles para compra todavía.' : 'Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.'}</PreviewNotice>
-      <section className="epc-universe-board" aria-label="Ilustración de gestión de universo">
+      <PreviewNotice>{account ? t("Datos privados de tu cuenta. Los extras mostrados no están disponibles para compra todavía.") : t("Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.")}</PreviewNotice>
+      <section className="epc-universe-board" aria-label={t("Ilustración de gestión de universo")}>
         <div className="epc-universe-sidebar">
           <UniverseCover name={universeName} />
-          <span className="epc-overline">{account ? 'TU UNIVERSO ACTIVO' : 'UNIVERSO DE EJEMPLO'}</span>
-          <h2>{universeName || 'Mi universo'}</h2>
-          <p>Un espacio privado para reunir personajes, ideas y conversaciones.</p>
+          <span className="epc-overline">{account ? t("TU UNIVERSO ACTIVO") : t("UNIVERSO DE EJEMPLO")}</span>
+          <h2>{universeName || t('Mi universo')}</h2>
+          <p>{t("Un espacio privado para reunir personajes, ideas y conversaciones.")}</p>
           <div className="epc-universe-stats">
-            <div><span>Universos usados</span><strong>{account ? `${account.universeCount} ` : '1 '}<small>/ {account?.maxUniverses ?? 1}</small></strong></div>
-            <div><span>Personajes usados</span><strong>{account ? `${account.characterCount} ` : '3 '}<small>/ {account?.maxCharacters ?? 5}</small></strong></div>
+            <div><span>{t("Universos usados")}</span><strong>{account ? `${account.universeCount} ` : '1 '}<small>/ {account?.maxUniverses ?? 1}</small></strong></div>
+            <div><span>{t("Personajes usados")}</span><strong>{account ? `${account.characterCount} ` : '3 '}<small>/ {account?.maxCharacters ?? 5}</small></strong></div>
           </div>
-          <div className="epc-slot-label"><span>{account ? 'Capacidad de personajes' : 'Capacidad de ejemplo'}</span><span>{account ? `${account.characterCount} de ${account.maxCharacters}` : '3 de 5'}</span></div>
-          <div className="epc-slots" aria-label="Capacidad de personajes">
+          <div className="epc-slot-label"><span>{account ? t("Capacidad de personajes") : t("Capacidad de ejemplo")}</span><span>{account ? `${account.characterCount} ${t('de')} ${account.maxCharacters}` : `3 ${t('de')} 5`}</span></div>
+          <div className="epc-slots" aria-label={t("Capacidad de personajes")}>
             {slots.map((filled, index) => <i key={index} className={filled ? 'is-filled' : ''} />)}
           </div>
           {account && <button type="button" className="epc-caption" onClick={() => void addUniverse()} disabled={createUniverse.isPending}>
-            {createUniverse.isPending ? 'Creando…' : account.universeCount >= account.maxUniverses ? 'Cupo de universos alcanzado' : 'Añadir universo'}
+            {createUniverse.isPending ? t("Creando…") : account.universeCount >= account.maxUniverses ? t("Cupo de universos alcanzado") : t("Añadir universo")}
           </button>}
-          {!account && <small className="epc-caption">Muestra conceptual de Free</small>}
+          {!account && <small className="epc-caption">{t("Muestra conceptual de Free")}</small>}
         </div>
         <div className="epc-characters-area">
-          <div className="epc-characters-head"><div><span className="ep-overline">COLECCIÓN</span><h2>{t("Personajes")}</h2></div>{!account && <span className="epc-example-tag">EJEMPLO</span>}</div>
+          <div className="epc-characters-head"><div><span className="ep-overline">{t("COLECCIÓN")}</span><h2>{t("Personajes")}</h2></div>{!account && <span className="epc-example-tag">{t("EJEMPLO")}</span>}</div>
           <div className="epc-character-list">
             {account && activeUniverse ? activeUniverse.characters.filter(character => !character.archived).map(character => (
               <Link href={`/profile/${character.id}`} className="epc-character-row" key={character.id} data-testid={`link-creator-character-${character.id}`}>
@@ -237,22 +238,22 @@ export function CreatorUniversePreview() {
                 <ChevronRight size={16} aria-hidden="true" />
               </Link>
             )) : [
-              { monogram: 'A', label: 'Personaje de muestra A', tint: 'rose' },
-              { monogram: 'B', label: 'Personaje de muestra B', tint: 'lilac' },
-              { monogram: 'C', label: 'Personaje de muestra C', tint: 'sand' },
+              { monogram: 'A', label: t("Personaje de muestra A"), tint: 'rose' },
+              { monogram: 'B', label: t("Personaje de muestra B"), tint: 'lilac' },
+              { monogram: 'C', label: t("Personaje de muestra C"), tint: 'sand' },
             ].map(character => (
               <div className="epc-character-row" key={character.monogram}>
                 <span className={`epc-character-avatar ${character.tint}`} aria-hidden="true">{character.monogram}</span>
-                <span className="epc-character-name">{character.label}<small>Perfil privado · muestra</small></span>
+                <span className="epc-character-name">{character.label}<small>{t("Perfil privado · muestra")}</small></span>
                 <ChevronRight size={16} aria-hidden="true" />
               </div>
             ))}
           </div>
-          <button className="epc-add-character" type="button" disabled={!account} onClick={createCharacter} aria-label="Añadir personaje">
-            <span><Plus size={16} /></span><strong>Añadir personaje</strong><small>{account ? atCharacterLimit ? 'Límite alcanzado' : 'En este universo' : 'Acción ilustrativa'}</small>
+          <button className="epc-add-character" type="button" disabled={!account} onClick={createCharacter} aria-label={t("Añadir personaje")}>
+            <span><Plus size={16} /></span><strong>{t("Añadir personaje")}</strong><small>{account ? atCharacterLimit ? t('Límite alcanzado') : t('En este universo') : t('Acción ilustrativa')}</small>
           </button>
           {actionError && <p role="alert" className="epc-subtle-note">{actionError}</p>}
-          {account && universes.length > 1 && <div className="epc-character-list" aria-label="Tus universos">
+          {account && universes.length > 1 && <div className="epc-character-list" aria-label={t("Tus universos")}>
             {universes.map(universe => <button key={universe.universeId} type="button" className="epc-character-row w-full text-left"
               onClick={() => {
                 if (user && universe.universeId !== activeUniverseId) {
@@ -261,7 +262,7 @@ export function CreatorUniversePreview() {
                 }
               }}>
               <span className="epc-character-avatar lilac" aria-hidden="true">e</span>
-              <span className="epc-character-name">{universe.name}<small>{universe.characterCount} personajes · {universe.current ? 'Activo' : 'Cambiar'}</small></span>
+              <span className="epc-character-name">{universe.name}<small>{universe.characterCount} personajes · {universe.current ? t("Activo") : t("Cambiar")}</small></span>
               <ChevronRight size={16} aria-hidden="true" />
             </button>)}
           </div>}
@@ -281,7 +282,7 @@ export function CreatorUniversePreview() {
             }) : undefined,
           }))} />
       )}
-      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> {account ? 'Ver mi plan' : 'Ver plan de ejemplo'}</Link></div>
+      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> {account ? t("Ver mi plan") : t("Ver plan de ejemplo")}</Link></div>
     </PreviewShell>
   );
 }
