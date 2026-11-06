@@ -9,7 +9,7 @@ export function BasicFields({ form, setForm, onBusy }: { form: BasicForm; setFor
   const up = (patch: Partial<BasicForm>) => setForm((p) => ({ ...p, ...patch }));
   return (
     <div data-testid="section-character-basic">
-      <AvatarPicker value={form.avatar} onChange={(avatar) => up({ avatar })} onBusy={onBusy} />
+      <AvatarPicker value={form.avatar} name={form.name} onChange={(avatar) => up({ avatar })} onBusy={onBusy} />
       <Text id="character-name" label="Nombre visible" value={form.name} onChange={(name) => up({ name })} max={80} hint={`${form.name.length}/80`} />
       <Field id="character-handle" label="@username" hint="Minúsculas, números, puntos y guiones bajos. Máx. 30.">
         <div className="relative">
