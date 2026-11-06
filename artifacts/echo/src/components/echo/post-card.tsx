@@ -1,3 +1,4 @@
+import { useFeedText } from '@/lib/feed-translations';
 import { useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Pin, Send, UserRound } from 'lucide-react';
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function PostCard({ post, onCommentClick, eager }: Props) {
+  const t = useFeedText();
   const { me, character, actions, state } = useSocial();
   const author = character(post.authorId);
   const [sheet, setSheet] = useState<null | 'comments' | 'likers' | 'share' | 'options'>(null);
@@ -58,8 +60,8 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           <Link href={`/profile/${author.id}`} className="inline-flex items-center gap-1 text-[14.5px] font-semibold">{author.handle}<VerifiedBadge account={author} /></Link>
           {post.location && <Link href={`/search?location=${encodeURIComponent(post.location)}`} className="block truncate text-xs text-muted-foreground" data-testid={`link-post-location-${post.id}`}>{post.location}</Link>}
         </div>
-        {post.pinned && <Pin className="h-4 w-4 text-primary" strokeWidth={1.8} aria-label="Fijada" data-testid={`status-post-pinned-${post.id}`} />}
-        <button onClick={() => setSheet('options')} aria-label="Opciones" className="tap -mr-2 grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:text-foreground" data-testid={`button-options-${post.id}`}>
+        {post.pinned && <Pin className="h-4 w-4 text-primary" strokeWidth={1.8} aria-label={t("Fijada")} data-testid={`status-post-pinned-${post.id}`} />}
+        <button onClick={() => setSheet('options')} aria-label={t("Opciones")} className="tap -mr-2 grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:text-foreground" data-testid={`button-options-${post.id}`}>
           <MoreHorizontal className="h-5 w-5" strokeWidth={1.6} />
         </button>
       </header>
@@ -69,7 +71,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           <PostMediaView
             postId={post.id}
             media={media}
-            alt={post.caption || `Foto de ${author.name}`}
+            alt={post.caption || `${t("Foto de")} ${author.name}`}
             eager={eager}
             onTap={onImageTap}
             overlay={burst > 0 && (
@@ -82,17 +84,17 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
       )}
 
       <div className="flex items-center px-2.5 pt-2">
-        <IconBtn label={liked ? 'Quitar me gusta' : 'Me gusta'} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
+        <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
           <Heart className={cn('h-[25px] w-[25px] transition-transform', liked && 'scale-110 fill-primary text-primary')} strokeWidth={1.6} />
         </IconBtn>
-        <IconBtn label="Comentar" onClick={openComments} testId={`button-comment-${post.id}`}>
+        <IconBtn label={t("Comentar")} onClick={openComments} testId={`button-comment-${post.id}`}>
           <MessageCircle className="h-[24px] w-[24px] -scale-x-100" strokeWidth={1.6} />
         </IconBtn>
-        <IconBtn label="Compartir" onClick={() => setSheet('share')} testId={`button-share-${post.id}`}>
+        <IconBtn label={t("Compartir")} onClick={() => setSheet('share')} testId={`button-share-${post.id}`}>
           <Send className="h-[23px] w-[23px]" strokeWidth={1.6} />
         </IconBtn>
         <span className="flex-1" />
-        <IconBtn label={saved ? 'Quitar de guardados' : 'Guardar'} pressed={saved} onClick={() => actions.toggleSave(post.id)} testId={`button-save-${post.id}`}>
+        <IconBtn label={t(saved ? 'Quitar de guardados' : 'Guardar')} pressed={saved} onClick={() => actions.toggleSave(post.id)} testId={`button-save-${post.id}`}>
           <Bookmark className={cn('h-[24px] w-[24px]', saved && 'fill-foreground')} strokeWidth={1.6} />
         </IconBtn>
       </div>
@@ -100,19 +102,19 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
       <div className="px-4">
         {post.likes.length > 0 ? (
           <button onClick={() => setSheet('likers')} className="text-left text-[14px]" data-testid={`button-likers-${post.id}`}>
-            Le gusta a <span className="font-semibold">{firstLiker?.id === me.id ? 'ti' : firstLiker?.handle}</span>
+            {t('Le gusta a')} <span className="font-semibold">{firstLiker?.id === me.id ? t('ti') : firstLiker?.handle}</span>
             {post.likes.length > 1 && (
               <>
-                {' '}y a <span className="font-semibold">{post.likes.length - 1 === 1 ? '1 persona más' : `${post.likes.length - 1} personas más`}</span>
+                {' '}{t('y a')} <span className="font-semibold">{post.likes.length - 1 === 1 ? `${post.likes.length - 1} ${t(post.likes.length - 1 === 1 ? '1 persona más' : 'personas más')}`}</span>
               </>
             )}
           </button>
         ) : (
-          <p className="text-[14px] text-muted-foreground">Sé la primera persona en darle me gusta</p>
+          <p className="text-[14px] text-muted-foreground">{t("Sé la primera persona en darle me gusta")}</p>
         )}
         <div className="mt-1 flex items-center gap-3 text-[13px] text-muted-foreground">
-          <span data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> me gusta</span>
-          <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.comments, commentCount))}</span> comentarios</span>
+          <span data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> {t("me gusta")}</span>
+          <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.comments, commentCount))}</span> {t("comentarios")}</span>
           <span className="flex-1" />
           <PostMetricsEditor post={post} actualComments={commentCount} />
         </div>
@@ -124,7 +126,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         )}
         {tagged.length > 0 && (
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted-foreground" data-testid={`text-tagged-${post.id}`}>
-            <UserRound className="h-3.5 w-3.5" strokeWidth={1.8} /> Con
+            <UserRound className="h-3.5 w-3.5" strokeWidth={1.8} /> {t("Con")}
             {tagged.map((c, i) => c && (
               <Link key={c.id} href={`/profile/${c.id}`} className="font-semibold text-foreground" data-testid={`link-tagged-${post.id}-${c.id}`}>@{c.handle}{i < tagged.length - 1 ? ',' : ''}</Link>
             ))}
@@ -132,13 +134,13 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         )}
         {commentCount > 0 && (
           <button onClick={openComments} className="mt-1.5 text-[14px] text-muted-foreground" data-testid={`button-view-comments-${post.id}`}>
-            {commentCount === 1 ? 'Ver 1 comentario' : `Ver los ${commentCount} comentarios`}
+            {commentCount === 1 ? t('Ver 1 comentario') : `${t('Ver los')} ${commentCount} ${t('comentarios (ver)')}`}
           </button>
         )}
         <Link href={`/p/${post.id}`} className="mt-1 block text-[11.5px] uppercase tracking-[0.08em] text-muted-foreground/80" data-testid={`link-post-time-${post.id}`}>
-          {timeAgo(post.createdAt)}{post.editedAt ? ' · editada' : ''}
+          {timeAgo(post.createdAt)}{post.editedAt ? t(' · editada') : ''}
         </Link>
-        {post.commentsEnabled === false && <p className="mt-1 text-[12px] text-muted-foreground" data-testid={`status-comments-off-${post.id}`}>Comentarios desactivados</p>}
+        {post.commentsEnabled === false && <p className="mt-1 text-[12px] text-muted-foreground" data-testid={`status-comments-off-${post.id}`}>{t("Comentarios desactivados")}</p>}
       </div>
 
       <CommentsSheet post={post} open={sheet === 'comments'} onClose={() => setSheet(null)} />
