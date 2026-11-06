@@ -23,6 +23,7 @@ export const echoAutonomyCharactersTable = pgTable("echo_ai_autonomy_characters"
   universeId: text("universe_id").notNull().default("primary"),
   characterId: text("character_id").notNull(),
   enabled: boolean("enabled").notNull().default(false),
+  dmEnabled: boolean("dm_enabled").notNull().default(false),
   maxActionsPerDay: integer("max_actions_per_day").notNull().default(2),
   minCooldownMinutes: integer("min_cooldown_minutes").notNull().default(360),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
