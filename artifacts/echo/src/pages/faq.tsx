@@ -1,3 +1,4 @@
+import { useFaqText } from '@/lib/faq-translations';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'wouter';
 import { PublicFooter, PublicHeader, publicPreviewHref } from './landing';
@@ -43,25 +44,26 @@ const items = [
 ];
 
 export default function FaqPage({ previewMode = false }: { previewMode?: boolean } = {}) {
+  const t = useFaqText();
   return (
     <main className="echo-public">
       <div className="ep-wrap">
         <PublicHeader previewMode={previewMode} />
         <section className="ep-page-intro">
-          <span className="ep-eyebrow">Preguntas claras</span>
-          <h1 className="ep-serif">Antes de<br /><em style={{ color: 'var(--ep-rose)' }}>empezar.</em></h1>
-          <p>Lo esencial sobre personajes, memoria, Vision, planes y lo que viene después.</p>
+          <span className="ep-eyebrow">{t("Preguntas claras")}</span>
+          <h1 className="ep-serif">{t('Antes de')}<br /><em style={{ color: 'var(--ep-rose)' }}>{t("empezar.")}</em></h1>
+          <p>{t("Lo esencial sobre personajes, memoria, Vision, planes y lo que viene después.")}</p>
         </section>
-        <section className="ep-faq-wrap" aria-label="Preguntas frecuentes">
+        <section className="ep-faq-wrap" aria-label={t("Preguntas frecuentes")}>
           {items.map((item, index) => (
             <details className="ep-faq-item" key={item.question} open={index === 0}>
-              <summary data-testid={`faq-question-${index + 1}`}>{item.question}</summary>
-              <p data-testid={`faq-answer-${index + 1}`}>{item.answer}</p>
+              <summary data-testid={`faq-question-${index + 1}`}>{t(item.question)}</summary>
+              <p data-testid={`faq-answer-${index + 1}`}>{t(item.answer)}</p>
             </details>
           ))}
           <div className="ep-faq-cta">
-            <div><h3>¿Listo para abrir tu espacio?</h3><p>Empieza con un universo y crea tus primeros personajes.</p></div>
-            <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-faq-signup">Crear una cuenta <ArrowRight size={15} /></Link>
+            <div><h3>{t("¿Listo para abrir tu espacio?")}</h3><p>{t("Empieza con un universo y crea tus primeros personajes.")}</p></div>
+            <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-faq-signup">{t('Crear una cuenta')} <ArrowRight size={15} /></Link>
           </div>
         </section>
         <PublicFooter previewMode={previewMode} />
