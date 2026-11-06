@@ -322,6 +322,6 @@ html.theme-light {
 /* Mobile Safari: reserve room for floating browser chrome and the ECHO navigation. */
 @media (max-width: 1023px) {
   .pb-nav { padding-bottom: calc(var(--nav-clearance) + 1.25rem); }
-  [data-testid="nav-mobile"] { padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem); }
+  [data-testid="nav-mobile"] { bottom: 0; }
   [data-testid="form-composer"] { padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem); }
 }
