@@ -11,6 +11,7 @@ import type { Character } from '@/domain/types';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { BasicFields, type BasicForm } from '@/components/characters/basic-fields';
+import { BasicVoiceCatalogue } from '@/components/characters/basic-voice-catalogue';
 import { VisualIdentity } from '@/components/characters/visual-identity';
 import type { IdentityReference } from '@/domain/types';
 import { IdentitySection } from '@/components/characters/identity-section';
@@ -137,6 +138,7 @@ export default function CharacterEditorPage() {
 
         {mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
+          <BasicVoiceCatalogue />
           <VisualIdentity avatar={form.avatar} identity={identity} onBusy={setUploading}
             onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
