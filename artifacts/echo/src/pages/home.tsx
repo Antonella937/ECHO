@@ -13,7 +13,7 @@ export default function HomePage() {
 
   return (
     <div>
-      <header className="sticky top-0 z-30 bg-background/85 pt-safe backdrop-blur-xl">
+      <header className="sticky top-0 z-30 bg-background pt-[calc(env(safe-area-inset-top,0px)+12px)] lg:pt-0">
         <div className="relative flex h-16 items-center justify-center px-3">
           <h1 className="wordmark text-[30px] leading-none text-foreground" data-testid="text-wordmark">ECHO</h1>
           <div className="absolute right-2 flex items-center lg:hidden">
