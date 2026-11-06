@@ -111,6 +111,55 @@ export function createCreatorHubSocialRouter(): IRouter {
     finally { client.release(); }
   });
 
+  // Request initiation is separate from sending a message. No message body is
+  // accepted here and no recipient inbox is exposed to the sender.
+  router.post("/creator-hub/social/message-requests", async (req, res) => {
+    const parsed = targetSchema.safeParse(req.body);
+    if (!parsed.success || parsed.data.targetOwnerId === req.userId) {
+      res.status(400).json({ error: "INVALID_TARGET" }); return;
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const target = await client.query(
+        "SELECT message_privacy FROM echo_creator_profiles WHERE owner_id=$1 FOR UPDATE",
+        [parsed.data.targetOwnerId],
+      );
+      if (!target.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+      const blocked = await client.query(
+        "SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)",
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      if (blocked.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+      const accepted = await client.query(
+        "SELECT 1 FROM echo_creator_message_requests WHERE sender_owner_id=$1 AND recipient_owner_id=$2 AND status='accepted'",
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      if (accepted.rowCount) { await client.query("COMMIT"); res.json({ status: "accepted" }); return; }
+      if (target.rows[0].message_privacy === "nobody") {
+        await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGES_DISABLED" }); return;
+      }
+      if (target.rows[0].message_privacy === "everyone") {
+        await client.query("COMMIT"); res.json({ status: "allowed" }); return;
+      }
+      // A rejected request cannot be re-sent automatically. This prevents
+      // harassment via repeated request notifications.
+      const rejected = await client.query(
+        "SELECT 1 FROM echo_creator_message_requests WHERE sender_owner_id=$1 AND recipient_owner_id=$2 AND status='rejected'",
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      if (rejected.rowCount) { await client.query("ROLLBACK"); res.status(403).json({ error: "REQUEST_NOT_ALLOWED" }); return; }
+      await client.query(
+        `INSERT INTO echo_creator_message_requests(sender_owner_id,recipient_owner_id)
+         VALUES($1,$2) ON CONFLICT DO NOTHING`,
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      await client.query("COMMIT");
+      res.json({ status: "requested" });
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  });
+
   // A recipient-scoped inbox: never return another user's requests.
   router.get("/creator-hub/social/message-requests", async (req, res) => {
     const result = await pool.query(
