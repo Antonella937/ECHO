@@ -8,6 +8,8 @@ export interface AutonomyWorkerTarget {
   ownerId: string;
   universeId: string;
   characterId: string;
+  socialEnabled?: boolean;
+  dmEnabled?: boolean;
 }
 
 export interface AutonomyWorkerRepository {
@@ -54,6 +56,7 @@ export async function runAutonomyWorkerTick(input: {
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
     const socialSlot = Math.floor(now.getTime() / SOCIAL_INTERVAL_MS);
     for (const target of targets) {
+      if (target.dmEnabled === false) continue;
       const characterHash = createHash("sha256").update(`${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
       const lane: "dm" | "social" = "dm";
       const digest = createHash("sha256").update(`dm:${slot}:${characterHash}`).digest("hex");
@@ -76,6 +79,7 @@ export async function runAutonomyWorkerTick(input: {
     // Spontaneous activity retains its slower cadence and separate idempotency namespace.
     if (slot % (SOCIAL_INTERVAL_MS / AUTONOMY_WORKER_INTERVAL_MS) === 0) {
       for (const target of targets) {
+        if (target.socialEnabled === false) continue;
         const hash = createHash("sha256").update(`social:${socialSlot}:${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex");
         const idempotencyKey = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
         evaluated++;
