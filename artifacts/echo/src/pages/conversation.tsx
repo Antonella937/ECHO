@@ -4,7 +4,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Mic, Paperclip, Send, Smile, Square, Trash2, X, Pause, Play } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
