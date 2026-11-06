@@ -203,6 +203,30 @@ export default function CreatorHubPage() {
     } catch { setProfileError('No pudimos guardar la privacidad. Revisá que tu @usuario esté disponible y volvé a intentar.'); }
     finally { setSocialSaving(false); }
   }
+  const [peopleQuery, setPeopleQuery] = useState('');
+  const [peopleResults, setPeopleResults] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
+  const [peopleBusy, setPeopleBusy] = useState(false);
+  const [peopleFeedback, setPeopleFeedback] = useState('');
+  async function searchPeople() {
+    if (peopleQuery.trim().length < 2) return;
+    setPeopleBusy(true); setPeopleFeedback('');
+    try {
+      const data = await customFetch<{ profiles: typeof peopleResults }>('/api/creator-hub/social/search?q=' + encodeURIComponent(peopleQuery.trim()), { responseType: 'json' });
+      setPeopleResults(data.profiles);
+    } catch { setPeopleFeedback('No pudimos buscar personas.'); }
+    finally { setPeopleBusy(false); }
+  }
+  async function requestMessage(ownerId: string) {
+    setPeopleBusy(true); setPeopleFeedback('');
+    try {
+      const result = await customFetch<{ status: 'requested' | 'allowed' | 'accepted' }>('/api/creator-hub/social/message-requests', {
+        method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetOwnerId: ownerId }),
+      });
+      setPeopleFeedback(result.status === 'requested' ? 'Solicitud enviada. Aparecerá en la bandeja de esa persona.' : 'Esta persona permite mensajes. El chat se habilitará cuando esté lista la mensajería.');
+    } catch { setPeopleFeedback('No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.'); }
+    finally { setPeopleBusy(false); }
+  }
   const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
   const [messageInbox, setMessageInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
   const [inboxBusy, setInboxBusy] = useState(false);
@@ -279,6 +303,17 @@ export default function CreatorHubPage() {
                 </label>
                 <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil. Los mensajes estarán disponibles cuando se habilite su sistema de moderación.</p>
               </>}
+            </div>
+            <div className="rounded-2xl border border-border p-4 space-y-3">
+              <h3 className="font-semibold">Buscar personas</h3>
+              <div className="flex gap-2"><input aria-label="Buscar por nombre o arroba" value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder="Nombre o @usuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">Buscar</button></div>
+              {peopleFeedback && <p role="status" className="text-xs text-muted-foreground">{peopleFeedback}</p>}
+              {peopleResults.map(person => (
+                <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
+                  <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {person.visibility === 'private' ? 'Privado' : 'Público'}</p></div>
+                  <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(person.ownerId)} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Mensaje privado</button>
+                </div>
+              ))}
             </div>
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Bandeja de solicitudes</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">Actualizar</button></div>
