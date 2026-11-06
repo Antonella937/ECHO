@@ -53,6 +53,7 @@ export interface SocialActions {
 }
 
 interface StoreValue {
+  universeId: string;
   state: SocialState;
   me: Character;
   storageError: string | null;
@@ -340,6 +341,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     if (!state || !meId) return null;
     const me = state.characters.find((c) => c.id === meId) ?? state.characters[0];
     return {
+      universeId: mediaUniverseId,
       state,
       me,
       storageError,
@@ -350,7 +352,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       adapter,
       character: (id) => state.characters.find((c) => c.id === id),
     };
-  }, [state, meId, storageError, lastSavedAt, syncing, actions, dispatch, adapter]);
+  }, [state, meId, mediaUniverseId, storageError, lastSavedAt, syncing, actions, dispatch, adapter]);
 
   if (!value) {
     if (!storageError) return <>{fallback}</>;
