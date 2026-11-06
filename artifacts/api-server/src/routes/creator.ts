@@ -4,6 +4,7 @@ import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
+import { resolveEchoPlan } from "../lib/entitlements";
 import {
   configureAiBudget,
   creatorUsageSummary,
@@ -41,20 +42,20 @@ router.use("/creator", authenticate);
 
 router.get("/creator/account", async (req, res): Promise<void> => {
   const ownerId = req.userId!;
-  const entitlements = await creatorEntitlements(ownerId);
+  const [entitlements, membershipPlan] = await Promise.all([creatorEntitlements(ownerId), resolveEchoPlan(ownerId)]);
   const [universes, usage] = await Promise.all([listUniverses(ownerId), creatorUsageSummary(ownerId)]);
   const characterCount = universes.reduce((sum, universe) => {
     const characters = universe.state.characters;
     return sum + (Array.isArray(characters) ? characters.length : 0);
   }, 0);
   res.json({
-    plan: entitlements.plan,
+    plan: membershipPlan,
     lifetimeAccess: lifetimeAccessForOwner(ownerId),
     billingExempt: lifetimeAccessForOwner(ownerId) !== null,
     billingStatus: "not_connected",
     betaAccess: process.env.ECHO_BETA_ACCESS_MODE === "three_seats",
-    maxUniverses: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxUniverses,
-    maxCharacters: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxCharacters,
+    maxUniverses: creatorCapacity(ownerId, membershipPlan, entitlements.addonCharacters, entitlements.addonUniverses).maxUniverses,
+    maxCharacters: creatorCapacity(ownerId, membershipPlan, entitlements.addonCharacters, entitlements.addonUniverses).maxCharacters,
     addonUniverses: entitlements.addonUniverses,
     addonCharacters: entitlements.addonCharacters,
     universeCount: universes.length,
@@ -94,14 +95,14 @@ router.put("/creator/ai-budget", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: "INVALID_AI_BUDGET" }); return; }
   const ownerId = req.userId!;
   const usage = await configureAiBudget(ownerId, parsed.data);
-  const [entitlements, universes] = await Promise.all([creatorEntitlements(ownerId), listUniverses(ownerId)]);
+  const [entitlements, membershipPlan, universes] = await Promise.all([creatorEntitlements(ownerId), resolveEchoPlan(ownerId), listUniverses(ownerId)]);
   const characterCount = universes.reduce((sum, universe) => sum +
     (Array.isArray(universe.state.characters) ? universe.state.characters.length : 0), 0);
   res.json({
-    plan: entitlements.plan, lifetimeAccess: lifetimeAccessForOwner(ownerId),
+    plan: membershipPlan, lifetimeAccess: lifetimeAccessForOwner(ownerId),
     billingExempt: lifetimeAccessForOwner(ownerId) !== null, billingStatus: "not_connected",
-    maxUniverses: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxUniverses,
-    maxCharacters: creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses).maxCharacters,
+    maxUniverses: creatorCapacity(ownerId, membershipPlan, entitlements.addonCharacters, entitlements.addonUniverses).maxUniverses,
+    maxCharacters: creatorCapacity(ownerId, membershipPlan, entitlements.addonCharacters, entitlements.addonUniverses).maxCharacters,
     addonUniverses: entitlements.addonUniverses, addonCharacters: entitlements.addonCharacters,
     universeCount: universes.length, characterCount, usage,
   });
