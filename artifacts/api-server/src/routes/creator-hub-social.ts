@@ -8,7 +8,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 const profileSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9._]{3,30}$/),
-  visibility: z.enum(["private", "public"]).default("private"),
+  visibility: z.enum(["private", "public"]).optional(),
   messagePrivacy: z.enum(["everyone", "requests", "nobody"]).optional(),
   bio: z.string().max(500).default(""),
 }).strict();
@@ -38,11 +38,11 @@ export function createCreatorHubSocialRouter(): IRouter {
     try {
       const result = await pool.query(
         `INSERT INTO echo_creator_profiles (owner_id, display_name, username, username_key, visibility, bio, message_privacy)
-         VALUES ($1,$2,$3,lower($3),$4,$5,coalesce($6,'requests'))
+         VALUES ($1,$2,$3,lower($3),coalesce($4,'private'),$5,coalesce($6,'requests'))
          ON CONFLICT (owner_id) DO UPDATE SET
          display_name=excluded.display_name,
          username=excluded.username, username_key=excluded.username_key,
-         visibility=excluded.visibility, bio=excluded.bio, message_privacy=coalesce($6,echo_creator_profiles.message_privacy), updated_at=now()
+         visibility=coalesce($4,echo_creator_profiles.visibility), bio=excluded.bio, message_privacy=coalesce($6,echo_creator_profiles.message_privacy), updated_at=now()
          RETURNING display_name AS "displayName", username, visibility, message_privacy AS "messagePrivacy", bio`,
         [req.userId, displayName, username, visibility, bio, messagePrivacy ?? null],
       );
