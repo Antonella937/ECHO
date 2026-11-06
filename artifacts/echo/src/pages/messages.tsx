@@ -80,7 +80,7 @@ export default function MessagesPage() {
         </ul>
       )}
       <p className="px-6 pt-6 text-center text-[11.5px] leading-relaxed text-muted-foreground/70">
-        Los personajes aún no responden solos: lo que envíes queda guardado en la conversación.
+        Los personajes con autonomía activada pueden responderte por aquí. Las respuestas pueden tardar unos minutos.
       </p>
       <NewConversationSheet open={composing} onClose={() => setComposing(false)} />
     </div>
