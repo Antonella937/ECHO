@@ -34,6 +34,7 @@ export function AutonomySettingsSection() {
   const [latest, setLatest] = useState<AutonomyDryRunResult | null>(null);
   const [simulatingCharacterId, setSimulatingCharacterId] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [updatingControl, setUpdatingControl] = useState<string | null>(null);
   const settings = query.data;
   const updateCache = (next: NonNullable<typeof settings>) => {
     client.setQueryData(getGetAutonomySettingsQueryKey({ universeId: next.universeId }), next);
@@ -44,13 +45,17 @@ export function AutonomySettingsSection() {
     { onSuccess: updateCache, onError: () => toast({ title: t("No se pudo guardar el bloqueo global"), variant: "destructive" }) },
   );
 
-  const setCharacter = (characterId: string, enabled: boolean) => update.mutate(
-    { data: { characterId, enabled, universeId } },
-    {
-      onSuccess: updateCache,
-      onError: () => toast({ title: t("No se pudo guardar el control del personaje"), variant: "destructive" }),
-    },
-  );
+  const setCharacter = (characterId: string, enabled: boolean, lane: "social" | "dm") => {
+    setUpdatingControl(`${lane}:${characterId}`);
+    update.mutate(
+      { data: { characterId, enabled, lane, universeId } },
+      {
+        onSuccess: updateCache,
+        onError: () => toast({ title: t("No se pudo guardar el control del personaje"), variant: "destructive" }),
+        onSettled: () => setUpdatingControl(null),
+      },
+    );
+  };
 
   const runPreview = (characterId: string) => {
     setLatest(null);
@@ -79,7 +84,7 @@ export function AutonomySettingsSection() {
   return (
     <section className="mt-9" aria-labelledby="autonomy-h">
       <h2 id="autonomy-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        Autonomía de texto
+        {t("Autonomía de texto")}
       </h2>
       <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
         {settings?.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar solos con IA de texto. Las imágenes IA permanecen apagadas.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
@@ -104,23 +109,24 @@ export function AutonomySettingsSection() {
         {query.isLoading && <div className="p-4 text-xs text-muted-foreground">{t("Cargando controles privados…")}</div>}
         {query.isError && (
           <div role="alert" className="p-4 text-xs text-destructive">
-            No se pudieron cargar los controles de autonomía. No se habilitó ninguna cuenta.
+            {t("No se pudieron cargar los controles de autonomía. No se habilitó ninguna cuenta.")}
           </div>
         )}
+        <div className="p-4">
+          <h3 className="text-sm font-semibold">{t("Autonomía social")}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{t("Elegí quién puede publicar, comentar, dar me gusta y reaccionar por su cuenta.")}</p>
+        </div>
         {settings?.characters.map((character) => (
-          <div key={character.characterId} className="flex items-center gap-3 p-4">
+          <div key={`social-${character.characterId}`} className="flex items-center gap-3 p-4">
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold">{character.displayName}</div>
               <div className="mt-1 text-xs text-muted-foreground">@{character.username}</div>
-              <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                {character.enabled ? settings.liveExecutionEnabled ? t("Puede actuar automáticamente si el bloqueo global está desactivado") : t("Designada para autonomía futura") : t("Solo se opera manualmente")}
-              </div>
             </div>
             <Switch
               checked={character.enabled}
-              disabled={update.isPending}
-              onCheckedChange={(enabled) => setCharacter(character.characterId, enabled)}
-              aria-label={`${t("Permitir autonomía futura para")} ${character.displayName}`}
+              disabled={update.isPending && updatingControl === `social:${character.characterId}`}
+              onCheckedChange={(enabled) => setCharacter(character.characterId, enabled, "social")}
+              aria-label={`${t("Autonomía social para")} ${character.displayName}`}
               data-testid={`switch-autonomy-character-${character.characterId}`}
             />
             <button
@@ -132,6 +138,25 @@ export function AutonomySettingsSection() {
             >
               {t(dryRun.isPending && simulatingCharacterId === character.characterId ? 'Simulando…' : 'Simular')}
             </button>
+          </div>
+        ))}
+        <div className="p-4">
+          <h3 className="text-sm font-semibold">{t("Mensajes autónomos")}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden responder mensajes privados automáticamente. Este permiso es independiente de la actividad social.")}</p>
+        </div>
+        {settings?.characters.map((character) => (
+          <div key={`dm-${character.characterId}`} className="flex items-center gap-3 p-4">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold">{character.displayName}</div>
+              <div className="mt-1 text-xs text-muted-foreground">@{character.username}</div>
+            </div>
+            <Switch
+              checked={character.dmEnabled}
+              disabled={update.isPending && updatingControl === `dm:${character.characterId}`}
+              onCheckedChange={(enabled) => setCharacter(character.characterId, enabled, "dm")}
+              aria-label={`${t("Mensajes autónomos para")} ${character.displayName}`}
+              data-testid={`switch-autonomy-dm-${character.characterId}`}
+            />
           </div>
         ))}
       </div>
@@ -149,7 +174,7 @@ export function AutonomySettingsSection() {
                 : t("sin llamada al modelo")}
             </div>
             <span className={cn("rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground")}>
-              Solo preview
+              {t("Solo preview")}
             </span>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{latest.reason}</p>
@@ -164,7 +189,7 @@ export function AutonomySettingsSection() {
             </>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">
-            No se publicó, envió, gustó ni reaccionó nada. Ejecución en vivo: desactivada.
+            {t("No se publicó, envió, gustó ni reaccionó nada. Ejecución en vivo: desactivada.")}
           </p>
         </div>
       )}
