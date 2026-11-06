@@ -58,3 +58,15 @@ CREATE TABLE IF NOT EXISTS echo_creator_blocks (
   PRIMARY KEY(blocker_owner_id, blocked_owner_id),
   CONSTRAINT echo_creator_blocks_no_self CHECK(blocker_owner_id <> blocked_owner_id)
 );
+
+-- Human-to-human DMs are separate from AI character messages.
+CREATE TABLE IF NOT EXISTS echo_creator_direct_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_owner_id text NOT NULL,
+  recipient_owner_id text NOT NULL,
+  body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT echo_creator_direct_messages_no_self CHECK(sender_owner_id <> recipient_owner_id)
+);
+CREATE INDEX IF NOT EXISTS echo_creator_direct_messages_sender_idx ON echo_creator_direct_messages(sender_owner_id,recipient_owner_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS echo_creator_direct_messages_recipient_idx ON echo_creator_direct_messages(recipient_owner_id,sender_owner_id,created_at DESC);
