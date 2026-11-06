@@ -15,6 +15,8 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
   const cancelled = useRef(false);
   const generation = useRef(0);
   const mounted = useRef(true);
+  const requesting = useRef(false);
+  const stopping = useRef(false);
   const doneRef = useRef(onDone); doneRef.current = onDone;
   const errRef = useRef(onError); errRef.current = onError;
 
@@ -24,21 +26,32 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
     stream.current?.getTracks().forEach(t => t.stop());
     stream.current = null;
     rec.current = null;
+    requesting.current = false;
+    stopping.current = false;
     setElapsed(0);
     setStatus('idle');
   }, []);
 
   const stop = useCallback(() => {
-    if (rec.current && rec.current.state !== 'inactive') rec.current.stop(); else cleanup();
+    if (requesting.current && !rec.current) {
+      generation.current += 1;
+      cleanup();
+      return;
+    }
+    if (rec.current && rec.current.state !== 'inactive' && !stopping.current) {
+      stopping.current = true;
+      try { rec.current.stop(); } catch { cleanup(); errRef.current('No se pudo finalizar la grabación.'); }
+    }
   }, [cleanup]);
 
   const cancel = useCallback(() => { generation.current += 1; cancelled.current = true; chunks.current = []; stop(); }, [stop]);
 
   const start = useCallback(async () => {
-    if (rec.current || stream.current) return;
+    if (rec.current || stream.current || requesting.current) return;
     const requestId = ++generation.current;
     const sup = recorderSupport();
     if (!sup.ok) { errRef.current(sup.reason); return; }
+    requesting.current = true;
     setStatus('requesting');
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -46,18 +59,25 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
         s.getTracks().forEach(track => track.stop());
         return;
       }
+      requesting.current = false;
       stream.current = s;
       const r = new MediaRecorder(s, { mimeType: sup.mimeType });
       rec.current = r; chunks.current = []; cancelled.current = false;
       r.ondataavailable = e => { if (e.data.size) chunks.current.push(e.data); };
-      r.onerror = () => { cancelled.current = true; errRef.current('La grabación falló.'); cleanup(); };
+      r.onerror = () => {
+        cancelled.current = true;
+        errRef.current('La grabación falló.');
+        if (r.state !== 'inactive') { try { r.stop(); } catch { cleanup(); } }
+        else cleanup();
+      };
       r.onstop = () => {
         const secs = (Date.now() - started.current) / 1000;
         const blob = new Blob(chunks.current, { type: (r.mimeType || sup.mimeType).split(';')[0] });
         const keep = !cancelled.current && blob.size > 0;
         chunks.current = [];
         cleanup();
-        if (keep) doneRef.current(blob, secs);
+        if (keep && mounted.current) doneRef.current(blob, secs);
+        else if (!cancelled.current && mounted.current) errRef.current('No se capturó audio. Intentá grabar nuevamente.');
       };
       r.start(250);
       started.current = Date.now();
@@ -76,6 +96,7 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
   useEffect(() => () => {
     mounted.current = false;
     generation.current += 1;
+    requesting.current = false;
     cancelled.current = true;
     if (rec.current && rec.current.state !== 'inactive') { rec.current.onstop = null; rec.current.stop(); }
     timers.current.forEach(t => { window.clearInterval(t); window.clearTimeout(t); });
