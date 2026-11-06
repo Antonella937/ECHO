@@ -142,8 +142,14 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       if (!text.trim() && !extra?.attachments?.length && !extra?.postId && !extra?.storyId) return;
       if (extra?.quoteMessageId && !cur().messages.some(m => m.id === extra.quoteMessageId && m.threadId === threadIdFor(myId(), to)))
         throw new Error('La cita debe pertenecer a esta conversación.');
+      // Sending a reply means the sender has already engaged with this thread.
+      // Clear older incoming unread markers before appending the outgoing message.
+      const threadId = threadIdFor(myId(), to);
+      if (cur().messages.some(m => m.threadId === threadId && m.recipientId === myId() && !m.readBy.includes(myId()))) {
+        dispatch({ type: 'thread.read', threadId, actorId: myId() });
+      }
       playMessageSound('outgoing');
-      dispatch({ type: 'message.sent', message: { id: uid('m'), threadId: threadIdFor(myId(), to), senderId: myId(), recipientId: to,
+      dispatch({ type: 'message.sent', message: { id: uid('m'), threadId, senderId: myId(), recipientId: to,
         text: text.trim(), createdAt: new Date().toISOString(), storyId: extra?.storyId ?? null, postId: extra?.postId ?? null,
         readBy: [myId()], origin: 'user', ...(extra?.quoteMessageId ? { quoteMessageId: extra.quoteMessageId } : {}),
         ...(extra?.attachments?.length ? { attachments: extra.attachments } : {}) } });
