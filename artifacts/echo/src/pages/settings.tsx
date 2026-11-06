@@ -43,18 +43,18 @@ export default function SettingsPage() {
               className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
               data-testid="button-sign-out"
             >
-              <LogOut className="h-4 w-4" /> Cerrar sesión
+              <LogOut className="h-4 w-4" /> {st("Cerrar sesión")}
             </button>
           </div>
         <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">{st("Tu perfil de creador ›")}</span></Link>
 
           <UniverseSelector />
           <Link href="/search" className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-sm font-semibold">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> Buscar en este universo
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> {st("Buscar en este universo")}
           </Link>
         </section>
 
-        <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">Mi plan y suscripciones <span className="text-xs text-muted-foreground">{st("Ver planes y complementos ›")}</span></Link>
+        <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">{st("Mi plan y suscripciones")} <span className="text-xs text-muted-foreground">{st("Ver planes y complementos ›")}</span></Link>
 
         <section className="mt-9" aria-labelledby="identity-h">
           <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Cuentas e identidad activa")}</h2>
@@ -74,7 +74,7 @@ export default function SettingsPage() {
 
         <section className="mt-9" aria-labelledby="close-friends-h" data-testid="section-close-friends">
           <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> Mejores amigos · {me.name}</h2>
-          <p className="mt-2 px-1 text-xs text-muted-foreground">Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.</p>
+          <p className="mt-2 px-1 text-xs text-muted-foreground">{st("Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.")}</p>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-3">
             {state.characters.filter(c => c.id !== me.id && !c.archived).map(c => {
               const selected = (state.closeFriends?.[me.id] ?? []).includes(c.id);
@@ -107,10 +107,10 @@ export default function SettingsPage() {
           <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Sobre ECHO")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
             <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
-              <span>Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.</span></p>
-            <p className="mt-2.5 pl-[26px]">La autonomía de texto puede habilitarse para cuentas autorizadas de la beta privada, con controles individuales y pausa general. La generación de imágenes IA sigue desactivada.</p>
-            <p className="mt-2.5 pl-[26px]">Las fotos de ejemplo son ilustrativas y no muestran a personas reales.</p>
-            <p className="mt-2.5 pl-[26px]">Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.</p>
+              <span>{st("Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.")}</span></p>
+            <p className="mt-2.5 pl-[26px]">{st("La autonomía de texto puede habilitarse para cuentas autorizadas de la beta privada, con controles individuales y pausa general. La generación de imágenes IA sigue desactivada.")}</p>
+            <p className="mt-2.5 pl-[26px]">{st("Las fotos de ejemplo son ilustrativas y no muestran a personas reales.")}</p>
+            <p className="mt-2.5 pl-[26px]">{st("Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.")}</p>
           </div>
         </section>
 
@@ -126,9 +126,9 @@ export default function SettingsPage() {
             </div>
             {storageError && <p role="alert" className="mt-3 text-destructive">{storageError}</p>}
             <p className="mt-3 text-muted-foreground">
-              {state.posts.length} publicaciones · {state.comments.length} comentarios · {state.messages.length} mensajes
+              {state.posts.length} {st("publicaciones")} · {state.comments.length} {st("comentarios")} · {state.messages.length} {st("mensajes")}
             </p>
-            {lastSavedAt && <p className="mt-1.5 text-xs text-muted-foreground">Última sincronización: {new Date(lastSavedAt).toLocaleString('es-ES')}</p>}
+            {lastSavedAt && <p className="mt-1.5 text-xs text-muted-foreground">{st("Última sincronización:")} {new Date(lastSavedAt).toLocaleString(useSettingsLocale(st))}</p>}
             {storageError && (
               <button
                 type="button"
@@ -136,7 +136,7 @@ export default function SettingsPage() {
                 className="mt-3 h-10 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground"
                 data-testid="button-retry-sync"
               >
-                Reintentar sincronización
+                {st("Reintentar sincronización")}
               </button>
             )}
           </div>
@@ -148,6 +148,8 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+function useSettingsLocale(st: (key: string) => string) { return st("Última sincronización:") === "Last synced:" ? "en-US" : undefined; }
 
 function AppearanceSection() {
   const language = useLanguage();
@@ -188,7 +190,7 @@ function AppearanceSection() {
           <label className="flex h-11 items-center gap-2 rounded-full border border-border pl-1.5 pr-3 text-xs" data-testid="label-accent-custom">
             <input type="color" value={custom} onChange={(e) => setCustom(e.target.value)} onBlur={() => custom !== current.accent && set({ ...current, accent: custom })}
               aria-label="Acento personalizado" className="h-8 w-8 cursor-pointer rounded-full border-0 bg-transparent p-0" data-testid="input-accent-custom" />
-            Personalizado
+            {st("Personalizado")}
           </label>
           {custom.toLowerCase() !== current.accent.toLowerCase() && (
             <button type="button" onClick={() => set({ ...current, accent: custom })} className="h-11 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground" data-testid="button-accent-apply">{st("Aplicar")}</button>
@@ -218,17 +220,17 @@ function ImageGenerationStyleSection() {
   const { state, actions } = useSocial();
   const selected = state.imageStyle ?? 'natural';
   const styles: { id: ImageStyle; label: string; detail: string }[] = [
-    { id: 'natural', label: st('Realismo natural'), detail: 'Fotos cotidianas, piel con textura, luz real y rasgos naturales.' },
-    { id: 'phone', label: st('Cámara de celular'), detail: 'Selfies espontáneas, flash, encuadres casuales y ruido digital.' },
-    { id: 'analog', label: st('Analógica / 35 mm'), detail: 'Grano de película, colores orgánicos y sensación nostálgica.' },
-    { id: 'editorial', label: st('Editorial'), detail: 'Fotografía profesional de moda, iluminación cuidada y detalle realista.' },
-    { id: 'cinematic', label: st('Cinematográfica'), detail: 'Sombras, luz dramática y composición de película.' },
+    { id: 'natural', label: st('Realismo natural'), detail: st("Fotos cotidianas, piel con textura, luz real y rasgos naturales.") },
+    { id: 'phone', label: st('Cámara de celular'), detail: st("Selfies espontáneas, flash, encuadres casuales y ruido digital.") },
+    { id: 'analog', label: st('Analógica / 35 mm'), detail: st("Grano de película, colores orgánicos y sensación nostálgica.") },
+    { id: 'editorial', label: st('Editorial'), detail: st("Fotografía profesional de moda, iluminación cuidada y detalle realista.") },
+    { id: 'cinematic', label: st('Cinematográfica'), detail: st("Sombras, luz dramática y composición de película.") },
   ];
   return <section className="mt-9" aria-labelledby="image-style-h" data-testid="section-ai-image-settings">
     <h2 id="image-style-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Generación de imágenes IA")}</h2>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <h3 className="text-sm font-semibold">{st("Estilo fotográfico predeterminado")}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Elegí cómo querés que se vean las imágenes generadas. Las referencias visuales y rasgos de cada personaje se mantienen independientemente del estilo.</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{st("Elegí cómo querés que se vean las imágenes generadas. Las referencias visuales y rasgos de cada personaje se mantienen independientemente del estilo.")}</p>
       <div className="mt-4 space-y-2" role="radiogroup" aria-label="Estilo de imágenes IA">
         {styles.map(({ id, label, detail }) => <button key={id} type="button" role="radio" aria-checked={selected === id}
           onClick={() => { actions.setImageStyle(id); toast({ title: st('Estilo de imagen guardado'), description: label }); }}
@@ -241,7 +243,7 @@ function ImageGenerationStyleSection() {
             <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span></span>
         </button>)}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">La preferencia se sincroniza con este universo. Se aplicará al generador cuando esté conectado; elegir un estilo no genera imágenes ni consume créditos.</p>
+      <p className="mt-3 text-xs text-muted-foreground">{st("La preferencia se sincroniza con este universo. Se aplicará al generador cuando esté conectado; elegir un estilo no genera imágenes ni consume créditos.")}</p>
     </div>
   </section>;
 }
