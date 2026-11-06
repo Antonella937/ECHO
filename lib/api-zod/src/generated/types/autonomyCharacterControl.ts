@@ -11,6 +11,7 @@ export interface AutonomyCharacterControl {
   displayName: string;
   username: string;
   enabled: boolean;
+  dmEnabled: boolean;
   /**
      * @minimum 1
      * @maximum 4
