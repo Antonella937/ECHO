@@ -255,3 +255,5 @@ textarea.ep-field-control { resize: vertical; min-height: 92px; }
 /* Optically center Instrument Serif's lowercase e inside the ECHO mark. */
 .ep-mark { line-height: 1; padding-top: 0; }
 .ep-mark { text-indent: 0; }
+
+.ep-mark > span { display: block; line-height: 1; transform: translateY(-2px); }
