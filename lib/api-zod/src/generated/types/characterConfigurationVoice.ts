@@ -11,6 +11,7 @@ import type { CharacterConfigurationVoiceMessageLength } from './characterConfig
 export type CharacterConfigurationVoice = {
   /** @maxLength 4000 */
   speakingStyle: string;
+  basicVoiceId?: string;
   messageLength: CharacterConfigurationVoiceMessageLength;
   /** @maxLength 4000 */
   vocabulary: string;
