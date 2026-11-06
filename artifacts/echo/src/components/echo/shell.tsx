@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Bell, Bookmark, Home, PlusSquare, Send, Settings } from 'lucide-react';
+import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { cn } from '@/lib/utils';
@@ -106,9 +106,12 @@ export function Shell({ children }: { children: ReactNode }) {
             )}
           </div>
         </div>
-        <p className="mt-auto px-1 text-[11px] leading-relaxed text-muted-foreground/70">
+        <div className="mt-auto space-y-4 pt-6">
+        <p className="px-1 text-[11px] leading-relaxed text-muted-foreground/70">
           {state.creatorSetup ? `Universo privado: ${state.creatorSetup.universeName}.` : 'Universo privado.'} Los personajes y sus respuestas todavía son simulados.
         </p>
+        <Link href="/creator-hub" aria-label="Creator Hub" className="flex min-h-11 items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 text-xs font-semibold text-primary transition-colors hover:bg-primary/20" data-testid="link-aside-creator-hub"><Palette className="h-5 w-5" strokeWidth={1.7} /><span>Creator Hub</span></Link>
+        </div>
       </aside>
 
       {/* Mobile bottom nav */}
