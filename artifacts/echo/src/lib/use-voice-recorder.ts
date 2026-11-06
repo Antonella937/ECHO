@@ -88,8 +88,12 @@ export function useVoiceRecorder(onDone: (blob: Blob, seconds: number) => void, 
       if (!mounted.current || requestId !== generation.current) return;
       cleanup();
       const name = (e as DOMException)?.name;
-      errRef.current(name === 'NotAllowedError' || name === 'SecurityError' ? 'Permiso de micrófono denegado. Activalo en los ajustes del navegador.'
-        : name === 'NotFoundError' ? 'No se encontró ningún micrófono.' : 'No se pudo iniciar la grabación.');
+      errRef.current(name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError' ? 'Permiso de micrófono denegado. Habilitalo en los ajustes del navegador y volvé a intentar.'
+        : name === 'NotFoundError' || name === 'DevicesNotFoundError' ? 'No se encontró ningún micrófono conectado.'
+        : name === 'NotReadableError' || name === 'TrackStartError' ? 'No se pudo acceder al micrófono. Cerrá otras aplicaciones que lo estén usando e intentá de nuevo.'
+        : name === 'OverconstrainedError' ? 'El micrófono no admite la configuración solicitada.'
+        : name === 'AbortError' ? 'Se interrumpió el acceso al micrófono. Intentá nuevamente.'
+        : 'No se pudo iniciar la grabación. Revisá el micrófono y volvé a intentar.');
     }
   }, [cleanup]);
 
