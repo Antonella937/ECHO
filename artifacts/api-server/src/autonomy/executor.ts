@@ -353,7 +353,7 @@ export async function executeAutonomyDecision(input: {
       eq(echoAutonomyRunsTable.ownerId, input.ownerId), eq(echoAutonomyRunsTable.status, "executed"),
       gte(echoAutonomyRunsTable.createdAt, since),
     ));
-    if ((ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12) {
+    if (input.opportunity.situation !== "dm" && ((ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "rate_limited", lastErrorCode: "OWNER_ACTION_CAP", finishedAt: now, updatedAt: now,
       }).where(and(
@@ -395,9 +395,18 @@ export async function executeAutonomyDecision(input: {
           ? state.messages.filter((item) => item.senderId === input.characterId && item.origin !== "autonomy" &&
             toTime(item.createdAt) >= since.getTime()).length
           : 0;
-    const totalLimitHit = recent + history.length >= maxActionsPerDay ||
+    const isDm = input.opportunity.situation === "dm";
+    // Replies and initiated DMs are not social posts. Keep a separate bounded DM budget.
+    const dmHistory = history.filter((item) => item.situation === "dm");
+    const latestDmAt = Math.max(0, ...state.messages
+      .filter((item) => item.senderId === input.characterId && item.origin === "autonomy")
+      .map((item) => toTime(item.createdAt)).filter(Number.isFinite));
+    const dmLimitHit = dmHistory.length >= 30 ||
+      (latestDmAt > 0 && now.getTime() - latestDmAt < 2 * 60_000);
+    const socialLimitHit = recent + history.filter((item) => item.situation !== "dm").length >= maxActionsPerDay ||
       (latestActivity > 0 && now.getTime() - latestActivity < minCooldownMinutes * 60_000);
-    if (totalLimitHit || (input.opportunity.situation &&
+    const totalLimitHit = isDm ? dmLimitHit : socialLimitHit;
+    if (totalLimitHit || (!isDm && input.opportunity.situation &&
       situationCount + stateTypeCount >= (typeCaps[input.opportunity.situation] ?? 0))) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "rate_limited", lastErrorCode: totalLimitHit ? "CHARACTER_COOLDOWN_OR_DAILY_CAP" : "ACTION_TYPE_CAP",
