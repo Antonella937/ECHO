@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import router from "./routes";
+import { ensureCreatorProfile } from "./lib/creatorProfileBootstrap";
 import { isAutonomyDmTyping } from "./autonomy/service";
 import { privateBetaSeats } from "./middlewares/privateBetaSeats";
 import { logger } from "./lib/logger";
@@ -81,6 +82,17 @@ app.use("/api", betaSeatMode ? privateBetaSeats : (req, res, next) => {
   const userId = getAuth(req).userId;
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
   if (!betaIds.includes(userId)) { res.status(403).json({ error: "PRIVATE_BETA_ACCESS_REQUIRED" }); return; }
+  next();
+});
+
+// Register a private Creator Hub profile as soon as an account uses ECHO, not when Creator Hub opens.
+app.use("/api", async (req, _res, next) => {
+  if (req.path === "/healthz") return next();
+  const ownerId = getAuth(req).userId;
+  if (ownerId) {
+    try { await ensureCreatorProfile(ownerId); }
+    catch (error) { logger.warn({ error: error instanceof Error ? error.message : "unknown" }, "Creator Hub automatic profile registration failed"); }
+  }
   next();
 });
 
