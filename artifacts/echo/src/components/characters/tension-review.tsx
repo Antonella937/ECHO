@@ -1,3 +1,5 @@
+import { useRelationshipReviewText } from '@/lib/relationship-review-translations';
+import { useLanguage } from '@/lib/i18n';
 import { useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
@@ -13,6 +15,8 @@ const types = {
   conflict_resolved: 'Conflicto resuelto',
 };
 export function TensionReview({ actorId, targetId }: { actorId: string; targetId: string }) {
+  const t = useRelationshipReviewText();
+  const language = useLanguage();
   const { universeId, actions } = useSocial();
   const [items, setItems] = useState<Candidate[]>([]);
   const [history, setHistory] = useState<Entry[]>([]);
@@ -27,12 +31,12 @@ export function TensionReview({ actorId, targetId }: { actorId: string; targetId
       const result = await customFetch<{ revision: number; candidates: Candidate[] }>('/api/universe/relationships/tension/candidates?' + query, { method: 'GET', responseType: 'json' });
       const past = await customFetch<{ entries: Entry[] }>('/api/universe/relationships/tension/history?' + query, { method: 'GET', responseType: 'json' });
       setItems(result.candidates); setRevision(result.revision); setHistory(past.entries); setMessage('');
-    } catch { setMessage('No se pudo consultar el historial.'); }
+    } catch { setMessage(t("No se pudo consultar el historial.")); }
     finally { setBusy(false); }
   }
   async function approve(item: Candidate) {
     if (revision === null || !selected[item.sourceId] || busy) return;
-    if (!window.confirm('¿Confirmás «' + (types[selected[item.sourceId] as keyof typeof types] ?? selected[item.sourceId]) + '»? Esto modificará la tensión y guardará el acontecimiento.')) return;
+    if (!window.confirm('¿Confirmás «' + t(types[selected[item.sourceId] as keyof typeof types] ?? selected[item.sourceId]) + '»? Esto modificará la tensión y guardará el acontecimiento.')) return;
     let committed = false;
     setBusy(true);
     try {
@@ -42,32 +46,32 @@ export function TensionReview({ actorId, targetId }: { actorId: string; targetId
       });
       committed = true;
       setRevision(null); setItems([]);
-      setMessage('Confirmado en el servidor (tensión ' + (approved.delta > 0 ? '+' : '') + approved.delta + '). Actualizando…');
+      setMessage(`${t('Confirmado en el servidor')} (${t('tensión')} ${approved.delta > 0 ? '+' : ''}${approved.delta}). ${t('Actualizando…')}`);
       await actions.refreshAfterApproval();
       const latest = await customFetch<{ revision: number; candidates: Candidate[] }>('/api/universe/relationships/tension/candidates?' + query, { method: 'GET', responseType: 'json', cache: 'no-store' });
       const past = await customFetch<{ entries: Entry[] }>('/api/universe/relationships/tension/history?' + query, { method: 'GET', responseType: 'json', cache: 'no-store' });
       setItems(latest.candidates); setRevision(latest.revision); setHistory(past.entries);
-      setMessage('Acontecimiento confirmado. tensión ' + (approved.delta > 0 ? '+' : '') + approved.delta + '.');
-    } catch { setRevision(null); setMessage(committed ? 'Confirmado en el servidor, pero la pantalla no se actualizó. Sincronizá y volvé a consultar.' : 'No se pudo confirmar. Sincronizá y volvé a consultar.'); }
+      setMessage(`${t('Acontecimiento confirmado.')} ${t('tensión')} ${approved.delta > 0 ? '+' : ''}${approved.delta}.`);
+    } catch { setRevision(null); setMessage(committed ? t("Confirmado en el servidor, pero la pantalla no se actualizó. Sincronizá y volvé a consultar.") : t("No se pudo confirmar. Sincronizá y volvé a consultar.")); }
     finally { setBusy(false); }
   }
   if (targetId === 'owner') return null;
   return <section className="mt-4 rounded-xl border border-border p-3">
     <div className="flex items-center justify-between gap-2">
-      <strong className="text-sm">Evolución de tensión</strong>
-      <button type="button" disabled={busy} onClick={() => void load()} className="rounded-lg border px-3 py-2 text-xs">Revisar mensajes</button>
+      <strong className="text-sm">{t("Evolución de tensión")}</strong>
+      <button type="button" disabled={busy} onClick={() => void load()} className="rounded-lg border px-3 py-2 text-xs">{t("Revisar mensajes")}</button>
     </div>
-    <p className="mt-2 text-xs text-muted-foreground">Seleccioná el acontecimiento real antes de confirmar. Ningún cambio es automático.</p>
+    <p className="mt-2 text-xs text-muted-foreground">{t("Seleccioná el acontecimiento real antes de confirmar. Ningún cambio es automático.")}</p>
     {message && <p role="status" className="mt-2 text-xs">{message}</p>}
     {revision !== null && <ul className="mt-2 space-y-2">{items.map(item => <li key={item.sourceId} className="rounded-lg border p-2">
       <p className="text-xs">{item.excerpt}</p>
-      <select aria-label="Acontecimiento" className="mt-2 w-full rounded-lg border bg-background p-2 text-xs" value={selected[item.sourceId] ?? ''} onChange={e => setSelected(s => ({ ...s, [item.sourceId]: e.target.value }))}>
-        <option value="">Elegir acontecimiento</option>
-        {Object.entries(types).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      <select aria-label={t("Acontecimiento")} className="mt-2 w-full rounded-lg border bg-background p-2 text-xs" value={selected[item.sourceId] ?? ''} onChange={e => setSelected(s => ({ ...s, [item.sourceId]: e.target.value }))}>
+        <option value="">{t("Elegir acontecimiento")}</option>
+        {Object.entries(types).map(([value, label]) => <option key={value} value={value}{t(label)}</option>)}
       </select>
-      <button type="button" disabled={busy || !selected[item.sourceId]} onClick={() => void approve(item)} className="mt-2 rounded-lg border px-3 py-2 text-xs">Confirmar</button>
+      <button type="button" disabled={busy || !selected[item.sourceId]} onClick={() => void approve(item)} className="mt-2 rounded-lg border px-3 py-2 text-xs">{t("Confirmar")}</button>
     </li>)}</ul>}
-    <p className="mt-3 text-sm font-semibold">Historial de tensión</p>
-    {history.map(entry => <p key={entry.memoryId} className="mt-2 text-xs">{entry.content} · {new Date(entry.occurredAt).toLocaleString()}</p>)}
+    <p className="mt-3 text-sm font-semibold">{t("Historial de tensión")}</p>
+    {history.map(entry => <p key={entry.memoryId} className="mt-2 text-xs">{entry.content} · {new Date(entry.occurredAt).toLocaleString(language)}</p>)}
   </section>;
 }
