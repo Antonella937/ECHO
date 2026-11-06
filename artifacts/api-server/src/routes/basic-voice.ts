@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
+import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { SaveUniverseBody } from "@workspace/api-zod";
 
 /** Free voice IDs are fixed; the client cannot choose an arbitrary provider voice. */
@@ -58,6 +60,52 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
   } catch (error) {
     req.log.warn({ err: error instanceof Error ? error.name : "unknown" }, "Basic voice synthesis unavailable");
     res.status(503).json({ error: "VOICE_SYNTHESIS_UNAVAILABLE" });
+  }
+});
+
+
+/** Attach a privately uploaded WAV to the existing character-authored DM.
+ * The message text remains untouched and is the canonical conversational memory.
+ */
+router.post("/voices/basic/attach-to-dm", requireAuth, async (req, res) => {
+  const { universeId = "primary", characterId, messageId, objectPath } = req.body ?? {};
+  if ([universeId, characterId, messageId, objectPath].some(v => typeof v !== "string") ||
+      universeId.length > 128 || characterId.length > 128 || messageId.length > 128 ||
+      !/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(objectPath)) {
+    res.status(400).json({ error: "INVALID_VOICE_ATTACHMENT" }); return;
+  }
+  try {
+    const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+      .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath))).limit(1);
+    if (!owned) { res.status(404).json({ error: "AUDIO_NOT_OWNED" }); return; }
+    const result = await db.transaction(async tx => {
+      const [universe] = await tx.select().from(echoUniversesTable).where(and(
+        eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId),
+        isNull(echoUniversesTable.archivedAt), isNull(echoUniversesTable.deletedAt),
+      )).for("update").limit(1);
+      if (!universe) return "UNIVERSE_NOT_FOUND";
+      const parsed = SaveUniverseBody.shape.state.safeParse(universe.state);
+      if (!parsed.success) return "INVALID_UNIVERSE";
+      const character = parsed.data.characters.find(c => c.id === characterId && !c.archived);
+      if (!character?.configuration?.voice?.basicVoiceId || !voices[character.configuration.voice.basicVoiceId]) return "VOICE_NOT_SELECTED";
+      const message = parsed.data.messages.find(m => m.id === messageId && m.senderId === characterId &&
+        m.text.trim() && m.text.length <= 500 && !m.hiddenForIds?.includes(characterId));
+      if (!message) return "CHARACTER_MESSAGE_NOT_FOUND";
+      if (message.attachments?.some(a => a.type === "audio")) return "ALREADY_HAS_AUDIO";
+      const attachment = { id: `voice-${messageId}`, type: "audio" as const, url: objectPath, mimeType: "audio/wav" };
+      const state = { ...parsed.data, messages: parsed.data.messages.map(m => m.id === messageId
+        ? { ...m, attachments: [...(m.attachments ?? []), attachment] } : m) };
+      const updated = await tx.update(echoUniversesTable).set({
+        state, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date(),
+      }).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId)))
+        .returning({ revision: echoUniversesTable.revision });
+      return updated.length ? "OK" : "WRITE_FAILED";
+    });
+    if (result !== "OK") { res.status(result === "ALREADY_HAS_AUDIO" ? 409 : 422).json({ error: result }); return; }
+    res.json({ ok: true, messageId, objectPath });
+  } catch (error) {
+    req.log.warn({ err: error instanceof Error ? error.name : "unknown" }, "Voice attachment failed");
+    res.status(503).json({ error: "VOICE_ATTACHMENT_UNAVAILABLE" });
   }
 });
 export default router;
