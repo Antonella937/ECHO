@@ -105,7 +105,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
             {t('Le gusta a')} <span className="font-semibold">{firstLiker?.id === me.id ? t('ti') : firstLiker?.handle}</span>
             {post.likes.length > 1 && (
               <>
-                {' '}{t('y a')} <span className="font-semibold">{post.likes.length - 1 === 1 ? `${post.likes.length - 1} ${t(post.likes.length - 1 === 1 ? '1 persona más' : 'personas más')}`}</span>
+                {' '}{t('y a')} <span className="font-semibold">{post.likes.length - 1 === 1 ? post.likes.length - 1 === 1 ? t('1 persona más') : `${post.likes.length - 1} ${t('personas más')}`}</span>
               </>
             )}
           </button>
