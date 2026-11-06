@@ -576,6 +576,7 @@ export type CharacterConfigurationPersonality = {
 };
 
 export type CharacterConfigurationVoice = {
+  basicVoiceId?: string;
   /** @maxLength 4000 */
   speakingStyle: string;
   messageLength: CharacterConfigurationVoiceMessageLength;
