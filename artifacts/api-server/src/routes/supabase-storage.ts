@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
-import { db, echoMediaTable } from "@workspace/db";
+import { db, echoMediaTable, pool } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { ClaimUploadBody, ClaimUploadResponse, RequestUploadUrlBody, RequestUploadUrlResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -170,7 +170,20 @@ export function createSupabaseStorageRouter(): IRouter {
         [sourceUniverseId, sourceCharacterId, sourceType, sourceContentId].filter(Boolean).length % 4 !== 0) {
         res.status(400).end(); return;
       }
-      if (!await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
+      // Private voice notes can be read only by their sender or intended
+      // recipient, provided neither account has blocked the other.
+      const voiceAccess = await pool.query(
+        `SELECT 1 FROM echo_creator_voice_messages v
+         WHERE v.object_path=$1 AND v.sender_owner_id=$2
+           AND ($3=v.sender_owner_id OR $3=v.recipient_owner_id)
+           AND NOT EXISTS (
+             SELECT 1 FROM echo_creator_blocks b
+             WHERE (b.blocker_owner_id=v.sender_owner_id AND b.blocked_owner_id=v.recipient_owner_id)
+                OR (b.blocker_owner_id=v.recipient_owner_id AND b.blocked_owner_id=v.sender_owner_id)
+           ) LIMIT 1`,
+        [objectPath, media.ownerId, req.userId],
+      );
+      if (!voiceAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
         res.status(404).end(); return;
       }
       const { base, key } = config();

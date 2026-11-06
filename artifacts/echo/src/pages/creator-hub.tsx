@@ -1,3 +1,4 @@
+import { HumanVoicePlayback, HumanVoiceRecorder } from '@/components/echo/human-voice-note';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
 import { BadgeCheck, Camera, Check, Pencil, X } from 'lucide-react';
@@ -149,17 +150,18 @@ export default function CreatorHubPage() {
   }
   const defaultUsername = (user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'creator').toLowerCase().replace(/[^a-z0-9._]/g, '');
   const savedUsername = typeof user?.unsafeMetadata?.creatorHubUsername === 'string' ? user.unsafeMetadata.creatorHubUsername : '';
-  const username = savedUsername || defaultUsername;
+  const [registeredUsername, setRegisteredUsername] = useState('');
+  const username = registeredUsername || savedUsername || defaultUsername;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [founderVerified, setFounderVerified] = useState(false);
+  const [verificationRole, setVerificationRole] = useState<'owner_lifetime' | 'founder_lifetime' | null>(null);
   useEffect(() => {
     let active = true;
     void customFetch<{ lifetimeAccess?: string | null; billingExempt?: boolean }>('/api/account/entitlements', { responseType: 'json' })
-      .then(data => { if (active) setFounderVerified(data.lifetimeAccess === 'owner_lifetime' && data.billingExempt === true); })
-      .catch(() => { if (active) setFounderVerified(false); });
+      .then(data => { if (active) setVerificationRole(data.billingExempt === true && (data.lifetimeAccess === 'owner_lifetime' || data.lifetimeAccess === 'founder_lifetime') ? data.lifetimeAccess : null); })
+      .catch(() => { if (active) setVerificationRole(null); });
     return () => { active = false; };
   }, [user?.id]);
   async function saveUsername() {
@@ -168,11 +170,148 @@ export default function CreatorHubPage() {
     if (!user) return;
     setSaving(true); setError('');
     try {
+      const registered = await customFetch<{ profile: { username: string } }>('/api/creator-hub/social/me', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName: alias, username: next, visibility: socialProfile?.visibility ?? 'private', messagePrivacy: socialProfile?.messagePrivacy ?? 'requests', bio: savedBio }) });
+      setRegisteredUsername(registered.profile.username);
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubUsername: next } });
       await user.reload();
       setEditing(false);
-    } catch { setError('No pudimos guardar el usuario. Intentá nuevamente.'); }
+    } catch (err) { setError(String(err).includes('409') || String(err).includes('USERNAME_ALREADY_IN_USE') ? 'Este @usuario ya está en uso. Elegí otro.' : 'No pudimos registrar el usuario. Intentá nuevamente.'); }
     finally { setSaving(false); }
+  }
+  // Social account preferences are stored server-side; Clerk metadata remains the
+  // source for the existing visual profile until explicit profile synchronization.
+  const [socialProfile, setSocialProfile] = useState<{ visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null>(null);
+  const [socialSaving, setSocialSaving] = useState(false);
+  const [socialReady, setSocialReady] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    void customFetch<{ profile: { visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null }>('/api/creator-hub/social/me', { responseType: 'json' })
+      .then(data => { if (active) { setSocialProfile(data.profile); if (data.profile && 'username' in data.profile && typeof data.profile.username === 'string') setRegisteredUsername(data.profile.username); setSocialReady(true); } })
+      .catch(() => { if (active) setSocialReady(false); });
+    return () => { active = false; };
+  }, [user?.id]);
+  async function saveSocialPreferences(visibility: 'private' | 'public', messagePrivacy: 'everyone' | 'requests' | 'nobody') {
+    if (!user || socialSaving) return;
+    setSocialSaving(true); setProfileError('');
+    try {
+      const result = await customFetch<{ profile: { visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } }>('/api/creator-hub/social/me', {
+        method: 'PUT', responseType: 'json',
+        body: JSON.stringify({ displayName: alias, username, visibility, messagePrivacy, bio: savedBio }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      setSocialProfile(result.profile);
+    } catch { setProfileError('No pudimos guardar la privacidad. Revisá que tu @usuario esté disponible y volvé a intentar.'); }
+    finally { setSocialSaving(false); }
+  }
+  const [peopleQuery, setPeopleQuery] = useState('');
+  const [peopleResults, setPeopleResults] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
+  const [peopleBusy, setPeopleBusy] = useState(false);
+  const [peopleFeedback, setPeopleFeedback] = useState('');
+  async function searchPeople() {
+    if (peopleQuery.trim().length < 2) return;
+    setPeopleBusy(true); setPeopleFeedback('');
+    try {
+      const data = await customFetch<{ profiles: typeof peopleResults }>('/api/creator-hub/social/search?q=' + encodeURIComponent(peopleQuery.trim()), { responseType: 'json' });
+      setPeopleResults(data.profiles);
+    } catch { setPeopleFeedback('No pudimos buscar personas.'); }
+    finally { setPeopleBusy(false); }
+  }
+  async function requestMessage(ownerId: string) {
+    setPeopleBusy(true); setPeopleFeedback('');
+    try {
+      const result = await customFetch<{ status: 'requested' | 'allowed' | 'accepted' }>('/api/creator-hub/social/message-requests', {
+        method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetOwnerId: ownerId }),
+      });
+      if (result.status === 'requested') setPeopleFeedback('Solicitud enviada. Aparecerá en la bandeja de esa persona.');
+      else { setPeopleFeedback('Podés escribirle.'); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? 'esta persona'); }
+    } catch { setPeopleFeedback('No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.'); }
+    finally { setPeopleBusy(false); }
+  }
+  const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string; kind?: "text" | "voice"; objectPath?: string; durationSeconds?: number; reactions?: Array<{ emoji: string; ownerId: string }> }>>([]);
+  const [chatDraft, setChatDraft] = useState('');
+  const [otherTyping, setOtherTyping] = useState(false);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reactingMessage, setReactingMessage] = useState<string | null>(null);
+  async function refreshHumanChat(ownerId: string) {
+    const [history, presence] = await Promise.all([
+      customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' }),
+      customFetch<{ typing: boolean }>('/api/creator-hub/social/typing/' + encodeURIComponent(ownerId), { responseType: 'json' }),
+    ]);
+    setChatMessages(history.messages);
+    setOtherTyping(presence.typing);
+  }
+  useEffect(() => {
+    if (!activeChat) return;
+    const ownerId = activeChat.ownerId;
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') void refreshHumanChat(ownerId).catch(() => {}); }, 3000);
+    return () => {
+      clearInterval(interval);
+      if (typingTimeout.current) clearTimeout(typingTimeout.current);
+      void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: ownerId, typing: false }) }).catch(() => {});
+    };
+  }, [activeChat?.ownerId]);
+  function updateChatDraft(value: string) {
+    setChatDraft(value);
+    if (!activeChat) return;
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, typing: Boolean(value.trim()) }) }).catch(() => {});
+    if (value.trim()) typingTimeout.current = setTimeout(() => {
+      void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, typing: false }) }).catch(() => {});
+    }, 4500);
+  }
+  async function toggleReaction(messageId: string, emoji: string, alreadyReacted: boolean) {
+    if (!activeChat) return;
+    try {
+      await customFetch('/api/creator-hub/social/reactions', { method: alreadyReacted ? 'DELETE' : 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, emoji }) });
+      await refreshHumanChat(activeChat.ownerId);
+    } catch { setChatError('No pudimos guardar la reacción.'); }
+  }
+
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState('');
+  async function openHumanChat(ownerId: string, name: string) {
+    setActiveChat({ ownerId, name }); setChatError('');
+    try {
+      const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
+      setChatMessages(result.messages); setOtherTyping(false);
+    } catch { setChatError('No pudimos abrir esta conversación.'); }
+  }
+  async function sendHumanMessage() {
+    if (!activeChat || !chatDraft.trim() || chatBusy) return;
+    setChatBusy(true); setChatError('');
+    try {
+      await customFetch('/api/creator-hub/social/messages', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, body: chatDraft.trim() }) });
+      setChatDraft('');
+      await openHumanChat(activeChat.ownerId, activeChat.name);
+    } catch { setChatError('No se pudo enviar. Puede que necesites una solicitud aceptada.'); }
+    finally { setChatBusy(false); }
+  }
+  const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
+  const [messageInbox, setMessageInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
+  const [inboxBusy, setInboxBusy] = useState(false);
+  const [inboxError, setInboxError] = useState('');
+  async function refreshInbox() {
+    try {
+      const [follows, messages] = await Promise.all([
+        customFetch<{ requests: typeof followInbox }>('/api/creator-hub/social/requests', { responseType: 'json' }),
+        customFetch<{ requests: typeof messageInbox }>('/api/creator-hub/social/message-requests', { responseType: 'json' }),
+      ]);
+      setFollowInbox(follows.requests); setMessageInbox(messages.requests); setInboxError('');
+    } catch { setInboxError('No se pudieron cargar las solicitudes.'); }
+  }
+  useEffect(() => {
+    if (socialReady && user?.id) void refreshInbox();
+  }, [socialReady, user?.id]);
+  async function decideInbox(kind: 'requests' | 'message-requests', id: string, action: 'accept' | 'reject') {
+    setInboxBusy(true); setInboxError('');
+    try {
+      await customFetch('/api/creator-hub/social/' + kind + '/' + encodeURIComponent(id) + '/' + action, { method: 'POST', responseType: 'json' });
+      await refreshInbox();
+    } catch { setInboxError('No se pudo actualizar la solicitud.'); }
+    finally { setInboxBusy(false); }
   }
   const nameParts = alias.split(/\s+/).filter(Boolean);
   const initials = nameParts.length > 1
@@ -200,16 +339,79 @@ export default function CreatorHubPage() {
                 <button type="button" disabled={uploading !== null} onClick={() => avatarImage ? startAdjustingAvatar() : avatarInput.current?.click()} aria-label={avatarImage ? "Ajustar foto de perfil" : "Subir foto de perfil"} className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border border-border bg-card text-foreground disabled:opacity-50"><Camera size={15}/></button>
               </div>
               <div className="min-w-0 flex-1 pt-3 sm:pt-0">
-                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">{editingName ? <div className="flex min-w-0 items-center gap-1"><input aria-label="Nombre de creador" value={nameDraft} maxLength={80} onChange={e => setNameDraft(e.target.value)} className="min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm" /><button type="button" disabled={saving} aria-label="Guardar nombre" onClick={() => void saveName()}><Check size={17}/></button><button type="button" aria-label="Cancelar edición de nombre" onClick={() => setEditingName(false)}><X size={17}/></button></div> : <div className="flex min-w-0 items-center gap-1"><h2 className="min-w-0 truncate text-lg font-semibold leading-tight sm:text-3xl">{alias}</h2><button type="button" aria-label="Editar nombre" onClick={() => {setNameDraft(alias);setProfileError('');setEditingName(true);}} className="shrink-0 p-1 text-muted-foreground"><Pencil size={15}/></button></div>}{founderVerified && <span title="Fundadora verificada de ECHO" aria-label="Fundadora verificada de ECHO"><BadgeCheck className="h-5 w-5 shrink-0 fill-primary text-primary-foreground sm:h-6 sm:w-6" /></span>}</div>
-                {founderVerified && <p className="mt-1 text-xs font-semibold text-primary">CEO &amp; Founder of ECHO</p>}
+                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">{editingName ? <div className="flex min-w-0 items-center gap-1"><input aria-label="Nombre de creador" value={nameDraft} maxLength={80} onChange={e => setNameDraft(e.target.value)} className="min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm" /><button type="button" disabled={saving} aria-label="Guardar nombre" onClick={() => void saveName()}><Check size={17}/></button><button type="button" aria-label="Cancelar edición de nombre" onClick={() => setEditingName(false)}><X size={17}/></button></div> : <div className="flex min-w-0 items-center gap-1"><h2 className="min-w-0 truncate text-lg font-semibold leading-tight sm:text-3xl">{alias}</h2><button type="button" aria-label="Editar nombre" onClick={() => {setNameDraft(alias);setProfileError('');setEditingName(true);}} className="shrink-0 p-1 text-muted-foreground"><Pencil size={15}/></button></div>}{verificationRole && <span title="Cuenta verificada de ECHO" aria-label="Cuenta verificada de ECHO"><BadgeCheck className="h-5 w-5 shrink-0 fill-primary text-primary-foreground sm:h-6 sm:w-6" /></span>}</div>
+                {verificationRole && <p className="mt-1 text-xs font-semibold text-primary">{verificationRole === "owner_lifetime" ? "CEO & Founder of ECHO" : "First ECHO Tester"}</p>}
                 {editing ? <div className="mt-2 space-y-2"><div className="flex items-center gap-2"><span className="text-muted-foreground">@</span><input aria-label="Nuevo nombre de usuario" value={draft} maxLength={30} onChange={e => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" aria-label="Guardar usuario" disabled={saving} onClick={() => void saveUsername()} className="rounded-full p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" aria-label="Cancelar edición" onClick={() => {setEditing(false);setError('');}} className="rounded-full p-2"><X size={18}/></button></div>{error && <p role="alert" className="text-xs text-destructive">{error}</p>}<p className="text-xs text-muted-foreground">Este alias es independiente de tu email de inicio de sesión.</p></div> : <div className="mt-1 flex items-center gap-2"><p className="truncate text-sm text-muted-foreground">@{username}</p><button type="button" aria-label="Editar nombre de usuario" title="Editar nombre de usuario" onClick={() => {setDraft(username);setError('');setEditing(true);}} className="rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
               </div>
-              <span className="hidden shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground sm:inline-flex">Perfil privado</span>
+              <span className="hidden shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground sm:inline-flex">{socialProfile?.visibility === "public" ? "Perfil público" : "Perfil privado"}</span>
             </div>
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
             {editingBio ? <div className="space-y-2"><div className="flex items-center gap-2" role="toolbar" aria-label="Formato de biografía"><button type="button" onClick={() => formatBio('**', '**')} aria-label="Negrita" title="Negrita" className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold">B</button><button type="button" onClick={() => formatBio('*', '*')} aria-label="Cursiva" title="Cursiva" className="rounded-lg border border-border px-3 py-1.5 text-sm italic">I</button><button type="button" onClick={() => formatBio('__', '__')} aria-label="Subrayado" title="Subrayado" className="rounded-lg border border-border px-3 py-1.5 text-sm underline">U</button></div><textarea ref={bioInputRef} aria-label="Biografía de Creator Hub" value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder="Contá algo sobre vos…" className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 caracteres</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">Cancelar</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{savingBio ? 'Guardando…' : 'Guardar biografía'}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 max-w-fit whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{renderBio(bio)}</p><button type="button" aria-label="Editar biografía" title="Editar biografía" onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
             <div className="space-y-2">
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline underline-offset-4 hover:text-foreground">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
+            </div>
+            <div className="rounded-2xl border border-border p-4 space-y-4">
+              <h3 className="font-semibold">Privacidad de Creator Hub</h3>
+              {!socialReady ? <p className="text-sm text-muted-foreground">Los ajustes sociales estarán disponibles cuando se habilite el servidor de Creator Hub.</p> : <>
+                <label className="block space-y-2 text-sm"><span>Visibilidad del perfil</span>
+                  <select aria-label="Visibilidad del perfil" disabled={socialSaving} value={socialProfile?.visibility ?? 'private'} onChange={e => void saveSocialPreferences(e.target.value as 'private' | 'public', socialProfile?.messagePrivacy ?? 'requests')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
+                    <option value="private">Privado · aprobar seguidores</option><option value="public">Público · cualquiera puede seguirte</option>
+                  </select>
+                </label>
+                <label className="block space-y-2 text-sm"><span>Quién puede enviarte mensajes</span>
+                  <select aria-label="Privacidad de mensajes" disabled={socialSaving} value={socialProfile?.messagePrivacy ?? 'requests'} onChange={e => void saveSocialPreferences(socialProfile?.visibility ?? 'private', e.target.value as 'everyone' | 'requests' | 'nobody')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
+                    <option value="everyone">Todos</option><option value="requests">Solicitudes · revisar antes de aceptar</option><option value="nobody">Nadie puede iniciar un chat</option>
+                  </select>
+                </label>
+                <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil. Los mensajes estarán disponibles cuando se habilite su sistema de moderación.</p>
+              </>}
+            </div>
+            <div className="rounded-2xl border border-border p-4 space-y-3">
+              <h3 className="font-semibold">Buscar personas</h3>
+              <div className="flex gap-2"><input aria-label="Buscar por nombre o arroba" value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder="Nombre o @usuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">Buscar</button></div>
+              {peopleFeedback && <p role="status" className="text-xs text-muted-foreground">{peopleFeedback}</p>}
+              {peopleResults.map(person => (
+                <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
+                  <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {person.visibility === 'private' ? 'Privado' : 'Público'}</p></div>
+                  <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(person.ownerId)} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Mensaje privado</button>
+                </div>
+              ))}
+            </div>
+            {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between"><h3 className="font-semibold">Chat con {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">Actualizar</button></div>
+              <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
+                {chatMessages.length === 0 && <p className="text-xs text-muted-foreground">Todavía no hay mensajes.</p>}
+                {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.kind === "voice" && message.objectPath ? <HumanVoicePlayback objectPath={message.objectPath} durationSeconds={message.durationSeconds ?? 0} /> : message.body}</div>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {message.reactions?.map((reaction, index) => <span key={index} className="text-xs">{reaction.emoji}</span>)}
+                    <button type="button" onClick={() => setReactingMessage(reactingMessage === message.id ? null : message.id)} aria-label="Reaccionar" className="rounded-full px-2 text-xs text-muted-foreground hover:bg-secondary">☺ +</button>
+                  </div>
+                  {reactingMessage === message.id && <div className="flex flex-wrap gap-1 rounded-xl bg-background p-1">
+                    {['❤️','😂','🥹','😍','👍','🔥','😮','😢'].map(emoji => <button type="button" key={emoji} onClick={() => { setReactingMessage(null); void toggleReaction(message.id, emoji, Boolean(message.reactions?.some(r => r.emoji === emoji && r.ownerId === user?.id))); }} className="rounded-lg p-1 hover:bg-secondary" aria-label={`Reaccionar con ${emoji}`}>{emoji}</button>)}
+                  </div>}
+                </div>)}
+                {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} está escribiendo</span><span className="animate-pulse">● ● ●</span></div>}
+              </div>
+              {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
+              <HumanVoiceRecorder key={activeChat.ownerId} targetOwnerId={activeChat.ownerId} onSent={() => refreshHumanChat(activeChat.ownerId)} />
+              <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder="Escribí un mensaje…" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Enviar</button></div>
+            </div>}
+            <div className="rounded-2xl border border-border p-4 space-y-4">
+              <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Bandeja de solicitudes</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">Actualizar</button></div>
+              {inboxError && <p role="alert" className="text-xs text-destructive">{inboxError}</p>}
+              {([['Seguidores', followInbox, 'requests'], ['Mensajes', messageInbox, 'message-requests']] as const).map(([label, requests, kind]) => (
+                <div key={kind} className="space-y-2">
+                  <h4 className="text-sm font-medium">{label} · {requests.length}</h4>
+                  {requests.length === 0 ? <p className="text-xs text-muted-foreground">No hay solicitudes pendientes.</p> : requests.map(request => (
+                    <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{request.displayName}</p><p className="truncate text-xs text-muted-foreground">@{request.username}</p></div>
+                      <div className="flex gap-2"><button type="button" disabled={inboxBusy} onClick={() => void decideInbox(kind, request.id, 'reject')} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Rechazar</button><button type="button" disabled={inboxBusy} onClick={() => void decideInbox(kind, request.id, 'accept')} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">Aceptar</button></div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">La mensajería real se habilitará después de validar sus controles de privacidad.</p>
             </div>
             <div className="border-t border-border pt-5">
               <div className="grid grid-cols-2 gap-3">

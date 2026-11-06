@@ -281,3 +281,22 @@ export function postUrl(postId: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   return `${window.location.origin}${base}/p/${postId}`;
 }
+
+/** Upload a recorded voice note to private storage and validate its bytes server-side. */
+export async function uploadPrivateVoice(blob: Blob): Promise<string> {
+  const contentType = blob.type.split(';')[0];
+  if (!['audio/webm', 'audio/mp4', 'audio/ogg'].includes(contentType) ||
+      blob.size < 1 || blob.size > 15 * 1024 * 1024) throw new Error('Formato o tamaño de audio no permitido.');
+  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+    '/api/storage/uploads/request-url',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'voice-message', size: blob.size, contentType }), responseType: 'json' },
+  );
+  const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+  if (!uploaded.ok) throw new Error('No pudimos subir el audio.');
+  await customFetch('/api/storage/uploads/claim', {
+    method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objectPath }),
+  });
+  return objectPath;
+}
