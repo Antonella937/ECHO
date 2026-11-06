@@ -117,7 +117,7 @@ export function createCreatorHubSocialRouter(): IRouter {
     const parsed = reactionSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_REACTION" }); return; }
     const result = await pool.query(
-      "INSERT INTO echo_creator_message_reactions(message_id,reactor_owner_id,emoji) SELECT id,$1,$3 FROM echo_creator_direct_messages WHERE id=$2 AND (sender_owner_id=$1 OR recipient_owner_id=$1) ON CONFLICT DO NOTHING RETURNING message_id",
+      "INSERT INTO echo_creator_message_reactions(message_id,reactor_owner_id,emoji) SELECT m.id,$1,$3 FROM echo_creator_direct_messages m WHERE m.id=$2 AND (m.sender_owner_id=$1 OR m.recipient_owner_id=$1) AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b WHERE (b.blocker_owner_id=m.sender_owner_id AND b.blocked_owner_id=m.recipient_owner_id) OR (b.blocker_owner_id=m.recipient_owner_id AND b.blocked_owner_id=m.sender_owner_id)) ON CONFLICT DO NOTHING RETURNING message_id",
       [req.userId, parsed.data.messageId, parsed.data.emoji],
     );
     res.json({ added: Boolean(result.rowCount) });
@@ -300,6 +300,11 @@ export function createCreatorHubSocialRouter(): IRouter {
       [req.userId, target],
     );
     if (blocked.rowCount) { res.status(404).json({ error: "CONVERSATION_NOT_FOUND" }); return; }
+    const relationship = await pool.query(
+      "SELECT 1 FROM echo_creator_message_requests WHERE status='accepted' AND ((sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1)) UNION SELECT 1 FROM echo_creator_direct_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) UNION SELECT 1 FROM echo_creator_voice_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) LIMIT 1",
+      [req.userId, target],
+    );
+    if (!relationship.rowCount) { res.status(404).json({ error: "CONVERSATION_NOT_FOUND" }); return; }
     const messages = await pool.query(
       `SELECT id, sender_owner_id AS "senderOwnerId", recipient_owner_id AS "recipientOwnerId",
        body, created_at AS "createdAt",
