@@ -26,6 +26,7 @@ export interface SocialActions {
   hideMessage(id: string): void;
   editMessage(id: string, text: string): void;
   toggleSaveMessage(id: string): void;
+  applyTweakedMessage(id: string, expectedText: string, nextText: string): void;
   setAppearance(appearance: Appearance): void;
   setImageStyle(style: ImageStyle): void;
   createAccount(input: AccountInput): string;
@@ -238,6 +239,11 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (!message || message.senderId !== myId()) throw new Error('Solo podés editar tus propios mensajes.');
         if (!text.trim() || text.length > 10000) throw new Error('El mensaje debe tener entre 1 y 10000 caracteres.');
         coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id ? { ...m, text: text.trim(), editedAt: new Date().toISOString() } : m) }));
+      },
+      applyTweakedMessage(id, expectedText, nextText) {
+        const m = cur().messages.find(m => m.id === id);
+        if (!m || m.senderId === myId() || m.origin === 'user' || m.text !== expectedText || !nextText.trim() || nextText.length > 2000) throw new Error('La respuesta cambió. Volvé a generar el ajuste.');
+        coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(item => item.id === id && item.text === expectedText ? { ...item, text: nextText.trim(), editedAt: new Date().toISOString() } : item) }));
       },
       toggleSaveMessage(id) {
         const message = cur().messages.find(m => m.id === id);
