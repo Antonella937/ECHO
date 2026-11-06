@@ -86,6 +86,36 @@ router.post("/universe/relationships/approve", async (req, res): Promise<void> =
   res.json(result);
 });
 
+// Owner-scoped, read-only relationship trust history.
+router.get("/universe/relationships/trust/history", async (req, res): Promise<void> => {
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const actorId = req.query.actorId, targetId = req.query.targetId;
+  if (typeof actorId !== "string" || !actorId || actorId.length > 100 ||
+      typeof targetId !== "string" || !targetId || targetId.length > 100 ||
+      universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_TRUST_HISTORY_QUERY" }); return;
+  }
+  const [universe] = await db.select().from(echoUniversesTable).where(and(
+    eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId),
+  )).limit(1);
+  if (!universe || universe.archivedAt || universe.deletedAt) {
+    res.status(404).json({ error: "UNIVERSE_UNAVAILABLE" }); return;
+  }
+  const entries = await db.select({
+    memoryId: echoMemoryArchiveTable.memoryId,
+    sourceId: echoMemoryArchiveTable.sourceId,
+    content: echoMemoryArchiveTable.content,
+    occurredAt: echoMemoryArchiveTable.occurredAt,
+  }).from(echoMemoryArchiveTable).where(and(
+    eq(echoMemoryArchiveTable.ownerId, req.userId!),
+    eq(echoMemoryArchiveTable.universeId, universeId),
+    eq(echoMemoryArchiveTable.characterId, actorId),
+    eq(echoMemoryArchiveTable.targetId, targetId),
+    eq(echoMemoryArchiveTable.kind, "relationship_trust"),
+  )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(50);
+  res.json({ entries });
+});
+
 // Read-only candidate review. Never changes trust or marks evidence verified.
 router.get("/universe/relationships/trust/candidates", async (req, res): Promise<void> => {
   const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
