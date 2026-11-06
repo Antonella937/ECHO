@@ -43,7 +43,7 @@ export function MessageSoundObserver() {
       show('messages', sender?.name ?? 'Nuevo mensaje', 'Te envió un mensaje en ECHO', 'echo-dm-' + message.id);
     }
     for (const notice of newNotices) {
-      const category: PushCategory = notice.type === 'like' ? 'likes' : notice.type === 'comment' || notice.type === 'reply' ? 'comments' : 'mentions';
+      const category: PushCategory = notice.kind === 'like' ? 'likes' : notice.kind === 'comment' || notice.kind === 'reply' ? 'comments' : 'mentions';
       show(category, 'Nueva actividad en ECHO', 'Tenés una nueva notificación', 'echo-activity-' + notice.id);
     }
   }, [state.messages, state.notifications, state.characters, universe, identity, ownerId]);
