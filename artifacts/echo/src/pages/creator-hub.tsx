@@ -229,15 +229,53 @@ export default function CreatorHubPage() {
     finally { setPeopleBusy(false); }
   }
   const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
-  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string }>>([]);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string; reactions?: Array<{ emoji: string; ownerId: string }> }>>([]);
   const [chatDraft, setChatDraft] = useState('');
+  const [otherTyping, setOtherTyping] = useState(false);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reactingMessage, setReactingMessage] = useState<string | null>(null);
+  async function refreshHumanChat(ownerId: string) {
+    const [history, presence] = await Promise.all([
+      customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' }),
+      customFetch<{ typing: boolean }>('/api/creator-hub/social/typing/' + encodeURIComponent(ownerId), { responseType: 'json' }),
+    ]);
+    setChatMessages(history.messages);
+    setOtherTyping(presence.typing);
+  }
+  useEffect(() => {
+    if (!activeChat) return;
+    const ownerId = activeChat.ownerId;
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') void refreshHumanChat(ownerId).catch(() => {}); }, 3000);
+    return () => {
+      clearInterval(interval);
+      if (typingTimeout.current) clearTimeout(typingTimeout.current);
+      void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: ownerId, typing: false }) }).catch(() => {});
+    };
+  }, [activeChat?.ownerId]);
+  function updateChatDraft(value: string) {
+    setChatDraft(value);
+    if (!activeChat) return;
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, typing: Boolean(value.trim()) }) }).catch(() => {});
+    if (value.trim()) typingTimeout.current = setTimeout(() => {
+      void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: activeChat.ownerId, typing: false }) }).catch(() => {});
+    }, 4500);
+  }
+  async function toggleReaction(messageId: string, emoji: string, alreadyReacted: boolean) {
+    if (!activeChat) return;
+    try {
+      await customFetch('/api/creator-hub/social/reactions', { method: alreadyReacted ? 'DELETE' : 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, emoji }) });
+      await refreshHumanChat(activeChat.ownerId);
+    } catch { setChatError('No pudimos guardar la reacción.'); }
+  }
+
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
   async function openHumanChat(ownerId: string, name: string) {
     setActiveChat({ ownerId, name }); setChatError('');
     try {
       const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
-      setChatMessages(result.messages);
+      setChatMessages(result.messages); setOtherTyping(false);
     } catch { setChatError('No pudimos abrir esta conversación.'); }
   }
   async function sendHumanMessage() {
@@ -342,10 +380,20 @@ export default function CreatorHubPage() {
               <div className="flex items-center justify-between"><h3 className="font-semibold">Chat con {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">Actualizar</button></div>
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
                 {chatMessages.length === 0 && <p className="text-xs text-muted-foreground">Todavía no hay mensajes.</p>}
-                {chatMessages.map(message => <p key={message.id} className="rounded-lg bg-background px-3 py-2 text-sm break-words">{message.body}</p>)}
+                {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.body}</div>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {message.reactions?.map((reaction, index) => <span key={index} className="text-xs">{reaction.emoji}</span>)}
+                    <button type="button" onClick={() => setReactingMessage(reactingMessage === message.id ? null : message.id)} aria-label="Reaccionar" className="rounded-full px-2 text-xs text-muted-foreground hover:bg-secondary">☺ +</button>
+                  </div>
+                  {reactingMessage === message.id && <div className="flex flex-wrap gap-1 rounded-xl bg-background p-1">
+                    {['❤️','😂','🥹','😍','👍','🔥','😮','😢'].map(emoji => <button type="button" key={emoji} onClick={() => { setReactingMessage(null); void toggleReaction(message.id, emoji, Boolean(message.reactions?.some(r => r.emoji === emoji && r.ownerId === user?.id))); }} className="rounded-lg p-1 hover:bg-secondary" aria-label={`Reaccionar con ${emoji}`}>{emoji}</button>)}
+                  </div>}
+                </div>)}
+                {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} está escribiendo</span><span className="animate-pulse">● ● ●</span></div>}
               </div>
               {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
-              <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => setChatDraft(e.target.value)} placeholder="Escribí un mensaje…" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Enviar</button></div>
+              <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder="Escribí un mensaje…" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Enviar</button></div>
             </div>}
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Bandeja de solicitudes</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">Actualizar</button></div>
