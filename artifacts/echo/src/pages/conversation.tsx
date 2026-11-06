@@ -5,7 +5,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Check, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -294,6 +294,8 @@ export default function ConversationPage() {
               onReply={() => setQuoteId(m.id)}
               onSave={() => { try { actions.toggleSaveMessage(m.id); } catch (e) { setError((e as Error).message); } }}
               onEdit={(value) => { try { actions.editMessage(m.id, value); } catch (e) { setError((e as Error).message); } }}
+              onApplyTweak={(expected, value) => { try { actions.applyTweakedMessage(m.id, expected, value); return true; } catch (e) { setError((e as Error).message); return false; } }}
+              universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'}
               onJump={jumpTo}
               hiding={hiding === m.id}
               onToggleHiding={() => setHiding(h => h === m.id ? null : m.id)}
@@ -445,18 +447,33 @@ function summarize(m: Message, t: (key: string) => string): string {
   return t('Mensaje');
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
   canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
   onSave(): void; onEdit(value: string): void;
+  onApplyTweak(expected: string, value: string): boolean; universeId: string;
 }) {
   const t = useConversationText();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.text);
+  const [tweakOpen, setTweakOpen] = useState(false);
+  const [tweakInstruction, setTweakInstruction] = useState('');
+  const [tweakPreview, setTweakPreview] = useState('');
+  const [tweakOriginal, setTweakOriginal] = useState('');
+  const [tweakBusy, setTweakBusy] = useState(false);
+  const [tweakError, setTweakError] = useState(false);
+  const generateTweak = async () => {
+    if (!tweakInstruction.trim() || tweakBusy) return;
+    setTweakBusy(true); setTweakError(false); setTweakPreview(''); setTweakOriginal(m.text);
+    try {
+      const result = await customFetch<{ text: string }>('/api/ai-engine/tweak-message', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, messageId: m.id, instructions: tweakInstruction.trim() }) });
+      setTweakPreview(result.text);
+    } catch { setTweakError(true); } finally { setTweakBusy(false); }
+  };
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearPress = () => { if (pressTimer.current) clearTimeout(pressTimer.current); pressTimer.current = null; };
   useEffect(() => () => clearPress(), []);
@@ -499,6 +516,14 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         <textarea autoFocus maxLength={10000} value={draft} onChange={e => setDraft(e.target.value)} className="min-h-20 w-full resize-y rounded-lg border border-input bg-background p-2 text-sm" aria-label={t('Editar mensaje')} />
         <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(false)} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t('Cancelar')}</button><button type="submit" disabled={!draft.trim()} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">{t('Guardar cambios')}</button></div>
       </form>}
+      {tweakOpen && <div className="my-2 w-full max-w-xl space-y-2 rounded-xl border border-primary/40 bg-card p-3" data-testid={`tweak-message-${m.id}`}>
+        <label className="block text-xs font-semibold">{t('Instrucciones para la IA')}</label>
+        <textarea maxLength={1200} value={tweakInstruction} onChange={e => setTweakInstruction(e.target.value)} placeholder={t('¿Qué querés cambiar de esta respuesta?')} className="min-h-20 w-full resize-y rounded-lg border border-input bg-background p-2 text-sm" />
+        {tweakBusy && <p role="status" className="text-xs text-muted-foreground">{t('Generando ajuste…')}</p>}
+        {tweakError && <p role="alert" className="text-xs text-destructive">{t('No se pudo generar el ajuste. Intentá nuevamente.')}</p>}
+        {tweakPreview && <div className="rounded-xl bg-secondary p-3"><p className="mb-1 text-xs font-semibold">{t('Vista previa')}</p><p className="whitespace-pre-wrap text-sm">{tweakPreview}</p></div>}
+        <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => { setTweakOpen(false); setTweakPreview(''); }} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t('Cancelar')}</button><button type="button" disabled={tweakBusy || !tweakInstruction.trim()} onClick={() => void generateTweak()} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">{t(tweakPreview ? 'Regenerar ajuste' : 'Generar ajuste')}</button>{tweakPreview && <button type="button" onClick={() => { if (onApplyTweak(tweakOriginal, tweakPreview)) { setTweakOpen(false); setTweakPreview(''); } }} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground">{t('Aplicar ajuste')}</button>}</div>
+      </div>}
       {m.attachments?.length ? (
         <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
           {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
@@ -520,6 +545,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
           <button type="button" onClick={onSave} aria-label={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} title={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-save-${m.id}`}><Bookmark className={cn('h-4 w-4', m.savedByIds?.includes(meId) && 'fill-primary text-primary')} /></button>
+          {!mine && m.origin !== 'user' && <button type="button" onClick={() => { setTweakOpen(v => !v); setTweakPreview(''); }} aria-label={t('Ajustar con IA')} title={t('Ajustar con IA')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-tweak-${m.id}`}><Sparkles className="h-4 w-4" /></button>}
           {mine && <button type="button" onClick={() => { setDraft(m.text); setEditing(true); }} aria-label={t('Editar mensaje')} title={t('Editar mensaje')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-edit-${m.id}`}><Pencil className="h-4 w-4" /></button>}
           <button type="button" onClick={onToggleHiding} aria-label={t("Eliminar para mí")} title={t("Eliminar para mí")} aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
@@ -531,6 +557,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           <button type="button" onClick={() => { setMenuOpen(false); onReply(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Responder")}</button>
           <button type="button" onClick={() => { setMenuOpen(false); onToggleReacting(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Reaccionar")}</button>
           <button type="button" onClick={() => { setMenuOpen(false); onSave(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')}</button>
+          {!mine && m.origin !== 'user' && <button type="button" onClick={() => { setMenuOpen(false); setTweakOpen(true); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t('Ajustar con IA')}</button>}
           {mine && <button type="button" onClick={() => { setMenuOpen(false); setDraft(m.text); setEditing(true); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t('Editar mensaje')}</button>}
           <button type="button" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-xs">{t("Cerrar")}</button>
         </div>
