@@ -336,6 +336,7 @@ export async function runAutonomyLiveCycle(
       preview = await previewForOwner(ownerId, decisionInput, {
         read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
         vision: (id, state, input) => visionService.loadContext(id, state, input),
+        liveDmReply: dependencies.lane === 'dm' && opportunity.situation === 'dm',
       });
     } finally {
       activeDmTyping.delete(typingId);
