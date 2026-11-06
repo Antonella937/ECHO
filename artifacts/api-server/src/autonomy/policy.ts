@@ -170,6 +170,7 @@ export function chooseAutonomyOpportunity(input: {
   random?: () => number;
   minCooldownMinutes?: number;
   maxActionsPerDay?: number;
+  lane?: "dm" | "social";
 }): Opportunity {
   const { state, character } = input;
   const now = input.now ?? new Date();
@@ -208,12 +209,16 @@ export function chooseAutonomyOpportunity(input: {
   const latestReplyAt = state.messages
     .filter((message) => message.senderId === character.id && message.origin === "autonomy")
     .reduce((latest, message) => Math.max(latest, asTime(message.createdAt) ?? 0), 0);
-  if (unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
+  if (input.lane !== "social" && unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
       now.getTime() - latestReplyAt >= replyDelayMs) {
     return { situation: "dm", recipientId: unanswered.senderId,
       reasonCode: "OPPORTUNITY_SELECTED",
       reason: "A recent incoming direct message is awaiting a reply.",
       localHour: local.hour, timezone };
+  }
+
+  if (input.lane === "dm") {
+    return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "No eligible unanswered direct message.", localHour: local.hour, timezone };
   }
 
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
