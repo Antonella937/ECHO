@@ -107,7 +107,7 @@ export function AlphaConsentBoundary({ children }: { children: React.ReactNode }
     </div></Frame>;
   }
   if (consent.isLoading || !consent.data) {
-    return <Frame><div className="ep-complete" role="status" data-testid="status-consent-loading"><span className="ep-eyebrow">Comprobando borrador alfa…</span></div></Frame>;
+    return <Frame><div className="ep-complete" role="status" data-testid="status-consent-loading"><span className="ep-eyebrow">Cargando ECHO…</span></div></Frame>;
   }
   if (consent.data.draftAcknowledged) return <>{children}</>;
   const errorMessage = record.isError ? 'No se pudo registrar el borrador. Inténtalo de nuevo.' : null;
