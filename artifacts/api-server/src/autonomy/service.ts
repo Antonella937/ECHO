@@ -16,6 +16,7 @@ import {
   isAutonomyOwnerAuthorized,
 } from "./constants";
 import type { LiveExecutionOutcome } from "./executor";
+import { sendNewOwnerPush } from "../lib/onesignal-push";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -359,6 +360,16 @@ export async function runAutonomyLiveCycle(
       opportunity, decision: preview.decision, contextHash: preview.contextAudit.contextHash,
       model: preview.model, liveEnabled, now,
     });
+    if (outcome.status === "executed" && process.env.ECHO_ONESIGNAL_REST_API_KEY) {
+      // Delivery is best-effort, after the universe transaction has committed.
+      try {
+        const fresh = await dependencies.repository.read(ownerId, universeId);
+        const parsed = SaveUniverseBody.safeParse({ state: fresh.state, expectedRevision: fresh.revision });
+        if (parsed.success) await sendNewOwnerPush(ownerId, state, parsed.data.state);
+      } catch (error) {
+        console.warn("OneSignal dispatch failed", { reason: error instanceof Error ? error.name : "UNKNOWN" });
+      }
+    }
     return {
       status: outcome.status,
       reasonCode: "reasonCode" in outcome ? outcome.reasonCode : "EXECUTED",
