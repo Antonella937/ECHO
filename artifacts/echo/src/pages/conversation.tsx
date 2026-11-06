@@ -512,7 +512,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   return (
-    <li onContextMenu={(e) => { e.preventDefault(); clearPress(); setMenuOpen(true); }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) startGesture(touch.clientX, touch.clientY); }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
+    <li onContextMenu={(e) => { e.preventDefault(); if (window.matchMedia('(min-width: 640px)').matches) { clearPress(); setMenuOpen(true); } }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) { clearPress(); gesture.current = { x: touch.clientX, y: touch.clientY, opened: false, swiped: false }; } }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
@@ -557,19 +557,19 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
         </div>
       ) : null}
-      <div className={cn('flex w-full min-w-0 max-w-full items-center gap-1', mine ? 'flex-row-reverse' : 'flex-row')}>
+      <div className={cn('flex w-full min-w-0 max-w-full flex-col items-start gap-0.5 sm:items-center sm:gap-1', mine ? 'sm:flex-row-reverse items-end' : 'sm:flex-row items-start')}>
         {visibleText && (
           <p
             className={cn(
-              'min-w-0 max-w-[calc(100%-3rem)] sm:max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
+              'min-w-0 max-w-[92%] sm:max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
               mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-secondary text-foreground',
             )}
           >
             {visibleText}
           </p>
         )}
-        <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
-          {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
+        <span className="flex max-w-full shrink-0 flex-wrap gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
+          {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
           <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
           <button type="button" onClick={onSave} aria-label={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} title={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-save-${m.id}`}><Bookmark className={cn('h-4 w-4', m.savedByIds?.includes(meId) && 'fill-primary text-primary')} /></button>
