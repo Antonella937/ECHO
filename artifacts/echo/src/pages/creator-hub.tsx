@@ -283,6 +283,23 @@ export default function CreatorHubPage() {
   const [peopleResults, setPeopleResults] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const selectedPerson = peopleResults.find(person => person.ownerId === selectedPersonId);
+  const [viewedProfile, setViewedProfile] = useState<{ displayName: string; username: string; visibility: string; bio: string | null; following: boolean; requested: boolean } | null>(null);
+  const [viewedPosts, setViewedPosts] = useState<Publication[]>([]);
+  const [profileLoading, setProfileLoading] = useState(false);
+  useEffect(() => {
+    if (!selectedPersonId) { setViewedProfile(null); setViewedPosts([]); return; }
+    let cancelled = false;
+    setProfileLoading(true);
+    Promise.all([
+      customFetch<{ profile: NonNullable<typeof viewedProfile> }>('/api/creator-hub/social/profile/' + encodeURIComponent(selectedPersonId), { responseType: 'json' }),
+      customFetch<{ publications: Publication[] }>('/api/creator-hub/social/publications/' + encodeURIComponent(selectedPersonId), { responseType: 'json' }),
+    ]).then(([detail, posts]) => {
+      if (!cancelled) { setViewedProfile(detail.profile); setViewedPosts(posts.publications); }
+    }).catch(() => { if (!cancelled) setViewedProfile(null); })
+      .finally(() => { if (!cancelled) setProfileLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedPersonId]);
+
   const [conversations, setConversations] = useState<Array<{ownerId:string;displayName:string;username:string}>>([]);
   async function refreshConversations() {
     try {
@@ -417,6 +434,33 @@ export default function CreatorHubPage() {
   const initials = nameParts.length > 1
     ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
     : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
+  if (selectedPersonId) {
+    const person = viewedProfile ?? selectedPerson;
+    return <div className="min-h-[100dvh] bg-background text-foreground">
+      <header className="flex items-center gap-4 border-b border-border px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]">
+        <button type="button" onClick={() => setSelectedPersonId(null)} aria-label={ct("back")} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-secondary"><ArrowLeft size={22}/></button>
+        <span className="text-lg font-semibold">{ht("Perfil")}</span>
+      </header>
+      <main className="mx-auto max-w-2xl px-5 py-8">
+        {profileLoading && <p className="text-muted-foreground">{ht("Cargando…")}</p>}
+        {!profileLoading && !person && <p className="text-muted-foreground">{ht("No encontramos perfiles con ese nombre. La otra persona debe abrir Creator Hub al menos una vez.")}</p>}
+        {person && <div className="space-y-7">
+          <div className="h-40 rounded-3xl bg-[linear-gradient(125deg,hsl(263_18%_19%),hsl(336_15%_16%))] sm:h-52"/>
+          <div className="flex items-center gap-4">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-background bg-secondary text-2xl font-semibold">{person.displayName.split(/\\s+/).map(n=>n[0]).slice(0,2).join('').toUpperCase()}</div>
+            <div className="min-w-0"><h1 className="text-2xl font-semibold">{person.displayName}</h1><p className="break-all text-muted-foreground">@{person.username}</p></div>
+          </div>
+          {'bio' in person && person.bio && <p className="whitespace-pre-wrap text-sm leading-relaxed">{person.bio}</p>}
+          <div className="flex flex-wrap gap-3">
+            <button type="button" disabled={peopleBusy || person.following || person.requested} onClick={() => void followPerson(selectedPersonId)} className="rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-60">{ht(person.following ? 'Siguiendo' : person.requested ? 'Solicitado' : person.visibility === 'private' ? 'Solicitar seguir' : 'Seguir')}</button>
+            <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPersonId)} className="flex items-center gap-2 rounded-full border border-primary/40 px-5 py-3 text-primary"><MessageCircle size={18}/>{ht("Mensaje privado")}</button>
+          </div>
+          {person.visibility === 'private' && !person.following && <div className="rounded-2xl border border-border px-5 py-8 text-center"><LockKeyhole className="mx-auto mb-3 text-muted-foreground"/><p className="font-semibold">{ht("Perfil privado")}</p><p className="mt-2 text-sm text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p></div>}
+          {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="rounded-2xl border border-border p-5"><h3 className="font-semibold">{post.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{post.body}</p></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
+        </div>}
+      </main>
+    </div>;
+  }
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
       <header className="relative z-20 flex min-h-[88px] shrink-0 items-center justify-between gap-2 px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+24px)] text-foreground sm:min-h-[92px] lg:px-8 lg:pt-6">
@@ -477,14 +521,6 @@ export default function CreatorHubPage() {
               <div className="flex gap-2"><input aria-label={ct("findPeople")} value={peopleQuery} onChange={e => { setPeopleQuery(e.target.value); setPeopleFeedback(""); }} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder={ht("Nombre o @usuario")} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">{ct("search")}</button></div>
               {peopleBusy && <p role="status" className="text-xs text-muted-foreground">{ht("Buscando personas…")}</p>}
               {peopleFeedback && <p role="status" className="text-xs text-muted-foreground">{peopleFeedback}</p>}
-              {selectedPerson && <div className="rounded-2xl border border-primary/30 bg-secondary/30 p-4 space-y-4" aria-label={ht("Perfil")}>
-                <div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold">{selectedPerson.displayName}</h4><p className="text-sm text-muted-foreground">@{selectedPerson.username} · Perfil {ht(selectedPerson.visibility === 'private' ? 'Privado' : 'Público')}</p></div><button type="button" onClick={() => setSelectedPersonId(null)} aria-label={ct("back")} className="rounded-full p-2 text-muted-foreground"><X size={18}/></button></div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" disabled={peopleBusy || selectedPerson.following || selectedPerson.requested} onClick={() => void followPerson(selectedPerson.ownerId)} className="rounded-full bg-primary px-2 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{ht(selectedPerson.following ? 'Siguiendo' : selectedPerson.requested ? 'Solicitado' : selectedPerson.visibility === 'private' ? 'Solicitar seguir' : 'Seguir')}</button>
-                  <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPerson.ownerId)} className="flex items-center justify-center gap-2 rounded-full border border-primary/40 px-2 py-3 text-sm text-primary disabled:opacity-60"><MessageCircle size={16}/> Mensaje privado</button>
-                </div>
-                {selectedPerson.visibility === 'private' && !selectedPerson.following && <p className="text-xs text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p>}
-              </div>}
               {peopleResults.map(person => (
                 <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
                   <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {ht(person.visibility === 'private' ? 'Privado' : 'Público')}</p></div>
