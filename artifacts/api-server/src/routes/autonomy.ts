@@ -24,6 +24,7 @@ import {
   readOwnerControls,
   reserveDryRun,
   updateCharacterControl,
+  updateDmPreferences,
   updateOwnerKillSwitch,
   completeDryRun,
 } from "../autonomy/repository";
@@ -96,6 +97,9 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
         username: character.handle,
         enabled: control.enabled,
         dmEnabled: control.dmEnabled,
+        dmFrequency: control.dmFrequency ?? "sometimes",
+        dmMediaPreference: control.dmMediaPreference ?? "text",
+        dmInstructions: control.dmInstructions ?? "",
         maxActionsPerDay: control.maxActionsPerDay,
         minCooldownMinutes: control.minCooldownMinutes,
       };
@@ -130,13 +134,17 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
       const account = stored.success
         ? stored.data.state.characters.find((character) => character.id === update.characterId)
         : undefined;
-      if (!account || (account.archived && update.enabled)) {
+      if (!account || (account.archived && ("enabled" in update ? update.enabled : true))) {
         res.status(404).json({ error: "CHARACTER_NOT_FOUND_OR_ARCHIVED" }); return;
       }
-      if (update.enabled && !isAutonomyOwnerAuthorized(ownerId)) {
+      if ("enabled" in update && update.enabled && !isAutonomyOwnerAuthorized(ownerId)) {
         res.status(403).json({ error: "AUTONOMY_OWNER_NOT_AUTHORIZED" }); return;
       }
-      await updateCharacterControl(ownerId, account.id, update.enabled, universeId, update.lane ?? "social");
+      if ("dmPreferences" in update) {
+        await updateDmPreferences(ownerId, account.id, universeId, update.dmPreferences);
+      } else {
+        await updateCharacterControl(ownerId, account.id, update.enabled, universeId, update.lane ?? "social");
+      }
     }
     res.json(await ownerSettings(ownerId, universeId));
   } catch (error) {
