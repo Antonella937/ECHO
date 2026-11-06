@@ -1,3 +1,4 @@
+import { useConversationText } from '@/lib/conversation-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
@@ -35,6 +36,7 @@ function splitVoiceTranscript(text: string, hasAudio: boolean): { visibleText: s
 interface Pending { key: string; kind: MessageAttachment['type']; preview: string; name: string; uploading: boolean; file: File | Blob; durationSeconds?: number; attachment?: MessageAttachment; transcript?: string; transcriptionWarning?: string; error?: string }
 
 export default function ConversationPage() {
+  const t = useConversationText();
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
@@ -212,7 +214,7 @@ export default function ConversationPage() {
   });
 
   if (!other || other.id === me.id)
-    return <EmptyState title="Conversación no disponible" body="No puedes escribirte a ti mismo, aunque a veces apetezca." />;
+    return <EmptyState title={t("Conversación no disponible")} body={t("No puedes escribirte a ti mismo, aunque a veces apetezca.")} />;
 
   const uploading = pending.some(p => p.uploading);
   const failed = pending.some(p => p.error);
@@ -253,7 +255,7 @@ export default function ConversationPage() {
     <div className="flex min-h-[100dvh] min-w-0 flex-col overflow-x-clip">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="flex h-16 items-center gap-2 px-2">
-          <button onClick={back} aria-label="Volver" className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
+          <button onClick={back} aria-label={t("Volver")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
             <ChevronLeft className="h-6 w-6" strokeWidth={1.6} />
           </button>
           <Link href={`/profile/${other.id}`} className="flex min-w-0 items-center gap-3" data-testid="link-conversation-profile">
@@ -263,7 +265,7 @@ export default function ConversationPage() {
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
-          <button type="button" onClick={() => requestVoiceReply()} aria-label="Pedir una nota de voz" title="Pedir nota de voz" className="ml-auto tap grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-request-voice"><Mic className="h-5 w-5" /></button>
+          <button type="button" onClick={() => requestVoiceReply()} aria-label={t("Pedir una nota de voz")} title={t("Pedir nota de voz")} className="ml-auto tap grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-request-voice"><Mic className="h-5 w-5" /></button>
         </div>
       </header>
 
@@ -273,14 +275,14 @@ export default function ConversationPage() {
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
           <div className="text-xs text-muted-foreground">{other.occupation} · {other.location}</div>
         </div>
-        {messages.length === 0 && <p className="text-center text-sm text-muted-foreground" data-testid="text-conversation-empty">Todavía no os habéis escrito. Envía el primer mensaje para empezar.</p>}
+        {messages.length === 0 && <p className="text-center text-sm text-muted-foreground" data-testid="text-conversation-empty">{t("Todavía no os habéis escrito. Envía el primer mensaje para empezar.")}</p>}
         <ul className="flex flex-col gap-1.5">
           {messages.map((m, i) => (
             <Bubble
               key={m.id} m={m} mine={m.senderId === me.id} meId={me.id} otherId={other.id}
               showTime={i === 0 || new Date(m.createdAt).getTime() - new Date(messages[i - 1].createdAt).getTime() > 3 * 3600_000}
               state={state} quoted={m.quoteMessageId ? byId.get(m.quoteMessageId) ?? null : undefined}
-              names={{ [me.id]: 'Tú', [other.id]: other.name.split(' ')[0] }}
+              names={{ [me.id]: t('Tú'), [other.id]: other.name.split(' ')[0] }}
               isLastMine={m.id === lastMineId}
               reacting={reacting === m.id}
               onToggleReacting={() => setReacting(r => r === m.id ? null : m.id)}
@@ -312,10 +314,10 @@ export default function ConversationPage() {
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
             <span className="flex-1">{error}</span>
-            <button type="button" onClick={() => setError(null)} aria-label="Cerrar aviso" data-testid="button-dismiss-composer-error"><X className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => setError(null)} aria-label={t("Cerrar aviso")} data-testid="button-dismiss-composer-error"><X className="h-3.5 w-3.5" /></button>
           </div>
         )}
-        {voiceRequest && <p className="mb-2 rounded-xl bg-secondary/70 px-3 py-2 text-xs text-muted-foreground">Petición de audio: se enviará como mensaje. La generación de voz todavía requiere conectar el motor.</p>}
+        {voiceRequest && <p className="mb-2 rounded-xl bg-secondary/70 px-3 py-2 text-xs text-muted-foreground">{t("Petición de audio: se enviará como mensaje. La generación de voz todavía requiere conectar el motor.")}</p>}
         {quoteId && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border-l-2 border-primary bg-secondary/70 px-3 py-2" data-testid="composer-quote">
             <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -323,10 +325,10 @@ export default function ConversationPage() {
               <div className="font-semibold">Respondiendo a {quoted ? (quoted.senderId === me.id ? 'ti' : other.name.split(' ')[0]) : 'un mensaje'}</div>
               <div className="truncate text-muted-foreground">{quoted ? summarize(quoted) : 'Mensaje no disponible'}</div>
             </div>
-            <button type="button" onClick={() => setQuoteId(null)} aria-label="Cancelar cita" className="tap grid h-8 w-8 place-items-center rounded-full hover:bg-background" data-testid="button-cancel-quote"><X className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setQuoteId(null)} aria-label={t("Cancelar cita")} className="tap grid h-8 w-8 place-items-center rounded-full hover:bg-background" data-testid="button-cancel-quote"><X className="h-4 w-4" /></button>
           </div>
         )}
-        {recorder.status === 'recording' && recordingTip && <p className="mb-2 text-center text-xs text-muted-foreground">Grabando… Tocá el cuadrado para terminar y escuchar antes de enviar. El tacho descarta la nota.</p>}
+        {recorder.status === 'recording' && recordingTip && <p className="mb-2 text-center text-xs text-muted-foreground">{t("Grabando… Tocá el cuadrado para terminar y escuchar antes de enviar. El tacho descarta la nota.")}</p>}
         {pending.length > 0 && (
           <ul className="mb-2 flex gap-2 overflow-x-auto pb-1" data-testid="list-pending-attachments">
             {pending.map(p => (
@@ -334,10 +336,10 @@ export default function ConversationPage() {
                 {p.kind === 'image' && <img src={p.preview} alt="" className="h-20 w-20 object-cover" />}
                 {p.kind === 'video' && <video src={p.preview} muted playsInline preload="metadata" className="h-20 w-20 object-cover" />}
                 {p.kind === 'audio' && <VoicePreview src={p.preview} durationSeconds={p.durationSeconds} uploading={p.uploading} error={p.error} onRetry={() => retryUpload(p.key)} onDiscard={() => remove(p.key)} />}
-                {p.kind !== 'audio' && p.error && <button type="button" onClick={() => retryUpload(p.key)} className="mx-2 mb-1 rounded-md bg-secondary px-2 py-1 text-xs font-semibold" data-testid={`button-retry-attachment-${p.key}`}>Reintentar subida</button>}
+                {p.kind !== 'audio' && p.error && <button type="button" onClick={() => retryUpload(p.key)} className="mx-2 mb-1 rounded-md bg-secondary px-2 py-1 text-xs font-semibold" data-testid={`button-retry-attachment-${p.key}`}>{t("Reintentar subida")}</button>}
                 {p.kind !== 'audio' && (p.uploading || p.error) && (
                   <span className={cn('absolute inset-x-0 bottom-0 px-1.5 py-0.5 text-[10px]', p.error ? 'bg-destructive text-destructive-foreground' : 'bg-background/80 text-muted-foreground')}>
-                    {p.error ? 'Error al subir' : 'Subiendo…'}
+                    {p.error ? t('Error al subir') : t('Subiendo…')}
                   </span>
                 )}
                 {p.kind !== 'audio' && <button type="button" onClick={() => remove(p.key)} aria-label={`Quitar ${p.name}`} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-background/90" data-testid={`button-remove-attachment-${p.key}`}>
@@ -359,7 +361,7 @@ export default function ConversationPage() {
                   value={p.transcript ?? ''}
                   maxLength={10000}
                   rows={2}
-                  placeholder="Escribí acá lo que dijiste si la transcripción falló…"
+                  placeholder={t("Escribí acá lo que dijiste si la transcripción falló…")}
                   onChange={e => setPending(items => items.map(item =>
                     item.key === p.key ? { ...item, transcript: e.target.value, transcriptionWarning: undefined } : item))}
                   className="w-full resize-y rounded-lg border border-input bg-background p-2 text-sm focus:border-primary/60 focus:outline-none"
@@ -394,18 +396,18 @@ export default function ConversationPage() {
         )}
         {recorder.status !== 'idle' ? (
           <div className="flex items-center gap-2 pb-1" data-testid="status-recording">
-            <button type="button" onClick={() => { recorder.cancel(); setRecordingTip(false); }} aria-label="Descartar grabación" className="tap grid h-12 w-12 place-items-center rounded-full bg-secondary" data-testid="button-cancel-recording"><Trash2 className="h-5 w-5" /></button>
+            <button type="button" onClick={() => { recorder.cancel(); setRecordingTip(false); }} aria-label={t("Descartar grabación")} className="tap grid h-12 w-12 place-items-center rounded-full bg-secondary" data-testid="button-cancel-recording"><Trash2 className="h-5 w-5" /></button>
             <div className="flex h-12 flex-1 items-center gap-2 rounded-full border border-primary/50 bg-card px-5 text-[15px]">
               <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-destructive" />
-              <span role="status" aria-live="off">{recorder.status === 'requesting' ? 'Pidiendo micrófono…' : `${formatDuration(recorder.elapsed)} / ${formatDuration(MAX_RECORDING_MS / 1000)}`}</span>
+              <span role="status" aria-live="off">{recorder.status === 'requesting' ? t('Pidiendo micrófono…') : `${formatDuration(recorder.elapsed)} / ${formatDuration(MAX_RECORDING_MS / 1000)}`}</span>
             </div>
-            <button type="button" onClick={() => { recorder.stop(); setRecordingTip(false); }} disabled={recorder.status !== 'recording'} aria-label="Detener grabación" className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-stop-recording"><Square className="h-4 w-4 fill-current" /></button>
+            <button type="button" onClick={() => { recorder.stop(); setRecordingTip(false); }} disabled={recorder.status !== 'recording'} aria-label={t("Detener grabación")} className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-stop-recording"><Square className="h-4 w-4 fill-current" /></button>
           </div>
         ) : (
           <div className="flex items-center gap-2 pb-1">
             <input ref={fileRef} type="file" multiple hidden accept="image/*,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
               onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }} data-testid="input-attachment-file" />
-            <button type="button" onClick={() => fileRef.current?.click()} aria-label="Adjuntar foto, video o audio" className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-attach">
+            <button type="button" onClick={() => fileRef.current?.click()} aria-label={t("Adjuntar foto, video o audio")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-attach">
               <Paperclip className="h-5 w-5" strokeWidth={1.7} />
             </button>
             <input
@@ -417,11 +419,11 @@ export default function ConversationPage() {
               data-testid="input-message"
             />
             {!text.trim() && ready.length === 0 && !uploading ? (
-              <button type="button" onClick={() => { setRecordingTip(true); void recorder.start(); }} aria-label="Grabar nota de voz" className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-secondary" data-testid="button-record-voice">
+              <button type="button" onClick={() => { setRecordingTip(true); void recorder.start(); }} aria-label={t("Grabar nota de voz")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-secondary" data-testid="button-record-voice">
                 <Mic className="h-5 w-5" strokeWidth={1.8} />
               </button>
             ) : (
-              <button type="submit" disabled={!canSend} aria-label="Enviar mensaje" className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-send-message">
+              <button type="submit" disabled={!canSend} aria-label={t("Enviar mensaje")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-send-message">
                 <Send className="h-5 w-5" strokeWidth={1.8} />
               </button>
             )}
