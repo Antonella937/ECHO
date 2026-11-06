@@ -37,9 +37,9 @@ export function FounderSurprise() {
         onClick={() => { setStage(0); setOpen(true); }}
         aria-label="Volver a ver tu regalo de fundadora"
         title="Tu regalo de ECHO"
-        className="fixed bottom-[calc(var(--nav-clearance)+1.5rem)] right-4 z-40 grid h-12 w-12 place-items-center rounded-full border border-[#79536d] bg-[#271b2a] text-[#f0c7dc] shadow-xl lg:bottom-5"
+        className="fixed bottom-[calc(var(--nav-clearance)+3rem)] right-5 z-30 grid h-8 w-8 place-items-center rounded-md text-[#c7a4ba]/70 transition-colors hover:bg-[#271b2a] hover:text-[#f0c7dc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e6b3cd] lg:bottom-5"
         data-testid="button-founder-reopen"
-      ><span className="font-serif text-2xl italic">A</span></button>
+      ><span className="font-serif text-base italic">A</span></button>
       {open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/85 px-4 py-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Un mensaje para Ala" data-testid="dialog-founder-surprise">
           <div className="relative my-auto w-full max-w-[430px] rounded-[28px] border border-[#60445b] bg-[#151019] px-6 py-9 text-center text-[#f6edf3] shadow-2xl">
