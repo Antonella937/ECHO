@@ -29,7 +29,7 @@ export function RoutineSection({ config, set }: SectionProps) {
             <button type="button" onClick={() => upR({ entries: r.entries.filter((x) => x.id !== e.id) })} aria-label={t("Quitar bloque")} className="tap grid h-12 w-11 place-items-center rounded-full text-muted-foreground hover:text-destructive" data-testid={`button-remove-routine-${e.id}`}><Trash2 className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Select id={`rt-act-${e.id}`} label={t("Actividad")} value={e.activity} onChange={(activity) => up(e.id, { activity })} options={Object.fromEntries(Object.entries(ACTIVITIES).map(([key,value]) => [key,t(value)]))} />
+            <Select id={`rt-act-${e.id}`} label={t("Actividad")} value={e.activity} onChange={(activity) => up(e.id, { activity })} options={Object.fromEntries(Object.entries(ACTIVITIES).map(([key,value]) => [key,t(value)])) as Record<Entry['activity'], string>} />
             <Select id={`rt-rec-${e.id}`} label={t("Repetición")} value={e.recurrence} onChange={(recurrence) => up(e.id, recurrence === 'once' ? { recurrence, date: e.date ?? new Date().toISOString().slice(0, 10) } : { recurrence, date: null })} options={{ weekly: t("Semanal"), once: t("Una vez") }} />
           </div>
           {e.recurrence === 'once' ? (
