@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canUseBasicVoices } from "../lib/entitlements";
 import { readUniverse } from "../lib/universeRepository";
 import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -24,6 +25,7 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
     res.status(400).json({ error: "INVALID_VOICE_REQUEST" }); return;
   }
   try {
+    if (!await canUseBasicVoices(req.userId!)) { res.status(403).json({ error: "ECHO_PLUS_REQUIRED" }); return; }
     const snapshot = await readUniverse(req.userId!, universeId);
     const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
     if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
@@ -71,6 +73,7 @@ router.post("/voices/basic/listen", requireAuth, async (req, res) => {
     res.status(400).json({ error: "INVALID_LISTEN_REQUEST" }); return;
   }
   try {
+    if (!await canUseBasicVoices(req.userId!)) { res.status(403).json({ error: "ECHO_PLUS_REQUIRED" }); return; }
     const snapshot = await readUniverse(req.userId!, universeId);
     const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
     if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
@@ -125,6 +128,7 @@ router.post("/voices/basic/attach-to-dm", requireAuth, async (req, res) => {
     res.status(400).json({ error: "INVALID_VOICE_ATTACHMENT" }); return;
   }
   try {
+    if (!await canUseBasicVoices(req.userId!)) { res.status(403).json({ error: "ECHO_PLUS_REQUIRED" }); return; }
     const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
       .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath))).limit(1);
     if (!owned) { res.status(404).json({ error: "AUDIO_NOT_OWNED" }); return; }
