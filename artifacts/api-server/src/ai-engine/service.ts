@@ -10,6 +10,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   read: (ownerId: string, universeId?: string) => Promise<{ state: unknown; revision: number }>;
   provider: TextProvider;
   vision?: (ownerId: string, state: import('@workspace/api-zod').SocialState, input: CharacterDecisionInput) => Promise<VisionContext>;
+  liveDmReply?: boolean;
 }) {
   if (!ownerId) throw new EngineError('AUTHENTICATION_REQUIRED', 401);
   if (!PreviewCharacterDecisionBody.strict().safeParse(input).success) throw new EngineError('INVALID_PREVIEW_INPUT');
@@ -31,5 +32,5 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     ? await dependencies.vision(ownerId, parsed.data.state, input)
     : { analyses: {}, postSummaries: {} };
   return previewDecision(dependencies.provider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview');
 }
