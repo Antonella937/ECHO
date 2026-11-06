@@ -1,5 +1,5 @@
 import { useSharedShellText } from '@/lib/shared-shell-translations';
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
@@ -15,24 +15,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
   const inConversation = /^\/messages\/.+/.test(location);
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    const update = () => {
-      // Anchor to the actually visible iOS viewport, including its initial toolbar state.
-      document.documentElement.style.setProperty('--echo-visible-bottom', `${viewport.offsetTop + viewport.height}px`);
-    };
-    update();
-    viewport.addEventListener('resize', update);
-    viewport.addEventListener('scroll', update);
-    window.addEventListener('pageshow', update);
-    return () => {
-      viewport.removeEventListener('resize', update);
-      viewport.removeEventListener('scroll', update);
-      window.removeEventListener('pageshow', update);
-      document.documentElement.style.removeProperty('--echo-visible-bottom');
-    };
-  }, []);
   // Creator Hub is a full-screen destination, not a feed panel.
   if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
 
