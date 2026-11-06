@@ -97,7 +97,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
             <span className="ep-eyebrow">{t("Bienvenido a ECHO")}</span>
             <h1>{t("Ya puedes entrar.")}</h1>
             <p>{t('Tu universo')} <strong>{form.getValues('universeName')}</strong> y el perfil de <strong>{form.getValues('displayName')}</strong> están preparados. Lo que ocurra después, lo decides tú.</p>
-            <button type="button" className="ep-button" onClick={onEnter} data-testid="button-enter-echo">Entrar a ECHO <ArrowRight size={16} /></button>
+            <button type="button" className="ep-button" onClick={onEnter} data-testid="button-enter-echo">{t("Entrar a ECHO")} <ArrowRight size={16} /></button>
           </div>
         </section>
       </main>
@@ -108,7 +108,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
     <main className="echo-public ep-onboarding">
       <header className="ep-onboarding-nav">
         <Link href="/" className="ep-brand" aria-label="ECHO, inicio" data-testid="link-onboarding-brand"><span className="ep-mark">e</span><span>ECHO</span></Link>
-        <Link href="/faq" className="ep-text-link" data-testid="link-onboarding-help"><CircleHelp size={15} /> Ayuda</Link>
+        <Link href="/faq" className="ep-text-link" data-testid="link-onboarding-help"><CircleHelp size={15} /> {t("Ayuda")}</Link>
       </header>
       <section className="ep-onboarding-main">
         <div className="ep-onboarding-heading">
@@ -184,7 +184,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
                   )} />
                   <FormField control={form.control} name="bio" render={({ field }) => (
                     <FormItem className="ep-field">
-                      <FormLabel className="ep-field-label">Biografía <span className="ep-muted">{t("(opcional)")}</span></FormLabel>
+                      <FormLabel className="ep-field-label">{t("Biografía")} <span className="ep-muted">{t("(opcional)")}</span></FormLabel>
                       <FormControl><textarea {...field} className="ep-field-control" placeholder={t("Una pequeña pista sobre su mundo…")} maxLength={160} data-testid="input-bio" /></FormControl>
                       <span className="ep-field-hint">{field.value.length}/160</span>
                       <FormMessage />
@@ -198,7 +198,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
                   ? <button type="button" className="ep-step-back" onClick={goBack} disabled={saving} data-testid="button-onboarding-back"><ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />{t("Volver")}</button>
                   : <span className="ep-field-hint">{t('Paso')} {step + 1} {t('de')} 3</span>}
                 <button type="submit" className="ep-button" disabled={saving} data-testid="button-onboarding-continue">
-                  {saving ? <><LoaderCircle size={15} className="ep-saving-mark" /> Guardando…</> : <>{t(step === 2 ? 'Crear mi universo' : 'Continuar')} <ArrowRight size={15} /></>}
+                  {saving ? <><LoaderCircle size={15} className="ep-saving-mark" /> {t("Guardando…")}</> : <>{t(step === 2 ? 'Crear mi universo' : 'Continuar')} <ArrowRight size={15} /></>}
                 </button>
               </div>
             </form>
