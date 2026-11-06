@@ -1,5 +1,5 @@
 import { useSharedShellText } from '@/lib/shared-shell-translations';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
@@ -15,6 +15,24 @@ export function Shell({ children }: { children: ReactNode }) {
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
   const inConversation = /^\/messages\/.+/.test(location);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      // Anchor to the actually visible iOS viewport, including its initial toolbar state.
+      document.documentElement.style.setProperty('--echo-visible-bottom', `${viewport.offsetTop + viewport.height}px`);
+    };
+    update();
+    viewport.addEventListener('resize', update);
+    viewport.addEventListener('scroll', update);
+    window.addEventListener('pageshow', update);
+    return () => {
+      viewport.removeEventListener('resize', update);
+      viewport.removeEventListener('scroll', update);
+      window.removeEventListener('pageshow', update);
+      document.documentElement.style.removeProperty('--echo-visible-bottom');
+    };
+  }, []);
   // Creator Hub is a full-screen destination, not a feed panel.
   if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
 
@@ -120,7 +138,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       {!inConversation && (
-        <nav className="echo-dark-surface fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom,0px),0.25rem)] lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
+        <nav className="echo-dark-surface echo-mobile-nav fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom,0px),0.25rem)] lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
           <div className="mx-auto mb-0 flex h-[var(--nav-height)] max-w-[440px] items-center justify-around rounded-[26px] border border-border/80 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
             {items.map((it) => {
               const active = it.match(location);
