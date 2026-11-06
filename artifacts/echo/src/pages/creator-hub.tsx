@@ -1,3 +1,4 @@
+import { HumanVoicePlayback, HumanVoiceRecorder } from '@/components/echo/human-voice-note';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
 import { BadgeCheck, Camera, Check, Pencil, X } from 'lucide-react';
@@ -229,7 +230,7 @@ export default function CreatorHubPage() {
     finally { setPeopleBusy(false); }
   }
   const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
-  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string; reactions?: Array<{ emoji: string; ownerId: string }> }>>([]);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string; kind?: "text" | "voice"; objectPath?: string; durationSeconds?: number; reactions?: Array<{ emoji: string; ownerId: string }> }>>([]);
   const [chatDraft, setChatDraft] = useState('');
   const [otherTyping, setOtherTyping] = useState(false);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -381,7 +382,7 @@ export default function CreatorHubPage() {
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
                 {chatMessages.length === 0 && <p className="text-xs text-muted-foreground">Todavía no hay mensajes.</p>}
                 {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.body}</div>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.kind === "voice" && message.objectPath ? <HumanVoicePlayback objectPath={message.objectPath} durationSeconds={message.durationSeconds ?? 0} /> : message.body}</div>
                   <div className="flex flex-wrap gap-1 pt-1">
                     {message.reactions?.map((reaction, index) => <span key={index} className="text-xs">{reaction.emoji}</span>)}
                     <button type="button" onClick={() => setReactingMessage(reactingMessage === message.id ? null : message.id)} aria-label="Reaccionar" className="rounded-full px-2 text-xs text-muted-foreground hover:bg-secondary">☺ +</button>
@@ -393,6 +394,7 @@ export default function CreatorHubPage() {
                 {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} está escribiendo</span><span className="animate-pulse">● ● ●</span></div>}
               </div>
               {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
+              <HumanVoiceRecorder key={activeChat.ownerId} targetOwnerId={activeChat.ownerId} onSent={() => refreshHumanChat(activeChat.ownerId)} />
               <div className="flex gap-2"><input aria-label="Escribir mensaje" value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder="Escribí un mensaje…" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Enviar</button></div>
             </div>}
             <div className="rounded-2xl border border-border p-4 space-y-4">
