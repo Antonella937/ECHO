@@ -161,7 +161,11 @@ export function CreatorAccountPreview() {
             : t("No se muestran límites numéricos de IA hasta calibrarlos con costos reales.")}</p>
         </article>
       </section>
-
+      <div className="epc-account-return">
+        <button type="button" className="ep-text-link" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/settings'); }}>
+          <ArrowLeft size={16} /> {t("Volver")}
+        </button>
+      </div>
     </PreviewShell>
   );
 }
