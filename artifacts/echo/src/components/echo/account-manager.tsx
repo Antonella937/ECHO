@@ -1,3 +1,4 @@
+import { useAccountManagementText } from '@/lib/account-management-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Check, Pencil, Plus, SlidersHorizontal } from 'lucide-react';
@@ -11,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 /** Identity switcher + account management (active / archived). */
 export function AccountManager() {
+  const translate = useAccountManagementText();
   const { state, me, actions } = useSocial();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<'active' | 'archived'>('active');
@@ -26,7 +28,7 @@ export function AccountManager() {
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
               className={cn('h-10 flex-1 rounded-xl text-xs font-semibold transition-colors', tab === t ? 'bg-card text-foreground' : 'text-muted-foreground')}
               data-testid={`tab-accounts-${t}`}>
-              {t === 'active' ? 'Activas' : `Archivadas${archivedCount ? ` · ${archivedCount}` : ''}`}
+              {t === 'active' ? translate('Activas') : `${translate('Archivadas')}${archivedCount ? ` · ${archivedCount}` : ''}`}
             </button>
           ))}
         </div>
@@ -38,10 +40,10 @@ export function AccountManager() {
         <Plus className="h-4 w-4" /> Crear personaje
       </Link>
 
-      <div className="mt-3 flex flex-col gap-2" role={tab === 'active' ? 'radiogroup' : undefined} aria-label="Identidad activa">
+      <div className="mt-3 flex flex-col gap-2" role={tab === 'active' ? 'radiogroup' : undefined} aria-label={translate("Identidad activa")}>
         {list.length === 0 && (
           <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground" data-testid="text-accounts-empty">
-            {tab === 'archived' ? 'No hay cuentas archivadas. Todo sigue a la vista.' : 'Sin cuentas activas.'}
+            {tab === 'archived' ? translate('No hay cuentas archivadas. Todo sigue a la vista.') : translate('Sin cuentas activas.')}
           </p>
         )}
         {list.map((c) => {
@@ -55,7 +57,7 @@ export function AccountManager() {
                 onClick={() => {
                   if (active || c.archived) return;
                   actions.switchIdentity(c.id);
-                  toast({ title: `Ahora publicas como ${c.name}` });
+                  toast({ title: `${translate('Ahora publicas como ')}${c.name}` });
                   // Open the selected identity's own configuration immediately.
                   navigate(`/characters/${c.id}/edit`);
                 }}
@@ -73,10 +75,10 @@ export function AccountManager() {
                   </span>
                 )}
               </button>
-              <Link href={`/characters/${c.id}/edit`} aria-label={`Ficha de personaje de ${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`link-character-edit-${c.id}`}>
+              <Link href={`/characters/${c.id}/edit`} aria-label={`${translate('Ficha de personaje de ')}${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`link-character-edit-${c.id}`}>
                 <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
               </Link>
-              <button onClick={() => setEditing(c.id)} aria-label={`Editar ${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`button-edit-account-${c.id}`}>
+              <button onClick={() => setEditing(c.id)} aria-label={`${translate('Editar ')}${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`button-edit-account-${c.id}`}>
                 <Pencil className="h-4 w-4" strokeWidth={1.8} />
               </button>
             </div>
