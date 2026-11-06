@@ -273,49 +273,49 @@ export default function CreatePage() {
             data-testid="tab-media-ai"><Sparkles className="h-4 w-4" /> {t("Generar con IA")}</button>
         </div>
         {mediaSource === 'ai' && <section className="mb-5 rounded-2xl border border-border bg-card/60 p-4" data-testid="section-ai-image-compose">
-          <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Crear una imagen para {me.name}</div>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.</p>
-          {aiEditSource && <div className="mt-3 rounded-xl border border-border p-3 text-xs" data-testid="ai-edit-source"><p className="font-semibold">Modo edición · vista previa gratuita</p><img src={resolveMedia(aiEditSource)} alt="Imagen original para editar" className="mt-2 max-h-44 w-full rounded-lg object-contain" /><button type="button" className="mt-2 underline" onClick={() => { setAiEditSource(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }}>Volver a imagen nueva</button></div>}
-          <textarea aria-label="Descripción de imagen IA" value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
+          <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> {t('Crear una imagen para')} {me.name}</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.")}</p>
+          {aiEditSource && <div className="mt-3 rounded-xl border border-border p-3 text-xs" data-testid="ai-edit-source"><p className="font-semibold">{t("Modo edición · vista previa gratuita")}</p><img src={resolveMedia(aiEditSource)} alt={t("Imagen original para editar")} className="mt-2 max-h-44 w-full rounded-lg object-contain" /><button type="button" className="mt-2 underline" onClick={() => { setAiEditSource(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }}>{t("Volver a imagen nueva")}</button></div>}
+          <textarea aria-label={t("Descripción de imagen IA")} value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
             rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
             data-testid="input-ai-image-prompt" />
           <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-xs">
-            <div className="font-semibold">Estilo: {({ natural: 'Realismo natural', phone: 'Cámara de celular', analog: 'Analógica / 35 mm', editorial: 'Editorial', cinematic: 'Cinematográfica' } as const)[state.imageStyle ?? 'natural']}</div>
-            <div className="mt-1 text-muted-foreground">Referencia facial: {me.avatar ? 'foto de perfil' : 'sin foto'} · Referencias adicionales: {me.identity?.referenceImages?.length ?? 0}/5</div>
-            <div className="mt-1 text-muted-foreground">Descripciones: {me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente'} · {me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente'}</div>
-            <Link href={`/characters/${me.id}/edit`} className="mt-2 inline-block text-primary underline">Editar identidad visual</Link>
+            <div className="font-semibold">{t("Estilo:")} {t(({ natural: 'Realismo natural', phone: 'Cámara de celular', analog: 'Analógica / 35 mm', editorial: 'Editorial', cinematic: 'Cinematográfica' } as const)[state.imageStyle ?? 'natural'])}</div>
+            <div className="mt-1 text-muted-foreground">{t("Referencia facial:")} {me.avatar ? 'foto de perfil' : 'sin foto'} · Referencias adicionales: {me.identity?.referenceImages?.length ?? 0}/5</div>
+            <div className="mt-1 text-muted-foreground">{t("Descripciones:")} {me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente'} · {me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente'}</div>
+            <Link href={`/characters/${me.id}/edit`} className="mt-2 inline-block text-primary underline">{t("Editar identidad visual")}</Link>
           </div>
           {aiStatus && <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-xs" data-testid="ai-provider-status">
-            <div className="font-semibold">{aiStatus.enabled ? 'Generador disponible' : 'Generador pendiente de activación'}</div>
-            {!aiStatus.enabled && <p className="mt-1 text-muted-foreground">La vista previa es gratuita. Todavía no se envían solicitudes pagas.</p>}
+            <div className="font-semibold">{t(aiStatus.enabled ? 'Generador disponible' : 'Generador pendiente de activación')}</div>
+            {!aiStatus.enabled && <p className="mt-1 text-muted-foreground">{t("La vista previa es gratuita. Todavía no se envían solicitudes pagas.")}</p>}
             {aiStatus.prerequisites && <p className="mt-1 text-muted-foreground">
               Clave API: {aiStatus.prerequisites.openRouterKeyConfigured ? 'configurada' : 'pendiente'} · Almacenamiento: {aiStatus.prerequisites.privateStorageConfigured ? 'configurado' : 'pendiente'} · Proveedor: {aiStatus.prerequisites.providerValidated ? 'validado' : 'pendiente'} · Presupuesto: {aiStatus.prerequisites.budgetActivated ? 'habilitado' : 'bloqueado'}
             </p>}
           </div>}
           <button type="button" disabled={!aiPrompt.trim() || aiPreparing} onClick={() => void prepareAi()}
             className="mt-3 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40"
-            data-testid="button-ai-image-preview">{aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis'}</button>
+            data-testid="button-ai-image-preview">{t(aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis')}</button>
           <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-xs leading-relaxed" data-testid="label-ai-transfer-acknowledgement">
             <input type="checkbox" className="mt-0.5" checked={aiTransferAcknowledged} onChange={e => setAiTransferAcknowledged(e.target.checked)} data-testid="checkbox-ai-transfer-acknowledgement" />
             <span>Entiendo que, si activo una generación real, ECHO enviará mi descripción de la escena y hasta cuatro imágenes privadas de referencia del personaje a OpenRouter y al proveedor del modelo para crear la imagen. No debo incluir fotografías ajenas sin autorización ni datos sensibles. Esta confirmación es específica de la prueba de imágenes, no reemplaza los documentos legales definitivos ni habilita por sí sola el servicio.</span>
           </label>
           {aiPreview && aiPrepared && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
-            <div className="text-sm font-semibold">Vista previa de la solicitud</div>
-            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrepared.preparedPrompt}</p><p className="mt-2 text-xs text-muted-foreground">Referencias privadas seleccionadas: {aiPrepared.referenceCount ?? (aiEditSource ? 1 : 0)} · Estilo: {aiPrepared.style}</p>
+            <div className="text-sm font-semibold">{t("Vista previa de la solicitud")}</div>
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{aiPrepared.preparedPrompt}</p><p className="mt-2 text-xs text-muted-foreground">{t("Referencias privadas seleccionadas:")} {aiPrepared.referenceCount ?? (aiEditSource ? 1 : 0)} · Estilo: {aiPrepared.style}</p>
             {aiGeneratedPath ? <div className="mt-3 space-y-3" data-testid="ai-generated-result">
-              <img src={resolveMedia(aiGeneratedPath)} alt="Imagen generada para revisar" className="mx-auto max-h-80 w-full rounded-xl object-contain" />
+              <img src={resolveMedia(aiGeneratedPath)} alt={t("Imagen generada para revisar")} className="mx-auto max-h-80 w-full rounded-xl object-contain" />
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={acceptAi} className="h-11 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground" data-testid="button-ai-accept">Aprobar y continuar</button>
-                <button type="button" onClick={() => { setAiEditSource(aiGeneratedPath); setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-edit">Editar esta imagen</button>
-                <button type="button" onClick={() => { setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-regenerate">Otra versión</button>
+                <button type="button" onClick={acceptAi} className="h-11 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground" data-testid="button-ai-accept">{t("Aprobar y continuar")}</button>
+                <button type="button" onClick={() => { setAiEditSource(aiGeneratedPath); setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-edit">{t("Editar esta imagen")}</button>
+                <button type="button" onClick={() => { setAiGeneratedPath(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }} className="h-11 rounded-xl border border-border px-3 text-xs font-semibold" data-testid="button-ai-regenerate">{t("Otra versión")}</button>
               </div>
             </div> : <div className="mt-3 space-y-2">
               <button type="button" disabled={!aiStatus?.enabled || !aiTransferAcknowledged || aiGenerating} onClick={() => void generateAi()}
                 className="h-11 w-full rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-ai-generate">
-                {aiGenerating ? 'Generando…' : aiStatus?.enabled ? (aiEditSource ? 'Generar edición' : 'Generar imagen') : aiEditSource ? 'Edición pendiente de activación' : 'Generación pendiente de activación'}
+                {t(aiGenerating ? 'Generando…' : aiStatus?.enabled ? (aiEditSource ? 'Generar edición' : 'Generar imagen') : aiEditSource ? 'Edición pendiente de activación' : 'Generación pendiente de activación')}
               </button>
-              <p className="text-xs text-muted-foreground">{aiStatus?.enabled ? 'Generar puede consumir créditos. Revisá el presupuesto antes de continuar.' : 'Todavía no se envían solicitudes pagas. Podés subir una foto desde la otra pestaña.'}</p>
+              <p className="text-xs text-muted-foreground">{t(aiStatus?.enabled ? 'Generar puede consumir créditos. Revisá el presupuesto antes de continuar.' : 'Todavía no se envían solicitudes pagas. Podés subir una foto desde la otra pestaña.')}</p>
             </div>}
           </div>}
         </section>}
