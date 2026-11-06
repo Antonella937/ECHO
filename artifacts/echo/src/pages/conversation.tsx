@@ -21,7 +21,7 @@ import type { Message, MessageAttachment } from '@/domain/types';
 
 const REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
 
-interface Pending { key: string; kind: MessageAttachment['type']; preview: string; name: string; uploading: boolean; durationSeconds?: number; attachment?: MessageAttachment; error?: string }
+interface Pending { key: string; kind: MessageAttachment['type']; preview: string; name: string; uploading: boolean; file: File | Blob; durationSeconds?: number; attachment?: MessageAttachment; error?: string }
 
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
@@ -101,7 +101,7 @@ export default function ConversationPage() {
     const threadAtStart = activeThreadRef.current;
     for (const f of files) {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const entry: Pending = { key, kind: kindOf(f.type)!, preview: URL.createObjectURL(f), name: f instanceof File ? f.name : 'Nota de voz', uploading: true, durationSeconds: meta?.durationSeconds };
+      const entry: Pending = { key, kind: kindOf(f.type)!, preview: URL.createObjectURL(f), name: f instanceof File ? f.name : 'Nota de voz', uploading: true, file: f, durationSeconds: meta?.durationSeconds };
       setPending(p => [...p, entry]);
       uploadAttachment(f).then(
         a => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, attachment: { ...a, ...(meta?.durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(meta.durationSeconds) } : {}) } } : x)); },
@@ -109,6 +109,28 @@ export default function ConversationPage() {
       );
     }
   }, []);
+
+  const retryUpload = (key: string) => {
+    const item = pendingRef.current.find(p => p.key === key);
+    if (!item || item.uploading || !item.error) return;
+    const threadAtStart = activeThreadRef.current;
+    setPending(items => items.map(p => p.key === key ? { ...p, uploading: true, error: undefined } : p));
+    uploadAttachment(item.file).then(
+      attachment => {
+        if (activeThreadRef.current !== threadAtStart) return;
+        setPending(items => items.map(p => p.key === key ? {
+          ...p, uploading: false,
+          attachment: { ...attachment, ...(p.durationSeconds && !attachment.durationSeconds ? { durationSeconds: Math.round(p.durationSeconds) } : {}) },
+        } : p));
+      },
+      error => {
+        if (activeThreadRef.current !== threadAtStart) return;
+        setPending(items => items.map(p => p.key === key ? {
+          ...p, uploading: false, error: (error as Error).message || 'No se pudo subir.',
+        } : p));
+      },
+    );
+  };
 
   const recorder = useVoiceRecorder(
     (blob, secs) => { setRecordingTip(false); addFiles([blob], { durationSeconds: secs }); },
@@ -229,6 +251,7 @@ export default function ConversationPage() {
                 {p.kind === 'image' && <img src={p.preview} alt="" className="h-20 w-20 object-cover" />}
                 {p.kind === 'video' && <video src={p.preview} muted playsInline preload="metadata" className="h-20 w-20 object-cover" />}
                 {p.kind === 'audio' && <VoicePreview src={p.preview} durationSeconds={p.durationSeconds} uploading={p.uploading} error={p.error} onDiscard={() => remove(p.key)} />}
+                {p.error && <button type="button" onClick={() => retryUpload(p.key)} className="mx-2 mb-1 rounded-md bg-secondary px-2 py-1 text-xs font-semibold" data-testid={`button-retry-attachment-${p.key}`}>Reintentar subida</button>}
                 {(p.uploading || p.error) && (
                   <span className={cn('absolute inset-x-0 bottom-0 px-1.5 py-0.5 text-[10px]', p.error ? 'bg-destructive text-destructive-foreground' : 'bg-background/80 text-muted-foreground')}>
                     {p.error ? 'Error al subir' : 'Subiendo…'}
