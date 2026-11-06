@@ -439,7 +439,6 @@ export default function CreatorHubPage() {
             </>}
           </div>
         </section>
-        <p className="mx-auto mt-4 flex max-w-5xl items-start gap-2 px-6 pb-4 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. Las solicitudes de acceso y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
       </div>
       {adjustingAvatar && avatarImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 px-5 py-8" role="dialog" aria-modal="true" aria-label="Ajustar foto de perfil">
