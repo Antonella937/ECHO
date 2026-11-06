@@ -124,6 +124,7 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
 }
 
 export async function createAdditionalUniverse(ownerId: string, name: string, state: Record<string, unknown>) {
+  const membershipPlan = await resolveEchoPlan(ownerId);
   return db.transaction(async (tx) => {
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
     const entitlements = await lockEntitlement(tx, ownerId, asPlan(creatorSetup?.plan));
