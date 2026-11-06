@@ -183,9 +183,9 @@ export function createCreatorHubSocialRouter(): IRouter {
       if (!owned.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
       // A registered object is not proof of its type: independently inspect
       // the private stored bytes before linking them to a human DM.
-      const supabaseBase = process.env.SUPABASE_URL?.replace(/\\/$/, "");
+      const supabaseBase = process.env.SUPABASE_URL?.replace(new RegExp("/$"), "");
       const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!supabaseBase || !supabaseKey || !/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(supabaseBase)) {
+      if (!supabaseBase || !supabaseKey || !supabaseBase.startsWith("https://") || !supabaseBase.endsWith(".supabase.co")) {
         await client.query("ROLLBACK"); res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); return;
       }
       const stored = await fetch(supabaseBase + "/storage/v1/object/echo-media/" + objectPath.slice("/objects/".length), {
