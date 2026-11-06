@@ -84,7 +84,7 @@ export default function CreatePage() {
       if (mode === 'story' && items.length) {
         // story: single photo, picking again replaces
       } else if (files.length > limit) {
-        setError(`Máximo ${MAX_POST_MEDIA} fotos. Te quedan ${Math.max(0, limit)}; elegiste ${files.length}. Elegí menos.`);
+        setError(`${t('Máximo')} ${MAX_POST_MEDIA} ${t('fotos. Te quedan')} ${Math.max(0, limit)}; ${t('elegiste')} ${files.length}. ${t('Elegí menos.')}`);
         return;
       }
     }
@@ -92,7 +92,7 @@ export default function CreatePage() {
     const failures: string[] = [];
     try {
       for (let i = 0; i < files.length; i++) {
-        setProgress(files.length > 1 ? `Subiendo ${i + 1} de ${files.length}…` : 'Subiendo de forma privada…');
+        setProgress(files.length > 1 ? `${t('Subiendo')} ${i + 1} ${t('de')} ${files.length}…` : t('Subiendo de forma privada…'));
         try {
           const mid = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
           let item: PostMedia;
@@ -110,10 +110,10 @@ export default function CreatePage() {
             return cur.length >= MAX_POST_MEDIA ? cur : [...cur, item];
           });
         } catch (e) {
-          failures.push(`${files[i].name || `Foto ${i + 1}`}: ${(e as Error).message}`);
+          failures.push(`${files[i].name || `${t('Foto')} ${i + 1}`}: ${(e as Error).message}`);
         }
       }
-      if (failures.length) setError(`No se pudieron subir ${failures.length} foto(s). Las demás se conservaron. ${failures.join(' ')}`);
+      if (failures.length) setError(`${t('No se pudieron subir')} ${failures.length} ${t('foto(s). Las demás se conservaron.')} ${failures.join(' ')}`);
     } finally {
       setBusy(false);
       setProgress(null);
@@ -194,7 +194,7 @@ export default function CreatePage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    if (mediaSource === 'ai') { setError('La generación IA está en modo preparación. Cambiá a Subir foto o video para publicar.'); return; }
+    if (mediaSource === 'ai') { setError(t("La generación IA está en modo preparación. Cambiá a Subir foto o video para publicar.")); return; }
     if (!image) {
       setError(t('Elige una foto para continuar.'));
       return;
@@ -202,11 +202,11 @@ export default function CreatePage() {
     try {
       if (mode === 'story') {
         if (tooManyForStory) {
-          setError('Las historias admiten una sola foto. Quitá fotos hasta dejar una.');
+          setError(t("Las historias admiten una sola foto. Quitá fotos hasta dejar una."));
           return;
         }
         if (storyVideo) { setError(t('Las historias admiten solo fotos.')); return; }
-        if (musicPartial) { setError('Completá título y artista de la música, o dejá ambos vacíos.'); return; }
+        if (musicPartial) { setError(t("Completá título y artista de la música, o dejá ambos vacíos.")); return; }
         actions.createStory({ image, caption, closeFriendsOnly, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: t('Historia publicada'), description: `${t('Como')} ${me.name}` });
@@ -262,7 +262,7 @@ export default function CreatePage() {
             <button type="button" aria-pressed={!closeFriendsOnly} onClick={() => setCloseFriendsOnly(false)} className={cn('h-11 rounded-xl text-sm', !closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-everyone">{t("Todos")}</button>
             <button type="button" aria-pressed={closeFriendsOnly} onClick={() => setCloseFriendsOnly(true)} className={cn('h-11 rounded-xl text-sm', closeFriendsOnly ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-story-audience-close-friends">★ {t("Mejores amigos")}</button>
           </div>
-          {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} mejores amigos seleccionados. Podés editarlos en Ajustes.</p>}
+          {closeFriendsOnly && <p className="mt-2 text-xs text-muted-foreground">{state.closeFriends?.[me.id]?.length ?? 0} {t('mejores amigos seleccionados. Podés editarlos en Ajustes.')}</p>}
         </div>}
         <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-card p-1" role="tablist" aria-label={t("Origen de imagen")}>
           <button type="button" role="tab" aria-selected={mediaSource === 'upload'} onClick={() => setMediaSource('upload')}
@@ -322,11 +322,11 @@ export default function CreatePage() {
         <input ref={fileRef} type="file" accept={mode === 'post' ? 'image/*,video/mp4,video/webm' : 'image/*'} multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
         {mediaSource === 'upload' && (image ? (
           <div className="relative overflow-hidden rounded-[22px] bg-card py-0">
-            {!previewLoaded && <div className="absolute inset-0 z-10 flex items-center justify-center bg-card" role="status" aria-label="Procesando vista previa"><span className="text-sm text-muted-foreground">Procesando…</span></div>}
+            {!previewLoaded && <div className="absolute inset-0 z-10 flex items-center justify-center bg-card" role="status" aria-label={t("Procesando vista previa")}><span className="text-sm text-muted-foreground">{t('Procesando…')}</span></div>}
             {firstIsVideo ? (
               <video src={previewUrl} onLoadedData={() => setLoadedPreviewUrl(previewUrl)} controls playsInline preload="metadata" className="mx-auto block h-[min(240px,34dvh)] w-full bg-black object-contain" data-testid="video-preview" />
             ) : (
-              <img src={previewUrl} onLoad={() => setLoadedPreviewUrl(previewUrl)} alt={items.length > 1 ? `Vista previa, elemento 1 de ${items.length}` : 'Vista previa'} className={cn('mx-auto block object-cover', mode === 'story' ? 'aspect-[9/16] h-[min(240px,34dvh)] rounded-[18px]' : 'h-[min(240px,34dvh)] w-full')} data-testid="img-preview" />
+              <img src={previewUrl} onLoad={() => setLoadedPreviewUrl(previewUrl)} alt={items.length > 1 ? `${t('Vista previa, elemento 1 de')} ${items.length}` : t('Vista previa')} className={cn('mx-auto block object-cover', mode === 'story' ? 'aspect-[9/16] h-[min(240px,34dvh)] rounded-[18px]' : 'h-[min(240px,34dvh)] w-full')} data-testid="img-preview" />
             )}
             <button
               type="button"
@@ -350,7 +350,7 @@ export default function CreatePage() {
               <ImagePlus className="h-6 w-6" strokeWidth={1.5} />
             </span>
             <span className="font-display text-lg font-light">{t(busy ? 'Procesando…' : mode === 'post' ? 'Elige fotos o videos' : 'Elige una foto')}</span>
-            <span className="px-4 text-center text-xs text-muted-foreground">{busy ? progress ?? 'Subiendo de forma privada…' : mode === 'post' ? `Fotos o videos, hasta ${MAX_POST_MEDIA}. Se guardan en privado.` : 'JPG, PNG o HEIC compatible. Se guardará en tu cuenta.'}</span>
+            <span className="px-4 text-center text-xs text-muted-foreground">{busy ? progress ?? t('Subiendo de forma privada…') : mode === 'post' ? `${t('Fotos o videos, hasta')} ${MAX_POST_MEDIA}. ${t('Se guardan en privado.')}` : t('JPG, PNG o HEIC compatible. Se guardará en tu cuenta.')}</span>
           </button>
         ))}
 
@@ -371,24 +371,24 @@ export default function CreatePage() {
         {mediaSource === 'upload' && items.length > 0 && (mode === 'post' || items.length > 1) && (
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span data-testid="text-media-count">{items.length}/{MAX_POST_MEDIA} · fotos y videos MP4/WebM</span>
+              <span data-testid="text-media-count">{items.length}/{MAX_POST_MEDIA} · {t('fotos y videos MP4/WebM')}</span>
               {busy && <span aria-live="polite" data-testid="text-upload-progress">{progress}</span>}
             </div>
-            <ol className="no-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Orden de las fotos">
+            <ol className="no-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label={t("Orden de las fotos")}>
               {items.map((m, i) => (
                 <li key={m.id} data-media-id={m.id} className="w-[132px] shrink-0 rounded-2xl border border-border bg-card p-1.5" data-testid={`item-media-${i}`}>
                   <div className="relative">
                     {m.type === 'video' ? (
-                      <video src={resolveMedia(m.url)} muted playsInline preload="metadata" aria-label={`Video ${i + 1} de ${items.length}`} className="aspect-[4/5] w-full rounded-xl bg-black object-cover" data-testid={`video-media-preview-${i}`} />
+                      <video src={resolveMedia(m.url)} muted playsInline preload="metadata" aria-label={`${t('Video')} ${i + 1} ${t('de')} ${items.length}`} className="aspect-[4/5] w-full rounded-xl bg-black object-cover" data-testid={`video-media-preview-${i}`} />
                     ) : (
-                      <img src={resolveMedia(m.url)} alt={`Foto ${i + 1} de ${items.length}`} className="aspect-[4/5] w-full rounded-xl object-cover" data-testid={`img-media-preview-${i}`} />
+                      <img src={resolveMedia(m.url)} alt={`${t('Foto')} ${i + 1} ${t('de')} ${items.length}`} className="aspect-[4/5] w-full rounded-xl object-cover" data-testid={`img-media-preview-${i}`} />
                     )}
                     <span className="absolute left-1.5 top-1.5 rounded-full bg-[hsl(240_8%_3%/0.7)] px-2 py-0.5 text-[11px] font-semibold">{i + 1}</span>
                   </div>
                   <div className="mt-1 flex justify-between">
-                    <button type="button" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label={`Mover foto ${i + 1} a la izquierda`} className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary disabled:opacity-30" data-testid={`button-media-left-${i}`}><ChevronLeft className="h-4 w-4" /></button>
-                    <button type="button" disabled={busy} onClick={() => remove(i)} aria-label={`Quitar foto ${i + 1}`} className="grid h-11 w-11 place-items-center rounded-full text-destructive hover:bg-secondary disabled:opacity-30" data-testid={`button-media-remove-${i}`}><X className="h-4 w-4" /></button>
-                    <button type="button" disabled={busy || i === items.length - 1} onClick={() => move(i, 1)} aria-label={`Mover foto ${i + 1} a la derecha`} className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary disabled:opacity-30" data-testid={`button-media-right-${i}`}><ChevronRight className="h-4 w-4" /></button>
+                    <button type="button" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label={`${t('Mover foto')} ${i + 1} ${t('a la izquierda')}`} className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary disabled:opacity-30" data-testid={`button-media-left-${i}`}><ChevronLeft className="h-4 w-4" /></button>
+                    <button type="button" disabled={busy} onClick={() => remove(i)} aria-label={`${t('Quitar foto')} ${i + 1}`} className="grid h-11 w-11 place-items-center rounded-full text-destructive hover:bg-secondary disabled:opacity-30" data-testid={`button-media-remove-${i}`}><X className="h-4 w-4" /></button>
+                    <button type="button" disabled={busy || i === items.length - 1} onClick={() => move(i, 1)} aria-label={`${t('Mover foto')} ${i + 1} ${t('a la derecha')}`} className="grid h-11 w-11 place-items-center rounded-full hover:bg-secondary disabled:opacity-30" data-testid={`button-media-right-${i}`}><ChevronRight className="h-4 w-4" /></button>
                   </div>
                 </li>
               ))}
@@ -401,18 +401,18 @@ export default function CreatePage() {
               )}
             </ol>
             {tooManyForStory && (
-              <p className="mt-2 text-xs text-primary" data-testid="text-story-too-many">Las historias admiten una sola foto. Quitá fotos hasta dejar una o volvé a Publicación.</p>
+              <p className="mt-2 text-xs text-primary" data-testid="text-story-too-many">{t("Las historias admiten una sola foto. Quitá fotos hasta dejar una o volvé a Publicación.")}</p>
             )}
           </div>
         )}
 
         <label className="mt-5 block">
-          <span className="sr-only">Pie de foto</span>
+          <span className="sr-only">{t("Pie de foto")}</span>
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value.slice(0, 600))}
             rows={2}
-            placeholder={mode === 'story' ? 'Texto sobre la historia (opcional)' : 'Escribe un pie de foto…'}
+            placeholder={t(mode === 'story' ? 'Texto sobre la historia (opcional)' : 'Escribe un pie de foto…')}
             className="min-h-[76px] w-full resize-none rounded-2xl border border-input bg-card px-4 py-3 text-[15px] leading-relaxed placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
             data-testid="input-caption"
           />
@@ -421,14 +421,14 @@ export default function CreatePage() {
 
         {mode === 'story' && (
           <div className="mt-3 grid gap-3">
-            <AccountMultiPicker value={mentioned} onChange={setMentioned} label="Mencionar cuentas" excludeId={me.id} max={50} testId="picker-story-mentions" />
+            <AccountMultiPicker value={mentioned} onChange={setMentioned} label={t("Mencionar cuentas")} excludeId={me.id} max={50} testId="picker-story-mentions" />
             <div className="rounded-2xl border border-input bg-card px-4 py-3">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground"><Music2 className="h-3.5 w-3.5" /> Música · solo metadatos</div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <input value={musicTitle} onChange={(e) => setMusicTitle(e.target.value.slice(0, 160))} placeholder="Canción" aria-label="Título de la canción" className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-title" />
-                <input value={musicArtist} onChange={(e) => setMusicArtist(e.target.value.slice(0, 160))} placeholder="Artista" aria-label="Artista" className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-artist" />
+                <input value={musicTitle} onChange={(e) => setMusicTitle(e.target.value.slice(0, 160))} placeholder={t("Canción")} aria-label={t("Título de la canción")} className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-title" />
+                <input value={musicArtist} onChange={(e) => setMusicArtist(e.target.value.slice(0, 160))} placeholder={t("Artista")} aria-label={t("Artista")} className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-artist" />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Se muestra como etiqueta. No se reproduce audio ni se conecta ningún servicio de música.</p>
+              <p className="mt-2 text-xs text-muted-foreground">{t("Se muestra como etiqueta. No se reproduce audio ni se conecta ningún servicio de música.")}</p>
             </div>
           </div>
         )}
@@ -438,23 +438,23 @@ export default function CreatePage() {
             <label className="mt-3 flex items-center gap-3 rounded-2xl border border-input bg-card px-4">
               <MapPin className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} />
               <input
-                aria-label="Ubicación"
+                aria-label={t("Ubicación")}
                 value={location}
                 onChange={(e) => setLocation(e.target.value.slice(0, 80))}
-                placeholder="Añadir ubicación"
+                placeholder={t("Añadir ubicación")}
                 className="h-12 flex-1 bg-transparent text-[15px] placeholder:text-muted-foreground focus:outline-none"
                 data-testid="input-location"
               />
             </label>
-            <div className="mt-3"><AccountMultiPicker value={tagged} onChange={setTagged} label="Etiquetar cuentas" excludeId={me.id} testId="picker-post-tags" /></div>
+            <div className="mt-3"><AccountMultiPicker value={tagged} onChange={setTagged} label={t("Etiquetar cuentas")} excludeId={me.id} testId="picker-post-tags" /></div>
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-              <span className="block text-sm font-medium">Permitir comentarios</span>
+              <span className="block text-sm font-medium">{t("Permitir comentarios")}</span>
               <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} data-testid="switch-comments-enabled" />
             </label>
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
               <span>
-                <span className="block text-sm font-medium">Compartir también en tu historia</span>
-                <span className="text-xs text-muted-foreground">Aparecerá en el círculo de {me.name.split(' ')[0]}{items.length > 1 ? ' · se usa solo la primera foto' : ''}{items.length && !items.some((m) => m.type === 'image') ? ' · requiere al menos una foto' : ''}</span>
+                <span className="block text-sm font-medium">{t("Compartir también en tu historia")}</span>
+                <span className="text-xs text-muted-foreground">{t('Aparecerá en el círculo de')} {me.name.split(' ')[0]}{items.length > 1 ? t(' · se usa solo la primera foto') : ''}{items.length && !items.some((m) => m.type === 'image') ? t(' · requiere al menos una foto') : ''}</span>
               </span>
               <Switch checked={alsoStory} onCheckedChange={setAlsoStory} data-testid="switch-also-story" />
             </label>
@@ -473,7 +473,7 @@ export default function CreatePage() {
           className="tap mt-6 h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground disabled:opacity-40"
           data-testid="button-publish"
         >
-          {mode === 'story' ? 'Publicar historia' : 'Publicar'}
+          {t(mode === 'story' ? 'Publicar historia' : 'Publicar')}
         </button>
       </form>
     </div>
