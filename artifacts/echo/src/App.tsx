@@ -56,6 +56,7 @@ import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding'
 import { AlphaConsentBoundary } from '@/components/echo/alpha-consent';
 import BetaInformationPage from '@/pages/beta-information';
 import CreatorPrivacyCenter from '@/pages/creator-privacy-center';
+import CreatorHubPage from '@/pages/creator-hub';
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
 import { loadLegacyState, loadRecovery } from '@/store/persistence';
@@ -138,6 +139,7 @@ function ProtectedRouter() {
           <Route path="/messages/:id" component={ConversationPage} />
           <Route path="/saved" component={SavedPage} />
           <Route path="/tags/:tag" component={HashtagPage} />
+          <Route path="/creator-hub" component={CreatorHubPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/settings/subscriptions" component={SubscriptionsPage} />
           <Route path="/help" component={HelpCenterPage} />
