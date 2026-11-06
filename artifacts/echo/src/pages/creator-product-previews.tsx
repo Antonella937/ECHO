@@ -97,7 +97,7 @@ export function CreatorAccountPreview() {
         eyebrow="Cuenta · plan"
         title="Tu espacio, a"
         accent="tu ritmo."
-        description="Una vista de ejemplo para entender qué acompaña a una cuenta ECHO Creator."
+        description="Consultá tu membresía ECHO y el espacio disponible para crear."
       />;
   if (!isLoaded || (isSignedIn && !account)) {
     return <PreviewShell>{heading}<OwnerAccountPending loading={!live.isError} onRetry={() => void live.refetch()} /></PreviewShell>;
@@ -109,14 +109,14 @@ export function CreatorAccountPreview() {
       <section className="epc-account-layout" aria-label="Resumen ilustrativo de cuenta">
         <article className="epc-plan-panel">
           <div className="epc-panel-topline"><span>{account ? 'TU PLAN' : 'PLAN DE EJEMPLO'}</span><span className="epc-status">{account ? 'Activo · sin cobros' : 'Activo · ilustrativo'}</span></div>
-          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>Plan actual</span><h2>{account?.plan === 'creator' ? 'Creator' : 'Free'}</h2></div></div>
+          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>Plan actual</span><h2>{account?.lifetimeAccess ? 'Premium · vitalicio' : String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
           <p className="epc-panel-copy">Un comienzo para crear un universo privado y darle forma a sus personajes.</p>
           <div className="epc-capacity">
             <div><span>Universos</span><strong>{account ? `${account.universeCount} / ${account.maxUniverses}` : '1 universo'}</strong></div>
             <div className="epc-capacity-rule" aria-hidden="true"><i /></div>
             <div><span>Personajes</span><strong>{account ? `${account.characterCount} / ${account.maxCharacters}` : 'Hasta 5 personajes'}</strong></div>
           </div>
-          <Link href="/creator-preview/store" className="ep-button epc-wide-link">{account?.plan === 'creator' ? 'Ver capacidad Creator' : 'Explorar Creator'} <ArrowRight size={15} /></Link>
+          <Link href="/settings/subscriptions" className="ep-button epc-wide-link">Ver planes Free, Plus y Premium <ArrowRight size={15} /></Link>
         </article>
         <article className="epc-activity-panel">
           <div className="epc-panel-title"><span className="epc-icon-tile"><Sparkles size={17} /></span><div><span>Herramientas</span><h2>Lo que puedes explorar</h2></div></div>
@@ -290,19 +290,19 @@ export function CreatorStorePreview() {
         eyebrow="Creator · más espacio"
         title="Más lugar para"
         accent="seguir creando."
-        description="Creator está pensado para quienes quieren ampliar el espacio de su universo."
+        description="Creator es el espacio para los perfiles. La capacidad depende de Free, Plus o Premium."
       />
-      <PreviewNotice>Vista ilustrativa. Creator ofrece más espacio y los extras se presentan por separado.</PreviewNotice>
+      <PreviewNotice>Vista ilustrativa. Los perfiles Creator están disponibles en todos los planes; Plus y Premium amplían la capacidad de membresía.</PreviewNotice>
       <section className="epc-store-layout" aria-label="Opciones ilustrativas de Creator">
         <article className="epc-creator-card">
           <span className="epc-price-tag">MÁS CAPACIDAD</span>
-          <h2>Creator</h2>
+          <h2>Creator Hub</h2>
           <p>Un espacio ampliado para desarrollar más universos y personajes, a medida que tus ideas crecen.</p>
           <div className="epc-creator-visual" aria-hidden="true">
             <div className="epc-creator-orbit epc-creator-orbit-a" /><div className="epc-creator-orbit epc-creator-orbit-b" />
             <span>e</span>
           </div>
-          <div className="epc-creator-points"><span><Check size={15} /> Mayor capacidad</span><span><Check size={15} /> Más espacio para crear</span></div>
+          <div className="epc-creator-points"><span><Check size={15} /> Perfiles para todos los planes</span><span><Check size={15} /> Capacidad según membresía</span></div>
           <Link href="/creator-preview/pricing" className="ep-button epc-wide-link">Ver planes de ejemplo <ArrowRight size={15} /></Link>
         </article>
         <div className="epc-store-side">
@@ -385,7 +385,7 @@ export function CreatorLimitPreview() {
           <div className="epc-modal-backdrop" aria-hidden="true" />
           <section className="epc-limit-dialog" role="dialog" aria-labelledby="epc-limit-title" aria-describedby="epc-limit-description">
             <div className="epc-limit-symbol"><UsersRound size={20} /></div>
-            <span className="ep-overline">TU CUENTA · PLAN {account.plan === 'creator' ? 'CREATOR' : 'FREE'}</span>
+            <span className="ep-overline">TU CUENTA · PLAN {account.lifetimeAccess ? 'PREMIUM VITALICIO' : String(account.plan).toUpperCase()}</span>
             <h2 id="epc-limit-title">{full ? <>Has llegado al límite<br />de personajes.</> : <>Aún tienes espacio<br />para crear.</>}</h2>
             <p id="epc-limit-description" data-testid="text-limit-usage">Usas {used} de {max} personajes y {account.universeCount} de {account.maxUniverses} universos. Las ampliaciones todavía no están a la venta.</p>
             <div className="epc-limit-meter"><div><span>Personajes</span><strong>{used} <small>/ {max}</small></strong></div><div className="epc-meter-track"><i style={{ transform: `scaleX(${ratio})`, transformOrigin: 'left' }} /></div><small>Capacidad real de tu cuenta</small></div>
