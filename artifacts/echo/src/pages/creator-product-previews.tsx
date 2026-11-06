@@ -18,7 +18,9 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import { Link } from 'wouter';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { customFetch } from '@workspace/api-client-react';
+import { PublicLanguageSelector } from '@/components/echo/public-language-selector';
 import { UniverseCover } from '../components/echo/visual-defaults';
 import { PrivateShareCards } from '../components/echo/private-share-cards';
 import { hasCharacterImage, ownerScopedPreviewKey } from '../lib/visual-defaults';
@@ -40,12 +42,17 @@ import { useLocation } from 'wouter';
 import './creator-product-previews.css';
 
 export function PreviewShell({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn } = useUser();
+  const authenticated = isLoaded && isSignedIn;
   return (
     <main className="echo-public epc-shell">
       <div className="ep-wrap">
-        <PublicHeader previewMode />
+        {authenticated ? <header className="epc-private-nav">
+          <Link href="/" className="ep-brand" aria-label="ECHO"><span className="ep-mark" aria-hidden="true">e</span><span>ECHO</span></Link>
+          <PublicLanguageSelector />
+        </header> : <PublicHeader previewMode />}
         {children}
-        <PublicFooter previewMode signature="script" />
+        {!authenticated && <PublicFooter previewMode signature="script" />}
       </div>
     </main>
   );
@@ -96,6 +103,17 @@ export function CreatorAccountPreview() {
   const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? live.data : undefined;
   const usage = account?.usage;
+  const [lifetimeAccess, setLifetimeAccess] = useState<'owner_lifetime' | 'founder_lifetime' | null>(null);
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    void customFetch<{ lifetimeAccess?: 'owner_lifetime' | 'founder_lifetime' | null; billingExempt?: boolean }>('/api/account/entitlements', { responseType: 'json' })
+      .then((entitlements) => { if (!cancelled) setLifetimeAccess(entitlements.billingExempt ? entitlements.lifetimeAccess ?? null : null); })
+      .catch(() => { if (!cancelled) setLifetimeAccess(null); });
+    return () => { cancelled = true; };
+  }, [isLoaded, isSignedIn]);
+  const isCreator = lifetimeAccess === 'owner_lifetime';
+  const isFoundingTester = lifetimeAccess === 'founder_lifetime';
   const unlimited = Boolean(account && (account.maxCharacters >= 100000 || account.maxUniverses >= 10000));
   const heading = <PreviewHeading
         eyebrow={t("Cuenta · plan")}
@@ -109,18 +127,18 @@ export function CreatorAccountPreview() {
   return (
     <PreviewShell>
       {heading}
-      <PreviewNotice>{account ? t("Plan, capacidad y uso de IA de tu cuenta. Los cobros todavía no están conectados.") : t("Datos ilustrativos: inicia sesión para ver el plan y el uso reales de tu cuenta.")}</PreviewNotice>
+      {!account && <PreviewNotice>{t("Datos ilustrativos: inicia sesión para ver el plan y el uso reales de tu cuenta.")}</PreviewNotice>}
       <section className="epc-account-layout" aria-label={t("Resumen ilustrativo de cuenta")}>
         <article className="epc-plan-panel">
-          <div className="epc-panel-topline"><span>{account ? t("TU PLAN") : t("PLAN DE EJEMPLO")}</span><span className="epc-status">{account ? t("Activo · sin cobros") : t("Activo · ilustrativo")}</span></div>
-          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>{t("Plan actual")}</span><h2>{String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
-          <p className="epc-panel-copy">{t("Un comienzo para crear un universo privado y darle forma a sus personajes.")}</p>
+          <div className="epc-panel-topline"><span>{isCreator ? "ECHO · FOUNDER & CREATOR" : isFoundingTester ? "ECHO · FOUNDING TESTER" : account ? t("TU PLAN") : t("PLAN DE EJEMPLO")}</span><span className="epc-status">{account ? t("Activo · sin cobros") : t("Activo · ilustrativo")}</span></div>
+          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>{isCreator ? "Fundadora y creadora de ECHO" : isFoundingTester ? "Tester fundadora de ECHO" : t("Plan actual")}</span><h2>{isCreator ? "ECHO CREATOR" : isFoundingTester ? "ECHO FOUNDING TESTER" : String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
+          <p className="epc-panel-copy">{isCreator ? "El universo que creaste. Acceso vitalicio a todas las membresías y complementos, sin cargos de suscripción. ♡" : isFoundingTester ? "Gracias por acompañar a ECHO desde el principio. Tu acceso de tester fundadora es vitalicio. ♡" : t("Un comienzo para crear un universo privado y darle forma a sus personajes.")}</p>
           <div className="epc-capacity">
             <div><span>{t("Universos")}</span><strong>{account ? `${account.universeCount} / ${unlimited ? '∞' : account.maxUniverses}` : t('1 universo')}</strong></div>
             <div className="epc-capacity-rule" aria-hidden="true"><i /></div>
             <div><span>{t("Personajes")}</span><strong>{account ? `${account.characterCount} / ${unlimited ? '∞' : account.maxCharacters}` : t('Hasta 5 personajes')}</strong></div>
           </div>
-          <Link href="/settings/subscriptions" className="ep-button epc-wide-link">Ver planes Free, Plus y Premium <ArrowRight size={15} /></Link>
+          <Link href="/settings/subscriptions" className="ep-button epc-wide-link">{isCreator ? "Ver mis beneficios de creadora" : isFoundingTester ? "Ver mis beneficios de tester" : "Ver planes Free, Plus y Premium"} <ArrowRight size={15} /></Link>
         </article>
         <article className="epc-activity-panel">
           <div className="epc-panel-title"><span className="epc-icon-tile"><Sparkles size={17} /></span><div><span>{t("Herramientas")}</span><h2>{t("Lo que puedes explorar")}</h2></div></div>
@@ -143,7 +161,7 @@ export function CreatorAccountPreview() {
             : t("No se muestran límites numéricos de IA hasta calibrarlos con costos reales.")}</p>
         </article>
       </section>
-      <div className="epc-back-row"><Link href="/creator-preview" className="ep-text-link"><ArrowLeft size={15} /> Pantallas de revisión</Link></div>
+
     </PreviewShell>
   );
 }
@@ -210,7 +228,7 @@ export function CreatorUniversePreview() {
         accent={t("cada personaje.")}
         description={account ? t("Tus universos y personajes, con capacidad sincronizada desde tu cuenta.") : t("Una composición de muestra para visualizar cómo se organiza un universo y sus personajes.")}
       />
-      <PreviewNotice>{account ? t("Datos privados de tu cuenta. Los extras mostrados no están disponibles para compra todavía.") : t("Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.")}</PreviewNotice>
+      {!account && <PreviewNotice>{t("Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.")}</PreviewNotice>}
       <section className="epc-universe-board" aria-label={t("Ilustración de gestión de universo")}>
         <div className="epc-universe-sidebar">
           <div className="epc-universe-cover"><UniverseCover name={universeName} /></div>
