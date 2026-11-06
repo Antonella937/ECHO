@@ -26,4 +26,8 @@ export type AutonomySettingsUpdate = {
      * @maxLength 120
      */
   universeId?: string;
+} | {
+  characterId: string;
+  dmPreferences: { dmFrequency: "rarely" | "sometimes" | "frequently"; dmMediaPreference: "text" | "mixed" | "voice"; dmInstructions: string };
+  universeId?: string;
 };
