@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { BadgeCheck, Check, Pencil, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
+import { BadgeCheck, Camera, Check, Pencil, X } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { ArrowLeft, ExternalLink, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
@@ -12,7 +13,44 @@ import { Link } from 'wouter';
  */
 export default function CreatorHubPage() {
   const { user } = useUser();
-  const alias = user?.fullName?.trim() || user?.firstName?.trim() || user?.username || 'Tu espacio Creator';
+  const customName = typeof user?.unsafeMetadata?.creatorHubDisplayName === 'string' ? user.unsafeMetadata.creatorHubDisplayName : '';
+  const alias = customName || user?.fullName?.trim() || user?.firstName?.trim() || user?.username || 'Tu espacio Creator';
+  const resolveImage = useMediaResolver();
+  const avatarRef = typeof user?.unsafeMetadata?.creatorHubAvatar === 'string' ? user.unsafeMetadata.creatorHubAvatar : '';
+  const bannerRef = typeof user?.unsafeMetadata?.creatorHubBanner === 'string' ? user.unsafeMetadata.creatorHubBanner : '';
+  const avatarImage = avatarRef ? resolveImage(avatarRef) : '';
+  const bannerImage = bannerRef ? resolveImage(bannerRef) : '';
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const bannerInput = useRef<HTMLInputElement>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [uploading, setUploading] = useState<'avatar' | 'banner' | null>(null);
+  const [profileError, setProfileError] = useState('');
+  async function saveName() {
+    const next = nameDraft.trim();
+    if (next.length < 2 || next.length > 80) { setProfileError('El nombre debe tener entre 2 y 80 caracteres.'); return; }
+    if (!user) return;
+    setSaving(true); setProfileError('');
+    try {
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubDisplayName: next } });
+      await user.reload(); setEditingName(false);
+    } catch { setProfileError('No pudimos guardar el nombre.'); }
+    finally { setSaving(false); }
+  }
+  async function uploadPhoto(event: ChangeEvent<HTMLInputElement>, kind: 'avatar' | 'banner') {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+    event.target.value = '';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024) { setProfileError('Elegí una imagen JPG, PNG o WebP de hasta 15 MB.'); return; }
+    setUploading(kind); setProfileError('');
+    try {
+      const data = await compressImage(file, kind === 'avatar' ? 900 : 1920, 0.85);
+      const ref = await uploadPrivateImage(data);
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, [kind === 'avatar' ? 'creatorHubAvatar' : 'creatorHubBanner']: ref } });
+      await user.reload();
+    } catch { setProfileError('No pudimos guardar la imagen. Probá nuevamente.'); }
+    finally { setUploading(null); }
+  }
   const defaultUsername = (user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'creator').toLowerCase().replace(/[^a-z0-9._]/g, '');
   const savedUsername = typeof user?.unsafeMetadata?.creatorHubUsername === 'string' ? user.unsafeMetadata.creatorHubUsername : '';
   const username = savedUsername || defaultUsername;
@@ -52,19 +90,26 @@ export default function CreatorHubPage() {
       </header>
       <div className="px-4">
         <section className="overflow-hidden rounded-[28px] border border-border bg-card" aria-label="Perfil Creator Hub">
-          <div className="flex h-56 flex-col items-center justify-center gap-2 pt-12 sm:h-72 lg:h-80 bg-[linear-gradient(130deg,hsl(263_18%_19%),hsl(336_15%_16%))] text-muted-foreground">
-            <span className="select-none text-[clamp(4rem,14vw,9rem)] font-black tracking-[-0.08em] text-white/20" aria-hidden="true">{initials}</span>
+          <div className="relative flex h-56 flex-col items-center justify-center gap-2 pt-12 sm:h-72 lg:h-80 bg-[linear-gradient(130deg,hsl(263_18%_19%),hsl(336_15%_16%))] text-muted-foreground">
+            {bannerImage ? <img src={bannerImage} alt="Banner de Creator Hub" className="absolute inset-0 h-full w-full object-cover" /> : <span className="select-none text-[clamp(4rem,14vw,9rem)] font-black tracking-[-0.08em] text-white/20" aria-hidden="true">{initials}</span>}
+            <input ref={bannerInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Seleccionar banner" onChange={e => void uploadPhoto(e, 'banner')} />
+            <button type="button" disabled={uploading !== null} onClick={() => bannerInput.current?.click()} className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full bg-black/65 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"><Camera size={15}/>{uploading === 'banner' ? 'Subiendo…' : 'Editar banner'}</button>
           </div>
           <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-10">
             <div className="flex items-center gap-3">
-              <span className="grid h-20 w-20 shrink-0 place-items-center rounded-full border-4 border-background bg-secondary text-2xl font-semibold sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}: ${initials}`}>{initials}</span>
+              <div className="relative shrink-0">
+                <span className="grid h-20 w-20 overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}`}>{avatarImage ? <img src={avatarImage} alt="" className="h-full w-full object-cover" /> : initials}</span>
+                <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Seleccionar foto de perfil" onChange={e => void uploadPhoto(e, 'avatar')} />
+                <button type="button" disabled={uploading !== null} onClick={() => avatarInput.current?.click()} aria-label="Cambiar foto de perfil" className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border border-border bg-card text-foreground disabled:opacity-50"><Camera size={15}/></button>
+              </div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 truncate text-2xl font-semibold sm:text-3xl">{alias}</h2>{founderVerified && <span title="Fundadora verificada de ECHO" aria-label="Fundadora verificada de ECHO"><BadgeCheck className="h-6 w-6 fill-primary text-primary-foreground" /></span>}</div>
+                <div className="flex flex-wrap items-center gap-2">{editingName ? <div className="flex min-w-0 items-center gap-1"><input aria-label="Nombre de creador" value={nameDraft} maxLength={80} onChange={e => setNameDraft(e.target.value)} className="min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm" /><button type="button" disabled={saving} aria-label="Guardar nombre" onClick={() => void saveName()}><Check size={17}/></button><button type="button" aria-label="Cancelar edición de nombre" onClick={() => setEditingName(false)}><X size={17}/></button></div> : <div className="flex min-w-0 items-center gap-1"><h2 className="min-w-0 truncate text-2xl font-semibold sm:text-3xl">{alias}</h2><button type="button" aria-label="Editar nombre" onClick={() => {setNameDraft(alias);setProfileError('');setEditingName(true);}} className="shrink-0 p-1 text-muted-foreground"><Pencil size={15}/></button></div>}{founderVerified && <span title="Fundadora verificada de ECHO" aria-label="Fundadora verificada de ECHO"><BadgeCheck className="h-6 w-6 fill-primary text-primary-foreground" /></span>}</div>
                 {founderVerified && <p className="mt-1 text-xs font-semibold text-primary">CEO &amp; Founder of ECHO</p>}
                 {editing ? <div className="mt-2 space-y-2"><div className="flex items-center gap-2"><span className="text-muted-foreground">@</span><input aria-label="Nuevo nombre de usuario" value={draft} maxLength={30} onChange={e => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" aria-label="Guardar usuario" disabled={saving} onClick={() => void saveUsername()} className="rounded-full p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" aria-label="Cancelar edición" onClick={() => {setEditing(false);setError('');}} className="rounded-full p-2"><X size={18}/></button></div>{error && <p role="alert" className="text-xs text-destructive">{error}</p>}<p className="text-xs text-muted-foreground">Este alias es independiente de tu email de inicio de sesión.</p></div> : <div className="mt-1 flex items-center gap-2"><p className="truncate text-sm text-muted-foreground">@{username}</p><button type="button" aria-label="Editar nombre de usuario" title="Editar nombre de usuario" onClick={() => {setDraft(username);setError('');setEditing(true);}} className="rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
               </div>
               <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">Perfil privado</span>
             </div>
+            {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
             <p className="text-sm leading-relaxed text-muted-foreground">Tu espacio para presentar los mundos, personajes e historias que creás.</p>
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} /><span>Enlace externo opcional</span></div>
             <div className="border-t border-border pt-5">
