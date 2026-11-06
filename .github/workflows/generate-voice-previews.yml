@@ -1,0 +1,51 @@
+name: Generate and publish ECHO voice previews
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install speech dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          python -m pip install --upgrade pip
+          python -m pip install kokoro soundfile
+      - name: Generate WAV previews
+        run: python scripts/generate-basic-voice-previews.py --overwrite
+      - name: Verify all ten real WAV files
+        run: |
+          python - <<'PY'
+          import wave
+          from pathlib import Path
+          folder = Path("artifacts/echo/public/voice-previews")
+          for prefix in ("echo-f", "echo-m"):
+              for i in range(1, 6):
+                  p = folder / f"{prefix}-{i:02}.wav"
+                  with wave.open(str(p), "rb") as w:
+                      assert w.getnframes() > 24000, f"Audio missing or too short: {p}"
+                      assert w.getframerate() == 24000, f"Unexpected rate: {p}"
+                      assert w.getnchannels() == 1, f"Unexpected channels: {p}"
+                  print(f"Verified {p}")
+          PY
+      - name: Publish WAV files to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/echo/public/voice-previews/*.wav
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish ten generated Kokoro voice preview WAVs"
+            git push
+          fi
