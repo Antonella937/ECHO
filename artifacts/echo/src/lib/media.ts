@@ -283,6 +283,23 @@ export function postUrl(postId: string): string {
 }
 
 /** Upload a recorded voice note to private storage and validate its bytes server-side. */
+/** Preserve animated GIF frames; still images are compressed by the caller. */
+export async function uploadPublicationImage(file: File): Promise<string> {
+  const contentType = file.type.toLowerCase();
+  if (!['image/jpeg','image/png','image/webp','image/gif'].includes(contentType) || !file.size || file.size > 15*1024*1024) {
+    throw new Error('Usá JPG, PNG, WebP o GIF de hasta 15 MB.');
+  }
+  if (contentType !== 'image/gif') return uploadPrivateImage(await compressImage(file));
+  const {uploadURL,objectPath} = await customFetch<{uploadURL:string;objectPath:string}>('/api/storage/uploads/request-url',{
+    method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:'echo-publication.gif',size:file.size,contentType}),
+  });
+  const uploaded = await fetch(uploadURL,{method:'PUT',headers:{'Content-Type':contentType},body:file});
+  if (!uploaded.ok) throw new Error('No se pudo subir el GIF.');
+  await customFetch('/api/storage/uploads/claim',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({objectPath})});
+  return objectPath;
+}
+
 export async function uploadPrivateVoice(blob: Blob): Promise<string> {
   const contentType = blob.type.split(';')[0];
   if (!['audio/webm', 'audio/mp4', 'audio/ogg'].includes(contentType) ||
