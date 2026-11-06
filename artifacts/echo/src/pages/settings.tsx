@@ -1,6 +1,6 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
@@ -198,9 +198,12 @@ function AppearanceSection() {
         <div className="mt-5 border-t border-border pt-5">
           <label htmlFor="echo-language" className="mb-2 block text-sm font-semibold text-primary">🌐 {t("language")}</label>
           <p className="mb-3 text-xs text-muted-foreground">{t("languageDescription")}</p>
-          <select id="echo-language" value={language} onChange={event=>setLanguage(event.target.value as Language)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground">
+          <div className="relative w-full">
+          <select id="echo-language" value={language} onChange={event=>setLanguage(event.target.value as Language)} className="h-11 w-full appearance-none rounded-xl border border-border bg-background pl-3 pr-11 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary" style={{ WebkitAppearance: "none", MozAppearance: "none" }}>
             {LANGUAGES.map(item=><option key={item.code} value={item.code}>{item.name}</option>)}
           </select>
+          <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
         </div>
       </div>
     </section>
