@@ -1020,6 +1020,7 @@ export interface AutonomyCharacterControl {
   displayName: string;
   username: string;
   enabled: boolean;
+  dmEnabled: boolean;
   /**
      * @minimum 1
      * @maximum 4
@@ -1057,6 +1058,7 @@ export type AutonomySettingsUpdate = {
      */
   characterId: string;
   enabled: boolean;
+  lane?: "social" | "dm";
   /**
      * @minLength 1
      * @maxLength 120
