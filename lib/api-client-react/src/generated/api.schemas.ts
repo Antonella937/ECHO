@@ -1021,6 +1021,9 @@ export interface AutonomyCharacterControl {
   username: string;
   enabled: boolean;
   dmEnabled: boolean;
+  dmFrequency: "rarely" | "sometimes" | "frequently";
+  dmMediaPreference: "text" | "mixed" | "voice";
+  dmInstructions: string;
   /**
      * @minimum 1
      * @maximum 4
@@ -1063,6 +1066,10 @@ export type AutonomySettingsUpdate = {
      * @minLength 1
      * @maxLength 120
      */
+  universeId?: string;
+} | {
+  characterId: string;
+  dmPreferences: { dmFrequency: "rarely" | "sometimes" | "frequently"; dmMediaPreference: "text" | "mixed" | "voice"; dmInstructions: string };
   universeId?: string;
 };
 
