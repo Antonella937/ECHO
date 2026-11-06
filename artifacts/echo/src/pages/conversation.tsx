@@ -10,7 +10,6 @@ import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { EmptyState } from '@/components/echo/skeletons';
-import { useBack } from '@/components/echo/top-bar';
 import { AttachmentView } from '@/components/echo/dm-attachment-view';
 import { VoicePreview } from '@/components/echo/voice-preview';
 import { useMediaResolver, timeAgo } from '@/lib/media';
@@ -43,7 +42,8 @@ export default function ConversationPage() {
   const { me, character, actions, state } = useSocial();
   const other = character(id);
   const messages = useThreadMessages(id);
-  const back = useBack();
+  const [, navigate] = useLocation();
+  const back = () => navigate('/messages');
   const [text, setText] = useState('');
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
