@@ -14,7 +14,8 @@ declare global {
 }
 let scriptPromise: Promise<void> | null = null;
 let initialized: Promise<OneSignalClient> | null = null;
-const appId = import.meta.env.VITE_ONESIGNAL_APP_ID as string | undefined;
+// OneSignal App ID is public (unlike the server REST API key).
+const appId = '96bd4106-2422-40f1-a5dd-238b511758d8';
 export const isOneSignalConfigured = () => Boolean(appId && /^[a-f0-9-]{36}$/i.test(appId));
 
 function loadScript(): Promise<void> {
