@@ -5,7 +5,7 @@ import { ChevronLeft } from 'lucide-react';
 export function TopBar({ title, onBack, right, sub }: { title: ReactNode; onBack?: () => void; right?: ReactNode; sub?: ReactNode }) {
   const t = useSharedShellText();
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-background pt-safe pt-[calc(env(safe-area-inset-top,0px)+10px)] lg:pt-0">
       <div className="flex h-14 items-center gap-1 px-2">
         {onBack ? (
           <button
