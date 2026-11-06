@@ -30,6 +30,7 @@ export function AutonomySettingsSection() {
   const update = useUpdateAutonomySettings();
   const dryRun = useRunAutonomyDryRun();
   const [latest, setLatest] = useState<AutonomyDryRunResult | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const settings = query.data;
   const updateCache = (next: NonNullable<typeof settings>) => {
     client.setQueryData(getGetAutonomySettingsQueryKey({ universeId: next.universeId }), next);
@@ -49,6 +50,8 @@ export function AutonomySettingsSection() {
   );
 
   const runPreview = (characterId: string) => {
+    setLatest(null);
+    setPreviewError(null);
     if (!globalThis.crypto?.randomUUID) {
       toast({ title: "Este navegador no permite iniciar una simulación segura", variant: "destructive" });
       return;
@@ -56,8 +59,14 @@ export function AutonomySettingsSection() {
     dryRun.mutate(
       { data: { characterId, idempotencyKey: globalThis.crypto.randomUUID(), universeId } },
       {
-        onSuccess: setLatest,
-        onError: () => toast({ title: "No se pudo completar la simulación", description: "No se ejecutó ninguna acción social.", variant: "destructive" }),
+        onSuccess: (result) => { setPreviewError(null); setLatest(result); },
+        onError: (error) => {
+          const candidate = error as { data?: { error?: unknown }; response?: { data?: { error?: unknown } }; message?: unknown };
+          const code = candidate.data?.error ?? candidate.response?.data?.error;
+          const safeCode = typeof code === "string" && /^[A-Z][A-Z0-9_]{2,80}$/.test(code) ? code : "AUTONOMY_PREVIEW_UNAVAILABLE";
+          setPreviewError(safeCode);
+          toast({ title: "No se pudo completar la simulación", description: `Código: ${safeCode}. No se ejecutó ninguna acción social.`, variant: "destructive" });
+        },
       },
     );
   };
@@ -122,6 +131,7 @@ export function AutonomySettingsSection() {
         ))}
       </div>
 
+      {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">La simulación no se completó.</p><p className="mt-1">Código: <code>{previewError}</code>. No se ejecutó ninguna acción social.</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>Copiar código de error</button></div>}
       {latest && (
         <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4" aria-live="polite" data-testid="autonomy-dry-run-result">
           <div className="flex items-start justify-between gap-3">
