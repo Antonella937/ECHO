@@ -21,6 +21,17 @@ import type { Message, MessageAttachment } from '@/domain/types';
 
 const REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
 
+function splitVoiceTranscript(text: string, hasAudio: boolean): { visibleText: string; transcript: string | null } {
+  if (!hasAudio) return { visibleText: text, transcript: null };
+  const marker = '[Transcripción de nota de voz]:';
+  const index = text.indexOf(marker);
+  if (index < 0) return { visibleText: text, transcript: null };
+  return {
+    visibleText: text.slice(0, index).trim(),
+    transcript: text.slice(index + marker.length).trim() || null,
+  };
+}
+
 interface Pending { key: string; kind: MessageAttachment['type']; preview: string; name: string; uploading: boolean; file: File | Blob; durationSeconds?: number; attachment?: MessageAttachment; transcript?: string; transcriptionWarning?: string; error?: string }
 
 export default function ConversationPage() {
@@ -398,6 +409,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const post = m.postId ? state.posts.find((p) => p.id === m.postId) : undefined;
   const reactions = m.reactions ?? [];
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
+  const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   return (
     <li className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
@@ -433,14 +445,14 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         </div>
       ) : null}
       <div className={cn('flex w-full min-w-0 max-w-full items-center gap-1', mine ? 'flex-row-reverse' : 'flex-row')}>
-        {m.text && (
+        {visibleText && (
           <p
             className={cn(
               'min-w-0 max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
               mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-secondary text-foreground',
             )}
           >
-            {m.text}
+            {visibleText}
           </p>
         )}
         <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
@@ -449,6 +461,13 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           <button type="button" onClick={onToggleHiding} aria-label="Eliminar para mí" aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
+      {transcript && (
+        <details className={cn('mt-1 max-w-[min(20rem,85vw)] rounded-xl border border-border/60 px-3 py-2 text-xs', mine ? 'bg-primary/5' : 'bg-secondary/50')}
+          data-testid={`audio-transcript-${m.id}`}>
+          <summary className="cursor-pointer font-medium text-muted-foreground">Ver transcripción del audio</summary>
+          <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{transcript}</p>
+        </details>
+      )}
       {hiding && (
         <div role="alertdialog" aria-label="Eliminar mensaje para mí" className="mt-1 flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-xs shadow-sm" data-testid={`confirm-hide-${m.id}`}>
           <span className="text-muted-foreground">Se oculta solo para ti; la otra cuenta lo sigue viendo.</span>
