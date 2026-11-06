@@ -48,7 +48,7 @@ export async function approveTrustEvent(
     if (!updated[0]) throw new Error("TRUST_REVISION_RACE");
     await tx.insert(echoRelationshipLedgerTable).values({
       ownerId, universeId, actorId, targetId,
-      lastAppliedAt: ledger?.lastAppliedAt ?? null,
+      lastAppliedAt: ledger?.lastAppliedAt ?? now,
       appliedCount: ledger?.appliedCount ?? 0,
       consumedMessageIds: [...consumed, key],
     }).onConflictDoUpdate({
