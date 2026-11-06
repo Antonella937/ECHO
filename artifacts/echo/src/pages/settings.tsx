@@ -61,6 +61,7 @@ export default function SettingsPage() {
         <section className="mt-9" aria-labelledby="creator-h">
           <h2 id="creator-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Creator y privacidad</h2>
           <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
+            <Link href="/creator-hub" className="flex min-h-12 items-center px-4 hover:bg-secondary/50" data-testid="link-creator-hub">Mi perfil Creator Hub</Link>
             <Link href="/creator-preview/universes" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Mis universos y personajes</Link>
             <Link href="/creator-preview/privacy" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Privacidad de personajes</Link>
           </div>
