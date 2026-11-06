@@ -22,6 +22,7 @@ export function isAutonomyOwnerAuthorized(ownerId: string): boolean {
 export const AUTONOMY_LIVE_EXECUTION_ENABLED = autonomyProductionGate() || AUTONOMY_PRIVATE_BETA_ENABLED;
 export const DEFAULT_CHARACTER_CONTROL = {
   enabled: false,
+  dmEnabled: false,
   maxActionsPerDay: 2,
   minCooldownMinutes: 360,
 };
