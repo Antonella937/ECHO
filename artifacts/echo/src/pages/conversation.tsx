@@ -300,7 +300,7 @@ export default function ConversationPage() {
           ))}
         </ul>
         {otherTyping && (
-          <div className="mt-2 flex items-center gap-2" role="status" aria-label={`${other.name} está escribiendo`} data-testid="dm-typing-indicator">
+          <div className="mt-2 flex items-center gap-2" role="status" aria-label={`${other.name} ${t("está escribiendo")}`} data-testid="dm-typing-indicator">
             <CharacterAvatar character={other} size={26} />
             <div className="flex items-center gap-1 rounded-[20px] rounded-bl-md bg-secondary px-4 py-3" aria-hidden="true">
               {[0, 1, 2].map(i => <span key={i} className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 160}ms`, animationDuration: "900ms" }} />)}
@@ -322,8 +322,8 @@ export default function ConversationPage() {
           <div className="mb-2 flex items-center gap-2 rounded-xl border-l-2 border-primary bg-secondary/70 px-3 py-2" data-testid="composer-quote">
             <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-primary" />
             <div className="min-w-0 flex-1 text-xs">
-              <div className="font-semibold">Respondiendo a {quoted ? (quoted.senderId === me.id ? 'ti' : other.name.split(' ')[0]) : 'un mensaje'}</div>
-              <div className="truncate text-muted-foreground">{quoted ? summarize(quoted) : 'Mensaje no disponible'}</div>
+              <div className="font-semibold">{t('Respondiendo a')} {quoted ? (quoted.senderId === me.id ? t('ti') : other.name.split(' ')[0]) : t('un mensaje')}</div>
+              <div className="truncate text-muted-foreground">{quoted ? summarize(quoted, t) : 'Mensaje no disponible'}</div>
             </div>
             <button type="button" onClick={() => setQuoteId(null)} aria-label={t("Cancelar cita")} className="tap grid h-8 w-8 place-items-center rounded-full hover:bg-background" data-testid="button-cancel-quote"><X className="h-4 w-4" /></button>
           </div>
@@ -413,9 +413,9 @@ export default function ConversationPage() {
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={`Escribir como ${me.name.split(' ')[0]}…`}
+              placeholder={`${t("Escribir como")} ${me.name.split(' ')[0]}…`}
               className="h-12 min-w-0 flex-1 rounded-full border border-input bg-card px-5 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
-              aria-label={`Mensaje para ${other.name}`}
+              aria-label={`${t("Mensaje para")} ${other.name}`}
               data-testid="input-message"
             />
             {!text.trim() && ready.length === 0 && !uploading ? (
@@ -434,13 +434,13 @@ export default function ConversationPage() {
   );
 }
 
-function summarize(m: Message): string {
+function summarize(m: Message, t: (key: string) => string): string {
   if (m.text) return m.text;
   const a = m.attachments?.[0];
-  if (a) return a.type === 'image' ? 'Foto' : a.type === 'video' ? 'Video' : 'Nota de voz';
-  if (m.postId) return 'Publicación compartida';
-  if (m.storyId) return 'Historia';
-  return 'Mensaje';
+  if (a) return t(a.type === 'image' ? 'Foto' : a.type === 'video' ? 'Video' : 'Nota de voz');
+  if (m.postId) return t('Publicación compartida');
+  if (m.storyId) return t('Historia');
+  return t('Mensaje');
 }
 
 function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice }: {
@@ -450,6 +450,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   hiding: boolean; onToggleHiding(): void; onHide(): void;
   canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
 }) {
+  const t = useConversationText();
   const [menuOpen, setMenuOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearPress = () => { if (pressTimer.current) clearTimeout(pressTimer.current); pressTimer.current = null; };
@@ -466,12 +467,12 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
           <span className="text-[11px] text-muted-foreground">{story?.reactions?.some(r => r.actorId === m.senderId && r.value === m.text) || REACTIONS.includes(m.text)
-            ? (mine ? 'Reaccionaste a su historia' : 'Reaccionó a tu historia')
-            : (mine ? 'Respondiste a su historia' : 'Respondió a tu historia')}</span>
+            ? (mine ? t('Reaccionaste a su historia') : t('Reaccionó a tu historia'))
+            : (mine ? t('Respondiste a su historia') : t('Respondió a tu historia'))}</span>
           {story ? (
             <img src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })} alt="Historia" className="h-36 w-24 rounded-xl object-cover opacity-90" />
           ) : (
-            <span className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">Historia no disponible</span>
+            <span className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">{t("Historia no disponible")}</span>
           )}
         </div>
       )}
@@ -486,7 +487,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           className={cn('mb-0.5 max-w-[70%] rounded-2xl border-l-2 border-primary/70 bg-secondary/60 px-3 py-1.5 text-left text-xs', mine ? 'mr-1' : 'ml-1')}
           data-testid={`button-quote-${m.id}`}>
           <span className="block font-semibold text-muted-foreground">{quoted ? names[quoted.senderId] ?? '' : ''}</span>
-          <span className="line-clamp-2 text-muted-foreground">{quoted ? summarize(quoted) : 'Mensaje no disponible'}</span>
+          <span className="line-clamp-2 text-muted-foreground">{quoted ? summarize(quoted, t) : 'Mensaje no disponible'}</span>
         </button>
       )}
       {m.attachments?.length ? (
@@ -506,33 +507,33 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           </p>
         )}
         <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
-          {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={listening ? "Generando voz" : "Escuchar mensaje"} title="Escuchar con la voz elegida" className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
-          <button type="button" onClick={onReply} aria-label="Responder" className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
-          <button type="button" onClick={onToggleReacting} aria-label="Reaccionar" aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
-          <button type="button" onClick={onToggleHiding} aria-label="Eliminar para mí" aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
+          {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
+          <button type="button" onClick={onReply} aria-label={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
+          <button type="button" onClick={onToggleHiding} aria-label={t("Eliminar para mí")} aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
       {menuOpen && (
-        <div role="menu" aria-label="Opciones del mensaje" className="mt-1 flex max-w-[90vw] flex-wrap gap-1 rounded-2xl border border-border bg-card p-2 shadow-lg" data-testid={`menu-message-${m.id}`}>
-          {canListen && <button type="button" disabled={listening} onClick={() => { setMenuOpen(false); onListen(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Escuchar con su voz</button>}
-          {!mine && <button type="button" onClick={() => { setMenuOpen(false); onRequestVoice(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Pedir respuesta en audio</button>}
-          <button type="button" onClick={() => { setMenuOpen(false); onReply(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Responder</button>
-          <button type="button" onClick={() => { setMenuOpen(false); onToggleReacting(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">Reaccionar</button>
-          <button type="button" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-xs">Cerrar</button>
+        <div role="menu" aria-label={t("Opciones del mensaje")} className="mt-1 flex max-w-[90vw] flex-wrap gap-1 rounded-2xl border border-border bg-card p-2 shadow-lg" data-testid={`menu-message-${m.id}`}>
+          {canListen && <button type="button" disabled={listening} onClick={() => { setMenuOpen(false); onListen(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Escuchar con su voz")}</button>}
+          {!mine && <button type="button" onClick={() => { setMenuOpen(false); onRequestVoice(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Pedir respuesta en audio")}</button>}
+          <button type="button" onClick={() => { setMenuOpen(false); onReply(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Responder")}</button>
+          <button type="button" onClick={() => { setMenuOpen(false); onToggleReacting(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Reaccionar")}</button>
+          <button type="button" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-xs">{t("Cerrar")}</button>
         </div>
       )}
       {transcript && (
         <details className={cn('mt-1 max-w-[min(20rem,85vw)] rounded-xl border border-border/60 px-3 py-2 text-xs', mine ? 'bg-primary/5' : 'bg-secondary/50')}
           data-testid={`audio-transcript-${m.id}`}>
-          <summary className="cursor-pointer font-medium text-muted-foreground">Ver transcripción del audio</summary>
+          <summary className="cursor-pointer font-medium text-muted-foreground">{t("Ver transcripción del audio")}</summary>
           <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{transcript}</p>
         </details>
       )}
       {hiding && (
-        <div role="alertdialog" aria-label="Eliminar mensaje para mí" className="mt-1 flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-xs shadow-sm" data-testid={`confirm-hide-${m.id}`}>
-          <span className="text-muted-foreground">Se oculta solo para ti; la otra cuenta lo sigue viendo.</span>
-          <button type="button" onClick={onToggleHiding} className="h-9 rounded-full bg-secondary px-3 font-semibold" data-testid={`button-hide-cancel-${m.id}`}>Cancelar</button>
-          <button type="button" onClick={onHide} className="h-9 rounded-full bg-destructive px-3 font-semibold text-destructive-foreground" data-testid={`button-hide-confirm-${m.id}`}>Eliminar</button>
+        <div role="alertdialog" aria-label={t("Eliminar mensaje para mí")} className="mt-1 flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-xs shadow-sm" data-testid={`confirm-hide-${m.id}`}>
+          <span className="text-muted-foreground">{t("Se oculta solo para ti; la otra cuenta lo sigue viendo.")}</span>
+          <button type="button" onClick={onToggleHiding} className="h-9 rounded-full bg-secondary px-3 font-semibold" data-testid={`button-hide-cancel-${m.id}`}>{t("Cancelar")}</button>
+          <button type="button" onClick={onHide} className="h-9 rounded-full bg-destructive px-3 font-semibold text-destructive-foreground" data-testid={`button-hide-confirm-${m.id}`}>{t("Eliminar")}</button>
         </div>
       )}
       {reacting && (
@@ -552,7 +553,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         </div>
       )}
       {mine && isLastMine && (
-        <span className="mt-0.5 text-[11px] text-muted-foreground" data-testid={`status-read-${m.id}`}>{m.readBy.includes(otherId) ? 'Visto' : 'Enviado'}</span>
+        <span className="mt-0.5 text-[11px] text-muted-foreground" data-testid={`status-read-${m.id}`}>{t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>
       )}
     </li>
   );
