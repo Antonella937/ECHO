@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { customFetch } from '@workspace/api-client-react';
-import { getActiveUniverseId } from '@/store/persistence';
 import { useSocial } from '@/store/social-store';
 
 type Candidate = {
@@ -19,15 +17,14 @@ const labels: Record<string, string> = {
 
 /** Manual review: suggestions are never automatically approved or applied. */
 export function TrustReview({ actorId, targetId }: { actorId: string; targetId: string }) {
-  const { userId } = useAuth();
   const { actions } = useSocial();
   const [data, setData] = useState<Response | null>(null);
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  if (!userId || targetId === 'owner') return null;
-  const universeId = getActiveUniverseId(userId);
+  if (targetId === 'owner') return null;
+  const universeId = 'primary';
   const url = `/api/universe/relationships/trust/candidates?${new URLSearchParams({ universeId, actorId, targetId })}`;
   async function load() {
     setBusy(true); setError(''); setNotice('');
@@ -40,7 +37,7 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
     finally { setBusy(false); }
   }
   async function approve(candidate: Candidate) {
-    if (!data || !userId || busy) return;
+    if (!data || busy) return;
     setBusy(true); setError(''); setNotice('');
     try {
       await customFetch(`/api/universe/relationships/trust/approve?${new URLSearchParams({ universeId })}`, {
