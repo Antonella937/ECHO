@@ -529,7 +529,7 @@ export function createCreatorHubSocialRouter(): IRouter {
     body: z.string().max(5000).default(""),
     visibility: z.enum(["public","followers","private"]).default("private"),
     pinned: z.boolean().default(false),
-    coverPath: z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i).nullable().default(null),
+    coverPath: z.string().regex(new RegExp("^/objects/uploads/[0-9a-f-]{36}$", "i")).nullable().default(null),
   }).strict();
   router.post("/creator-hub/social/publications", async (req, res) => {
     const parsed = publicationSchema.safeParse(req.body);
