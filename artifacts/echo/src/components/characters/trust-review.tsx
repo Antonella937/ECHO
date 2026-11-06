@@ -38,9 +38,10 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
   }
   async function approve(candidate: Candidate) {
     if (!data || busy) return;
+    if (!window.confirm('¿Confirmás que ocurrió «' + (labels[candidate.kind] ?? candidate.kind) + '»? Esto modificará la confianza y guardará el acontecimiento.')) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      await customFetch(`/api/universe/relationships/trust/approve?${new URLSearchParams({ universeId })}`, {
+      const approved = await customFetch<{ applied: boolean; delta: number }>(`/api/universe/relationships/trust/approve?${new URLSearchParams({ universeId })}`, {
         method: 'POST', responseType: 'json',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -50,8 +51,12 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
       });
       setData(null);
       setHistory(null);
+      setNotice('Acontecimiento confirmado en el servidor (confianza ' + (approved.delta > 0 ? '+' : '') + approved.delta + '). Actualizando…');
       await actions.refreshAfterApproval();
-      setNotice('Acontecimiento confirmado y guardado. Actualizá la lista para ver nuevos candidatos.');
+      const updated = await customFetch<Response>(url, { method: 'GET', responseType: 'json', cache: 'no-store' });
+      const past = await customFetch<{ entries: HistoryEntry[] }>(`/api/universe/relationships/trust/history?${new URLSearchParams({ universeId, actorId, targetId })}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
+      setData(updated); setHistory(past.entries);
+      setNotice('Acontecimiento confirmado. Confianza ' + (approved.delta > 0 ? '+' : '') + approved.delta + '.');
     } catch {
       setData(null);
       setError('No se pudo aprobar. Puede haber cambios pendientes de sincronización. Sincronizá y volvé a consultar.');
