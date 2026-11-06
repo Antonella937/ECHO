@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { TrustReview } from './trust-review';
 import { TensionReview } from './tension-review';
+import { AttractionReview } from './attraction-review';
 import { useSocial } from '@/store/social-store';
 import { relationshipPresets } from '@/domain/character-core';
 import { Field, inputCls } from '@/components/echo/field';
@@ -60,6 +61,7 @@ export function RelationshipsSection({ config, set, selfId }: SectionProps & { s
           <Slider id={`rel-trust-${r.id}`} label="Confianza" value={r.trust} onChange={(trust) => up(r.id, { trust })} />
           {selfId && <TrustReview key={r.targetId} actorId={selfId} targetId={r.targetId} />}
           {selfId && r.tension != null && <TensionReview key={'tension-' + r.targetId} actorId={selfId} targetId={r.targetId} />}
+          {selfId && r.attraction != null && <AttractionReview key={'attraction-' + r.targetId} actorId={selfId} targetId={r.targetId} />}
           {(['attraction', 'tension'] as const).map((k) => r[k] == null ? (
             <div key={k} className="mt-2"><GhostButton onClick={() => up(r.id, { [k]: 30 })} testId={`button-enable-${k}-${r.id}`}><Plus className="h-3.5 w-3.5" /> {k === 'attraction' ? 'Agregar atracción' : 'Agregar tensión'}</GhostButton></div>
           ) : (
