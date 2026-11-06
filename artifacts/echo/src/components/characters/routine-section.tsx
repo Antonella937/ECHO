@@ -6,7 +6,7 @@ import { Area, Note, Select, Text, level, uid, type SectionProps } from './ui';
 
 type Entry = SectionProps['config']['routine']['entries'][number];
 const DAYS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
-const ACTIVITIES = { sleep: t("Dormir"), work: t("Trabajo"), study: t("Estudio"), meal: t("Comida"), exercise: t("Ejercicio"), rehearsal: t("Ensayo"), social: t("Social"), leisure: t("Ocio"), custom: t("Otra") } as const;
+const ACTIVITIES = { sleep: 'Dormir', work: 'Trabajo', study: 'Estudio', meal: 'Comida', exercise: 'Ejercicio', rehearsal: 'Ensayo', social: 'Social', leisure: 'Ocio', custom: 'Otra' } as const;
 
 export function RoutineSection({ config, set }: SectionProps) {
   const t = useCharacterActivityText();
