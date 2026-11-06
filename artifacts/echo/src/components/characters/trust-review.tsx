@@ -39,6 +39,7 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
   async function approve(candidate: Candidate) {
     if (!data || busy) return;
     if (!window.confirm('¿Confirmás que ocurrió «' + (labels[candidate.kind] ?? candidate.kind) + '»? Esto modificará la confianza y guardará el acontecimiento.')) return;
+    let committed = false;
     setBusy(true); setError(''); setNotice('');
     try {
       const approved = await customFetch<{ applied: boolean; delta: number }>(`/api/universe/relationships/trust/approve?${new URLSearchParams({ universeId })}`, {
@@ -49,6 +50,7 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
           kind: candidate.kind, expectedRevision: data.revision,
         }),
       });
+      committed = true;
       setData(null);
       setHistory(null);
       setNotice('Acontecimiento confirmado en el servidor (confianza ' + (approved.delta > 0 ? '+' : '') + approved.delta + '). Actualizando…');
@@ -59,7 +61,7 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
       setNotice('Acontecimiento confirmado. Confianza ' + (approved.delta > 0 ? '+' : '') + approved.delta + '.');
     } catch {
       setData(null);
-      setError('No se pudo aprobar. Puede haber cambios pendientes de sincronización. Sincronizá y volvé a consultar.');
+      setError(committed ? 'El acontecimiento se confirmó en el servidor, pero no se pudo actualizar la pantalla. Sincronizá y volvé a consultar.' : 'No se pudo aprobar. Puede haber cambios pendientes de sincronización. Sincronizá y volvé a consultar.');
     } finally { setBusy(false); }
   }
   async function analyze(item: Candidate) {
