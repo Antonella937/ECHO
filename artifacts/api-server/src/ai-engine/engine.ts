@@ -17,7 +17,7 @@ Allowed reaction values: ❤, 😂, 😮, 😢, 🔥, 👏. For draft and like a
 
 /** Pure orchestration: no repositories, events, schedulers or write functions. */
 export async function previewDecision(provider: TextProvider, state: SocialState, input: CharacterDecisionInput, sourceRevision: number,
-  now = new Date(), source: 'provided_snapshot' | 'persisted_owner_universe' = 'provided_snapshot', vision: VisionContext = { analyses: {}, postSummaries: {} }, historical: HistoricalRecall[] = []) {
+  now = new Date(), source: 'provided_snapshot' | 'persisted_owner_universe' = 'provided_snapshot', vision: VisionContext = { analyses: {}, postSummaries: {} }, historical: HistoricalRecall[] = [], mode: 'preview' | 'live_dm_reply' = 'preview') {
   const parsedInput = PreviewCharacterDecisionBody.strict().safeParse(input);
   if (!parsedInput.success) throw new EngineError('INVALID_PREVIEW_INPUT');
   const context = buildCharacterContext(state, parsedInput.data, now, vision, historical);
@@ -82,7 +82,7 @@ export async function previewDecision(provider: TextProvider, state: SocialState
   let completion: Awaited<ReturnType<TextProvider['complete']>>;
   try {
     completion = await provider.complete({
-      system: instructions + JSON.stringify(decisionSchema), context: context.serialized, outputSchema: decisionSchema,
+      system: (mode === 'live_dm_reply' ? instructions.replace("manual character-preview engine", "live character DM reply engine").replace("Nothing will be executed or published. Choose action \"none\" whenever silence, delay, boundaries, lack of context or routine makes that appropriate.", "This decision may be sent as a real direct-message reply. An eligible incoming message is waiting: normally choose action \"draft\" and respond naturally in the character's own voice. Choose \"none\" only when replying would violate boundaries, safety, or the character's established context; routine and general social posting preferences alone are not reasons to ignore an incoming message.") : instructions) + JSON.stringify(decisionSchema), context: context.serialized, outputSchema: decisionSchema,
       validate: text => { validateDecision(text); },
     });
   } catch (error) {
