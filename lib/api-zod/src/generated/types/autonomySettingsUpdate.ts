@@ -20,6 +20,7 @@ export type AutonomySettingsUpdate = {
      */
   characterId: string;
   enabled: boolean;
+  lane?: "social" | "dm";
   /**
      * @minLength 1
      * @maxLength 120
