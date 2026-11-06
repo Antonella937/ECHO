@@ -21,7 +21,7 @@ import type { Message, MessageAttachment } from '@/domain/types';
 
 const REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
 
-interface Pending { key: string; kind: MessageAttachment['type']; preview: string; name: string; uploading: boolean; file: File | Blob; durationSeconds?: number; attachment?: MessageAttachment; error?: string }
+interface Pending { key: string; kind: MessageAttachment['type']; preview: string; name: string; uploading: boolean; file: File | Blob; durationSeconds?: number; attachment?: MessageAttachment; transcript?: string; transcriptionWarning?: string; error?: string }
 
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
@@ -103,10 +103,25 @@ export default function ConversationPage() {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const entry: Pending = { key, kind: kindOf(f.type)!, preview: URL.createObjectURL(f), name: f instanceof File ? f.name : 'Nota de voz', uploading: true, file: f, durationSeconds: meta?.durationSeconds };
       setPending(p => [...p, entry]);
-      uploadAttachment(f).then(
-        a => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, attachment: { ...a, ...(meta?.durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(meta.durationSeconds) } : {}) } } : x)); },
-        e => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, error: (e as Error).message || 'No se pudo subir.' } : x)); },
-      );
+      uploadAttachment(f).then(async a => {
+        let transcript: string | undefined;
+        let transcriptionWarning: string | undefined;
+        if (a.type === 'audio') {
+          try {
+            const result = await customFetch<{ transcript: string }>('/api/storage/audio/transcribe', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ objectPath: a.url }), responseType: 'json',
+            });
+            transcript = result.transcript;
+          } catch {
+            transcriptionWarning = 'El audio se guardó, pero la transcripción todavía no está disponible. El personaje no podrá interpretar su contenido.';
+          }
+        }
+        if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? {
+          ...x, uploading: false, transcript, transcriptionWarning,
+          attachment: { ...a, ...(meta?.durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(meta.durationSeconds) } : {}) },
+        } : x));
+      }, e => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, error: (e as Error).message || 'No se pudo subir.' } : x)); });
     }
   }, []);
 
@@ -156,7 +171,9 @@ export default function ConversationPage() {
     e.preventDefault();
     if (!canSend) return;
     try {
-      actions.sendMessage(other.id, text, { ...(quoted ? { quoteMessageId: quoted.id } : {}), ...(ready.length ? { attachments: ready } : {}) });
+      const spoken = pending.filter(p => p.transcript).map(p => `[Transcripción de nota de voz]: ${p.transcript}`).join('\n');
+      const messageText = [text.trim(), spoken].filter(Boolean).join('\n\n');
+      actions.sendMessage(other.id, messageText, { ...(quoted ? { quoteMessageId: quoted.id } : {}), ...(ready.length ? { attachments: ready } : {}) });
       pending.forEach(p => URL.revokeObjectURL(p.preview));
       setText(''); setPending([]); setQuoteId(null); setError(null);
     } catch (err) {
