@@ -4,7 +4,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -46,6 +46,8 @@ export default function ConversationPage() {
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [listeningId, setListeningId] = useState<string | null>(null);
+  const playbackRef = useRef<HTMLAudioElement | null>(null);
   const [recordingTip, setRecordingTip] = useState(false);
   const [reacting, setReacting] = useState<string | null>(null);
   const [hiding, setHiding] = useState<string | null>(null);
@@ -104,6 +106,33 @@ export default function ConversationPage() {
       root.style.removeProperty('--echo-keyboard-inset');
     };
   }, []);
+
+  // On-demand TTS is opt-in per tap. No provider configured => no paid request.
+  const listenToMessage = async (messageId: string) => {
+    if (listeningId) return;
+    setListeningId(messageId);
+    setError(null);
+    try {
+      if (!user?.id || !other) throw new Error('No se pudo identificar el personaje.');
+      const audio = await customFetch<Blob>('/api/voices/basic/listen', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), characterId: other.id, messageId }),
+        responseType: 'blob',
+      });
+      if (!(audio instanceof Blob) || audio.size === 0) throw new Error('El motor no devolvió audio.');
+      playbackRef.current?.pause();
+      const url = URL.createObjectURL(audio);
+      const player = new Audio(url);
+      playbackRef.current = player;
+      player.onended = () => { URL.revokeObjectURL(url); if (playbackRef.current === player) playbackRef.current = null; };
+      player.onerror = () => { URL.revokeObjectURL(url); setError('No se pudo reproducir la voz.'); };
+      await player.play();
+    } catch (e) {
+      const message = (e as Error).message ?? '';
+      setError(message.includes('VOICE_ENGINE_NOT_CONFIGURED') ? 'Las voces reales estarán disponibles cuando conectemos el motor de voz.' : 'No se pudo generar la voz. No se modificó el mensaje.');
+    } finally { setListeningId(null); }
+  };
+  useEffect(() => () => { playbackRef.current?.pause(); }, []);
 
   const transcribeAudio = async (attachment: MessageAttachment): Promise<string> => {
     const result = await customFetch<{ transcript: string }>('/api/storage/audio/transcribe', {
@@ -247,6 +276,9 @@ export default function ConversationPage() {
               reacting={reacting === m.id}
               onToggleReacting={() => setReacting(r => r === m.id ? null : m.id)}
               onReact={(v) => { try { actions.reactMessage(m.id, v); } catch (e) { setError((e as Error).message); } setReacting(null); }}
+              canListen={m.senderId === other.id && !!other.configuration?.voice?.basicVoiceId && !!m.text.trim() && !m.attachments?.some(a => a.type === 'audio') && m.text.length <= 500}
+              listening={listeningId === m.id}
+              onListen={() => void listenToMessage(m.id)}
               onReply={() => setQuoteId(m.id)}
               onJump={jumpTo}
               hiding={hiding === m.id}
@@ -398,11 +430,12 @@ function summarize(m: Message): string {
   return 'Mensaje';
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
+  canListen: boolean; listening: boolean; onListen(): void;
 }) {
   const resolveMedia = useMediaResolver();
   const story = m.storyId ? state.stories.find((s) => s.id === m.storyId) : undefined;
@@ -456,6 +489,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           </p>
         )}
         <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
+          {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={listening ? "Generando voz" : "Escuchar mensaje"} title="Escuchar con la voz elegida" className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
           <button type="button" onClick={onReply} aria-label="Responder" className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label="Reaccionar" aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleHiding} aria-label="Eliminar para mí" aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
