@@ -151,6 +151,47 @@ export function createCreatorHubSocialRouter(): IRouter {
     res.json({ typing: Boolean(result.rows[0]?.typing) });
   });
 
+  const voiceSchema = z.object({
+    targetOwnerId: z.string().min(1).max(255),
+    objectPath: z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i),
+    durationSeconds: z.number().int().min(1).max(120),
+  }).strict();
+  router.post("/creator-hub/social/voice-messages", async (req, res) => {
+    const parsed = voiceSchema.safeParse(req.body);
+    if (!parsed.success || parsed.data.targetOwnerId === req.userId) {
+      res.status(400).json({ error: "INVALID_VOICE_MESSAGE" }); return;
+    }
+    const { targetOwnerId, objectPath, durationSeconds } = parsed.data;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const owned = await client.query(
+        "SELECT 1 FROM echo_media WHERE owner_id=$1 AND object_path=$2",
+        [req.userId, objectPath],
+      );
+      if (!owned.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
+      const target = await client.query("SELECT message_privacy FROM echo_creator_profiles WHERE owner_id=$1 FOR UPDATE", [targetOwnerId]);
+      if (!target.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+      const blocked = await client.query("SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)", [req.userId,targetOwnerId]);
+      if (blocked.rowCount) { await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGES_NOT_ALLOWED" }); return; }
+      const connected = await client.query(
+        "SELECT 1 FROM echo_creator_message_requests WHERE status='accepted' AND ((sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1)) UNION SELECT 1 FROM echo_creator_direct_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) LIMIT 1",
+        [req.userId,targetOwnerId],
+      );
+      if (!connected.rowCount && target.rows[0].message_privacy !== "everyone") {
+        await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGE_REQUEST_REQUIRED" }); return;
+      }
+      const result = await client.query(
+        `INSERT INTO echo_creator_voice_messages(sender_owner_id,recipient_owner_id,object_path,duration_seconds)
+         VALUES($1,$2,$3,$4) RETURNING message_id AS "id",object_path AS "objectPath",duration_seconds AS "durationSeconds",created_at AS "createdAt"`,
+        [req.userId,targetOwnerId,objectPath,durationSeconds],
+      );
+      await client.query("COMMIT");
+      res.status(201).json({ voiceMessage: result.rows[0] });
+    } catch(error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  });
+
   const dmBodySchema = z.object({
     targetOwnerId: z.string().min(1).max(255),
     body: z.string().trim().min(1).max(2000),
