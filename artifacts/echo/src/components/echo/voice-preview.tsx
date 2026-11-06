@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Trash2 } from 'lucide-react';
 import { formatDuration } from '@/lib/dm-attachments';
 
-export function VoicePreview({ src, durationSeconds, uploading, error, onDiscard }: {
+export function VoicePreview({ src, durationSeconds, uploading, error, onRetry, onDiscard }: {
   src: string;
   durationSeconds?: number;
   uploading: boolean;
   error?: string;
+  onRetry?(): void;
   onDiscard(): void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -60,6 +61,7 @@ export function VoicePreview({ src, durationSeconds, uploading, error, onDiscard
           <span role="status">{error ? 'Error al subir' : playError ? 'No se puede reproducir' : uploading ? 'Subiendo…' : 'Lista para enviar'}</span>
         </div>
       </div>
+      {error && onRetry && <button type="button" onClick={onRetry} className="rounded-lg bg-secondary px-2 py-1 text-xs font-semibold" aria-label="Reintentar subida de audio">Reintentar</button>}
       <button type="button" onClick={() => { audioRef.current?.pause(); onDiscard(); }} aria-label="Descartar nota de voz"
         className="tap grid h-9 w-9 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-discard-voice-preview">
         <Trash2 className="h-4 w-4" />
