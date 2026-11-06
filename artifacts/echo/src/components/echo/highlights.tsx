@@ -29,11 +29,7 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
         return (
           <div key={h.id} className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
             <button onClick={() => openStoryList(authorId, h.storyIds.filter(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }))} className="tap h-16 w-16 overflow-hidden rounded-full border border-border bg-card p-[3px]" aria-label={`Ver destacada ${h.title}`} data-testid={`button-highlight-${h.id}`}>
-              <span className="relative block h-full w-full overflow-hidden rounded-full bg-secondary">
-                <span className="absolute inset-0 animate-pulse rounded-full bg-gradient-to-br from-primary/15 via-muted to-primary/10" aria-hidden="true" />
-                {(customCover || cover) && <img src={customCover ? resolveMedia(customCover) : resolveMedia(cover!.image, { sourceType: 'story', sourceContentId: cover!.id })} alt="" loading="eager" decoding="async" className="relative h-full w-full rounded-full object-cover"
-                  onError={() => { if (cover && !customCover) setUnavailable(previous => ({ ...previous, [h.id]: [...new Set([...(previous[h.id] ?? []), cover.id])] })); }} />}
-              </span>
+              <HighlightCover title={h.title} src={customCover ? resolveMedia(customCover) : cover ? resolveMedia(cover.image, { sourceType: 'story', sourceContentId: cover.id }) : ''} onError={() => { if (cover && !customCover) setUnavailable(previous => ({ ...previous, [h.id]: [...new Set([...(previous[h.id] ?? []), cover.id])] })); }} />
             </button>
             <span className="w-full truncate text-center text-[11.5px]">{h.title}</span>
             {isMe && <button onClick={() => setEditing(h)} className="-mt-2 grid h-11 w-11 place-items-center text-muted-foreground" aria-label={`Editar ${h.title}`} data-testid={`button-highlight-edit-${h.id}`}><Pencil className="h-3.5 w-3.5" /></button>}
@@ -155,5 +151,19 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
         </div>
       )}
     </Sheet>
+  );
+}
+
+/** Keep a legible branded cover visible until the private image is decoded. */
+function HighlightCover({ title, src, onError }: { title: string; src: string; onError(): void }) {
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const ready = Boolean(src && loadedSrc === src);
+  return (
+    <span className="relative grid h-full w-full place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/35 via-secondary to-primary/20">
+      {!ready && <span className="text-lg font-semibold text-foreground/80" aria-hidden="true">{title.trim().charAt(0).toLocaleUpperCase() || 'E'}</span>}
+      {src && <img src={src} alt="" loading="eager" decoding="async"
+        onLoad={() => setLoadedSrc(src)} onError={onError}
+        className={cn('absolute inset-0 h-full w-full rounded-full object-cover transition-opacity duration-150', ready ? 'opacity-100' : 'opacity-0')} />}
+    </span>
   );
 }
