@@ -22,6 +22,39 @@ export default function CreatorHubPage() {
   const bannerImage = bannerRef ? resolveImage(bannerRef) : '';
   const avatarInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
+  const [adjustingAvatar, setAdjustingAvatar] = useState(false);
+  const [avatarPosition, setAvatarPosition] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
+  const [savingPosition, setSavingPosition] = useState(false);
+  const dragStart = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
+  const storedAvatarPosition = user?.unsafeMetadata?.creatorHubAvatarPosition;
+  const savedAvatarPosition = typeof storedAvatarPosition === 'object' && storedAvatarPosition !== null && 'x' in storedAvatarPosition && 'y' in storedAvatarPosition
+    ? { x: Number(storedAvatarPosition.x) || 50, y: Number(storedAvatarPosition.y) || 50 }
+    : { x: 50, y: 50 };
+  function startAdjustingAvatar() {
+    setAvatarPosition(savedAvatarPosition);
+    setProfileError('');
+    setAdjustingAvatar(true);
+  }
+  function moveAvatar(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragStart.current) return;
+    const { x, y, originX, originY } = dragStart.current;
+    const size = event.currentTarget.getBoundingClientRect().width;
+    const scale = 100 / Math.max(size, 1);
+    setAvatarPosition({
+      x: Math.max(0, Math.min(100, originX - (event.clientX - x) * scale)),
+      y: Math.max(0, Math.min(100, originY - (event.clientY - y) * scale)),
+    });
+  }
+  async function saveAvatarPosition() {
+    if (!user) return;
+    setSavingPosition(true);
+    try {
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubAvatarPosition: avatarPosition } });
+      await user.reload();
+      setAdjustingAvatar(false);
+    } catch { setProfileError('No pudimos guardar el encuadre. Intentá nuevamente.'); }
+    finally { setSavingPosition(false); }
+  }
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [uploading, setUploading] = useState<'avatar' | 'banner' | null>(null);
@@ -69,7 +102,7 @@ export default function CreatorHubPage() {
     try {
       const data = await compressImage(file, kind === 'avatar' ? 900 : 1920, 0.85);
       const ref = await uploadPrivateImage(data);
-      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, [kind === 'avatar' ? 'creatorHubAvatar' : 'creatorHubBanner']: ref } });
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, [kind === 'avatar' ? 'creatorHubAvatar' : 'creatorHubBanner']: ref, ...(kind === 'avatar' ? { creatorHubAvatarPosition: { x: 50, y: 50 } } : {}) } });
       await user.reload();
     } catch { setProfileError('No pudimos guardar la imagen. Probá nuevamente.'); }
     finally { setUploading(null); }
@@ -122,9 +155,9 @@ export default function CreatorHubPage() {
           <div className="mx-auto w-full max-w-5xl space-y-5 px-5 py-6 sm:px-10 lg:py-7">
             <div className="flex items-start gap-3 sm:items-center">
               <div className="relative shrink-0">
-                <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold leading-none sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}`}>{avatarImage ? <img src={avatarImage} alt="" className="h-full w-full object-cover" /> : <span className="block text-center leading-none">{initials}</span>}</span>
+                <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold leading-none sm:h-28 sm:w-28" aria-label={`Avatar de ${alias}`}>{avatarImage ? <img src={avatarImage} alt="" className="h-full w-full object-cover" style={{ objectPosition: `${savedAvatarPosition.x}% ${savedAvatarPosition.y}%` }} /> : <span className="block text-center leading-none">{initials}</span>}</span>
                 <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Seleccionar foto de perfil" onChange={e => void uploadPhoto(e, 'avatar')} />
-                <button type="button" disabled={uploading !== null} onClick={() => avatarInput.current?.click()} aria-label="Cambiar foto de perfil" className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border border-border bg-card text-foreground disabled:opacity-50"><Camera size={15}/></button>
+                <button type="button" disabled={uploading !== null} onClick={() => avatarImage ? startAdjustingAvatar() : avatarInput.current?.click()} aria-label={avatarImage ? "Ajustar foto de perfil" : "Subir foto de perfil"} className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border border-border bg-card text-foreground disabled:opacity-50"><Camera size={15}/></button>
               </div>
               <div className="min-w-0 flex-1 pt-3 sm:pt-0">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">{editingName ? <div className="flex min-w-0 items-center gap-1"><input aria-label="Nombre de creador" value={nameDraft} maxLength={80} onChange={e => setNameDraft(e.target.value)} className="min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm" /><button type="button" disabled={saving} aria-label="Guardar nombre" onClick={() => void saveName()}><Check size={17}/></button><button type="button" aria-label="Cancelar edición de nombre" onClick={() => setEditingName(false)}><X size={17}/></button></div> : <div className="flex min-w-0 items-center gap-1"><h2 className="min-w-0 truncate text-lg font-semibold leading-tight sm:text-3xl">{alias}</h2><button type="button" aria-label="Editar nombre" onClick={() => {setNameDraft(alias);setProfileError('');setEditingName(true);}} className="shrink-0 p-1 text-muted-foreground"><Pencil size={15}/></button></div>}{founderVerified && <span title="Fundadora verificada de ECHO" aria-label="Fundadora verificada de ECHO"><BadgeCheck className="h-5 w-5 shrink-0 fill-primary text-primary-foreground sm:h-6 sm:w-6" /></span>}</div>
@@ -153,6 +186,34 @@ export default function CreatorHubPage() {
         </section>
         <p className="mx-auto mt-4 flex max-w-5xl items-start gap-2 px-6 pb-4 text-xs leading-relaxed text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0" /> Esta es la base visual de Creator Hub. Las solicitudes de acceso y el contenido compartido se habilitarán cuando existan controles de privacidad completos. Ningún universo se publica automáticamente.</p>
       </div>
+      {adjustingAvatar && avatarImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 px-5 py-8" role="dialog" aria-modal="true" aria-label="Ajustar foto de perfil">
+          <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 text-center shadow-2xl">
+            <h2 className="text-xl font-semibold">Ajustar foto de perfil</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Arrastrá la imagen para centrarla dentro del círculo.</p>
+            <div
+              className="relative mx-auto mt-6 h-64 w-64 max-w-full overflow-hidden rounded-full border-4 border-primary/40 bg-secondary touch-none cursor-grab active:cursor-grabbing"
+              onPointerDown={event => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                dragStart.current = { x: event.clientX, y: event.clientY, originX: avatarPosition.x, originY: avatarPosition.y };
+              }}
+              onPointerMove={moveAvatar}
+              onPointerUp={() => { dragStart.current = null; }}
+              onPointerCancel={() => { dragStart.current = null; }}
+            >
+              <img src={avatarImage} alt="Vista previa del encuadre" draggable={false} className="h-full w-full select-none object-cover pointer-events-none" style={{ objectPosition: `${avatarPosition.x}% ${avatarPosition.y}%` }} />
+            </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <button type="button" className="rounded-full border border-border px-4 py-2 text-sm" onClick={() => { setAdjustingAvatar(false); avatarInput.current?.click(); }}>Cambiar foto</button>
+              <button type="button" className="rounded-full border border-border px-4 py-2 text-sm" onClick={() => setAvatarPosition({ x: 50, y: 50 })}>Centrar</button>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button type="button" disabled={savingPosition} className="flex-1 rounded-full border border-border px-4 py-3 text-sm" onClick={() => setAdjustingAvatar(false)}>Cancelar</button>
+              <button type="button" disabled={savingPosition} className="flex-1 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60" onClick={() => void saveAvatarPosition()}>{savingPosition ? 'Guardando…' : 'Guardar posición'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
