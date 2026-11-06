@@ -168,12 +168,38 @@ export async function uploadPrivateImage(dataUrl: string): Promise<string> {
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'echo-image', size: image.size, contentType }), responseType: 'json' },
   );
-  const upload = await fetch(uploadURL, {
-    method: 'PUT',
-    headers: { 'Content-Type': contentType },
-    body: image,
-  });
-  if (!upload.ok) throw new Error('No se pudo subir la imagen al almacenamiento privado.');
+  // Signed uploads can fail transiently on mobile networks. Reuse the same
+  // signed URL for bounded retries, but never retry permanent 4xx failures.
+  let upload: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      upload = await fetch(uploadURL, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: image,
+      });
+      if (upload.ok) break;
+      if (![408, 429, 500, 502, 503, 504].includes(upload.status)) break;
+    } catch {
+      if (attempt === 2) throw new Error('No se pudo conectar con el almacenamiento privado. Revisá la conexión e intentá de nuevo.');
+    }
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  if (!upload?.ok) {
+    let reason = '';
+    if (upload) {
+      try {
+        const body = await upload.text();
+        const parsed: unknown = JSON.parse(body);
+        if (parsed && typeof parsed === 'object') {
+          const detail = parsed as Record<string, unknown>;
+          reason = [detail.error, detail.message]
+            .filter((value): value is string => typeof value === 'string').join(': ').slice(0, 180);
+        }
+      } catch { /* Upstream errors may not contain JSON. */ }
+    }
+    throw new Error(`No se pudo subir la imagen (HTTP ${upload?.status ?? 'sin respuesta'})${reason ? ` — ${reason}` : ''}.`);
+  }
 
   const claimed = await customFetch<{ objectPath: string }>('/api/storage/uploads/claim', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
