@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Check, ChevronRight, Layers, Plus } from 'lucide-react';
-import { useCreateCreatorUniverse, useGetCreatorAccount, useListCreatorUniverses, useManageCreatorUniverse, type CreatorUniverseSummary, type UniverseManagementInput } from '@workspace/api-client-react';
+import { customFetch, useCreateCreatorUniverse, useGetCreatorAccount, useListCreatorUniverses, useManageCreatorUniverse, type CreatorUniverseSummary, type UniverseManagementInput } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
 import { getActiveUniverseId, setActiveUniverseId } from '@/store/persistence';
 import { activateOwnedUniverse, newUniverseInput } from '@/lib/universe-navigation';
@@ -38,6 +38,16 @@ export function UniverseSelector() {
   const manage = useManageCreatorUniverse();
   const availableIds = (list.data ?? []).filter(item => !item.archived).map(item => item.universeId);
   const capacity = account.data;
+  const [lifetimeAccess, setLifetimeAccess] = useState<'owner_lifetime' | 'founder_lifetime' | null>(null);
+  useEffect(() => {
+    if (!open || !isSignedIn) return;
+    let cancelled = false;
+    void customFetch<{ lifetimeAccess?: 'owner_lifetime' | 'founder_lifetime' | null; billingExempt?: boolean }>('/api/account/entitlements', { responseType: 'json' })
+      .then(result => { if (!cancelled) setLifetimeAccess(result.billingExempt ? result.lifetimeAccess ?? null : null); })
+      .catch(() => { if (!cancelled) setLifetimeAccess(null); });
+    return () => { cancelled = true; };
+  }, [open, isSignedIn, ownerId]);
+  const lifetimeUnlimited = lifetimeAccess === 'owner_lifetime' || lifetimeAccess === 'founder_lifetime';
   const hasCapacity = Boolean(capacity && capacity.universeCount < capacity.maxUniverses &&
     capacity.characterCount < capacity.maxCharacters);
   const buttonCls = 'flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border p-3 text-left text-sm hover:bg-secondary disabled:opacity-50';
@@ -143,7 +153,7 @@ export function UniverseSelector() {
               <button type="button" className="ml-2 min-h-11 underline" onClick={() => void account.refetch()}>{t("Reintentar")}</button>
             </p>}
             {capacity && <p className="text-xs text-muted-foreground">
-              {capacity.universeCount} {t("de")} {capacity.maxUniverses} {t("universos")} · {capacity.characterCount} {t("de")} {capacity.maxCharacters} {t("personajes")}
+              {capacity.universeCount} / {lifetimeUnlimited ? "∞" : capacity.maxUniverses} {t("universos")} · {capacity.characterCount} / {lifetimeUnlimited ? "∞" : capacity.maxCharacters} {t("personajes")}
               {!hasCapacity && t('. No hay capacidad disponible para un universo con su primer personaje.')}
             </p>}
           </div>
