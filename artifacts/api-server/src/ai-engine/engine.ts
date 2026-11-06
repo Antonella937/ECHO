@@ -6,7 +6,7 @@ import type { HistoricalRecall } from './context';
 
 const instructions = `You are ECHO's manual character-preview engine. Return ONLY one JSON object matching the supplied schema.
 Nothing will be executed or published. Choose action "none" whenever silence, delay, boundaries, lack of context or routine makes that appropriate. For none, text and reaction MUST be null.
-For "draft", write one plausible Spanish text as this character for ONLY the requested text situation. Limits: post 600 characters, comment 1000, DM 2000.
+For "draft", write one plausible text in the account interface language as this character for ONLY the requested text situation. Limits: post 600 characters, comment 1000, DM 2000.
 For "like", choose only for like_post or like_comment and return text:null, reaction:null. For "react", choose only for story_reaction or dm_reaction and return text:null plus exactly one allowed reaction value. In every case, the target is fixed by ECHO and must not be invented or changed.
 Use actual identity, personality, voice, relationships, routine, social settings, editable memories, current state and available recent interactions. Do not invent missing biography, shared history or observations.
 Owner is distinct from Nela or any active character. Routine is probabilistic, not robotic. A delay is only a suggestion, never scheduled here.
@@ -17,7 +17,7 @@ Allowed reaction values: ❤, 😂, 😮, 😢, 🔥, 👏. For draft and like a
 
 /** Pure orchestration: no repositories, events, schedulers or write functions. */
 export async function previewDecision(provider: TextProvider, state: SocialState, input: CharacterDecisionInput, sourceRevision: number,
-  now = new Date(), source: 'provided_snapshot' | 'persisted_owner_universe' = 'provided_snapshot', vision: VisionContext = { analyses: {}, postSummaries: {} }, historical: HistoricalRecall[] = [], mode: 'preview' | 'live_dm_reply' = 'preview') {
+  now = new Date(), source: 'provided_snapshot' | 'persisted_owner_universe' = 'provided_snapshot', vision: VisionContext = { analyses: {}, postSummaries: {} }, historical: HistoricalRecall[] = [], mode: 'preview' | 'live_dm_reply' = 'preview', language: string = 'es') {
   const parsedInput = PreviewCharacterDecisionBody.strict().safeParse(input);
   if (!parsedInput.success) throw new EngineError('INVALID_PREVIEW_INPUT');
   const context = buildCharacterContext(state, parsedInput.data, now, vision, historical);
@@ -82,7 +82,7 @@ export async function previewDecision(provider: TextProvider, state: SocialState
   let completion: Awaited<ReturnType<TextProvider['complete']>>;
   try {
     completion = await provider.complete({
-      system: (mode === 'live_dm_reply' ? instructions.replace("manual character-preview engine", "live character DM reply engine").replace("Nothing will be executed or published. Choose action \"none\" whenever silence, delay, boundaries, lack of context or routine makes that appropriate.", "This decision may be sent as a real direct-message reply. An eligible incoming message is waiting: normally choose action \"draft\" and respond naturally in the character's own voice. Choose \"none\" only when replying would violate boundaries, safety, or the character's established context; routine and general social posting preferences alone are not reasons to ignore an incoming message.") : instructions) + JSON.stringify(decisionSchema), context: context.serialized, outputSchema: decisionSchema,
+      system: ('Account interface language: ' + ({es:'Spanish',en:'English',pt:'Portuguese',fr:'French',de:'German',it:'Italian',ko:'Korean',ja:'Japanese',zh:'Simplified Chinese'} as Record<string,string>)[language] + '. Write all generated character dialogue and user-facing explanations in this language, preserving character identity and proper nouns. Never translate quoted past messages. ' + (mode === 'live_dm_reply' ? instructions.replace("manual character-preview engine", "live character DM reply engine").replace("Nothing will be executed or published. Choose action \"none\" whenever silence, delay, boundaries, lack of context or routine makes that appropriate.", "This decision may be sent as a real direct-message reply. An eligible incoming message is waiting: normally choose action \"draft\" and respond naturally in the character's own voice. Choose \"none\" only when replying would violate boundaries, safety, or the character's established context; routine and general social posting preferences alone are not reasons to ignore an incoming message.") : instructions)) + JSON.stringify(decisionSchema), context: context.serialized, outputSchema: decisionSchema,
       validate: text => { validateDecision(text); },
     });
   } catch (error) {
