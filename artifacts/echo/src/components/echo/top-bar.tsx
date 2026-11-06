@@ -1,14 +1,16 @@
+import { useSharedShellText } from '@/lib/shared-shell-translations';
 import type { ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 export function TopBar({ title, onBack, right, sub }: { title: ReactNode; onBack?: () => void; right?: ReactNode; sub?: ReactNode }) {
+  const t = useSharedShellText();
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
       <div className="flex h-14 items-center gap-1 px-2">
         {onBack ? (
           <button
             onClick={onBack}
-            aria-label="Volver"
+            aria-label={t("Volver")}
             className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary"
             data-testid="button-back"
           >
