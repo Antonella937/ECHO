@@ -122,8 +122,11 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       identity: input.identity === undefined ? current.identity :
         sameCharacterValue(input.identity, expected.identity) ? current.identity :
         (() => {
-          const merged = configField(current.identity, input.identity, expected.identity);
-          return { ...(merged as Character['identity']), updatedAt: input.identity.updatedAt };
+          const { updatedAt: _currentTime, ...currentFields } = current.identity;
+          const { updatedAt: _inputTime, ...inputFields } = input.identity;
+          const { updatedAt: _expectedTime, ...expectedFields } = expected.identity ?? current.identity;
+          const merged = configField(currentFields, inputFields, expectedFields);
+          return { ...(merged as Omit<Character['identity'], 'updatedAt'>), updatedAt: input.identity.updatedAt };
         })(),
       configuration: input.configuration
         ? configField(characterConfig(current), input.configuration, expected.configuration ?? characterConfig({ ...current, configuration: undefined })) as Character['configuration']
