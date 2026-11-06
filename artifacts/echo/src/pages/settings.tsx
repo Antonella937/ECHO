@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const back = useBack();
   const t = useTranslation();
   const st = useSettingsText();
+  const language = useLanguage();
 
   return (
     <div>
@@ -128,7 +129,7 @@ export default function SettingsPage() {
             <p className="mt-3 text-muted-foreground">
               {state.posts.length} {st("publicaciones")} · {state.comments.length} {st("comentarios")} · {state.messages.length} {st("mensajes")}
             </p>
-            {lastSavedAt && <p className="mt-1.5 text-xs text-muted-foreground">{st("Última sincronización:")} {new Date(lastSavedAt).toLocaleString(useSettingsLocale(st))}</p>}
+            {lastSavedAt && <p className="mt-1.5 text-xs text-muted-foreground">{st("Última sincronización:")} {new Date(lastSavedAt).toLocaleString(({ es: 'es-AR', en: 'en-US', pt: 'pt-BR', fr: 'fr-FR', de: 'de-DE', it: 'it-IT', ko: 'ko-KR', ja: 'ja-JP', zh: 'zh-CN' } as const)[language])}</p>}
             {storageError && (
               <button
                 type="button"
@@ -148,8 +149,6 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-function useSettingsLocale(st: (key: string) => string) { return st("Última sincronización:") === "Last synced:" ? "en-US" : undefined; }
 
 function AppearanceSection() {
   const language = useLanguage();
