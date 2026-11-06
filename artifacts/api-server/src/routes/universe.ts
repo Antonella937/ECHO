@@ -13,6 +13,7 @@ import { ObjectPermission } from "../lib/objectAcl";
 import { universeAccountError } from "../lib/universeValidation";
 import { recordIncomingConversationEvents } from "../ai-engine/incoming-memory";
 import { approveRelationshipProgression } from "../lib/relationshipApproval";
+import { sendNewOwnerPush } from "../lib/onesignal-push";
 
 const router: IRouter = Router();
 
@@ -139,6 +140,12 @@ router.put("/universe", async (req, res): Promise<void> => {
   }
 
   res.json(SaveUniverseResponse.parse(saved));
+  // Dispatch only committed new notifications to the authenticated owner.
+  if (previousState.success && previous.revision === expectedRevision && process.env.ECHO_ONESIGNAL_REST_API_KEY) {
+    void sendNewOwnerPush(req.userId!, previousState.data, enrichedState).catch(error => {
+      console.warn("OneSignal dispatch failed", { reason: error instanceof Error ? error.name : "UNKNOWN" });
+    });
+  }
 });
 
 // Verification is read-only: proves every referenced private file exists and
