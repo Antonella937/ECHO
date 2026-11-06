@@ -16,6 +16,30 @@ const PATTERNS: { kind: TrustEventKind; patterns: RegExp[] }[] = [
   { kind: "repair_confirmed", patterns: [/\b(?:te pido perd[oó]n y quiero reparar|i want to make amends)\b/i] },
 ];
 
+/**
+ * Conservative contextual screening. Quoted, hypothetical, negated or
+ * explicitly joking statements are not suitable for automatic suggestions.
+ * This is deterministic triage, NOT an LLM truth judgment.
+ */
+export function screenTrustEvidence(text: string): { eligible: boolean; reason: string } {
+  const normalized = text.normalize("NFC").trim();
+  if (!normalized || normalized.length > 6000) return { eligible: false, reason: "EMPTY_OR_OVERSIZED" };
+  if (/(?:^|[.!?\\n]\\s*)(?:si|if|imagina|imagine|supongamos|what if)\\b/i.test(normalized) ||
+      /\\b(?:habr[ií]a|hubiera|would have|could have|hypothetically|en teor[ií]a)\\b/i.test(normalized)) {
+    return { eligible: false, reason: "HYPOTHETICAL" };
+  }
+  if (/\\b(?:es broma|era broma|just kidding|i'm joking|jajaja|lol|mentira,? era broma)\\b/i.test(normalized)) {
+    return { eligible: false, reason: "JOKE_OR_RETRACTION" };
+  }
+  if (/\\b(?:no te ment[ií]|nunca te ment[ií]|i didn't lie|i never lied|no te traicion[eé]|i didn't betray)\\b/i.test(normalized)) {
+    return { eligible: false, reason: "NEGATED" };
+  }
+  if (/^(?:[>“"']|dijo:|she said:|he said:)/i.test(normalized)) {
+    return { eligible: false, reason: "QUOTED_OR_REPORTED" };
+  }
+  return { eligible: true, reason: "REVIEW_REQUIRED" };
+}
+
 export function suggestTrustCandidates(
   state: SocialState, actorId: string, targetId: string,
   consumedSourceIds: readonly string[], now = new Date(),
@@ -32,6 +56,8 @@ export function suggestTrustCandidates(
        (m.senderId === targetId && m.recipientId === actorId)) &&
       !consumedSourceIds.includes(`trust:${m.id}`);
   }).flatMap(m => {
+    const screen = screenTrustEvidence(m.text);
+    if (!screen.eligible) return [];
     const matched = PATTERNS.find(p => p.patterns.some(pattern => pattern.test(m.text)));
     return matched ? [{
       sourceId: m.id, actorId, targetId, kind: matched.kind,
