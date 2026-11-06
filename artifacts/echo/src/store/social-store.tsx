@@ -49,6 +49,7 @@ export interface SocialActions {
   markAllNotificationsRead(): void;
   switchIdentity(id: CharacterId): void;
   retrySync(): Promise<void>;
+  refreshAfterApproval(): Promise<void>;
   resetAll(): Promise<void>;
 }
 
@@ -112,6 +113,12 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     else await engine.sync();
     if (engine.view.error || engine.view.conflicts.length)
       throw new Error(engine.view.error ?? 'Resuelve los cambios en conflicto para continuar.');
+  }, []);
+
+  const refreshAfterApproval = useCallback(async () => {
+    const engine = coordinator.current;
+    if (!engine) throw new Error('Sync unavailable');
+    await engine.refreshAfterApproval();
   }, []);
 
   const dispatch = useCallback((payload: SocialEventPayload, source: EventSource = 'user') => {
@@ -330,12 +337,13 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         }
       },
       retrySync,
+      refreshAfterApproval,
       async resetAll() {
         coordinator.current?.edit(() => createSeedState());
         await retrySync();
       },
     };
-  }, [dispatch, retrySync]);
+  }, [dispatch, retrySync, refreshAfterApproval]);
 
   const value = useMemo<StoreValue | null>(() => {
     if (!state || !meId) return null;
