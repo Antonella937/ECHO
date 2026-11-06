@@ -5,7 +5,8 @@ import { readUniverse } from '../lib/universeRepository';
 import { db, echoMediaTable } from '@workspace/db';
 import { and, eq, inArray } from 'drizzle-orm';
 import { imageGenerationAvailability } from '../lib/imageGenerationProvider';
-import { buildCharacterImagePrompt, buildMultiCharacterImagePrompt, resolveSceneCharacters, imageStyleInstructions } from '../lib/imagePromptBuilder';
+import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imagePromptBuilder';
+import { prepareImageScene } from '../lib/imageScenePreparation';
 import { imageGenerationAccessStatus } from '../lib/imageGenerationAccess';
 import { paidImageGenerationActivated } from '../lib/imageGenerationActivation';
 import { generateCharacterImage } from '../lib/imageGenerationService';
@@ -26,34 +27,6 @@ const GenerateInput = Input.extend({
   sourceObjectPath: z.string().regex(/^\/objects\/uploads\/[0-9a-f-]{36}$/i).optional(),
 });
 
-/** Select one primary photo per mentioned person first, then fill remaining slots. */
-function sceneReferences(people: any[]): { paths: string[]; labels: string[] } {
-  const valid = (value: unknown): value is string => typeof value === 'string'
-    && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(value);
-  const perPerson = people.map(person => [...new Set([
-    person.avatar, ...(Array.isArray(person.identity?.referenceImages) ? person.identity.referenceImages : []),
-  ].filter(valid))]);
-  const paths: string[] = [];
-  const labels: string[] = [];
-  const append = (path: string, label: string) => {
-    if (paths.length < 4 && !paths.includes(path)) { paths.push(path); labels.push(label); }
-  };
-  perPerson.forEach((refs, index) => { if (refs[0]) append(refs[0], String(people[index].name)); });
-  perPerson.forEach((refs, index) => refs.slice(1).forEach(path => append(path, String(people[index].name))));
-  return { paths, labels };
-}
-function scenePrompt(people: any[], scene: string, style: keyof typeof imageStyleInstructions, labels: string[]) {
-  const base = people.length === 1
-    ? buildCharacterImagePrompt({ name: String(people[0].name ?? ''), scene, style, identity: people[0].identity ?? {} })
-    : buildMultiCharacterImagePrompt({
-      characters: people.map(person => ({ name: String(person.name ?? ''), identity: person.identity ?? {} })),
-      scene, style,
-    });
-  return base + (labels.length ? '\nReference image order: ' +
-    labels.map((name, index) => `image ${index + 1} = ${name}`).join('; ') +
-    '. Match each reference ONLY to its named person.' : '');
-}
-
 const router: IRouter = Router();
 
 router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
@@ -71,8 +44,8 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
     const identity = character.identity ?? {};
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const people = resolveSceneCharacters(input.data.prompt, character, characters as any[]);
-    const { paths: references, labels } = sceneReferences(people);
+    const scene = prepareImageScene(input.data.prompt, character, characters, selected);
+    const references = scene.referencePaths;
     // Only count reference objects registered to the authenticated owner.
     // Actual bytes will be fetched server-side when paid generation is enabled.
     const owned = references.length ? await db.select({ objectPath: echoMediaTable.objectPath })
@@ -81,7 +54,7 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
         inArray(echoMediaTable.objectPath, references),
       )) : [];
     const verifiedReferenceCount = owned.length;
-    const preparedPrompt = scenePrompt(people, input.data.prompt, selected, labels);
+    const preparedPrompt = scene.preparedPrompt;
     res.json({
       status: 'preview_only',
       generationEnabled: false,
@@ -90,8 +63,8 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
       access: imageGenerationAccessStatus(req.userId),
       characterId: character.id,
       characterName: character.name,
-      recognizedCharacters: people.map((person: any) => ({ id: person.id, name: person.name })),
-      referenceAssignments: labels,
+      recognizedCharacters: scene.people,
+      referenceAssignments: scene.referenceAssignments,
       style: selected,
       referenceCount: verifiedReferenceCount,
       ignoredUnverifiedReferences: references.length - verifiedReferenceCount,
@@ -183,8 +156,8 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const identity = character.identity ?? {};
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const people = resolveSceneCharacters(input.data.prompt, character, characters as any[]);
-    const { paths: referencePaths, labels } = sceneReferences(people);
+    const scene = prepareImageScene(input.data.prompt, character, characters, selected);
+    const referencePaths = scene.referencePaths;
     const preparedPrompt = scenePrompt(people, input.data.prompt, selected, labels);
     const result = await generateCharacterImage({
       ownerId: req.userId!, universeId: input.data.universeId,
