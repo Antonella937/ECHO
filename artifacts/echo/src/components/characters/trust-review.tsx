@@ -17,14 +17,13 @@ const labels: Record<string, string> = {
 
 /** Manual review: suggestions are never automatically approved or applied. */
 export function TrustReview({ actorId, targetId }: { actorId: string; targetId: string }) {
-  const { actions } = useSocial();
+  const { actions, universeId } = useSocial();
   const [data, setData] = useState<Response | null>(null);
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   if (targetId === 'owner') return null;
-  const universeId = 'primary';
   const url = `/api/universe/relationships/trust/candidates?${new URLSearchParams({ universeId, actorId, targetId })}`;
   async function load() {
     setBusy(true); setError(''); setNotice('');
