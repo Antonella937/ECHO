@@ -111,6 +111,88 @@ export function createCreatorHubSocialRouter(): IRouter {
     finally { client.release(); }
   });
 
+  const dmBodySchema = z.object({
+    targetOwnerId: z.string().min(1).max(255),
+    body: z.string().trim().min(1).max(2000),
+  }).strict();
+
+  router.post("/creator-hub/social/messages", async (req, res) => {
+    const parsed = dmBodySchema.safeParse(req.body);
+    if (!parsed.success || parsed.data.targetOwnerId === req.userId) {
+      res.status(400).json({ error: "INVALID_MESSAGE" }); return;
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const target = await client.query(
+        "SELECT message_privacy FROM echo_creator_profiles WHERE owner_id=$1 FOR UPDATE",
+        [parsed.data.targetOwnerId],
+      );
+      const sender = await client.query(
+        "SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1",
+        [req.userId],
+      );
+      if (!target.rowCount || !sender.rowCount) {
+        await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return;
+      }
+      const blocked = await client.query(
+        "SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)",
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      if (blocked.rowCount) {
+        await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGES_NOT_ALLOWED" }); return;
+      }
+      const accepted = await client.query(
+        `SELECT 1 FROM echo_creator_message_requests WHERE
+         ((sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1))
+         AND status='accepted' LIMIT 1`,
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      const previouslyConnected = await client.query(
+        `SELECT 1 FROM echo_creator_direct_messages WHERE
+         (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) LIMIT 1`,
+        [req.userId, parsed.data.targetOwnerId],
+      );
+      const canSend = accepted.rowCount || (target.rows[0].message_privacy === "everyone" && !previouslyConnected.rowCount);
+      // Existing conversations continue unless blocked, except when recipient
+      // has explicitly disabled all messages.
+      const allowed = target.rows[0].message_privacy !== "nobody" && (canSend || previouslyConnected.rowCount);
+      if (!allowed) {
+        await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGE_REQUEST_REQUIRED" }); return;
+      }
+      const result = await client.query(
+        `INSERT INTO echo_creator_direct_messages(sender_owner_id,recipient_owner_id,body)
+         VALUES($1,$2,$3) RETURNING id, sender_owner_id AS "senderOwnerId",
+         recipient_owner_id AS "recipientOwnerId", body, created_at AS "createdAt"`,
+        [req.userId, parsed.data.targetOwnerId, parsed.data.body],
+      );
+      await client.query("COMMIT");
+      res.status(201).json({ message: result.rows[0] });
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  });
+
+  router.get("/creator-hub/social/messages/:targetOwnerId", async (req, res) => {
+    const target = req.params.targetOwnerId;
+    if (!target || target === req.userId || target.length > 255) {
+      res.status(400).json({ error: "INVALID_TARGET" }); return;
+    }
+    const blocked = await pool.query(
+      "SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)",
+      [req.userId, target],
+    );
+    if (blocked.rowCount) { res.status(404).json({ error: "CONVERSATION_NOT_FOUND" }); return; }
+    const messages = await pool.query(
+      `SELECT id, sender_owner_id AS "senderOwnerId", recipient_owner_id AS "recipientOwnerId",
+       body, created_at AS "createdAt" FROM echo_creator_direct_messages
+       WHERE (sender_owner_id=$1 AND recipient_owner_id=$2)
+          OR (sender_owner_id=$2 AND recipient_owner_id=$1)
+       ORDER BY created_at DESC, id DESC LIMIT 100`,
+      [req.userId, target],
+    );
+    res.json({ messages: messages.rows.reverse() });
+  });
+
   // Request initiation is separate from sending a message. No message body is
   // accepted here and no recipient inbox is exposed to the sender.
   router.post("/creator-hub/social/message-requests", async (req, res) => {
