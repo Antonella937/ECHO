@@ -228,3 +228,7 @@
   .echo-public .epc-private-nav .ep-brand { font-size: 13px; }
   .echo-public .epc-plan-name h2 { font-size: clamp(25px, 7vw, 37px); }
 }
+
+.echo-public .epc-account-return { display: flex; justify-content: flex-start; margin: 24px 0 38px; }
+.echo-public .epc-account-return button { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 4px; font: inherit; cursor: pointer; }
+@media (max-width: 760px) { .echo-public .epc-private-nav { display: none; } .echo-public .epc-account-return { margin-top: 28px; } }
