@@ -24,6 +24,7 @@ export async function readOwnerControls(ownerId: string, universeId = "primary")
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
+      dmEnabled: row.dmEnabled,
       maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),
       minCooldownMinutes: Math.max(60, Math.min(1440, row.minCooldownMinutes)),
     }])),
@@ -39,16 +40,16 @@ export async function updateOwnerKillSwitch(ownerId: string, engaged: boolean) {
     });
 }
 
-export async function updateCharacterControl(ownerId: string, characterId: string, enabled: boolean, universeId = "primary") {
+export async function updateCharacterControl(ownerId: string, characterId: string, enabled: boolean, universeId = "primary", lane: "social" | "dm" = "social") {
   await db.insert(echoAutonomyCharactersTable)
-    .values({ ownerId, universeId, characterId, enabled })
+    .values({ ownerId, universeId, characterId, ...(lane === "dm" ? { dmEnabled: enabled } : { enabled }) })
     .onConflictDoUpdate({
       target: [
         echoAutonomyCharactersTable.ownerId,
         echoAutonomyCharactersTable.universeId,
         echoAutonomyCharactersTable.characterId,
       ],
-      set: { enabled, updatedAt: new Date() },
+      set: { ...(lane === "dm" ? { dmEnabled: enabled } : { enabled }), updatedAt: new Date() },
     });
 }
 
@@ -73,6 +74,8 @@ export async function listLiveOptInTargets() {
     ownerId: echoAutonomyCharactersTable.ownerId,
     universeId: echoAutonomyCharactersTable.universeId,
     characterId: echoAutonomyCharactersTable.characterId,
+    socialEnabled: echoAutonomyCharactersTable.enabled,
+    dmEnabled: echoAutonomyCharactersTable.dmEnabled,
   }).from(echoAutonomyCharactersTable).innerJoin(
     echoAutonomyOwnersTable,
     eq(echoAutonomyOwnersTable.ownerId, echoAutonomyCharactersTable.ownerId),
@@ -81,7 +84,7 @@ export async function listLiveOptInTargets() {
     eq(echoUniversesTable.universeId, echoAutonomyCharactersTable.universeId),
   )
   ).where(and(
-    eq(echoAutonomyCharactersTable.enabled, true),
+    sql`(${echoAutonomyCharactersTable.enabled} = true OR ${echoAutonomyCharactersTable.dmEnabled} = true)`,
     eq(echoAutonomyOwnersTable.killSwitchEngaged, false),
     isNull(echoUniversesTable.archivedAt),
     isNull(echoUniversesTable.deletedAt),
