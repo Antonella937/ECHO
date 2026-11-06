@@ -15,6 +15,7 @@ import { runAutonomyLiveCycle, type LiveAutonomyRepository } from "./service";
 import { logger } from "../lib/logger";
 import { runAutonomyWorkerTick, startAutonomyWorker } from "./worker";
 import { readUniverse } from "../lib/universeRepository";
+import { dispatchAutonomousVoice, getVoiceOwnerControls } from "./voice-adapter";
 
 const provider = new FreeModelProvider();
 const repository: LiveAutonomyRepository = {
@@ -45,6 +46,9 @@ export function startAutonomyBackgroundWorker() {
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
           now,
           lane: input.lane,
+          voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
+            ...controls, dispatch: dispatchAutonomousVoice,
+          } : undefined).catch(() => undefined),
             });
             if (outcome.status === "no_action" || outcome.status === "rate_limited" || outcome.status === "disabled") {
               logger.info({ lane: input.lane ?? "social", status: outcome.status, reasonCode: outcome.reasonCode }, "Autonomy character skipped");
