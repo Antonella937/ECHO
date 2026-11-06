@@ -1,3 +1,4 @@
+import { useRelationshipPresetText } from '@/lib/relationship-preset-translations';
 import { useCharacterRelationshipText } from '@/lib/character-relationship-translations';
 import { Plus, Trash2 } from 'lucide-react';
 import { TrustReview } from './trust-review';
@@ -23,6 +24,7 @@ export function useTargets(selfId?: string) {
 
 export function RelationshipsSection({ config, set, selfId }: SectionProps & { selfId?: string }) {
   const t = useCharacterRelationshipText();
+  const presetText = useRelationshipPresetText();
   const targets = useTargets(selfId);
   const { state } = useSocial();
   const mainName = state.creatorSetup ? state.characters.find((character) => character.id === 'nela')?.name ?? t('la identidad principal') : 'Nela';
@@ -40,7 +42,7 @@ export function RelationshipsSection({ config, set, selfId }: SectionProps & { s
 
   return (
     <div data-testid="section-character-relationships">
-      <Note>“{t(OWNER_LABEL)}” · {mainName}</Note>
+      <Note>“{t(OWNER_LABEL)}” {presetText("sos vos, quien maneja este universo. Es distinto de")} {mainName}, {presetText("que es un personaje más.")}</Note>
       {rels.length === 0 && <p className="mt-4 rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">{t("Sin vínculos definidos.")}</p>}
       {rels.map((r) => (
         <div key={r.id} className="mt-4 rounded-2xl border border-border bg-card/40 p-3" data-testid={`card-relationship-${r.id}`}>
@@ -56,7 +58,7 @@ export function RelationshipsSection({ config, set, selfId }: SectionProps & { s
           </Field>
           <Field id={`rel-preset-${r.id}`} label={t("Tipo de vínculo")}>
             <select id={`rel-preset-${r.id}`} value={r.preset} onChange={(e) => up(r.id, { preset: e.target.value as Rel['preset'] })} className={inputCls} data-testid={`select-relationship-preset-${r.id}`}>
-              {Object.entries(relationshipPresets).map(([k, v]) => <option key={k} value={k}>{String(v)}</option>)}
+              {Object.entries(relationshipPresets).map(([k, v]) => <option key={k} value={k}>{presetText(String(v))}</option>)}
             </select>
           </Field>
           <Text id={`rel-label-${r.id}`} label={t("Etiqueta propia (opcional)")} value={r.customLabel} onChange={(customLabel) => up(r.id, { customLabel })} max={200} testId={`input-relationship-label-${r.id}`} />
@@ -78,7 +80,7 @@ export function RelationshipsSection({ config, set, selfId }: SectionProps & { s
         </div>
       ))}
       <button type="button" onClick={add} disabled={!free.length} className="tap mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/50 text-sm font-semibold text-primary disabled:opacity-50" data-testid="button-add-relationship">
-        <Plus className="h-4 w-4" /> Agregar vínculo
+        <Plus className="h-4 w-4" /> {t("Agregar vínculo")}
       </button>
     </div>
   );
