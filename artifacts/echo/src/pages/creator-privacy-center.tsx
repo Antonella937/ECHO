@@ -116,7 +116,7 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
           <div className="epc-privacy-rail-top"><Shield size={17} /><span>{t("UNIVERSO")}</span></div>
           <h2 data-testid="text-universe-name">{metadata.name}</h2>
           <div className="epc-setting-line">
-            <span><LockKeyhole size={15} /> Compartir universo</span>
+            <span><LockKeyhole size={15} /> {t("Compartir universo")}</span>
             {sharingQuery.isError
               ? <button type="button" className="epc-text-control" onClick={() => void sharingQuery.refetch()} data-testid="button-retry-sharing">{t("Reintentar")}</button>
               : sharing === undefined ? <span className="epc-state-pill">{t("Cargando…")}</span>
@@ -174,7 +174,7 @@ export default function CreatorPrivacyCenter() {
     <PreviewShell>
       <PreviewHeading eyebrow={t("Privacidad · controles")} title={t("Cada personaje,")} accent={t("sus propios límites.")}
         description={t("Ajustes reales de tu universo activo y sus personajes.")} />
-      {!isLoaded ? <StateCard testId="status-privacy-loading" title="Cargando…" body={t("Comprobando tu sesión.")} />
+      {!isLoaded ? <StateCard testId="status-privacy-loading" title={t("Cargando…")} body={t("Comprobando tu sesión.")} />
         : !isSignedIn || !user ? (
           <section className="ep-complete" data-testid="status-privacy-signed-out">
             <span className="ep-eyebrow">{t("Privacidad")}</span>
@@ -187,7 +187,7 @@ export default function CreatorPrivacyCenter() {
             <PrivacyCenterContent key={`${user.id}:${getActiveUniverseId(user.id)}`} ownerId={user.id} />
           </AlphaConsentBoundary>
         )}
-      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> Cuenta</Link></div>
+      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> {t("Cuenta")}</Link></div>
     </PreviewShell>
   );
 }
