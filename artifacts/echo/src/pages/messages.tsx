@@ -44,14 +44,14 @@ export default function MessagesPage() {
           </div>
           <p className="font-display text-xl font-light tracking-wide">{t("Aún no hay mensajes")}</p>
           <p className="mt-2 max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-            Escribe a alguien de tu universo. La conversación aparecerá aquí cuando envíes el primer mensaje.
+            {t('Escribe a alguien de tu universo. La conversación aparecerá aquí cuando envíes el primer mensaje.')}
           </p>
           <button
             onClick={() => setComposing(true)}
             className="tap mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground"
             data-testid="button-empty-new-conversation"
           >
-            <PenSquare className="h-4 w-4" strokeWidth={2} /> Nueva conversación
+            <PenSquare className="h-4 w-4" strokeWidth={2} /> {t("Nueva conversación")}
           </button>
         </div>
       ) : (
@@ -83,7 +83,7 @@ export default function MessagesPage() {
         </ul>
       )}
       <p className="px-6 pt-6 text-center text-[11.5px] leading-relaxed text-muted-foreground/70">
-        Los personajes con autonomía activada pueden responderte por aquí. Las respuestas pueden tardar unos minutos.
+        {t('Los personajes con autonomía activada pueden responderte por aquí. Las respuestas pueden tardar unos minutos.')}
       </p>
       <NewConversationSheet open={composing} onClose={() => setComposing(false)} />
     </div>
