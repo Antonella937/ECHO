@@ -117,10 +117,14 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       verified: formField(now.verified, wanted.verified, before.verified),
       occupation: formField(now.occupation, input.occupation ?? now.occupation, expected.occupation ?? now.occupation),
       location: formField(now.location, input.location ?? now.location, expected.location ?? now.location),
+      // Merge identity by field, so saving a new facial/body description cannot
+      // silently overwrite another device's independent image/style edits.
       identity: input.identity === undefined ? current.identity :
         sameCharacterValue(input.identity, expected.identity) ? current.identity :
-        sameCharacterValue(current.identity, expected.identity) || sameCharacterValue(current.identity, input.identity)
-          ? input.identity : (() => { throw Error('La identidad visual cambió en otro dispositivo. Volvé a abrir el editor.'); })(),
+        (() => {
+          const merged = configField(current.identity, input.identity, expected.identity);
+          return { ...(merged as Character['identity']), updatedAt: input.identity.updatedAt };
+        })(),
       configuration: input.configuration
         ? configField(characterConfig(current), input.configuration, expected.configuration ?? characterConfig({ ...current, configuration: undefined })) as Character['configuration']
         : current.configuration,
