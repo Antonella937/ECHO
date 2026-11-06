@@ -31,7 +31,7 @@ export function screenTrustEvidence(text: string): { eligible: boolean; reason: 
   if (/\\b(?:es broma|era broma|just kidding|i'm joking|jajaja|lol|mentira,? era broma)\\b/i.test(normalized)) {
     return { eligible: false, reason: "JOKE_OR_RETRACTION" };
   }
-  if (/(?:^|[^\\p{L}])(?:no te ment[ií]|nunca te ment[ií]|i didn't lie|i never lied|no te traicion[eé]|i didn't betray)(?![\\p{L}])/iu.test(normalized)) {
+  if (/(?:^|[^\p{L}])(?:no te ment[ií]|nunca te ment[ií]|i didn't lie|i never lied|no te traicion[eé]|i didn't betray)(?![\p{L}])/iu.test(normalized)) {
     return { eligible: false, reason: "NEGATED" };
   }
   if (/^(?:[>“"']|dijo:|she said:|he said:)/i.test(normalized)) {
