@@ -13,11 +13,7 @@ export function AccountActions({ account, dirty }: { account: Character; dirty: 
   const [mode, setMode] = useState<null | 'duplicate' | 'delete'>(null);
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const block = account.id === 'nela'
-    ? state.creatorSetup
-      ? `${account.name} es la identidad principal y está protegida.`
-      : 'Nela es la identidad principal y está protegida.'
-    : deletionBlockReason(state, account.id);
+  const block = deletionBlockReason(state, account.id);
   const run = (fn: () => void) => { setError(null); try { fn(); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo completar.'); } };
 
   return (
@@ -35,13 +31,13 @@ export function AccountActions({ account, dirty }: { account: Character; dirty: 
         ) : (
           <button onClick={() => setMode('duplicate')} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border text-sm" data-testid="button-duplicate-character"><Copy className="h-4 w-4" /> Duplicar personaje</button>
         )}
-        {account.id !== 'nela' && (account.archived ? (
+        {(account.archived ? (
           <button onClick={() => run(() => { actions.archiveAccount(account.id, false); toast({ title: 'Cuenta restaurada' }); })} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-semibold" data-testid="button-restore-character"><ArchiveRestore className="h-4 w-4" /> Restaurar cuenta</button>
         ) : (
           <button onClick={() => run(() => { actions.archiveAccount(account.id, true); toast({ title: 'Cuenta archivada', description: 'Su historial se conserva.' }); })} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border text-sm text-muted-foreground" data-testid="button-archive-character"><Archive className="h-4 w-4" /> Archivar (conserva historial)</button>
         ))}
         {block ? (
-          <p className="rounded-2xl bg-secondary/60 p-3 text-[13px] text-muted-foreground" data-testid="text-delete-blocked">No se puede eliminar: {block}{account.id !== 'nela' && !account.archived && ' Podés archivarla en su lugar.'}</p>
+          <p className="rounded-2xl bg-secondary/60 p-3 text-[13px] text-muted-foreground" data-testid="text-delete-blocked">No se puede eliminar: {block}{!account.archived && ' Podés archivarla en su lugar.'}</p>
         ) : mode === 'delete' ? (
           <div className="rounded-2xl border border-destructive/40 p-4">
             <label htmlFor="confirm-delete" className="text-sm text-muted-foreground">Esto es permanente. Escribí <b className="text-foreground">@{account.handle}</b> para confirmar.</label>
