@@ -9,9 +9,10 @@ export const MAX_RECORDING_MS = 120_000;
 export type AttachmentKind = MessageAttachment['type'];
 
 export function kindOf(mime: string): AttachmentKind | null {
-  if (mime.startsWith('image/')) return 'image';
-  if (/^video\/(mp4|webm)/.test(mime)) return 'video';
-  if (/^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|wave|aac|x-m4a)/.test(mime)) return 'audio';
+  const normalized = mime.split(';', 1)[0].trim().toLowerCase();
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(normalized)) return 'image';
+  if (['video/mp4', 'video/webm'].includes(normalized)) return 'video';
+  if (['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'].includes(normalized)) return 'audio';
   return null;
 }
 
@@ -21,6 +22,7 @@ export function validateAttachments(files: { type: string; size: number }[], exi
   for (const f of files) {
     const k = kindOf(f.type);
     if (!k) throw new Error('Formato no admitido. Usá fotos, video MP4/WebM o audio WebM/Ogg/MP4/MP3/WAV.');
+    if (!Number.isFinite(f.size) || f.size <= 0) throw new Error('El archivo está vacío o no se puede leer.');
     if (f.size > MAX_FILE_BYTES) throw new Error('Cada archivo puede pesar hasta 50 MB.');
     if (k === 'audio' && f.size > MAX_AUDIO_BYTES) throw new Error('Los audios pueden pesar hasta 15 MB.');
   }
@@ -29,9 +31,7 @@ export function validateAttachments(files: { type: string; size: number }[], exi
 type Uploader = (file: File | Blob) => Promise<MessageAttachment>;
 export async function uploadAttachment(file: File | Blob): Promise<MessageAttachment> {
   validateAttachments([file]);
-  const fn = (media as unknown as { uploadPrivateFile?: Uploader }).uploadPrivateFile;
-  if (typeof fn !== 'function') throw new Error('La subida de archivos todavía no está disponible.');
-  return fn(file);
+  return media.uploadPrivateFile(file);
 }
 
 export function recorderSupport(): { ok: true; mimeType: string } | { ok: false; reason: string } {
