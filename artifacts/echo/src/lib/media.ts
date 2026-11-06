@@ -177,8 +177,21 @@ export async function uploadPrivateFile(file: Blob): Promise<import('@/domain/ty
     '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'echo-attachment', size: file.size, contentType: mimeType }), responseType: 'json' },
   );
-  const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': mimeType }, body: file });
-  if (!upload.ok) throw new Error('No se pudo subir el adjunto.');
+  let upload: Response;
+  try {
+    upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': mimeType }, body: file });
+  } catch {
+    throw new Error('No se pudo conectar con Supabase para subir el audio. Comprobá la conexión o las restricciones de Safari.');
+  }
+  if (!upload.ok) {
+    if (upload.status === 400 || upload.status === 415 || upload.status === 422)
+      throw new Error(`Supabase rechazó el formato del audio (HTTP ${upload.status}). Revisá los tipos MIME permitidos en el bucket echo-media.`);
+    if (upload.status === 413)
+      throw new Error('Supabase rechazó el tamaño del archivo (HTTP 413).');
+    if (upload.status === 401 || upload.status === 403)
+      throw new Error(`Supabase rechazó la autorización de subida (HTTP ${upload.status}).`);
+    throw new Error(`Falló la transferencia al almacenamiento privado (HTTP ${upload.status}).`);
+  }
   const claimed = await customFetch<{ objectPath: string }>('/api/storage/uploads/claim', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ objectPath }), responseType: 'json',
