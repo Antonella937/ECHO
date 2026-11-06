@@ -25,6 +25,9 @@ export async function readOwnerControls(ownerId: string, universeId = "primary")
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
       dmEnabled: row.dmEnabled,
+      dmFrequency: row.dmFrequency,
+      dmMediaPreference: row.dmMediaPreference,
+      dmInstructions: row.dmInstructions,
       maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),
       minCooldownMinutes: Math.max(60, Math.min(1440, row.minCooldownMinutes)),
     }])),
@@ -51,6 +54,11 @@ export async function updateCharacterControl(ownerId: string, characterId: strin
       ],
       set: { ...(lane === "dm" ? { dmEnabled: enabled } : { enabled }), updatedAt: new Date() },
     });
+}
+
+export async function updateDmPreferences(ownerId: string, characterId: string, universeId: string, preferences: { dmFrequency: "rarely" | "sometimes" | "frequently"; dmMediaPreference: "text" | "mixed" | "voice"; dmInstructions: string }) {
+  await db.insert(echoAutonomyCharactersTable).values({ ownerId, universeId, characterId, ...preferences })
+    .onConflictDoUpdate({ target: [echoAutonomyCharactersTable.ownerId, echoAutonomyCharactersTable.universeId, echoAutonomyCharactersTable.characterId], set: { ...preferences, updatedAt: new Date() } });
 }
 
 export async function getExecutedActionHistory(ownerId: string, characterId: string, since: Date, universeId = "primary") {
