@@ -17,6 +17,7 @@ import {
 } from "./constants";
 import type { LiveExecutionOutcome } from "./executor";
 import { sendNewOwnerPush } from "../lib/onesignal-push";
+import { chooseVoiceDelivery, isExplicitVoiceRequest, type VoiceDecisionInput } from "./voice-policy";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -259,6 +260,16 @@ export async function runAutonomyLiveCycle(
     now?: Date;
     random?: () => number;
     lane?: "dm" | "social";
+    /** Optional production adapter. Never invoked unless owner voice opt-in and budgets are supplied. */
+    voiceDelivery?: {
+      ownerEnabled: boolean;
+      engineReady: boolean;
+      maxVoiceMessagesPerDay: number;
+      voiceMessagesToday: number;
+      remainingCharacters: number;
+      preference: "off" | "occasional" | "frequent";
+      dispatch(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }): Promise<void>;
+    };
   },
 ): Promise<{ status: string; reasonCode: string; characterId: string; runId: string | null; model: string | null }> {
   const liveEnabled = dependencies.liveExecutionEnabled ?? isAutonomyLiveExecutionEnabled();
@@ -360,6 +371,41 @@ export async function runAutonomyLiveCycle(
       opportunity, decision: preview.decision, contextHash: preview.contextAudit.contextHash,
       model: preview.model, liveEnabled, now,
     });
+    // Production voice hook: only after the text message has been committed. The
+    // adapter is deliberately absent until private TTS, consent and budgets exist.
+    // Voice failures must never roll back or duplicate an AI text reply.
+    if (outcome.status === "executed" && opportunity.situation === "dm" &&
+        preview.decision.action === "draft" && dependencies.voiceDelivery) {
+      const delivery = dependencies.voiceDelivery;
+      try {
+        const fresh = await dependencies.repository.read(ownerId, universeId);
+        const parsed = SaveUniverseBody.safeParse({ state: fresh.state, expectedRevision: fresh.revision });
+        if (parsed.success) {
+          const outgoing = [...parsed.data.state.messages].reverse().find(message =>
+            message.senderId === character.id && message.recipientId === opportunity.recipientId &&
+            message.origin === "autonomy" && message.text === preview.decision.text?.trim());
+          const incoming = [...state.messages].reverse().find(message =>
+            message.senderId === opportunity.recipientId && message.recipientId === character.id);
+          const voiceId = character.configuration?.voice?.basicVoiceId;
+          if (outgoing && voiceId && !outgoing.attachments?.some(a => a.type === "audio")) {
+            const policy: VoiceDecisionInput = {
+              voiceId, ownerEnabled: delivery.ownerEnabled, engineReady: delivery.engineReady,
+              requestedVoice: !!incoming && isExplicitVoiceRequest(incoming.text),
+              preference: delivery.preference, voiceMessagesToday: delivery.voiceMessagesToday,
+              maxVoiceMessagesPerDay: delivery.maxVoiceMessagesPerDay,
+              remainingCharacters: delivery.remainingCharacters, messageLength: outgoing.text.length,
+              random: dependencies.random,
+            };
+            if (chooseVoiceDelivery(policy) === "voice") {
+              await delivery.dispatch({ ownerId, universeId, characterId: character.id,
+                messageId: outgoing.id, text: outgoing.text, voiceId });
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Optional autonomous voice delivery skipped", { reason: error instanceof Error ? error.name : "UNKNOWN" });
+      }
+    }
     if (outcome.status === "executed" && process.env.ECHO_ONESIGNAL_REST_API_KEY) {
       // Delivery is best-effort, after the universe transaction has committed.
       try {
