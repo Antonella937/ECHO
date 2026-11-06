@@ -1,3 +1,4 @@
+import { useCharacterOptionText } from '@/lib/character-option-translations';
 import { usePersonalityText } from '@/lib/personality-translations';
 import { BASIC_VOICES } from '@/lib/basic-voices';
 import { Area, ListInput, Note, Select, SubHead, Text, level, type SectionProps } from './ui';
@@ -6,6 +7,7 @@ const STARTERS = ['curiosa', 'irónica', 'leal', 'impulsiva', 'reservada', 'cál
 
 export function PersonalitySection({ config, set }: SectionProps) {
   const translate = usePersonalityText();
+  const optionText = useCharacterOptionText();
   const p = config.personality, v = config.voice;
   const upP = (patch: Partial<typeof p>) => set((c) => ({ ...c, personality: { ...c.personality, ...patch } }));
   const upV = (patch: Partial<typeof v>) => set((c) => ({ ...c, voice: { ...c.voice, ...patch } }));
@@ -25,7 +27,7 @@ export function PersonalitySection({ config, set }: SectionProps) {
         <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{translate("Sumar rasgo sugerido (no borra nada)")}</p>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {STARTERS.filter((t) => !p.traits.includes(t)).map((t) => (
-            <button type="button" key={t} onClick={() => addTrait(t)} className="min-h-9 rounded-full border border-border px-3 text-xs text-muted-foreground hover:text-foreground" data-testid={`button-add-trait-${t}`}>+ {t}</button>
+            <button type="button" key={t} onClick={() => addTrait(t)} className="min-h-9 rounded-full border border-border px-3 text-xs text-muted-foreground hover:text-foreground" data-testid={`button-add-trait-${t}`}>+ {optionText(t)}</button>
           ))}
         </div>
       </div>
@@ -33,7 +35,7 @@ export function PersonalitySection({ config, set }: SectionProps) {
       <Area id="character-temperament" label={translate("Temperamento")} value={p.temperament} onChange={(temperament) => upP({ temperament })} max={2000} rows={2} />
       <ListInput id="character-values" label={translate("Valores")} value={p.values} onChange={(values) => upP({ values })} />
       <Area id="character-humor" label={translate("Humor")} value={p.humor} onChange={(humor) => upP({ humor })} max={2000} rows={2} />
-      <Select id="character-sociability" label={translate("Sociabilidad")} value={p.sociability} onChange={(sociability) => upP({ sociability })} options={level} />
+      <Select id="character-sociability" label={translate("Sociabilidad")} value={p.sociability} onChange={(sociability) => upP({ sociability })} options={Object.fromEntries(Object.entries(level).map(([key, value]) => [key, optionText(value)])) as typeof level} />
       <Area id="character-expressiveness" label={translate("Expresividad")} value={p.expressiveness} onChange={(expressiveness) => upP({ expressiveness })} max={2000} rows={2} />
       <Area id="character-emotional" label={translate("Estilo emocional")} value={p.emotionalStyle} onChange={(emotionalStyle) => upP({ emotionalStyle })} max={4000} rows={3} />
       <ListInput id="character-topics" label={translate("Temas recurrentes")} value={p.commonTopics} onChange={(commonTopics) => upP({ commonTopics })} />
