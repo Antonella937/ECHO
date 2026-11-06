@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'artifacts/api-server/src/lib/imageGeneration*.ts'
+      - 'artifacts/api-server/src/lib/imagePromptBuilder.ts'
+      - 'artifacts/api-server/src/routes/image-generation.ts'
+      - 'artifacts/api-server/tests/image-prompt-builder.test.ts'
       - 'artifacts/api-server/src/lib/openRouterImage*.ts'
       - 'artifacts/api-server/tests/image-generation-offline.test.ts'
       - 'artifacts/api-server/package.json'
