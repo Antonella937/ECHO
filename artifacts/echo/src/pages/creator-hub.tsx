@@ -207,6 +207,8 @@ export default function CreatorHubPage() {
   }
   const [peopleQuery, setPeopleQuery] = useState('');
   const [peopleResults, setPeopleResults] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const selectedPerson = peopleResults.find(person => person.ownerId === selectedPersonId);
   const [conversations, setConversations] = useState<Array<{ownerId:string;displayName:string;username:string}>>([]);
   async function refreshConversations() {
     try {
@@ -398,10 +400,18 @@ export default function CreatorHubPage() {
               <h3 className="font-semibold">Buscar personas</h3>
               <div className="flex gap-2"><input aria-label="Buscar por nombre o arroba" value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void searchPeople(); }} placeholder="Nombre o @usuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={peopleBusy || peopleQuery.trim().length < 2} onClick={() => void searchPeople()} className="rounded-full bg-secondary px-4 py-2 text-sm disabled:opacity-50">Buscar</button></div>
               {peopleFeedback && <p role="status" className="text-xs text-muted-foreground">{peopleFeedback}</p>}
+              {selectedPerson && <div className="rounded-2xl border border-primary/30 bg-secondary/30 p-4 space-y-4" aria-label="Perfil de otra persona">
+                <div className="flex items-start justify-between gap-3"><div><h4 className="font-semibold">{selectedPerson.displayName}</h4><p className="text-sm text-muted-foreground">@{selectedPerson.username} · Perfil {selectedPerson.visibility === 'private' ? 'privado' : 'público'}</p></div><button type="button" onClick={() => setSelectedPersonId(null)} aria-label="Cerrar perfil" className="rounded-full p-2 text-muted-foreground"><X size={18}/></button></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" disabled={peopleBusy || selectedPerson.following || selectedPerson.requested} onClick={() => void followPerson(selectedPerson.ownerId)} className="rounded-full bg-primary px-2 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{selectedPerson.following ? 'Siguiendo' : selectedPerson.requested ? 'Solicitado' : selectedPerson.visibility === 'private' ? 'Solicitar seguir' : 'Seguir'}</button>
+                  <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPerson.ownerId)} className="flex items-center justify-center gap-2 rounded-full border border-primary/40 px-2 py-3 text-sm text-primary disabled:opacity-60"><MessageCircle size={16}/> Mensaje privado</button>
+                </div>
+                {selectedPerson.visibility === 'private' && !selectedPerson.following && <p className="text-xs text-muted-foreground">Este perfil es privado. El contenido requiere autorización de su creador.</p>}
+              </div>}
               {peopleResults.map(person => (
                 <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
                   <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {person.visibility === 'private' ? 'Privado' : 'Público'}</p></div>
-                  <div className="flex flex-wrap gap-2"><button type="button" disabled={peopleBusy || person.following || person.requested} onClick={() => void followPerson(person.ownerId)} className="rounded-full bg-primary/15 px-3 py-2 text-xs font-medium text-primary disabled:opacity-50">{person.following ? "Siguiendo" : person.requested ? "Solicitado" : "Seguir"}</button><button type="button" disabled={peopleBusy} onClick={() => void requestMessage(person.ownerId)} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Mensaje privado</button></div>
+                  <button type="button" onClick={() => setSelectedPersonId(person.ownerId)} className="rounded-full border border-primary/40 px-3 py-2 text-xs font-medium text-primary">Ver perfil</button>
                 </div>
               ))}
             </div>
@@ -452,11 +462,7 @@ export default function CreatorHubPage() {
             </div>}
             {hubTab === 'perfil' && <>
             <div className="border-t border-border pt-5">
-              <div className="grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => setHubTab('explorar')} className="rounded-full bg-primary/15 px-3 py-3 text-sm font-semibold text-primary hover:bg-primary/25">Buscar y seguir</button>
-                <button type="button" onClick={() => {setHubTab('mensajes');void refreshConversations();}} className="flex items-center justify-center gap-2 rounded-full border border-primary/40 px-3 py-3 text-sm font-medium text-primary hover:bg-primary/10"><MessageCircle size={16} /> Mensaje privado</button>
-              </div>
-              <div className="mt-5 rounded-2xl bg-secondary/70 px-5 py-8 text-center sm:py-10">
+              <div className="rounded-2xl bg-secondary/70 px-5 py-8 text-center sm:py-10">
                 <LockKeyhole size={23} className="mx-auto mb-3 text-muted-foreground" />
                 <h3 className="font-semibold">Contenido privado</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Los personajes y universos compartidos solo serán visibles después de que el creador autorice el acceso.</p>
