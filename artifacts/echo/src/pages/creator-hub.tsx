@@ -203,6 +203,30 @@ export default function CreatorHubPage() {
     } catch { setProfileError('No pudimos guardar la privacidad. Revisá que tu @usuario esté disponible y volvé a intentar.'); }
     finally { setSocialSaving(false); }
   }
+  const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
+  const [messageInbox, setMessageInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
+  const [inboxBusy, setInboxBusy] = useState(false);
+  const [inboxError, setInboxError] = useState('');
+  async function refreshInbox() {
+    try {
+      const [follows, messages] = await Promise.all([
+        customFetch<{ requests: typeof followInbox }>('/api/creator-hub/social/requests', { responseType: 'json' }),
+        customFetch<{ requests: typeof messageInbox }>('/api/creator-hub/social/message-requests', { responseType: 'json' }),
+      ]);
+      setFollowInbox(follows.requests); setMessageInbox(messages.requests); setInboxError('');
+    } catch { setInboxError('No se pudieron cargar las solicitudes.'); }
+  }
+  useEffect(() => {
+    if (socialReady && user?.id) void refreshInbox();
+  }, [socialReady, user?.id]);
+  async function decideInbox(kind: 'requests' | 'message-requests', id: string, action: 'accept' | 'reject') {
+    setInboxBusy(true); setInboxError('');
+    try {
+      await customFetch('/api/creator-hub/social/' + kind + '/' + encodeURIComponent(id) + '/' + action, { method: 'POST', responseType: 'json' });
+      await refreshInbox();
+    } catch { setInboxError('No se pudo actualizar la solicitud.'); }
+    finally { setInboxBusy(false); }
+  }
   const nameParts = alias.split(/\s+/).filter(Boolean);
   const initials = nameParts.length > 1
     ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
@@ -255,6 +279,22 @@ export default function CreatorHubPage() {
                 </label>
                 <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil. Los mensajes estarán disponibles cuando se habilite su sistema de moderación.</p>
               </>}
+            </div>
+            <div className="rounded-2xl border border-border p-4 space-y-4">
+              <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Bandeja de solicitudes</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">Actualizar</button></div>
+              {inboxError && <p role="alert" className="text-xs text-destructive">{inboxError}</p>}
+              {([['Seguidores', followInbox, 'requests'], ['Mensajes', messageInbox, 'message-requests']] as const).map(([label, requests, kind]) => (
+                <div key={kind} className="space-y-2">
+                  <h4 className="text-sm font-medium">{label} · {requests.length}</h4>
+                  {requests.length === 0 ? <p className="text-xs text-muted-foreground">No hay solicitudes pendientes.</p> : requests.map(request => (
+                    <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{request.displayName}</p><p className="truncate text-xs text-muted-foreground">@{request.username}</p></div>
+                      <div className="flex gap-2"><button type="button" disabled={inboxBusy} onClick={() => void decideInbox(kind, request.id, 'reject')} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Rechazar</button><button type="button" disabled={inboxBusy} onClick={() => void decideInbox(kind, request.id, 'accept')} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">Aceptar</button></div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">La mensajería real se habilitará después de validar sus controles de privacidad.</p>
             </div>
             <div className="border-t border-border pt-5">
               <div className="grid grid-cols-2 gap-3">
