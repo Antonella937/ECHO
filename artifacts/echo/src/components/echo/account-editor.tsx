@@ -1,3 +1,4 @@
+import { useAccountManagementText } from '@/lib/account-management-translations';
 import { useEffect, useRef, useState } from 'react';
 import { Archive, ArchiveRestore } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
+  const t = useAccountManagementText();
   const { state, character, actions } = useSocial();
   const account = accountId ? character(accountId) : undefined;
   const isNew = !accountId;
@@ -69,15 +71,15 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
       };
       if (isNew) {
         const id = actions.createAccount(input);
-        toast({ title: `Cuenta @${input.handle.replace(/^@/, '')} creada` });
+        toast({ title: `${t('Cuenta @')}${input.handle.replace(/^@/, '')}${t(' creada')}` });
         onCreated?.(id);
       } else {
         actions.updateAccount(accountId!, input, original.current);
-        toast({ title: 'Perfil actualizado' });
+        toast({ title: t("Perfil actualizado") });
       }
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.');
+      setError(e instanceof Error ? e.message : t("No se pudo guardar."));
     } finally {
       saving.current = false;
       setBusy(false);
@@ -87,11 +89,11 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
   const toggleArchive = (archived: boolean) => {
     try {
       actions.archiveAccount(accountId!, archived);
-      toast({ title: archived ? 'Cuenta archivada' : 'Cuenta restaurada' });
+      toast({ title: archived ? t("Cuenta archivada") : t("Cuenta restaurada") });
       setConfirmArchive(false);
       if (archived) onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo completar.');
+      setError(e instanceof Error ? e.message : t("No se pudo completar."));
     }
   };
 
@@ -99,23 +101,23 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     <Sheet
       open={open}
       onClose={onClose}
-      title={isNew ? 'Nueva cuenta' : 'Editar perfil'}
+      title={isNew ? t('Nueva cuenta') : t('Editar perfil')}
       testId="sheet-account-editor"
       footer={
         <div className="flex gap-2 pb-2">
-          <button onClick={onClose} className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-medium" data-testid="button-cancel-account">Cancelar</button>
+          <button onClick={onClose} className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-medium" data-testid="button-cancel-account">{t("Cancelar")}</button>
           <button onClick={save} disabled={busy || uploading} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid={isNew ? 'button-create-account-submit' : 'button-save-account'}>
-            {uploading ? 'Esperando foto…' : isNew ? 'Crear cuenta' : 'Guardar'}
+            {uploading ? t('Esperando foto…') : isNew ? t('Crear cuenta') : t('Guardar')}
           </button>
         </div>
       }
     >
       <form onSubmit={(e) => { e.preventDefault(); save(); }} noValidate>
         <AvatarPicker value={avatar} name={name} onChange={setAvatar} onBusy={setUploading} />
-        <Field id="acc-name" label="Nombre" hint={`${name.length}/80`}>
+        <Field id="acc-name" label={t("Nombre")} hint={`${name.length}/80`}>
           <input id="acc-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} className={inputCls} autoComplete="off" data-testid="input-account-name" />
         </Field>
-        <Field id="acc-handle" label="@username" hint="Minúsculas, números, puntos y guiones bajos. Máx. 30.">
+        <Field id="acc-handle" label="@username" hint={t("Minúsculas, números, puntos y guiones bajos. Máx. 30.")}>
           <div className="relative">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
             <input id="acc-handle" value={handle} maxLength={31} autoCapitalize="none" autoCorrect="off" spellCheck={false}
@@ -126,25 +128,25 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
           <textarea id="acc-bio" value={bio} maxLength={500} rows={3} onChange={(e) => setBio(e.target.value)}
             className={cn(inputCls, 'h-auto resize-none py-3 leading-relaxed')} data-testid="input-account-bio" />
         </Field>
-        <Field id="acc-type" label="Tipo de cuenta">
+        <Field id="acc-type" label={t("Tipo de cuenta")}>
           <select id="acc-type" value={type} onChange={(e) => setType(e.target.value as AccountType)} className={inputCls} data-testid="select-account-type">
             {Object.entries(accountTypes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </Field>
         <label className="mt-4 flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border px-4">
-          <span className="text-sm">Insignia verificada</span>
+          <span className="text-sm">{t("Insignia verificada")}</span>
           <input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} className="h-5 w-5 accent-[hsl(var(--primary))]" data-testid="checkbox-account-verified" />
         </label>
 
         <div className="mt-6 rounded-2xl bg-accent/30 p-3 text-[13px] leading-relaxed text-muted-foreground">
-          <b className="text-foreground">Base visual</b>: cifra ficticia que se suma a los seguimientos reales del universo. Nunca crea seguidores. Déjala vacía para usar solo la actividad real.
+          <b className="text-foreground">{t("Base visual")}</b>: cifra ficticia que se suma a los seguimientos reales del universo. Nunca crea seguidores. Déjala vacía para usar solo la actividad real.
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field id="acc-followers" label="Base visual · seguidores" hint={`Reales: ${real.followers}`}>
-            <input id="acc-followers" inputMode="numeric" value={followers} onChange={(e) => setFollowers(e.target.value)} placeholder="Vacío" className={inputCls} data-testid="input-base-followers" />
+          <Field id="acc-followers" label={t("Base visual · seguidores")} hint={`${t('Reales: ')}${real.followers}`}>
+            <input id="acc-followers" inputMode="numeric" value={followers} onChange={(e) => setFollowers(e.target.value)} placeholder={t("Vacío")} className={inputCls} data-testid="input-base-followers" />
           </Field>
-          <Field id="acc-following" label="Base visual · seguidos" hint={`Reales: ${real.following}`}>
-            <input id="acc-following" inputMode="numeric" value={following} onChange={(e) => setFollowing(e.target.value)} placeholder="Vacío" className={inputCls} data-testid="input-base-following" />
+          <Field id="acc-following" label={t("Base visual · seguidos")} hint={`${t('Reales: ')}${real.following}`}>
+            <input id="acc-following" inputMode="numeric" value={following} onChange={(e) => setFollowing(e.target.value)} placeholder={t("Vacío")} className={inputCls} data-testid="input-base-following" />
           </Field>
         </div>
         {error && <p role="alert" className="mt-4 text-sm text-destructive" data-testid="text-account-error">{error}</p>}
@@ -159,10 +161,10 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
             </button>
           ) : confirmArchive ? (
             <div className="rounded-2xl border border-destructive/40 p-4">
-              <p className="text-sm text-muted-foreground">Se ocultará de la lista de identidades. Sus publicaciones, mensajes e historial se conservan y podrás restaurarla cuando quieras.</p>
+              <p className="text-sm text-muted-foreground">{t("Se ocultará de la lista de identidades. Sus publicaciones, mensajes e historial se conservan y podrás restaurarla cuando quieras.")}</p>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => setConfirmArchive(false)} className="h-11 flex-1 rounded-xl bg-secondary text-sm" data-testid="button-cancel-archive">Cancelar</button>
-                <button onClick={() => toggleArchive(true)} className="h-11 flex-1 rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground" data-testid="button-confirm-archive">Archivar</button>
+                <button onClick={() => setConfirmArchive(false)} className="h-11 flex-1 rounded-xl bg-secondary text-sm" data-testid="button-cancel-archive">{t("Cancelar")}</button>
+                <button onClick={() => toggleArchive(true)} className="h-11 flex-1 rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground" data-testid="button-confirm-archive">{t("Archivar")}</button>
               </div>
             </div>
           ) : (
