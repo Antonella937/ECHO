@@ -9,6 +9,7 @@ const profileSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9._]{3,30}$/),
   visibility: z.enum(["private", "public"]).default("private"),
+  messagePrivacy: z.enum(["everyone", "requests", "nobody"]).optional(),
   bio: z.string().max(500).default(""),
 }).strict();
 const searchSchema = z.object({ q: z.string().trim().min(2).max(80) }).strict();
@@ -24,7 +25,7 @@ export function createCreatorHubSocialRouter(): IRouter {
 
   router.get("/creator-hub/social/me", async (req, res) => {
     const result = await pool.query(
-      "SELECT display_name AS \"displayName\", username, visibility, bio FROM echo_creator_profiles WHERE owner_id=$1",
+      "SELECT display_name AS \"displayName\", username, visibility, message_privacy AS \"messagePrivacy\", bio FROM echo_creator_profiles WHERE owner_id=$1",
       [req.userId],
     );
     res.json({ profile: result.rows[0] ?? null });
@@ -33,22 +34,22 @@ export function createCreatorHubSocialRouter(): IRouter {
   router.put("/creator-hub/social/me", async (req, res) => {
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_PROFILE" }); return; }
-    const { displayName, username, visibility, bio } = parsed.data;
+    const { displayName, username, visibility, bio, messagePrivacy } = parsed.data;
     try {
       const result = await pool.query(
-        `INSERT INTO echo_creator_profiles (owner_id, display_name, display_name_key, username, username_key, visibility, bio)
-         VALUES ($1,$2,lower($2),$3,lower($3),$4,$5)
+        `INSERT INTO echo_creator_profiles (owner_id, display_name, username, username_key, visibility, bio, message_privacy)
+         VALUES ($1,$2,$3,lower($3),$4,$5,coalesce($6,'requests'))
          ON CONFLICT (owner_id) DO UPDATE SET
-         display_name=excluded.display_name, display_name_key=excluded.display_name_key,
+         display_name=excluded.display_name,
          username=excluded.username, username_key=excluded.username_key,
-         visibility=excluded.visibility, bio=excluded.bio, updated_at=now()
-         RETURNING display_name AS "displayName", username, visibility, bio`,
-        [req.userId, displayName, username, visibility, bio],
+         visibility=excluded.visibility, bio=excluded.bio, message_privacy=coalesce($6,echo_creator_profiles.message_privacy), updated_at=now()
+         RETURNING display_name AS "displayName", username, visibility, message_privacy AS "messagePrivacy", bio`,
+        [req.userId, displayName, username, visibility, bio, messagePrivacy ?? null],
       );
       res.json({ profile: result.rows[0] });
     } catch (error) {
       if ((error as { code?: string }).code === "23505") {
-        res.status(409).json({ error: "NAME_OR_USERNAME_ALREADY_IN_USE" }); return;
+        res.status(409).json({ error: "USERNAME_ALREADY_IN_USE" }); return;
       }
       throw error;
     }
