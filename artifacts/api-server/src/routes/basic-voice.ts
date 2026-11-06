@@ -11,6 +11,7 @@ const voices: Record<string, string> = {
   "echo-m-04": "bm_daniel", "echo-m-05": "bm_george",
 };
 const router: IRouter = Router();
+const recentRequests = new Map<string, number[]>();
 
 /** Synthesizes a new phrase, not a static sample. No provider means no charge and no fake audio. */
 router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
@@ -35,6 +36,10 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
     if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
       res.status(503).json({ error: "VOICE_ENGINE_INVALID_CONFIGURATION" }); return;
     }
+    const now = Date.now();
+    const recent = (recentRequests.get(req.userId!) ?? []).filter(time => now - time < 60_000);
+    if (recent.length >= 5) { res.status(429).json({ error: "VOICE_RATE_LIMITED" }); return; }
+    recent.push(now); recentRequests.set(req.userId!, recent);
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
