@@ -135,3 +135,26 @@ test('borrado sin uso contra nueva actividad de otro dispositivo conserva la cue
   assert.ok(merged.state.posts.some(p => p.id === 'new-remote-post'));
   assert.equal(universeAccountError(SaveUniverseBody.parse({ state: merged.state, expectedRevision: 0 }).state), null);
 });
+
+test('catálogo gratuito: guarda voz elegida en el contrato sin alterar personalidad ni mensajes', () => {
+  const state = fixture();
+  const character = row(state, 'mar');
+  const config = characterConfig(character);
+  const originalPersonality = structuredClone(config.personality);
+  const originalMessages = structuredClone(state.messages);
+  config.voice.basicVoiceId = 'echo-f-02';
+  const updated = editAccount(state, character.id, {
+    ...accountFormValues(character),
+    occupation: character.occupation,
+    location: character.location,
+    configuration: config,
+  });
+  const parsed = SaveUniverseBody.parse({ state: updated, expectedRevision: 0 });
+  const saved = parsed.state.characters.find(c => c.id === character.id)!.configuration!;
+  assert.equal(saved.voice.basicVoiceId, 'echo-f-02');
+  assert.deepEqual(saved.personality, originalPersonality);
+  assert.deepEqual(parsed.state.messages, originalMessages);
+  const invalid = structuredClone(updated);
+  invalid.characters.find(c => c.id === character.id)!.configuration!.voice.basicVoiceId = 'unknown-provider-voice';
+  assert.equal(SaveUniverseBody.safeParse({ state: invalid, expectedRevision: 0 }).success, false);
+});
