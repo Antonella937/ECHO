@@ -1,7 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
-import { db, echoRelationshipLedgerTable, echoUniversesTable } from "@workspace/db";
+import { db, echoMemoryArchiveTable, echoRelationshipLedgerTable, echoUniversesTable } from "@workspace/db";
 import { SaveUniverseBody } from "@workspace/api-zod";
 import { applyVerifiedTrustEvent, type TrustEventKind } from "./relationshipTrust";
+import { recordAutonomyEvent } from "../autonomy/event-memory";
 
 /**
  * Owner-approved trust changes anchored to an actual persisted DM.
@@ -41,8 +42,20 @@ export async function approveTrustEvent(
     }, { consumedSourceIds: consumed }, new Date());
     if (!result.applied) return reject(result.reason);
     const now = new Date();
+    const eventLabels: Record<TrustEventKind, string> = {
+      promise_kept: "promesa cumplida", support_given: "apoyo recibido",
+      boundary_respected: "límite respetado", lie_confirmed: "mentira confirmada",
+      promise_broken: "promesa incumplida", betrayal_confirmed: "traición confirmada",
+      repair_confirmed: "reparación confirmada",
+    };
+    const actorName = parsed.data.characters.find(c => c.id === actorId)?.name ?? actorId;
+    const targetName = parsed.data.characters.find(c => c.id === targetId)?.name ?? targetId;
+    const summary = `Evento confirmado por el propietario: ${eventLabels[kind]} entre ${actorName} y ${targetName}. Confianza ${result.delta > 0 ? "+" : ""}${result.delta}. Evidencia: mensaje ${sourceId}.`;
+    const withMemory = recordAutonomyEvent(result.state, actorId, {
+      sourceId: key, kind: "interaction", text: summary, targetId,
+    }, now);
     const updated = await tx.update(echoUniversesTable)
-      .set({ state: { ...result.state }, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: now })
+      .set({ state: { ...withMemory }, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: now })
       .where(and(scope, eq(echoUniversesTable.revision, expectedRevision)))
       .returning({ revision: echoUniversesTable.revision });
     if (!updated[0]) throw new Error("TRUST_REVISION_RACE");
@@ -58,6 +71,11 @@ export async function approveTrustEvent(
       ],
       set: { consumedMessageIds: [...consumed, key] },
     });
+    await tx.insert(echoMemoryArchiveTable).values({
+      ownerId, universeId, characterId: actorId,
+      memoryId: `trust:${sourceId}`, sourceId, kind: "relationship_trust",
+      targetId, content: summary, occurredAt: now,
+    }).onConflictDoNothing();
     return { applied: true, reason: result.reason, revision: updated[0].revision, delta: result.delta };
   });
 }
