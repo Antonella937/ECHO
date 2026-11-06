@@ -111,6 +111,41 @@ export function createCreatorHubSocialRouter(): IRouter {
     finally { client.release(); }
   });
 
+  const reactionSchema = z.object({ messageId: z.string().uuid(), emoji: z.enum(["❤️","😂","🥹","😍","👍","🔥","😮","😢"]) }).strict();
+  router.post("/creator-hub/social/reactions", async (req, res) => {
+    const parsed = reactionSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_REACTION" }); return; }
+    const result = await pool.query(
+      "INSERT INTO echo_creator_message_reactions(message_id,reactor_owner_id,emoji) SELECT id,$1,$3 FROM echo_creator_direct_messages WHERE id=$2 AND (sender_owner_id=$1 OR recipient_owner_id=$1) ON CONFLICT DO NOTHING RETURNING message_id",
+      [req.userId, parsed.data.messageId, parsed.data.emoji],
+    );
+    res.json({ added: Boolean(result.rowCount) });
+  });
+  router.delete("/creator-hub/social/reactions", async (req, res) => {
+    const parsed = reactionSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_REACTION" }); return; }
+    await pool.query("DELETE FROM echo_creator_message_reactions WHERE message_id=$1 AND reactor_owner_id=$2 AND emoji=$3", [parsed.data.messageId, req.userId, parsed.data.emoji]);
+    res.json({ removed: true });
+  });
+  const typingSchema = z.object({ targetOwnerId: z.string().min(1).max(255), typing: z.boolean() }).strict();
+  router.post("/creator-hub/social/typing", async (req, res) => {
+    const parsed = typingSchema.safeParse(req.body);
+    if (!parsed.success || parsed.data.targetOwnerId === req.userId) { res.status(400).json({ error: "INVALID_TARGET" }); return; }
+    const blocked = await pool.query("SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)", [req.userId, parsed.data.targetOwnerId]);
+    if (blocked.rowCount) { res.status(403).json({ error: "MESSAGES_NOT_ALLOWED" }); return; }
+    const eligible = await pool.query("SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1", [parsed.data.targetOwnerId]);
+    if (!eligible.rowCount) { res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+    if (parsed.data.typing) await pool.query("INSERT INTO echo_creator_typing_presence(sender_owner_id,recipient_owner_id,expires_at) VALUES($1,$2,now()+interval '6 seconds') ON CONFLICT(sender_owner_id,recipient_owner_id) DO UPDATE SET expires_at=excluded.expires_at", [req.userId, parsed.data.targetOwnerId]);
+    else await pool.query("DELETE FROM echo_creator_typing_presence WHERE sender_owner_id=$1 AND recipient_owner_id=$2", [req.userId, parsed.data.targetOwnerId]);
+    res.json({ ok: true });
+  });
+  router.get("/creator-hub/social/typing/:targetOwnerId", async (req, res) => {
+    const target = req.params.targetOwnerId;
+    if (!target || target === req.userId || target.length > 255) { res.status(400).json({ error: "INVALID_TARGET" }); return; }
+    const result = await pool.query("SELECT EXISTS(SELECT 1 FROM echo_creator_typing_presence WHERE sender_owner_id=$2 AND recipient_owner_id=$1 AND expires_at>now()) AS typing", [req.userId, target]);
+    res.json({ typing: Boolean(result.rows[0]?.typing) });
+  });
+
   const dmBodySchema = z.object({
     targetOwnerId: z.string().min(1).max(255),
     body: z.string().trim().min(1).max(2000),
