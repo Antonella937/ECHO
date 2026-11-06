@@ -62,6 +62,8 @@ export const MediaScopeContext = createContext<MediaScope | null>(null);
 const privateMediaCache = new Map<string, string>();
 const privateMediaPending = new Set<string>();
 const privateMediaFailures = new Map<string, number>();
+const privateMediaAttempts = new Map<string, number>();
+const privateMediaRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const PRIVATE_MEDIA_RETRY_MS = 10_000;
 const privateMediaListeners = new Set<() => void>();
 
@@ -70,6 +72,10 @@ export function retryPrivateMedia(ref: string, source?: MediaSource): void {
   const url = privateMediaUrl(ref, source);
   if (!ref.startsWith('/objects/') && !ref.startsWith('/api/storage/objects/')) return;
   privateMediaFailures.delete(url);
+  privateMediaAttempts.delete(url);
+  const timer = privateMediaRetryTimers.get(url);
+  if (timer) clearTimeout(timer);
+  privateMediaRetryTimers.delete(url);
   loadPrivateMedia(url);
 }
 
@@ -83,11 +89,27 @@ function loadPrivateMedia(url: string) {
         throw new Error('El servidor devolvió un formato de archivo no compatible.');
       }
       privateMediaFailures.delete(url);
+      privateMediaAttempts.delete(url);
+      const retryTimer = privateMediaRetryTimers.get(url);
+      if (retryTimer) clearTimeout(retryTimer);
+      privateMediaRetryTimers.delete(url);
       privateMediaCache.set(url, URL.createObjectURL(blob));
       privateMediaListeners.forEach(notify => notify());
     })
     .catch(error => {
       privateMediaFailures.set(url, Date.now());
+      const attempts = (privateMediaAttempts.get(url) ?? 0) + 1;
+      privateMediaAttempts.set(url, attempts);
+      // Transient network/auth delays on iOS can resolve without user intervention.
+      // Retry twice at most; persistent failures retain the manual retry control.
+      if (attempts < 3 && !privateMediaRetryTimers.has(url)) {
+        const timer = setTimeout(() => {
+          privateMediaRetryTimers.delete(url);
+          privateMediaFailures.delete(url);
+          loadPrivateMedia(url);
+        }, attempts * 2500);
+        privateMediaRetryTimers.set(url, timer);
+      }
       privateMediaListeners.forEach(notify => notify());
       console.warn('No se pudo mostrar un archivo privado de ECHO.', error);
     })
