@@ -207,6 +207,22 @@ export default function CreatorHubPage() {
   }
   const [peopleQuery, setPeopleQuery] = useState('');
   const [peopleResults, setPeopleResults] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
+  const [conversations, setConversations] = useState<Array<{ownerId:string;displayName:string;username:string}>>([]);
+  async function refreshConversations() {
+    try {
+      const data = await customFetch<{conversations: typeof conversations}>('/api/creator-hub/social/conversations', {responseType:'json'});
+      setConversations(data.conversations);
+    } catch { setInboxError('No pudimos cargar las conversaciones.'); }
+  }
+  async function followPerson(ownerId: string) {
+    setPeopleBusy(true); setPeopleFeedback('');
+    try {
+      const result = await customFetch<{status:string}>('/api/creator-hub/social/follow', {method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetOwnerId:ownerId})});
+      setPeopleFeedback(result.status === 'following' ? '¡Ahora seguís a esta persona!' : 'Solicitud para seguir enviada.');
+      setPeopleResults(previous => previous.map(person => person.ownerId === ownerId ? {...person, following: result.status === 'following',requested:result.status !== 'following'} : person));
+    } catch { setPeopleFeedback('No pudimos enviar la solicitud para seguir.'); }
+    finally { setPeopleBusy(false); }
+  }
   const [peopleBusy, setPeopleBusy] = useState(false);
   const [peopleFeedback, setPeopleFeedback] = useState('');
   async function searchPeople() {
@@ -226,7 +242,7 @@ export default function CreatorHubPage() {
         body: JSON.stringify({ targetOwnerId: ownerId }),
       });
       if (result.status === 'requested') setPeopleFeedback('Solicitud enviada. Aparecerá en la bandeja de esa persona.');
-      else { setPeopleFeedback('Podés escribirle.'); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? 'esta persona'); }
+      else { setHubTab('mensajes'); setPeopleFeedback('Podés escribirle.'); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? 'esta persona'); }
     } catch { setPeopleFeedback('No se pudo enviar la solicitud. Puede que la persona no acepte mensajes.'); }
     finally { setPeopleBusy(false); }
   }
@@ -291,7 +307,7 @@ export default function CreatorHubPage() {
     finally { setChatBusy(false); }
   }
   const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
-  const [messageInbox, setMessageInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
+  const [messageInbox, setMessageInbox] = useState<Array<{ id: string; senderOwnerId: string; displayName: string; username: string }>>([]);
   const [inboxBusy, setInboxBusy] = useState(false);
   const [inboxError, setInboxError] = useState('');
   async function refreshInbox() {
@@ -304,13 +320,18 @@ export default function CreatorHubPage() {
     } catch { setInboxError('No se pudieron cargar las solicitudes.'); }
   }
   useEffect(() => {
-    if (socialReady && user?.id) void refreshInbox();
+    if (socialReady && user?.id) { void refreshInbox(); void refreshConversations(); }
   }, [socialReady, user?.id]);
   async function decideInbox(kind: 'requests' | 'message-requests', id: string, action: 'accept' | 'reject') {
     setInboxBusy(true); setInboxError('');
     try {
       await customFetch('/api/creator-hub/social/' + kind + '/' + encodeURIComponent(id) + '/' + action, { method: 'POST', responseType: 'json' });
       await refreshInbox();
+      if (kind === 'message-requests' && action === 'accept') {
+        const accepted = messageInbox.find(request => request.id === id);
+        await refreshConversations();
+        if (accepted?.senderOwnerId) { setHubTab('mensajes'); await openHumanChat(accepted.senderOwnerId, accepted.displayName); }
+      }
     } catch { setInboxError('No se pudo actualizar la solicitud.'); }
     finally { setInboxBusy(false); }
   }
@@ -380,13 +401,18 @@ export default function CreatorHubPage() {
               {peopleResults.map(person => (
                 <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
                   <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {person.visibility === 'private' ? 'Privado' : 'Público'}</p></div>
-                  <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(person.ownerId)} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Mensaje privado</button>
+                  <div className="flex flex-wrap gap-2"><button type="button" disabled={peopleBusy || person.following || person.requested} onClick={() => void followPerson(person.ownerId)} className="rounded-full bg-primary/15 px-3 py-2 text-xs font-medium text-primary disabled:opacity-50">{person.following ? "Siguiendo" : person.requested ? "Solicitado" : "Seguir"}</button><button type="button" disabled={peopleBusy} onClick={() => void requestMessage(person.ownerId)} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">Mensaje privado</button></div>
                 </div>
               ))}
             </div>
             </div>}
             {hubTab === 'mensajes' && <div className="space-y-4">
               <div className="flex items-center justify-between gap-2"><h3 className="text-lg font-semibold">Tus mensajes</h3><button type="button" className="text-xs text-primary" onClick={() => setHubTab('explorar')}>Buscar personas</button></div>
+            <div className="rounded-2xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between"><h4 className="font-semibold">Conversaciones</h4><button type="button" className="text-xs text-primary" onClick={() => void refreshConversations()}>Actualizar</button></div>
+              {conversations.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tenés conversaciones. Buscá una persona en Explorar para empezar.</p>}
+              {conversations.map(person => <button key={person.ownerId} type="button" onClick={() => void openHumanChat(person.ownerId,person.displayName)} className="flex w-full items-center justify-between rounded-xl bg-secondary/50 px-4 py-3 text-left text-sm hover:bg-secondary"><span>{person.displayName} <span className="text-muted-foreground">@{person.username}</span></span><MessageCircle size={17} className="text-primary"/></button>)}
+            </div>
             {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
               <div className="flex items-center justify-between"><h3 className="font-semibold">Chat con {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">Actualizar</button></div>
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
@@ -427,8 +453,8 @@ export default function CreatorHubPage() {
             {hubTab === 'perfil' && <>
             <div className="border-t border-border pt-5">
               <div className="grid grid-cols-2 gap-3">
-                <button type="button" disabled title="Las solicitudes de acceso todavía no están habilitadas" className="rounded-full bg-secondary px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70">Solicitar acceso</button>
-                <button type="button" disabled title="Los mensajes Creator Hub todavía no están habilitados" className="flex items-center justify-center gap-2 rounded-full border border-border px-3 py-3 text-sm text-muted-foreground opacity-60"><MessageCircle size={16} /> Mensaje privado</button>
+                <button type="button" onClick={() => setHubTab('explorar')} className="rounded-full bg-primary/15 px-3 py-3 text-sm font-semibold text-primary hover:bg-primary/25">Buscar y seguir</button>
+                <button type="button" onClick={() => {setHubTab('mensajes');void refreshConversations();}} className="flex items-center justify-center gap-2 rounded-full border border-primary/40 px-3 py-3 text-sm font-medium text-primary hover:bg-primary/10"><MessageCircle size={16} /> Mensaje privado</button>
               </div>
               <div className="mt-5 rounded-2xl bg-secondary/70 px-5 py-8 text-center sm:py-10">
                 <LockKeyhole size={23} className="mx-auto mb-3 text-muted-foreground" />
