@@ -7,11 +7,12 @@ const SPEEDS = [1, 1.5, 2] as const;
 const AUDIO_PLAY_EVENT = 'echo:audio-message-play';
 
 /** Browser-native audio playback; the source is resolved through authenticated private media. */
-export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId }: {
+export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId, onRetry }: {
   src: string;
   mine: boolean;
   durationSeconds?: number;
   attachmentId: string;
+  onRetry?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -98,6 +99,7 @@ export function AudioMessagePlayer({ src, mine, durationSeconds, attachmentId }:
       </div>
       {error && <p role="alert" className="text-xs text-destructive">No se pudo reproducir el audio. Intentá nuevamente.</p>}
       {!src && !error && <p role="status" className="text-xs text-muted-foreground">Cargando audio…</p>}
+      {!src && onRetry && <button type="button" onClick={onRetry} className="self-start rounded-lg bg-background/80 px-2 py-1 text-xs font-medium" data-testid={`button-retry-audio-download-${attachmentId}`}>Reintentar descarga</button>}
     </div>
   );
 }
