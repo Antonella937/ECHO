@@ -163,8 +163,7 @@ export function CreatorUniversePreview() {
   const activeUniverse = isSignedIn ? activeUniverseQuery.data?.state ?? null : null;
   const universeMetadata = universes.find(universe => universe.universeId === activeUniverseId);
   const universeName = universeMetadata?.name ?? activeUniverse?.creatorSetup?.universeName ?? (account ? '' : t('Casa de papel'));
-  const slots = account ? Array.from({ length: Math.min(account.maxCharacters, 25) },
-    (_, index) => index < account.characterCount) : [true, true, true, false, false];
+  const capacityPercent = account ? Math.min(100, Math.round(100 * account.characterCount / Math.max(1, account.maxCharacters))) : 60;
   const createUniverse = useCreateCreatorUniverse();
   const [actionError, setActionError] = useState<string | null>(null);
   const [, navigate] = useLocation();
@@ -211,7 +210,7 @@ export function CreatorUniversePreview() {
       <PreviewNotice>{account ? t("Datos privados de tu cuenta. Los extras mostrados no están disponibles para compra todavía.") : t("Ilustración con conteos de ejemplo. Inicia sesión para ver y gestionar tus datos.")}</PreviewNotice>
       <section className="epc-universe-board" aria-label={t("Ilustración de gestión de universo")}>
         <div className="epc-universe-sidebar">
-          <UniverseCover name={universeName} />
+          <div className="epc-universe-cover"><UniverseCover name={universeName} /></div>
           <span className="epc-overline">{account ? t("TU UNIVERSO ACTIVO") : t("UNIVERSO DE EJEMPLO")}</span>
           <h2>{universeName || t('Mi universo')}</h2>
           <p>{t("Un espacio privado para reunir personajes, ideas y conversaciones.")}</p>
@@ -220,8 +219,8 @@ export function CreatorUniversePreview() {
             <div><span>{t("Personajes usados")}</span><strong>{account ? `${account.characterCount} ` : '3 '}<small>/ {account?.maxCharacters ?? 5}</small></strong></div>
           </div>
           <div className="epc-slot-label"><span>{account ? t("Capacidad de personajes") : t("Capacidad de ejemplo")}</span><span>{account ? `${account.characterCount} ${t('de')} ${account.maxCharacters}` : `3 ${t('de')} 5`}</span></div>
-          <div className="epc-slots" aria-label={t("Capacidad de personajes")}>
-            {slots.map((filled, index) => <i key={index} className={filled ? 'is-filled' : ''} />)}
+          <div className="epc-capacity-track" role="progressbar" aria-label={t("Capacidad de personajes")} aria-valuemin={0} aria-valuemax={account?.maxCharacters ?? 5} aria-valuenow={account?.characterCount ?? 3}>
+            <span style={{ width: `${capacityPercent}%` }} />
           </div>
           {account && <button type="button" className="epc-caption" onClick={() => void addUniverse()} disabled={createUniverse.isPending}>
             {createUniverse.isPending ? t("Creando…") : account.universeCount >= account.maxUniverses ? t("Cupo de universos alcanzado") : t("Añadir universo")}
@@ -233,7 +232,7 @@ export function CreatorUniversePreview() {
           <div className="epc-character-list">
             {account && activeUniverse ? activeUniverse.characters.filter(character => !character.archived).map(character => (
               <Link href={`/profile/${character.id}`} className="epc-character-row" key={character.id} data-testid={`link-creator-character-${character.id}`}>
-                <span className="epc-character-avatar rose" aria-hidden="true">{character.name.trim().charAt(0).toUpperCase() || 'E'}</span>
+                {hasCharacterImage(character.avatar) ? <img className="epc-character-avatar epc-character-photo" alt="" src={resolveMedia(character.avatar, { sourceUniverseId: activeUniverseId, sourceCharacterId: character.id, sourceType: "avatar", sourceContentId: character.id })} /> : <span className="epc-character-avatar rose" aria-hidden="true">{character.name.trim().charAt(0).toUpperCase() || 'E'}</span>}
                 <span className="epc-character-name">{character.name}<small>@{character.handle}</small></span>
                 <ChevronRight size={16} aria-hidden="true" />
               </Link>
