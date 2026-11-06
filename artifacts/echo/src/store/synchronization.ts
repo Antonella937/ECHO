@@ -78,6 +78,16 @@ export class UniverseSync {
     finally { this.view.busy = false; this.emit(); }
     if (this.view.state) await this.sync();
   }
+  /** Refresh after a server-side approved event without discarding local edits. */
+  async refreshAfterApproval() {
+    if (this.stopped) return;
+    if (this.running) await this.running;
+    if (this.view.conflicts.length) throw new Error('Resolve pending conflicts before refreshing.');
+    await this.sync();
+    if (this.view.error || this.view.conflicts.length)
+      throw new Error(this.view.error ?? 'Pending synchronization conflicts');
+    // A clean sync merges the latest remote revision into the local view.
+  }
   edit(update: (state: SocialState) => SocialState) {
     if (!this.view.state || this.view.conflicts.length || this.importHash || this.preparingImport) return;
     this.view.state = update(this.view.state);
