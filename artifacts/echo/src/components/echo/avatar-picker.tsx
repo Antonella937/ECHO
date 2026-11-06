@@ -1,3 +1,4 @@
+import { useSharedShellText } from '@/lib/shared-shell-translations';
 import { useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { compressImage, useMediaResolver, uploadPrivateImage } from '@/lib/media';
@@ -6,6 +7,7 @@ import { CharacterInitials } from './visual-defaults';
 
 export function AvatarPicker({ value, name = '', onChange, onBusy }: { value: string; name?: string; onChange(v: string): void; onBusy(b: boolean): void }) {
   const resolveMedia = useMediaResolver();
+  const tr = useSharedShellText();
   const input = useRef<HTMLInputElement>(null);
   const token = useRef(0);
   const [busy, setBusy] = useState(false);
@@ -22,7 +24,7 @@ export function AvatarPicker({ value, name = '', onChange, onBusy }: { value: st
       const path = await uploadPrivateImage(data);
       if (t === token.current) onChange(path);
     } catch (e) {
-      if (t === token.current) setError(e instanceof Error ? e.message : 'No se pudo subir la imagen.');
+      if (t === token.current) setError(e instanceof Error ? e.message : tr('No se pudo subir la imagen.'));
     } finally {
       if (t === token.current) set(false);
     }
@@ -33,16 +35,16 @@ export function AvatarPicker({ value, name = '', onChange, onBusy }: { value: st
       <div className="flex items-center gap-4">
         <div className="relative">
           {hasCharacterImage(value)
-            ? <img src={resolveMedia(value)} alt="Avatar seleccionado" className="h-20 w-20 rounded-full bg-muted object-cover" data-testid="img-editor-avatar" />
+            ? <img src={resolveMedia(value)} alt={tr("Avatar seleccionado")} className="h-20 w-20 rounded-full bg-muted object-cover" data-testid="img-editor-avatar" />
             : <CharacterInitials name={name} size={80} testId="img-editor-avatar" />}
           {busy && <span className="absolute inset-0 grid place-items-center rounded-full bg-background/70"><Loader2 className="h-6 w-6 animate-spin text-primary" /></span>}
         </div>
         <div className="flex flex-col gap-2">
           <button type="button" disabled={busy} onClick={() => input.current?.click()} className="flex h-11 items-center gap-2 rounded-xl bg-secondary px-4 text-sm font-semibold disabled:opacity-60" data-testid="button-upload-avatar">
-            <Camera className="h-4 w-4" /> {busy ? 'Subiendo…' : 'Subir foto'}
+            <Camera className="h-4 w-4" /> {busy ? tr('Subiendo…') : tr('Subir foto')}
           </button>
           {busy && (
-            <button type="button" onClick={() => { token.current++; set(false); }} className="h-9 text-left text-xs font-semibold text-muted-foreground" data-testid="button-cancel-upload">Cancelar subida</button>
+            <button type="button" onClick={() => { token.current++; set(false); }} className="h-9 text-left text-xs font-semibold text-muted-foreground" data-testid="button-cancel-upload">{tr('Cancelar subida')}</button>
           )}
         </div>
         <input ref={input} type="file" accept="image/*" className="hidden" data-testid="input-avatar-file"
