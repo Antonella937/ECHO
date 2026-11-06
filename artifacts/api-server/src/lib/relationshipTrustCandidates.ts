@@ -25,10 +25,10 @@ export function screenTrustEvidence(text: string): { eligible: boolean; reason: 
   const normalized = text.normalize("NFC").trim();
   if (!normalized || normalized.length > 6000) return { eligible: false, reason: "EMPTY_OR_OVERSIZED" };
   if (/(?:^|[.!?\n]\s*)(?:si|if|imagina|imagine|supongamos|what if)\b/i.test(normalized) ||
-      /\b(?:habr[ií]a|hubiera|would have|could have|hypothetically|en teor[ií]a)(?![\\p{L}])/iu.test(normalized)) {
+      /(?:^|[^\p{L}])(?:habr[ií]a|hubiera|would have|could have|hypothetically|en teor[ií]a)(?![\p{L}])/iu.test(normalized)) {
     return { eligible: false, reason: "HYPOTHETICAL" };
   }
-  if (/(?:^|[^\\p{L}])(?:es broma|era broma|just kidding|i'm joking|jajaja|lol|mentira,? era broma)(?![\\p{L}])/iu.test(normalized)) {
+  if (/(?:^|[^\p{L}])(?:es broma|era broma|just kidding|i'm joking|jajaja|lol|mentira,? era broma)(?![\p{L}])/iu.test(normalized)) {
     return { eligible: false, reason: "JOKE_OR_RETRACTION" };
   }
   if (/(?:^|[^\p{L}])(?:no te ment[ií]|nunca te ment[ií]|i didn't lie|i never lied|no te traicion[eé]|i didn't betray)(?![\p{L}])/iu.test(normalized)) {
