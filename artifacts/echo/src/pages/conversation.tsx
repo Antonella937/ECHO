@@ -281,6 +281,31 @@ export default function ConversationPage() {
             ))}
           </ul>
         )}
+        {pending.some(p => p.kind === 'audio' && !p.uploading && p.attachment && !p.error) && (
+          <div className="mb-2 space-y-2" data-testid="voice-transcript-editor">
+            {pending.filter(p => p.kind === 'audio' && !p.uploading && p.attachment && !p.error).map(p => (
+              <div key={p.key} className="rounded-xl border border-border bg-card p-3">
+                <label htmlFor={`voice-transcript-${p.key}`} className="mb-1 block text-xs font-semibold">
+                  Transcripción de la nota de voz (podés corregirla)
+                </label>
+                <textarea
+                  id={`voice-transcript-${p.key}`}
+                  value={p.transcript ?? ''}
+                  maxLength={10000}
+                  rows={2}
+                  placeholder="Escribí acá lo que dijiste si la transcripción falló…"
+                  onChange={e => setPending(items => items.map(item =>
+                    item.key === p.key ? { ...item, transcript: e.target.value, transcriptionWarning: undefined } : item))}
+                  className="w-full resize-y rounded-lg border border-input bg-background p-2 text-sm focus:border-primary/60 focus:outline-none"
+                  data-testid={`input-voice-transcript-${p.key}`}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  El personaje usará este texto para responder y recordar. El audio original no cambia.
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
         {pending.some(p => p.transcriptionWarning) && (
           <div role="status" className="mb-2 rounded-lg border border-amber-500/40 px-3 py-2 text-xs">
             {pending.filter(p => p.transcriptionWarning).map(p => <p key={p.key}>{p.transcriptionWarning}</p>)}
