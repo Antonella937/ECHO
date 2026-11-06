@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { Check, Pencil, Plus, SlidersHorizontal } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 /** Identity switcher + account management (active / archived). */
 export function AccountManager() {
   const { state, me, actions } = useSocial();
+  const [, navigate] = useLocation();
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
@@ -55,6 +56,8 @@ export function AccountManager() {
                   if (active || c.archived) return;
                   actions.switchIdentity(c.id);
                   toast({ title: `Ahora publicas como ${c.name}` });
+                  // Open the selected identity's own configuration immediately.
+                  navigate(`/characters/${c.id}/edit`);
                 }}
                 className="flex min-w-0 flex-1 items-center gap-3 p-1 text-left"
                 data-testid={`radio-identity-${c.id}`}
