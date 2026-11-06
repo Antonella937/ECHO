@@ -13,6 +13,7 @@ import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
 import { PushNotificationSettings } from '@/components/echo/push-notification-settings';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useSettingsText } from '@/lib/settings-translations';
 import { LANGUAGES, setLanguage, useLanguage, useTranslation, type Language } from '@/lib/i18n';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -25,13 +26,14 @@ export default function SettingsPage() {
   const { signOut } = useClerk();
   const back = useBack();
   const t = useTranslation();
+  const st = useSettingsText();
 
   return (
     <div>
       <TopBar title={t("settings")} onBack={back} />
       <div className="px-4 pb-12 pt-5">
         <section aria-labelledby="account-h">
-          <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tu cuenta</h2>
+          <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
             <div className="text-sm font-semibold">{user?.fullName || 'Cuenta ECHO'}</div>
             <div className="mt-1 text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || 'Sesión protegida'}</div>
@@ -44,7 +46,7 @@ export default function SettingsPage() {
               <LogOut className="h-4 w-4" /> Cerrar sesión
             </button>
           </div>
-        <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">Tu perfil de creador ›</span></Link>
+        <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">{st("Tu perfil de creador ›")}</span></Link>
 
           <UniverseSelector />
           <Link href="/search" className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-sm font-semibold">
@@ -52,10 +54,10 @@ export default function SettingsPage() {
           </Link>
         </section>
 
-        <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">Mi plan y suscripciones <span className="text-xs text-muted-foreground">Ver planes y complementos ›</span></Link>
+        <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">Mi plan y suscripciones <span className="text-xs text-muted-foreground">{st("Ver planes y complementos ›")}</span></Link>
 
         <section className="mt-9" aria-labelledby="identity-h">
-          <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cuentas e identidad activa</h2>
+          <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Cuentas e identidad activa")}</h2>
           <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
             Todo lo que publiques, comentes o envíes saldrá con este perfil.
           </p>
@@ -63,10 +65,10 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-9" aria-labelledby="creator-h">
-          <h2 id="creator-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Creator y privacidad</h2>
+          <h2 id="creator-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Creator y privacidad")}</h2>
           <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
-            <Link href="/creator-preview/universes" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Mis universos y personajes</Link>
-            <Link href="/creator-preview/privacy" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Privacidad de personajes</Link>
+            <Link href="/creator-preview/universes" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">{st("Mis universos y personajes")}</Link>
+            <Link href="/creator-preview/privacy" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">{st("Privacidad de personajes")}</Link>
           </div>
         </section>
 
@@ -78,7 +80,7 @@ export default function SettingsPage() {
               const selected = (state.closeFriends?.[me.id] ?? []).includes(c.id);
               return <button key={c.id} type="button" aria-pressed={selected} onClick={() => actions.toggleCloseFriend(c.id)} className="flex min-h-12 w-full items-center justify-between gap-3 border-b border-border/50 px-2 text-left text-sm last:border-0" data-testid={`button-close-friend-${c.id}`}>
                 <span className="truncate">{c.name} <span className="text-xs text-muted-foreground">@{c.handle}</span></span>
-                <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-semibold', selected ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground')}>{selected ? 'Agregado' : 'Agregar'}</span>
+                <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-semibold', selected ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground')}>{st(selected ? 'Agregado' : 'Agregar')}</span>
               </button>;
             })}
           </div>
@@ -95,14 +97,14 @@ export default function SettingsPage() {
         <PushNotificationSettings />
 
         <section className="mt-9" aria-labelledby="support-h">
-          <h2 id="support-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Ayuda y seguridad</h2>
+          <h2 id="support-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Ayuda y seguridad")}</h2>
           <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
-            <Link href="/help" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Centro de ayuda · Reportar un problema</Link>
+            <Link href="/help" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">{st("Centro de ayuda · Reportar un problema")}</Link>
           </div>
         </section>
 
         <section className="mt-9" aria-labelledby="about-h">
-          <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sobre ECHO</h2>
+          <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Sobre ECHO")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
             <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
               <span>Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.</span></p>
@@ -113,13 +115,13 @@ export default function SettingsPage() {
         </section>
 
         <section className="mt-9" aria-labelledby="storage-h">
-          <h2 id="storage-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Almacenamiento</h2>
+          <h2 id="storage-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Almacenamiento")}</h2>
           <div className="mt-3 rounded-2xl border border-border p-4 text-[13px]">
             <div className="flex items-center gap-2.5">
               <Cloud className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} />
-              <span className="flex-1">Nube privada ECHO</span>
+              <span className="flex-1">{st("Nube privada ECHO")}</span>
               <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-semibold', storageError ? 'bg-destructive/15 text-destructive' : 'bg-secondary text-muted-foreground')} data-testid="status-storage">
-                {storageError ? 'Pendiente' : 'Sincronizado'}
+                {st(storageError ? 'Pendiente' : 'Sincronizado')}
               </span>
             </div>
             {storageError && <p role="alert" className="mt-3 text-destructive">{storageError}</p>}
@@ -130,7 +132,7 @@ export default function SettingsPage() {
             {storageError && (
               <button
                 type="button"
-                onClick={() => void actions.retrySync().then(() => toast({ title: 'Universo sincronizado' })).catch(() => undefined)}
+                onClick={() => void actions.retrySync().then(() => toast({ title: st('Sincronizado') })).catch(() => undefined)}
                 className="mt-3 h-10 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground"
                 data-testid="button-retry-sync"
               >
@@ -150,6 +152,7 @@ export default function SettingsPage() {
 function AppearanceSection() {
   const language = useLanguage();
   const t = useTranslation();
+  const st = useSettingsText();
   const { state, actions } = useSocial();
   const current = state.appearance ?? DEFAULT_APPEARANCE;
   const [custom, setCustom] = useState(current.accent);
@@ -159,18 +162,18 @@ function AppearanceSection() {
   const themes = [['dark', 'Oscuro', Moon], ['light', 'Claro', Sun], ['system', 'Sistema', Monitor]] as const;
   return (
     <section className="mt-9" aria-labelledby="appearance-h">
-      <h2 id="appearance-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Apariencia</h2>
+      <h2 id="appearance-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Apariencia")}</h2>
       <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1" role="radiogroup" aria-label="Tema">
           {themes.map(([k, label, Icon]) => (
             <button key={k} type="button" role="radio" aria-checked={current.theme === k} onClick={() => set({ ...current, theme: k })}
               className={cn('flex h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold', current.theme === k ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
               data-testid={`button-theme-${k}`}>
-              <Icon className="h-4 w-4" strokeWidth={1.8} /> {label}
+              <Icon className="h-4 w-4" strokeWidth={1.8} /> {st(label)}
             </button>
           ))}
         </div>
-        <div className="mt-4 text-xs text-muted-foreground">Color de acento</div>
+        <div className="mt-4 text-xs text-muted-foreground">{st("Color de acento")}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Color de acento">
           {ACCENT_PRESETS.map((hex) => {
             const on = current.accent.toLowerCase() === hex;
@@ -188,13 +191,13 @@ function AppearanceSection() {
             Personalizado
           </label>
           {custom.toLowerCase() !== current.accent.toLowerCase() && (
-            <button type="button" onClick={() => set({ ...current, accent: custom })} className="h-11 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground" data-testid="button-accent-apply">Aplicar</button>
+            <button type="button" onClick={() => set({ ...current, accent: custom })} className="h-11 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground" data-testid="button-accent-apply">{st("Aplicar")}</button>
           )}
         </div>
         <button type="button" onClick={() => { setCustom(DEFAULT_APPEARANCE.accent); set(DEFAULT_APPEARANCE); }} className="mt-4 text-xs font-semibold text-muted-foreground hover:text-foreground" data-testid="button-appearance-reset">
           Restablecer (oscuro · rosa)
         </button>
-        <p className="mt-2 text-xs text-muted-foreground">Se sincroniza con tu universo en todos tus dispositivos.</p>
+        <p className="mt-2 text-xs text-muted-foreground">{st("Se sincroniza con tu universo en todos tus dispositivos.")}</p>
         <div className="mt-5 border-t border-border pt-5">
           <label htmlFor="echo-language" className="mb-2 block text-sm font-semibold text-primary">🌐 {t("language")}</label>
           <p className="mb-3 text-xs text-muted-foreground">{t("languageDescription")}</p>
@@ -211,29 +214,30 @@ function AppearanceSection() {
 }
 
 function ImageGenerationStyleSection() {
+  const st = useSettingsText();
   const { state, actions } = useSocial();
   const selected = state.imageStyle ?? 'natural';
   const styles: { id: ImageStyle; label: string; detail: string }[] = [
-    { id: 'natural', label: 'Realismo natural', detail: 'Fotos cotidianas, piel con textura, luz real y rasgos naturales.' },
-    { id: 'phone', label: 'Cámara de celular', detail: 'Selfies espontáneas, flash, encuadres casuales y ruido digital.' },
-    { id: 'analog', label: 'Analógica / 35 mm', detail: 'Grano de película, colores orgánicos y sensación nostálgica.' },
-    { id: 'editorial', label: 'Editorial', detail: 'Fotografía profesional de moda, iluminación cuidada y detalle realista.' },
-    { id: 'cinematic', label: 'Cinematográfica', detail: 'Sombras, luz dramática y composición de película.' },
+    { id: 'natural', label: st('Realismo natural'), detail: 'Fotos cotidianas, piel con textura, luz real y rasgos naturales.' },
+    { id: 'phone', label: st('Cámara de celular'), detail: 'Selfies espontáneas, flash, encuadres casuales y ruido digital.' },
+    { id: 'analog', label: st('Analógica / 35 mm'), detail: 'Grano de película, colores orgánicos y sensación nostálgica.' },
+    { id: 'editorial', label: st('Editorial'), detail: 'Fotografía profesional de moda, iluminación cuidada y detalle realista.' },
+    { id: 'cinematic', label: st('Cinematográfica'), detail: 'Sombras, luz dramática y composición de película.' },
   ];
   return <section className="mt-9" aria-labelledby="image-style-h" data-testid="section-ai-image-settings">
-    <h2 id="image-style-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Generación de imágenes IA</h2>
+    <h2 id="image-style-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Generación de imágenes IA")}</h2>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
-      <h3 className="text-sm font-semibold">Estilo fotográfico predeterminado</h3>
+      <h3 className="text-sm font-semibold">{st("Estilo fotográfico predeterminado")}</h3>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Elegí cómo querés que se vean las imágenes generadas. Las referencias visuales y rasgos de cada personaje se mantienen independientemente del estilo.</p>
       <div className="mt-4 space-y-2" role="radiogroup" aria-label="Estilo de imágenes IA">
         {styles.map(({ id, label, detail }) => <button key={id} type="button" role="radio" aria-checked={selected === id}
-          onClick={() => { actions.setImageStyle(id); toast({ title: 'Estilo de imagen guardado', description: label }); }}
+          onClick={() => { actions.setImageStyle(id); toast({ title: st('Estilo de imagen guardado'), description: label }); }}
           data-testid={`button-image-style-${id}`}
           className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors', selected === id ? 'border-primary bg-primary/10' : 'border-border bg-background/30')}>
           <span className={cn('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border', selected === id ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50')}>
             {selected === id && <Check className="h-3 w-3" />}
           </span>
-          <span><span className="block text-sm font-semibold">{label}{id === 'natural' && <span className="ml-1 text-[11px] font-normal text-muted-foreground">· recomendado</span>}</span>
+          <span><span className="block text-sm font-semibold">{label}{id === 'natural' && <span className="ml-1 text-[11px] font-normal text-muted-foreground">· {st("recomendado")}</span>}</span>
             <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span></span>
         </button>)}
       </div>
