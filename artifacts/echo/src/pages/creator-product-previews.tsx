@@ -131,14 +131,14 @@ export function CreatorAccountPreview() {
       <section className="epc-account-layout" aria-label={t("Resumen ilustrativo de cuenta")}>
         <article className="epc-plan-panel">
           <div className="epc-panel-topline"><span>{isCreator ? "ECHO · FOUNDER & CREATOR" : isFoundingTester ? "ECHO · FOUNDING TESTER" : account ? t("TU PLAN") : t("PLAN DE EJEMPLO")}</span><span className="epc-status">{account ? t("Activo · sin cobros") : t("Activo · ilustrativo")}</span></div>
-          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>{isCreator ? "Fundadora y creadora de ECHO" : isFoundingTester ? "Tester fundadora de ECHO" : t("Plan actual")}</span><h2>{isCreator ? "ECHO CREATOR" : isFoundingTester ? "ECHO FOUNDING TESTER" : String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
-          <p className="epc-panel-copy">{isCreator ? "El universo que creaste. Acceso vitalicio a todas las membresías y complementos, sin cargos de suscripción. ♡" : isFoundingTester ? "Gracias por acompañar a ECHO desde el principio. Tu acceso de tester fundadora es vitalicio. ♡" : t("Un comienzo para crear un universo privado y darle forma a sus personajes.")}</p>
+          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>{isCreator ? t("Fundadora y creadora de ECHO") : isFoundingTester ? t("Tester fundadora de ECHO") : t("Plan actual")}</span><h2>{isCreator ? "ECHO CREATOR" : isFoundingTester ? "ECHO FOUNDING TESTER" : String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
+          <p className="epc-panel-copy">{isCreator ? t("El universo que creaste. Acceso vitalicio a todas las membresías y complementos, sin cargos de suscripción. ♡") : isFoundingTester ? t("Gracias por acompañar a ECHO desde el principio. Tu acceso de tester fundadora es vitalicio. ♡") : t("Un comienzo para crear un universo privado y darle forma a sus personajes.")}</p>
           <div className="epc-capacity">
             <div><span>{t("Universos")}</span><strong>{account ? `${account.universeCount} / ${unlimited ? '∞' : account.maxUniverses}` : t('1 universo')}</strong></div>
             <div className="epc-capacity-rule" aria-hidden="true"><i /></div>
             <div><span>{t("Personajes")}</span><strong>{account ? `${account.characterCount} / ${unlimited ? '∞' : account.maxCharacters}` : t('Hasta 5 personajes')}</strong></div>
           </div>
-          <Link href="/settings/subscriptions" className="ep-button epc-wide-link">{isCreator ? "Ver mis beneficios de creadora" : isFoundingTester ? "Ver mis beneficios de tester" : "Ver planes Free, Plus y Premium"} <ArrowRight size={15} /></Link>
+          <Link href="/settings/subscriptions" className="ep-button epc-wide-link">{isCreator ? t("Ver mis beneficios de creadora") : isFoundingTester ? t("Ver mis beneficios de tester") : t("Ver planes Free, Plus y Premium")} <ArrowRight size={15} /></Link>
         </article>
         <article className="epc-activity-panel">
           <div className="epc-panel-title"><span className="epc-icon-tile"><Sparkles size={17} /></span><div><span>{t("Herramientas")}</span><h2>{t("Lo que puedes explorar")}</h2></div></div>
