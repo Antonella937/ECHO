@@ -6,9 +6,9 @@ import { CharacterAvatar } from './avatar';
 
 /** Compact searchable multi-select of accounts (tags / story mentions). */
 export function AccountMultiPicker({ value, onChange, label, excludeId, max = 20, testId }: {
-  const t = useAccountManagementText();
   value: string[]; onChange(ids: string[]): void; label: string; excludeId?: string; max?: number; testId: string;
 }) {
+  const t = useAccountManagementText();
   const { state, character } = useSocial();
   const [q, setQ] = useState('');
   const query = q.trim().toLowerCase().replace(/^@/, '');
