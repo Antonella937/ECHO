@@ -5,7 +5,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Check, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -292,6 +292,8 @@ export default function ConversationPage() {
               onListen={() => void listenToMessage(m.id)}
               onRequestVoice={() => requestVoiceReply(m)}
               onReply={() => setQuoteId(m.id)}
+              onSave={() => { try { actions.toggleSaveMessage(m.id); } catch (e) { setError((e as Error).message); } }}
+              onEdit={(value) => { try { actions.editMessage(m.id, value); } catch (e) { setError((e as Error).message); } }}
               onJump={jumpTo}
               hiding={hiding === m.id}
               onToggleHiding={() => setHiding(h => h === m.id ? null : m.id)}
@@ -443,15 +445,18 @@ function summarize(m: Message, t: (key: string) => string): string {
   return t('Mensaje');
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
   canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
+  onSave(): void; onEdit(value: string): void;
 }) {
   const t = useConversationText();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(m.text);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearPress = () => { if (pressTimer.current) clearTimeout(pressTimer.current); pressTimer.current = null; };
   useEffect(() => () => clearPress(), []);
@@ -490,6 +495,10 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           <span className="line-clamp-2 text-muted-foreground">{quoted ? summarize(quoted, t) : 'Mensaje no disponible'}</span>
         </button>
       )}
+      {editing && <form onSubmit={(e) => { e.preventDefault(); if (!draft.trim()) return; onEdit(draft); setEditing(false); }} className="my-2 flex w-full max-w-xl flex-col gap-2 rounded-xl border border-primary/40 bg-card p-3" data-testid={`edit-message-${m.id}`}>
+        <textarea autoFocus maxLength={10000} value={draft} onChange={e => setDraft(e.target.value)} className="min-h-20 w-full resize-y rounded-lg border border-input bg-background p-2 text-sm" aria-label={t('Editar mensaje')} />
+        <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(false)} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t('Cancelar')}</button><button type="submit" disabled={!draft.trim()} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">{t('Guardar cambios')}</button></div>
+      </form>}
       {m.attachments?.length ? (
         <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
           {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
@@ -510,6 +519,8 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
           <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
+          <button type="button" onClick={onSave} aria-label={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} title={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-save-${m.id}`}><Bookmark className={cn('h-4 w-4', m.savedByIds?.includes(meId) && 'fill-primary text-primary')} /></button>
+          {mine && <button type="button" onClick={() => { setDraft(m.text); setEditing(true); }} aria-label={t('Editar mensaje')} title={t('Editar mensaje')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-edit-${m.id}`}><Pencil className="h-4 w-4" /></button>}
           <button type="button" onClick={onToggleHiding} aria-label={t("Eliminar para mí")} title={t("Eliminar para mí")} aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
@@ -519,6 +530,8 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           {!mine && <button type="button" onClick={() => { setMenuOpen(false); onRequestVoice(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Pedir respuesta en audio")}</button>}
           <button type="button" onClick={() => { setMenuOpen(false); onReply(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Responder")}</button>
           <button type="button" onClick={() => { setMenuOpen(false); onToggleReacting(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Reaccionar")}</button>
+          <button type="button" onClick={() => { setMenuOpen(false); onSave(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')}</button>
+          {mine && <button type="button" onClick={() => { setMenuOpen(false); setDraft(m.text); setEditing(true); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t('Editar mensaje')}</button>}
           <button type="button" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-xs">{t("Cerrar")}</button>
         </div>
       )}
@@ -552,6 +565,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           ))}
         </div>
       )}
+      {m.editedAt && <span className="mt-0.5 text-[10px] text-muted-foreground">{t('Editado')}</span>}
       {mine && isLastMine && (
         <span className="mt-0.5 text-[11px] text-muted-foreground" data-testid={`status-read-${m.id}`}>{t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>
       )}
