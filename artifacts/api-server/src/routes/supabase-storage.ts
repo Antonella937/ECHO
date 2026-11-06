@@ -97,6 +97,56 @@ export function createSupabaseStorageRouter(): IRouter {
     } catch { res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); }
   });
 
+  // Transcribe only media registered to the authenticated owner. The original
+  // recording stays private in Supabase; Groq receives bytes only when configured.
+  router.post("/storage/audio/transcribe", requireAuth, async (req, res) => {
+    const objectPath = req.body?.objectPath;
+    if (typeof objectPath !== "string" || !validPath(objectPath)) {
+      res.status(400).json({ error: "INVALID_MEDIA_PATH" }); return;
+    }
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) { res.status(503).json({ error: "TRANSCRIPTION_NOT_CONFIGURED" }); return; }
+    try {
+      const [owned] = await db.select().from(echoMediaTable).where(and(
+        eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath))).limit(1);
+      if (!owned) { res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
+      const { base, key } = config();
+      const media = await fetch(storageUrl(base, objectPath.slice("/objects/".length)), {
+        headers: authHeaders(key), signal: AbortSignal.timeout(20000),
+      });
+      if (!media.ok) { res.status(502).json({ error: "MEDIA_FETCH_FAILED" }); return; }
+      const mime = (media.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
+      if (!["audio/mp4", "audio/mpeg", "audio/wav", "audio/webm", "audio/ogg"].includes(mime)) {
+        res.status(415).json({ error: "AUDIO_FORMAT_UNSUPPORTED" }); return;
+      }
+      const bytes = Buffer.from(await media.arrayBuffer());
+      if (!bytes.length || bytes.length > 15 * 1024 * 1024 || !validMediaHeader(bytes.subarray(0, 64), mime)) {
+        res.status(400).json({ error: "INVALID_AUDIO" }); return;
+      }
+      const form = new FormData();
+      const ext = ({ "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/wav": "wav",
+        "audio/webm": "webm", "audio/ogg": "ogg" } as Record<string, string>)[mime];
+      form.append("file", new Blob([new Uint8Array(bytes)], { type: mime }), `voice.${ext}`);
+      form.append("model", "whisper-large-v3-turbo");
+      form.append("response_format", "json");
+      const result = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST", headers: { Authorization: `Bearer ${groqKey}` }, body: form,
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!result.ok) {
+        req.log.warn({ upstreamStatus: result.status }, "Audio transcription failed");
+        res.status(result.status === 429 ? 429 : 502).json({ error: "TRANSCRIPTION_PROVIDER_FAILED" }); return;
+      }
+      const data = await result.json() as { text?: unknown };
+      const transcript = typeof data.text === "string" ? data.text.trim().slice(0, 10000) : "";
+      if (!transcript) { res.status(422).json({ error: "AUDIO_NOT_UNDERSTOOD" }); return; }
+      res.json({ transcript });
+    } catch (error) {
+      req.log.warn({ err: error }, "Audio transcription unavailable");
+      res.status(503).json({ error: "TRANSCRIPTION_UNAVAILABLE" });
+    }
+  });
+
   router.get("/storage/objects/*objectPath", requireAuth, async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
