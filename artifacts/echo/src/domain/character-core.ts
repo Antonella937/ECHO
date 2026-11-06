@@ -99,11 +99,8 @@ export function deriveRoutineContext(config: CharacterConfig, now = new Date()):
 }
 
 export function deletionBlockReason(state: SocialState, id: string): string | null {
-  if (id === 'nela') {
-    const mainName = state.creatorSetup ? state.characters.find((character) => character.id === id)?.name ?? 'La identidad principal' : 'Nela';
-    return `${mainName} es la identidad principal y no se puede eliminar.`;
-  }
   if (!state.characters.some(c => c.id === id)) return 'Esta cuenta ya no existe.';
+  if (state.characters.filter(c => !c.archived && c.id !== id).length === 0) return 'Necesitás conservar al menos una identidad activa en el universo.';
   const history = state.posts.some(p => p.authorId === id || p.likes.includes(id) || p.savedBy.includes(id)) ||
     state.stories.some(s => s.authorId === id || s.seenBy.includes(id)) ||
     state.comments.some(c => c.authorId === id || c.replyToAuthorId === id || c.likes.includes(id)) ||
@@ -120,7 +117,7 @@ export function deleteUnusedAccount(state: SocialState, id: string): SocialState
   if (blocked) throw Error(blocked);
   const follows = { ...state.follows }; delete follows[id];
   return { ...state, characters: state.characters.filter(c => c.id !== id), follows,
-    currentCharacterId: state.currentCharacterId === id ? 'nela' : state.currentCharacterId };
+    currentCharacterId: state.currentCharacterId === id ? state.characters.find(c => c.id !== id && !c.archived)!.id : state.currentCharacterId };
 }
 export function duplicateCharacter(state: SocialState, id: string, newId: string): Character {
   const original = state.characters.find(c => c.id === id);
