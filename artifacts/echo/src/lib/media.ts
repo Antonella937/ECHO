@@ -60,6 +60,13 @@ export const MediaScopeContext = createContext<MediaScope | null>(null);
  * Cache decoded object URLs for the current browser session, never expose signed URLs.
  */
 const privateMediaCache = new Map<string, string>();
+/** Immediately display an image uploaded in this session, while retaining authenticated reads after refresh. */
+export function primePrivateImage(ref: string, dataUrl: string): void {
+  const key = privateMediaUrl(ref);
+  privateMediaCache.set(key, dataUrl);
+  privateMediaListeners.forEach(notify => notify());
+}
+
 const privateMediaPending = new Set<string>();
 const privateMediaFailures = new Map<string, number>();
 const privateMediaAttempts = new Map<string, number>();
@@ -205,6 +212,7 @@ export async function uploadPrivateImage(dataUrl: string): Promise<string> {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ objectPath }), responseType: 'json',
   });
+  primePrivateImage(claimed.objectPath, dataUrl);
   return claimed.objectPath;
 }
 
