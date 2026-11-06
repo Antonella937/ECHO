@@ -148,11 +148,11 @@ export default function CreatePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
-      if (result.generationEnabled) throw new Error('La preparación no debe generar imágenes.');
+      if (result.generationEnabled) throw new Error(t('La preparación no debe generar imágenes.'));
       setAiPrepared({ preparedPrompt: result.preparedPrompt, referenceCount: result.referenceCount ?? (aiEditSource ? 1 : 0), style: result.style });
       setAiPreview(true);
       void checkAiStatus();
-    } catch (err) { setError((err as Error).message || 'No se pudo preparar la imagen.'); }
+    } catch (err) { setError((err as Error).message || t('No se pudo preparar la imagen.')); }
     finally { setAiPreparing(false); }
   };
 
@@ -166,9 +166,9 @@ export default function CreatePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1', ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
-      if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error('El generador devolvió una imagen inválida.');
+      if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error(t('El generador devolvió una imagen inválida.'));
       setAiGeneratedPath(result.objectPath);
-    } catch (err) { setError((err as Error).message || 'No se pudo generar la imagen.'); }
+    } catch (err) { setError((err as Error).message || t('No se pudo generar la imagen.')); }
     finally { setAiGenerating(false); void checkAiStatus(); }
   };
 
@@ -277,20 +277,20 @@ export default function CreatePage() {
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.")}</p>
           {aiEditSource && <div className="mt-3 rounded-xl border border-border p-3 text-xs" data-testid="ai-edit-source"><p className="font-semibold">{t("Modo edición · vista previa gratuita")}</p><img src={resolveMedia(aiEditSource)} alt={t("Imagen original para editar")} className="mt-2 max-h-44 w-full rounded-lg object-contain" /><button type="button" className="mt-2 underline" onClick={() => { setAiEditSource(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }}>{t("Volver a imagen nueva")}</button></div>}
           <textarea aria-label={t("Descripción de imagen IA")} value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
-            rows={4} maxLength={2000} placeholder={`Ej.: ${me.name} sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.`}
+            rows={4} maxLength={2000} placeholder={`${t('Ej.:')} ${me.name} ${t('sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.')}`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
             data-testid="input-ai-image-prompt" />
           <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-xs">
             <div className="font-semibold">{t("Estilo:")} {t(({ natural: 'Realismo natural', phone: 'Cámara de celular', analog: 'Analógica / 35 mm', editorial: 'Editorial', cinematic: 'Cinematográfica' } as const)[state.imageStyle ?? 'natural'])}</div>
-            <div className="mt-1 text-muted-foreground">{t("Referencia facial:")} {me.avatar ? 'foto de perfil' : 'sin foto'} · Referencias adicionales: {me.identity?.referenceImages?.length ?? 0}/5</div>
-            <div className="mt-1 text-muted-foreground">{t("Descripciones:")} {me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente'} · {me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente'}</div>
+            <div className="mt-1 text-muted-foreground">{t("Referencia facial:")} {t(me.avatar ? 'foto de perfil' : 'sin foto')} · {t('Referencias adicionales:')} {me.identity?.referenceImages?.length ?? 0}/5</div>
+            <div className="mt-1 text-muted-foreground">{t("Descripciones:")} {t(me.identity?.facialDescription ? 'rostro ✓' : 'rostro pendiente')} · {t(me.identity?.bodyDescription ? 'cuerpo ✓' : 'cuerpo pendiente')}</div>
             <Link href={`/characters/${me.id}/edit`} className="mt-2 inline-block text-primary underline">{t("Editar identidad visual")}</Link>
           </div>
           {aiStatus && <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-xs" data-testid="ai-provider-status">
             <div className="font-semibold">{t(aiStatus.enabled ? 'Generador disponible' : 'Generador pendiente de activación')}</div>
             {!aiStatus.enabled && <p className="mt-1 text-muted-foreground">{t("La vista previa es gratuita. Todavía no se envían solicitudes pagas.")}</p>}
             {aiStatus.prerequisites && <p className="mt-1 text-muted-foreground">
-              Clave API: {aiStatus.prerequisites.openRouterKeyConfigured ? 'configurada' : 'pendiente'} · Almacenamiento: {aiStatus.prerequisites.privateStorageConfigured ? 'configurado' : 'pendiente'} · Proveedor: {aiStatus.prerequisites.providerValidated ? 'validado' : 'pendiente'} · Presupuesto: {aiStatus.prerequisites.budgetActivated ? 'habilitado' : 'bloqueado'}
+              {t('Clave API:')} {aiStatus.prerequisites.openRouterKeyConfigured ? t('configurada') : t('pendiente')} · {t('Almacenamiento:')} {aiStatus.prerequisites.privateStorageConfigured ? t('configurado') : t('pendiente')} · {t('Proveedor:')} {aiStatus.prerequisites.providerValidated ? t('validado') : t('pendiente')} · {t('Presupuesto:')} {aiStatus.prerequisites.budgetActivated ? t('habilitado') : t('bloqueado')}
             </p>}
           </div>}
           <button type="button" disabled={!aiPrompt.trim() || aiPreparing} onClick={() => void prepareAi()}
@@ -298,7 +298,7 @@ export default function CreatePage() {
             data-testid="button-ai-image-preview">{t(aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis')}</button>
           <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-xs leading-relaxed" data-testid="label-ai-transfer-acknowledgement">
             <input type="checkbox" className="mt-0.5" checked={aiTransferAcknowledged} onChange={e => setAiTransferAcknowledged(e.target.checked)} data-testid="checkbox-ai-transfer-acknowledgement" />
-            <span>Entiendo que, si activo una generación real, ECHO enviará mi descripción de la escena y hasta cuatro imágenes privadas de referencia del personaje a OpenRouter y al proveedor del modelo para crear la imagen. No debo incluir fotografías ajenas sin autorización ni datos sensibles. Esta confirmación es específica de la prueba de imágenes, no reemplaza los documentos legales definitivos ni habilita por sí sola el servicio.</span>
+            <span>{t("Entiendo que, si activo una generación real, ECHO enviará mi descripción de la escena y hasta cuatro imágenes privadas de referencia del personaje a OpenRouter y al proveedor del modelo para crear la imagen. No debo incluir fotografías ajenas sin autorización ni datos sensibles. Esta confirmación es específica de la prueba de imágenes, no reemplaza los documentos legales definitivos ni habilita por sí sola el servicio.")}</span>
           </label>
           {aiPreview && aiPrepared && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
             <div className="text-sm font-semibold">{t("Vista previa de la solicitud")}</div>
