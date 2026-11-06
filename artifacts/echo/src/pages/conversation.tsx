@@ -475,7 +475,35 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
     } catch { setTweakError(true); } finally { setTweakBusy(false); }
   };
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gesture = useRef<{ x: number; y: number; opened: boolean; swiped: boolean } | null>(null);
   const clearPress = () => { if (pressTimer.current) clearTimeout(pressTimer.current); pressTimer.current = null; };
+  const startGesture = (x: number, y: number) => {
+    clearPress();
+    gesture.current = { x, y, opened: false, swiped: false };
+    pressTimer.current = setTimeout(() => {
+      if (gesture.current && !gesture.current.swiped) {
+        gesture.current.opened = true;
+        setMenuOpen(true);
+      }
+    }, 550);
+  };
+  const moveGesture = (x: number, y: number) => {
+    const start = gesture.current;
+    if (!start) return;
+    const dx = x - start.x;
+    const dy = y - start.y;
+    if (Math.abs(dy) > 12 || dx < -15 || Math.abs(dx) > 15) clearPress();
+    if (Math.abs(dy) > 25) start.swiped = true;
+  };
+  const endGesture = (x: number, y: number) => {
+    clearPress();
+    const start = gesture.current;
+    gesture.current = null;
+    if (!start || start.opened || start.swiped) return;
+    const dx = x - start.x;
+    const dy = y - start.y;
+    if (dx > 65 && Math.abs(dy) < 35) onReply();
+  };
   useEffect(() => () => clearPress(), []);
   const resolveMedia = useMediaResolver();
   const story = m.storyId ? state.stories.find((s) => s.id === m.storyId) : undefined;
@@ -484,7 +512,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   return (
-    <li onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }} onTouchStart={() => { clearPress(); pressTimer.current = setTimeout(() => setMenuOpen(true), 550); }} onTouchEnd={clearPress} onTouchCancel={clearPress} onTouchMove={clearPress} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
+    <li onContextMenu={(e) => { e.preventDefault(); clearPress(); setMenuOpen(true); }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) startGesture(touch.clientX, touch.clientY); }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
@@ -542,7 +570,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         )}
         <span className="flex shrink-0 opacity-60 transition-opacity group-hover:opacity-100">
           {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
-          <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
           <button type="button" onClick={onSave} aria-label={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} title={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-save-${m.id}`}><Bookmark className={cn('h-4 w-4', m.savedByIds?.includes(meId) && 'fill-primary text-primary')} /></button>
           {!mine && m.origin !== 'user' && <button type="button" onClick={() => { setTweakOpen(v => !v); setTweakPreview(''); }} aria-label={t('Ajustar con IA')} title={t('Ajustar con IA')} className="tap hidden sm:grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-tweak-${m.id}`}><Sparkles className="h-4 w-4" /></button>}
