@@ -10,6 +10,7 @@ import { characterConfig, defaultCharacterConfig, sectionStatus, validateCharact
 import type { Character } from '@/domain/types';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useCharacterEditorText } from '@/lib/character-editor-translations';
 import { BasicFields, type BasicForm } from '@/components/characters/basic-fields';
 import { BasicVoiceCatalogue } from '@/components/characters/basic-voice-catalogue';
 import { VisualIdentity } from '@/components/characters/visual-identity';
@@ -35,6 +36,7 @@ const EMPTY_IDENTITY: IdentityReference = { provider: 'mock', referenceImages: [
 const EMPTY: BasicForm = { name: '', handle: '', bio: '', avatar: 'asset:account-default', occupation: '', location: '' };
 
 export default function CharacterEditorPage() {
+  const t = useCharacterEditorText();
   const params = useParams<{ id?: string }>();
   const isNew = !params.id || params.id === 'new';
   const { state, character, actions } = useSocial();
@@ -79,7 +81,7 @@ export default function CharacterEditorPage() {
   const setForm = (fn: (p: BasicForm) => BasicForm) => { setFormRaw(fn); setDirty(true); };
   const set: SetCfg = (fn) => { setConfigRaw(fn); setDirty(true); };
 
-  if (!isNew && !account) return (<><TopBar title="Personaje" onBack={back} /><EmptyState title="No encontramos este personaje" body="Puede que se haya eliminado." /></>);
+  if (!isNew && !account) return (<><TopBar title={t("Personaje")} onBack={back} /><EmptyState title={t("No encontramos este personaje")} body={t("Puede que se haya eliminado.")} /></>);
 
   const save = () => {
     if (busy || uploading) return;
@@ -94,15 +96,15 @@ export default function CharacterEditorPage() {
         actions.updateAccount(account.id, input, original.current);
         original.current = structuredClone(input);
         setDirty(false);
-        toast({ title: 'Personaje guardado' });
+        toast({ title: t('Personaje guardado') });
       } else {
         const id = actions.createAccount(input);
         setDirty(false);
-        toast({ title: `@${input.handle} creado`, description: 'Podés seguir completando su ficha.' });
+        toast({ title: `@${input.handle} creado`, description: t('Podés seguir completando su ficha.') });
         navigate(`/characters/${id}/edit`, { replace: true });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Tus cambios siguen acá.');
+      setError(e instanceof Error ? e.message : t('No se pudo guardar. Tus cambios siguen acá.'));
     } finally { setBusy(false); }
   };
 
@@ -125,13 +127,13 @@ export default function CharacterEditorPage() {
 
   return (
     <>
-      <TopBar title={isNew ? 'Nuevo personaje' : `Editar ${account!.name}`} onBack={back}
-        sub={dirty ? <span className="text-primary" data-testid="status-character-dirty">Cambios sin guardar</span> : !isNew ? `${done}/7 secciones configuradas` : undefined} />
+      <TopBar title={isNew ? t('Nuevo personaje') : `${t('Editar')} ${account!.name}`} onBack={back}
+        sub={dirty ? <span className="text-primary" data-testid="status-character-dirty">{t("Cambios sin guardar")}</span> : !isNew ? `${done}/7 ${t("secciones configuradas")}` : undefined} />
       <div className="px-4 pb-40 pt-2" data-testid="page-character-editor">
         {isNew && (
-          <div className="mt-2 flex rounded-2xl bg-secondary p-1" role="tablist" aria-label="Modo de creación">
+          <div className="mt-2 flex rounded-2xl bg-secondary p-1" role="tablist" aria-label={t("Modo de creación")}>
             {([['quick', 'Rápido'], ['advanced', 'Avanzado'], ['assisted', 'Asistido']] as const).map(([m, l]) => (
-              <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cn('h-11 flex-1 rounded-xl text-xs font-semibold', mode === m ? 'bg-card text-foreground' : 'text-muted-foreground')} data-testid={`tab-character-${m}`}>{l}</button>
+              <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cn('h-11 flex-1 rounded-xl text-xs font-semibold', mode === m ? 'bg-card text-foreground' : 'text-muted-foreground')} data-testid={`tab-character-${m}`}>{t(l)}</button>
             ))}
           </div>
         )}
@@ -143,28 +145,28 @@ export default function CharacterEditorPage() {
             onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
             <div className="grid grid-cols-2 gap-3">
-              <NumberInput id="character-quick-age" label="Edad (opcional)" value={config.basic.age} onChange={(age) => set((c) => ({ ...c, basic: { ...c.basic, age } }))} min={0} max={150} />
-              <Text id="character-quick-pronouns" label="Pronombres (opcional)" value={config.basic.pronouns} onChange={(pronouns) => set((c) => ({ ...c, basic: { ...c.basic, pronouns } }))} max={100} />
+              <NumberInput id="character-quick-age" label={t("Edad (opcional)")} value={config.basic.age} onChange={(age) => set((c) => ({ ...c, basic: { ...c.basic, age } }))} min={0} max={150} />
+              <Text id="character-quick-pronouns" label={t("Pronombres (opcional)")} value={config.basic.pronouns} onChange={(pronouns) => set((c) => ({ ...c, basic: { ...c.basic, pronouns } }))} max={100} />
             </div>
-            <Area id="character-quick-description" label="Descripción (opcional)" value={config.personality.description} onChange={(description) => set((c) => ({ ...c, personality: { ...c.personality, description } }))} max={24000} rows={5} />
-            <p className="mt-3 px-1 text-xs text-muted-foreground">El resto queda con valores por defecto. Podés completarlo después en modo avanzado.</p>
+            <Area id="character-quick-description" label={t("Descripción (opcional)")} value={config.personality.description} onChange={(description) => set((c) => ({ ...c, personality: { ...c.personality, description } }))} max={24000} rows={5} />
+            <p className="mt-3 px-1 text-xs text-muted-foreground">{t("El resto queda con valores por defecto. Podés completarlo después en modo avanzado.")}</p>
           </>}
           {mode === 'advanced' && (
             <div className="mt-8">
-              <nav className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-2" aria-label="Secciones">
+              <nav className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-2" aria-label={t("Secciones")}>
                 {SECTIONS.map(([k, l]) => (
                   <button key={k} onClick={() => { setOpen(k); document.getElementById(`acc-${k}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                     className={cn('relative flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold', open === k ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground')} data-testid={`chip-section-${k}`}>
-                    <span className={cn('h-1.5 w-1.5 rounded-full', status[k] ? 'bg-primary' : 'bg-muted-foreground/40')} aria-hidden />{l}
-                    <span className="sr-only">{status[k] ? ' (configurada)' : ' (sin configurar)'}</span>
+                    <span className={cn('h-1.5 w-1.5 rounded-full', status[k] ? 'bg-primary' : 'bg-muted-foreground/40')} aria-hidden />{t(l)}
+                    <span className="sr-only">{status[k] ? t(' (configurada)') : t(' (sin configurar)')}</span>
                   </button>
                 ))}
               </nav>
               {SECTIONS.map(([k, l]) => (
                 <div key={k} id={`acc-${k}`} className="mt-2 scroll-mt-20 rounded-2xl border border-border bg-card/40">
                   <button onClick={() => setOpen(open === k ? null : k)} aria-expanded={open === k} className="flex min-h-14 w-full items-center gap-3 px-4 text-left" data-testid={`button-section-${k}`}>
-                    <span className="flex-1 font-display text-[16px] tracking-wide">{l}</span>
-                    <span className={cn('text-[11px]', status[k] ? 'text-primary' : 'text-muted-foreground')} data-testid={`status-section-${k}`}>{status[k] ? 'Configurada' : 'Por defecto'}</span>
+                    <span className="flex-1 font-display text-[16px] tracking-wide">{t(l)}</span>
+                    <span className={cn('text-[11px]', status[k] ? 'text-primary' : 'text-muted-foreground')} data-testid={`status-section-${k}`}>{status[k] ? t('Configurada') : t('Por defecto')}</span>
                     <ChevronDown className={cn('h-4 w-4 transition-transform', open === k && 'rotate-180')} />
                   </button>
                   {open === k && <div className="px-4 pb-5">{renderSection(k)}</div>}
@@ -176,17 +178,17 @@ export default function CharacterEditorPage() {
 
         {account && (
           <button onClick={() => setProfileOpen(true)} className="tap mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border text-sm" data-testid="button-open-profile-controls">
-            <BadgeCheck className="h-4 w-4" /> Verificación y cifras visibles
+            <BadgeCheck className="h-4 w-4" /> {t("Verificación y cifras visibles")}
           </button>
         )}
         {account && <AccountActions account={account} dirty={dirty} />}
-        {account && <Link href={`/profile/${account.id}`} className="mt-4 grid h-11 place-items-center text-sm text-muted-foreground underline" data-testid="link-character-profile">Ver perfil</Link>}
+        {account && <Link href={`/profile/${account.id}`} className="mt-4 grid h-11 place-items-center text-sm text-muted-foreground underline" data-testid="link-character-profile">{t("Ver perfil")}</Link>}
       </div>
 
       {(isNew || dirty || busy || uploading || error) && <div className="fixed inset-x-0 bottom-[calc(var(--nav-clearance)-0.5rem)] z-40 mx-auto max-w-[560px] px-4 pb-2 lg:bottom-4 lg:left-[248px] xl:right-[300px]">
         {error && <p role="alert" className="mb-2 rounded-xl bg-destructive/15 p-3 text-sm text-destructive" data-testid="text-character-error">{error}</p>}
         <button onClick={save} disabled={busy || uploading || (!isNew && !dirty)} className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg disabled:opacity-60" data-testid="button-character-save">
-          {uploading ? 'Esperando foto…' : busy ? 'Guardando…' : isNew ? 'Crear personaje' : dirty ? 'Guardar cambios' : 'Todo guardado'}
+          {t(uploading ? 'Esperando foto…' : busy ? 'Guardando…' : isNew ? 'Crear personaje' : dirty ? 'Guardar cambios' : 'Todo guardado')}
         </button>
       </div>}
       {account && <AccountEditor open={profileOpen} accountId={account.id} onClose={() => setProfileOpen(false)} />}
