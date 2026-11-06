@@ -342,7 +342,7 @@ export function CreatorStorePreview() {
           </section>
         </div>
       </section>
-      <div className="epc-back-row"><Link href="/creator-preview" className="ep-text-link"><ArrowLeft size={15} /> Pantallas de revisión</Link></div>
+      
     </PreviewShell>
   );
 }
@@ -381,7 +381,7 @@ export function CreatorPrivacyPreview() {
           <div className="epc-privacy-foot"><CircleHelp size={14} /> Solicitudes y bloqueos mostrados como ejemplos sin estado real.</div>
         </div>
       </section>
-      <div className="epc-back-row"><Link href="/creator-preview/account" className="ep-text-link"><ArrowLeft size={15} /> Ver cuenta de ejemplo</Link></div>
+      
     </PreviewShell>
   );
 }
@@ -423,7 +423,7 @@ export function CreatorLimitPreview() {
             <p className="epc-dialog-footnote"><Eye size={13} /> No hay checkout ni cobros conectados.</p>
           </section>
         </div>
-        <div className="epc-back-row"><Link href="/creator-preview" className="ep-text-link"><ArrowLeft size={15} /> Pantallas de revisión</Link></div>
+        
       </PreviewShell>
     );
   }
@@ -445,7 +445,7 @@ export function CreatorLimitPreview() {
           <p className="epc-dialog-footnote"><Eye size={13} /> Vista estática. Ninguna acción se ejecutará.</p>
         </section>
       </div>
-      <div className="epc-back-row"><Link href="/creator-preview" className="ep-text-link"><ArrowLeft size={15} /> Pantallas de revisión</Link></div>
+      
     </PreviewShell>
   );
 }
