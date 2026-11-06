@@ -39,7 +39,7 @@ export function startAutonomyBackgroundWorker() {
         },
         processCharacter: async (ownerId, input, now) => {
           try {
-            const outcome = await runAutonomyLiveCycle(ownerId, input, {
+            const outcome = await runAutonomyLiveCycle(ownerId, { universeId: input.universeId, characterId: input.characterId, idempotencyKey: input.idempotencyKey }, {
           repository,
           provider: new MeteredTextProvider(ownerId, "autonomy", provider),
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
