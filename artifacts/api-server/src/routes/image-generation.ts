@@ -158,7 +158,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
     const scene = prepareImageScene(input.data.prompt, character, characters, selected);
     const referencePaths = scene.referencePaths;
-    const preparedPrompt = scenePrompt(people, input.data.prompt, selected, labels);
+    const preparedPrompt = scene.preparedPrompt;
     const result = await generateCharacterImage({
       ownerId: req.userId!, universeId: input.data.universeId,
       characterId: character.id, preparedPrompt, style: selected, referencePaths,
