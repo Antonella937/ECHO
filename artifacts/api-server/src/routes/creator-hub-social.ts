@@ -522,24 +522,31 @@ export function createCreatorHubSocialRouter(): IRouter {
     );
     res.json({ status: "not_following" });
   });
+  const founderOwnerId = "user_3LeoBfUicTthDVixNbkPlqXFkdZ";
   const publicationSchema = z.object({
     kind: z.enum(["character","world","update","post"]),
     title: z.string().trim().min(1).max(120),
     body: z.string().max(5000).default(""),
     visibility: z.enum(["public","followers","private"]).default("private"),
     pinned: z.boolean().default(false),
+    coverPath: z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i).nullable().default(null),
   }).strict();
   router.post("/creator-hub/social/publications", async (req, res) => {
     const parsed = publicationSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({error:"INVALID_PUBLICATION"}); return; }
+    if (parsed.data.kind === "update" && req.userId !== founderOwnerId) { res.status(403).json({error:"OFFICIAL_UPDATES_RESTRICTED"}); return; }
     const profile = await pool.query("SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1", [req.userId]);
     if (!profile.rowCount) { res.status(409).json({error:"CREATOR_PROFILE_REQUIRED"}); return; }
-    const {kind,title,body,visibility,pinned} = parsed.data;
+    const {kind,title,body,visibility,pinned,coverPath} = parsed.data;
+    if (coverPath) {
+      const owned = await pool.query("SELECT 1 FROM echo_media WHERE owner_id=$1 AND object_path=$2", [req.userId,coverPath]);
+      if (!owned.rowCount) { res.status(400).json({error:"MEDIA_NOT_OWNED"}); return; }
+    }
     const result = await pool.query(
-      `INSERT INTO echo_creator_publications(owner_id,kind,title,body,visibility,pinned)
-       VALUES ($1,$2,$3,$4,$5,$6)
-       RETURNING id,kind,title,body,visibility,pinned,created_at AS "createdAt"`,
-      [req.userId,kind,title,body,visibility,pinned],
+      `INSERT INTO echo_creator_publications(owner_id,kind,title,body,visibility,pinned,cover_path)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id,kind,title,body,visibility,pinned,cover_path AS "coverPath",created_at AS "createdAt"`,
+      [req.userId,kind,title,body,visibility,pinned,coverPath],
     );
     res.status(201).json({publication:result.rows[0]});
   });
@@ -547,7 +554,7 @@ export function createCreatorHubSocialRouter(): IRouter {
     const ownerId = req.params.ownerId === "me" ? req.userId : req.params.ownerId;
     if (!ownerId || ownerId.length > 255) { res.status(400).json({error:"INVALID_OWNER"}); return; }
     const result = await pool.query(
-      `SELECT p.id,p.kind,p.title,p.body,p.visibility,p.pinned,p.created_at AS "createdAt"
+      `SELECT p.id,p.kind,p.title,p.body,p.visibility,p.pinned,p.cover_path AS "coverPath",p.created_at AS "createdAt"
        FROM echo_creator_publications p
        WHERE p.owner_id=$2 AND NOT EXISTS (
          SELECT 1 FROM echo_creator_blocks b WHERE
