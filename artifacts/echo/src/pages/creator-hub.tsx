@@ -313,6 +313,7 @@ export default function CreatorHubPage() {
       const result = await customFetch<{status:string}>('/api/creator-hub/social/follow', {method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetOwnerId:ownerId})});
       setPeopleFeedback(result.status === 'following' ? ht("¡Ahora seguís a esta persona!") : ht("Solicitud para seguir enviada."));
       setPeopleResults(previous => previous.map(person => person.ownerId === ownerId ? {...person, following: result.status === 'following',requested:result.status !== 'following'} : person));
+      setViewedProfile(previous => selectedPersonId === ownerId && previous ? {...previous, following: result.status === 'following', requested: result.status !== 'following'} : previous);
     } catch { setPeopleFeedback(ht("No pudimos enviar la solicitud para seguir.")); }
     finally { setPeopleBusy(false); }
   }
