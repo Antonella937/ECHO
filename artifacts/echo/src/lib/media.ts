@@ -64,6 +64,15 @@ const privateMediaPending = new Set<string>();
 const privateMediaFailures = new Map<string, number>();
 const PRIVATE_MEDIA_RETRY_MS = 10_000;
 const privateMediaListeners = new Set<() => void>();
+
+/** Explicit retries bypass the cooldown; private URLs and authentication remain unchanged. */
+export function retryPrivateMedia(ref: string, source?: MediaSource): void {
+  const url = privateMediaUrl(ref, source);
+  if (!ref.startsWith('/objects/') && !ref.startsWith('/api/storage/objects/')) return;
+  privateMediaFailures.delete(url);
+  loadPrivateMedia(url);
+}
+
 function loadPrivateMedia(url: string) {
   if (privateMediaCache.has(url) || privateMediaPending.has(url)) return;
   if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
@@ -79,6 +88,7 @@ function loadPrivateMedia(url: string) {
     })
     .catch(error => {
       privateMediaFailures.set(url, Date.now());
+      privateMediaListeners.forEach(notify => notify());
       console.warn('No se pudo mostrar un archivo privado de ECHO.', error);
     })
     .finally(() => privateMediaPending.delete(url));
