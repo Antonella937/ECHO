@@ -243,7 +243,7 @@ export default function CreatorHubPage() {
           .toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 30);
         const candidate = /^[a-z0-9._]{3,30}$/.test(base) ? base : 'creator';
         const suffix = user.id.replace(/[^a-z0-9]/gi, '').slice(-8).toLowerCase();
-        const candidates = [candidate, (candidate.slice(0, 21) + '_' + suffix).slice(0, 30)];
+        const candidates = [...new Set([candidate, (candidate.slice(0, 21) + '_' + suffix).slice(0, 30), ('creator_' + suffix).slice(0, 30)])];
         for (const next of candidates) {
           try {
             const registered = await customFetch<{ profile: { username: string; visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } }>('/api/creator-hub/social/me', {
