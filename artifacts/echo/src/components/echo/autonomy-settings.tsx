@@ -1,5 +1,6 @@
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from "react";
+import { useEffect } from "react";
 import { useUser } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -36,6 +37,11 @@ export function AutonomySettingsSection() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [updatingControl, setUpdatingControl] = useState<string | null>(null);
   const settings = query.data;
+  const [dmDrafts, setDmDrafts] = useState<Record<string, { dmFrequency: "rarely" | "sometimes" | "frequently"; dmMediaPreference: "text" | "mixed" | "voice"; dmInstructions: string }>>({});
+  useEffect(() => {
+    if (!query.data) return;
+    setDmDrafts(Object.fromEntries(query.data.characters.map((character) => [character.characterId, { dmFrequency: character.dmFrequency, dmMediaPreference: character.dmMediaPreference, dmInstructions: character.dmInstructions }])));
+  }, [query.data]);
   const updateCache = (next: NonNullable<typeof settings>) => {
     client.setQueryData(getGetAutonomySettingsQueryKey({ universeId: next.universeId }), next);
   };
@@ -55,6 +61,17 @@ export function AutonomySettingsSection() {
         onSettled: () => setUpdatingControl(null),
       },
     );
+  };
+
+  const saveDmPreferences = (characterId: string) => {
+    const dmPreferences = dmDrafts[characterId];
+    if (!dmPreferences) return;
+    setUpdatingControl(`prefs:${characterId}`);
+    update.mutate({ data: { characterId, dmPreferences, universeId } }, {
+      onSuccess: updateCache,
+      onError: () => toast({ title: t("No se pudieron guardar las preferencias de mensajes"), variant: "destructive" }),
+      onSettled: () => setUpdatingControl(null),
+    });
   };
 
   const runPreview = (characterId: string) => {
@@ -145,18 +162,61 @@ export function AutonomySettingsSection() {
           <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden responder mensajes privados automáticamente. Este permiso es independiente de la actividad social.")}</p>
         </div>
         {settings?.characters.map((character) => (
-          <div key={`dm-${character.characterId}`} className="flex items-center gap-3 p-4">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold">{character.displayName}</div>
-              <div className="mt-1 text-xs text-muted-foreground">@{character.username}</div>
+          <div key={`dm-${character.characterId}`} className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{character.displayName}</div>
+                <div className="mt-1 text-xs text-muted-foreground">@{character.username}</div>
+              </div>
+              <Switch
+                checked={character.dmEnabled}
+                disabled={update.isPending && updatingControl === `dm:${character.characterId}`}
+                onCheckedChange={(enabled) => setCharacter(character.characterId, enabled, "dm")}
+                aria-label={`${t("Mensajes autónomos para")} ${character.displayName}`}
+                data-testid={`switch-autonomy-dm-${character.characterId}`}
+              />
             </div>
-            <Switch
-              checked={character.dmEnabled}
-              disabled={update.isPending && updatingControl === `dm:${character.characterId}`}
-              onCheckedChange={(enabled) => setCharacter(character.characterId, enabled, "dm")}
-              aria-label={`${t("Mensajes autónomos para")} ${character.displayName}`}
-              data-testid={`switch-autonomy-dm-${character.characterId}`}
-            />
+            {character.dmEnabled && dmDrafts[character.characterId] && (
+              <div className="mt-3 space-y-3">
+                <label className="block text-xs font-medium">
+                  {t("Frecuencia de mensajes")}
+                  <select
+                    className="mt-1 block w-full rounded-lg border border-border bg-background p-2 text-sm"
+                    value={dmDrafts[character.characterId].dmFrequency}
+                    onChange={(event) => setDmDrafts((old) => ({ ...old, [character.characterId]: { ...old[character.characterId], dmFrequency: event.target.value as "rarely" | "sometimes" | "frequently" } }))}
+                  >
+                    <option value="rarely">{t("Rara vez")}</option>
+                    <option value="sometimes">{t("A veces")}</option>
+                    <option value="frequently">{t("Frecuentemente")}</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-medium">
+                  {t("Tipo de mensajes preferido")}
+                  <select
+                    className="mt-1 block w-full rounded-lg border border-border bg-background p-2 text-sm"
+                    value={dmDrafts[character.characterId].dmMediaPreference}
+                    onChange={(event) => setDmDrafts((old) => ({ ...old, [character.characterId]: { ...old[character.characterId], dmMediaPreference: event.target.value as "text" | "mixed" | "voice" } }))}
+                  >
+                    <option value="text">{t("Solo texto")}</option>
+                    <option value="mixed">{t("Texto y ocasionalmente fotos o audios")}</option>
+                    <option value="voice">{t("Texto y ocasionalmente audios")}</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-medium">
+                  {t("Indicaciones para la IA")}
+                  <textarea
+                    className="mt-1 block w-full rounded-lg border border-border bg-background p-2 text-sm"
+                    rows={3}
+                    maxLength={600}
+                    placeholder={t("Ej.: escribime espontáneamente, sin horarios fijos y con mensajes cortos.")}
+                    value={dmDrafts[character.characterId].dmInstructions}
+                    onChange={(event) => setDmDrafts((old) => ({ ...old, [character.characterId]: { ...old[character.characterId], dmInstructions: event.target.value } }))}
+                  />
+                </label>
+                <p className="text-xs text-muted-foreground">{t("Las preferencias de fotos y audios se guardan, pero el envío autónomo de multimedia aún no está disponible.")}</p>
+                <button type="button" className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50" disabled={update.isPending} onClick={() => saveDmPreferences(character.characterId)}>{t("Guardar preferencias")}</button>
+              </div>
+            )}
           </div>
         ))}
       </div>
