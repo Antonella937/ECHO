@@ -174,6 +174,32 @@ export default function CreatorHubPage() {
     } catch { setError('No pudimos guardar el usuario. Intentá nuevamente.'); }
     finally { setSaving(false); }
   }
+  // Social account preferences are stored server-side; Clerk metadata remains the
+  // source for the existing visual profile until explicit profile synchronization.
+  const [socialProfile, setSocialProfile] = useState<{ visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null>(null);
+  const [socialSaving, setSocialSaving] = useState(false);
+  const [socialReady, setSocialReady] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    void customFetch<{ profile: { visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null }>('/api/creator-hub/social/me', { responseType: 'json' })
+      .then(data => { if (active) { setSocialProfile(data.profile); setSocialReady(true); } })
+      .catch(() => { if (active) setSocialReady(false); });
+    return () => { active = false; };
+  }, [user?.id]);
+  async function saveSocialPreferences(visibility: 'private' | 'public', messagePrivacy: 'everyone' | 'requests' | 'nobody') {
+    if (!user || socialSaving) return;
+    setSocialSaving(true); setProfileError('');
+    try {
+      const result = await customFetch<{ profile: { visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } }>('/api/creator-hub/social/me', {
+        method: 'PUT', responseType: 'json',
+        body: JSON.stringify({ displayName: alias, username, visibility, messagePrivacy, bio: savedBio }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      setSocialProfile(result.profile);
+    } catch { setProfileError('No pudimos guardar la privacidad. Revisá que tu @usuario esté disponible y volvé a intentar.'); }
+    finally { setSocialSaving(false); }
+  }
   const nameParts = alias.split(/\s+/).filter(Boolean);
   const initials = nameParts.length > 1
     ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
@@ -204,12 +230,28 @@ export default function CreatorHubPage() {
                 {founderVerified && <p className="mt-1 text-xs font-semibold text-primary">CEO &amp; Founder of ECHO</p>}
                 {editing ? <div className="mt-2 space-y-2"><div className="flex items-center gap-2"><span className="text-muted-foreground">@</span><input aria-label="Nuevo nombre de usuario" value={draft} maxLength={30} onChange={e => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" aria-label="Guardar usuario" disabled={saving} onClick={() => void saveUsername()} className="rounded-full p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" aria-label="Cancelar edición" onClick={() => {setEditing(false);setError('');}} className="rounded-full p-2"><X size={18}/></button></div>{error && <p role="alert" className="text-xs text-destructive">{error}</p>}<p className="text-xs text-muted-foreground">Este alias es independiente de tu email de inicio de sesión.</p></div> : <div className="mt-1 flex items-center gap-2"><p className="truncate text-sm text-muted-foreground">@{username}</p><button type="button" aria-label="Editar nombre de usuario" title="Editar nombre de usuario" onClick={() => {setDraft(username);setError('');setEditing(true);}} className="rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
               </div>
-              <span className="hidden shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground sm:inline-flex">Perfil privado</span>
+              <span className="hidden shrink-0 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground sm:inline-flex">{socialProfile?.visibility === "public" ? "Perfil público" : "Perfil privado"}</span>
             </div>
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
             {editingBio ? <div className="space-y-2"><div className="flex items-center gap-2" role="toolbar" aria-label="Formato de biografía"><button type="button" onClick={() => formatBio('**', '**')} aria-label="Negrita" title="Negrita" className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold">B</button><button type="button" onClick={() => formatBio('*', '*')} aria-label="Cursiva" title="Cursiva" className="rounded-lg border border-border px-3 py-1.5 text-sm italic">I</button><button type="button" onClick={() => formatBio('__', '__')} aria-label="Subrayado" title="Subrayado" className="rounded-lg border border-border px-3 py-1.5 text-sm underline">U</button></div><textarea ref={bioInputRef} aria-label="Biografía de Creator Hub" value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder="Contá algo sobre vos…" className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 caracteres</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">Cancelar</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{savingBio ? 'Guardando…' : 'Guardar biografía'}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 max-w-fit whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{renderBio(bio)}</p><button type="button" aria-label="Editar biografía" title="Editar biografía" onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
             <div className="space-y-2">
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label="Enlace externo de Creator Hub" type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label="Guardar enlace" className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label="Cancelar enlace" className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline underline-offset-4 hover:text-foreground">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>Enlace externo opcional</span>}<button type="button" aria-label="Editar enlace externo" onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
+            </div>
+            <div className="rounded-2xl border border-border p-4 space-y-4">
+              <h3 className="font-semibold">Privacidad de Creator Hub</h3>
+              {!socialReady ? <p className="text-sm text-muted-foreground">Los ajustes sociales estarán disponibles cuando se habilite el servidor de Creator Hub.</p> : <>
+                <label className="block space-y-2 text-sm"><span>Visibilidad del perfil</span>
+                  <select aria-label="Visibilidad del perfil" disabled={socialSaving} value={socialProfile?.visibility ?? 'private'} onChange={e => void saveSocialPreferences(e.target.value as 'private' | 'public', socialProfile?.messagePrivacy ?? 'requests')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
+                    <option value="private">Privado · aprobar seguidores</option><option value="public">Público · cualquiera puede seguirte</option>
+                  </select>
+                </label>
+                <label className="block space-y-2 text-sm"><span>Quién puede enviarte mensajes</span>
+                  <select aria-label="Privacidad de mensajes" disabled={socialSaving} value={socialProfile?.messagePrivacy ?? 'requests'} onChange={e => void saveSocialPreferences(socialProfile?.visibility ?? 'private', e.target.value as 'everyone' | 'requests' | 'nobody')} className="w-full rounded-lg border border-border bg-background px-3 py-2">
+                    <option value="everyone">Todos</option><option value="requests">Solicitudes · revisar antes de aceptar</option><option value="nobody">Nadie puede iniciar un chat</option>
+                  </select>
+                </label>
+                <p className="text-xs text-muted-foreground">La privacidad de mensajes es independiente de la visibilidad del perfil. Los mensajes estarán disponibles cuando se habilite su sistema de moderación.</p>
+              </>}
             </div>
             <div className="border-t border-border pt-5">
               <div className="grid grid-cols-2 gap-3">
