@@ -1,3 +1,4 @@
+import { useDiscoveryText } from '@/lib/discovery-translations';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
 import { Archive, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
@@ -19,6 +20,7 @@ import { canViewStory, isStoryActive } from '@/domain/social-features';
 import { accountTypes, shownCount, formatCount } from '@/domain/accounts';
 
 export default function ProfilePage() {
+  const t = useDiscoveryText();
   const { id } = useParams<{ id: string }>();
   const { state, me, character, actions } = useSocial();
   const [, navigate] = useLocation();
@@ -38,8 +40,8 @@ export default function ProfilePage() {
   if (!person)
     return (
       <div>
-        <TopBar title="Perfil" onBack={back} />
-        <EmptyState title="Este perfil no existe" body="Puede que la cuenta ya no exista en tu universo." />
+        <TopBar title={t("Perfil")} onBack={back} />
+        <EmptyState title={t("Este perfil no existe")} body={t("Puede que la cuenta ya no exista en tu universo.")} />
       </div>
     );
 
@@ -59,10 +61,10 @@ export default function ProfilePage() {
         right={
           isMe && (
             <>
-              <Link href="/saved" aria-label="Guardados" className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="link-profile-saved">
+              <Link href="/saved" aria-label={t("Guardados")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="link-profile-saved">
                 <Bookmark className="h-[22px] w-[22px]" strokeWidth={1.6} />
               </Link>
-              <Link href="/settings" aria-label="Ajustes" className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="link-profile-settings">
+              <Link href="/settings" aria-label={t("Ajustes")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="link-profile-settings">
                 <Settings className="h-[22px] w-[22px]" strokeWidth={1.6} />
               </Link>
             </>
@@ -75,16 +77,16 @@ export default function ProfilePage() {
           <button
             onClick={() => (stories.length ? openStories(person.id, true) : undefined)}
             className="tap shrink-0 rounded-full"
-            aria-label={stories.length ? `Ver historias de ${person.name}` : person.name}
+            aria-label={stories.length ? `${t("Ver historias de")} ${person.name}` : person.name}
             disabled={!stories.length}
             data-testid="button-profile-avatar"
           >
             <CharacterAvatar character={person} size={88} ring={stories.length ? (stories.some(s => s.closeFriendsOnly) ? 'close-friends' : (unseen ? 'unseen' : 'seen')) : 'none'} />
           </button>
           <dl className="grid flex-1 grid-cols-3 text-center">
-            <Stat value={posts.length} label={posts.length === 1 ? "publicación" : "publicaciones"} testId="text-count-posts" />
-            <Stat value={followers} label="seguidores" testId="text-count-followers" />
-            <Stat value={following} label="seguidos" testId="text-count-following" />
+            <Stat value={posts.length} label={t(posts.length === 1 ? "publicación" : "publicaciones")} testId="text-count-posts" />
+            <Stat value={followers} label={t("seguidores")} testId="text-count-followers" />
+            <Stat value={following} label={t("seguidos")} testId="text-count-following" />
           </dl>
         </div>
 
@@ -93,7 +95,7 @@ export default function ProfilePage() {
           <p className="text-sm text-muted-foreground">@{person.handle} · {person.occupation || accountTypes[person.accountType ?? 'personal']}</p>
           {person.archived && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground" data-testid="status-profile-archived">
-              <Archive className="h-3.5 w-3.5" /> Cuenta archivada · historial conservado
+              <Archive className="h-3.5 w-3.5" /> {t("Cuenta archivada · historial conservado")}
             </p>
           )}
           <p className="mt-2 max-w-[440px] text-[14.5px] leading-relaxed text-foreground/90" data-testid="text-profile-bio">{person.bio}</p>
@@ -105,13 +107,13 @@ export default function ProfilePage() {
         {isMe ? (
           <div className="mt-5 grid grid-cols-2 gap-2">
             <Link href="/create" className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground" data-testid="link-profile-create">
-              <PlusSquare className="h-4 w-4" strokeWidth={2} /> Nueva publicación
+              <PlusSquare className="h-4 w-4" strokeWidth={2} /> {t("Nueva publicación")}
             </Link>
             <button onClick={() => setEditing(true)} className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold" data-testid="button-profile-edit">
-              <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Editar perfil
+              <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Editar perfil")}
             </button>
             <Link href="/settings" className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-identity">
-              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Cambiar identidad
+              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Cambiar identidad")}
             </Link>
             <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character-me">
               Ficha de personaje
@@ -124,21 +126,21 @@ export default function ProfilePage() {
               className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
               data-testid="button-profile-message"
             >
-              <MessageCircle className="h-4 w-4 shrink-0" strokeWidth={2} /> Mensaje
+              <MessageCircle className="h-4 w-4 shrink-0" strokeWidth={2} /> {t("Mensaje")}
             </button>
             <button
               disabled={person.archived}
               onClick={() => {
                 actions.switchIdentity(person.id);
-                toast({ title: `Ahora publicas como ${person.name}` });
+                toast({ title: `${t("Ahora publicas como")} ${person.name}` });
               }}
               className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50"
               data-testid="button-profile-become"
             >
-              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {person.archived ? 'Restaura para usar' : 'Usar este perfil'}
+              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t(person.archived ? 'Restaura para usar' : 'Usar este perfil')}
             </button>
             <button onClick={() => setEditing(true)} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="button-profile-edit">
-              <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> Editar perfil
+              <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Editar perfil")}
             </button>
             <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character">
               Ficha de personaje
@@ -170,20 +172,20 @@ export default function ProfilePage() {
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={cn('-mt-px flex h-12 items-center gap-2 border-t px-6 text-[11px] font-semibold uppercase tracking-[0.18em]', tab === k ? 'border-foreground' : 'border-transparent text-muted-foreground')}
             data-testid={`tab-profile-${k}`}>
-            <Icon className="h-4 w-4" strokeWidth={1.8} /> {label}
+            <Icon className="h-4 w-4" strokeWidth={1.8} /> {t(label)}
           </button>
         ))}
       </div>
 
       {tab === 'tagged' ? (
         tagged.length === 0
-          ? <EmptyState title={isMe ? 'Nadie te etiquetó todavía' : 'Sin etiquetas'} body="Las publicaciones donde aparezca esta cuenta se verán aquí." />
+          ? <EmptyState title={isMe ? t("Nadie te etiquetó todavía") : t("Sin etiquetas")} body={t("Las publicaciones donde aparezca esta cuenta se verán aquí.")} />
           : <PhotoGrid posts={tagged} />
       ) : posts.length === 0 ? (
         <EmptyState
-          title={isMe ? 'Tu cuadrícula está en blanco' : 'Aún no ha publicado'}
-          body={isMe ? 'La primera foto siempre cuesta. Después ya no.' : `${person.name.split(' ')[0]} todavía no ha compartido nada.`}
-          action={isMe && <Link href="/create" className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground" data-testid="link-profile-empty-create">Publicar</Link>}
+          title={isMe ? t("Tu cuadrícula está en blanco") : t("Aún no ha publicado")}
+          body={isMe ? t('La primera foto siempre cuesta. Después ya no.') : `${person.name.split(' ')[0]} ${t('todavía no ha compartido nada.')}`}
+          action={isMe && <Link href="/create" className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground" data-testid="link-profile-empty-create">{t("Publicar")}</Link>}
         />
       ) : (
         <PhotoGrid posts={posts} showPinned />
