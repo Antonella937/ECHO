@@ -217,10 +217,6 @@ export function chooseAutonomyOpportunity(input: {
       localHour: local.hour, timezone };
   }
 
-  if (input.lane === "dm") {
-    return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "No eligible unanswered direct message.", localHour: local.hour, timezone };
-  }
-
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
   if (latestActivity > 0 && now.getTime() - latestActivity < cooldownMs) {
     return { situation: null, reasonCode: "COOLDOWN", reason: "Minimum cooldown has not elapsed.", localHour: local.hour, timezone };
@@ -301,7 +297,7 @@ export function chooseAutonomyOpportunity(input: {
   const weights = [
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency) }] : []),
     ...(comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
-    ...(recipients.length && dmCount < 1
+    ...(input.lane === "dm" && recipients.length && dmCount < 1
       ? [{ situation: "dm" as const, weight: frequencyWeight(social?.initiatesDMs) }]
       : []),
     ...(targetPost && actionCount("like_post") < 3
@@ -312,7 +308,7 @@ export function chooseAutonomyOpportunity(input: {
       ? [{ situation: "story_reaction" as const, weight: frequencyWeight(social?.storiesFrequency) }] : []),
     ...(targetMessage && actionCount("dm_reaction") < 2
       ? [{ situation: "dm_reaction" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
-  ];
+  ].filter((item) => input.lane === "dm" ? item.situation === "dm" : item.situation !== "dm");
   if (weights.length === 0) {
     return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "No text action is currently eligible under the anti-repetition caps.", localHour: local.hour, timezone };
   }
