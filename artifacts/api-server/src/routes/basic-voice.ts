@@ -64,6 +64,56 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
 });
 
 
+/** On-demand listening: synthesize only the saved character's own DM text. */
+router.post("/voices/basic/listen", requireAuth, async (req, res) => {
+  const { universeId = "primary", characterId, messageId } = req.body ?? {};
+  if ([universeId, characterId, messageId].some(v => typeof v !== "string" || !v || v.length > 128)) {
+    res.status(400).json({ error: "INVALID_LISTEN_REQUEST" }); return;
+  }
+  try {
+    const snapshot = await readUniverse(req.userId!, universeId);
+    const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+    if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
+    const character = parsed.data.characters.find(c => c.id === characterId && !c.archived);
+    const voiceId = character?.configuration?.voice?.basicVoiceId ?? "";
+    const voice = voices[voiceId];
+    if (!voice) { res.status(409).json({ error: "CHARACTER_VOICE_NOT_SELECTED" }); return; }
+    const message = parsed.data.messages.find(m => m.id === messageId && m.senderId === characterId &&
+      !m.hiddenForIds?.includes(req.userId!) && !m.hiddenForIds?.includes(characterId));
+    if (!message) { res.status(404).json({ error: "MESSAGE_NOT_FOUND" }); return; }
+    const text = message.text.replace(/\\[Transcripción de nota de voz\\]:/g, "").trim();
+    if (!text || text.length > 500) { res.status(422).json({ error: "MESSAGE_NOT_SPEAKABLE" }); return; }
+    const endpoint = process.env.ECHO_KOKORO_TTS_URL;
+    if (!endpoint) { res.status(503).json({ error: "VOICE_ENGINE_NOT_CONFIGURED" }); return; }
+    const url = new URL(endpoint);
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+      res.status(503).json({ error: "VOICE_ENGINE_INVALID_CONFIGURATION" }); return;
+    }
+    const now = Date.now();
+    const recent = (recentRequests.get(req.userId!) ?? []).filter(time => now - time < 60_000);
+    if (recent.length >= 5) { res.status(429).json({ error: "VOICE_RATE_LIMITED" }); return; }
+    recent.push(now); recentRequests.set(req.userId!, recent);
+    const response = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json",
+        ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
+      body: JSON.stringify({ model: "kokoro", input: text, voice, response_format: "wav" }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!response.ok) { res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
+      data.toString("ascii", 8, 12) !== "WAVE") {
+      res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
+    }
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.send(data);
+  } catch (error) {
+    req.log.warn({ err: error instanceof Error ? error.name : "unknown" }, "Voice listening unavailable");
+    res.status(503).json({ error: "VOICE_LISTEN_UNAVAILABLE" });
+  }
+});
+
 /** Attach a privately uploaded WAV to the existing character-authored DM.
  * The message text remains untouched and is the canonical conversational memory.
  */
