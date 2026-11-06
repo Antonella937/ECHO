@@ -205,3 +205,16 @@
   .echo-public .epc-back-row { padding-bottom: 24px; }
   .echo-public [data-testid="private-share-cards"] { margin-top: 10px; }
 }
+
+/* Refinements requested after testing on phone and desktop. */
+.echo-public .epc-universe-cover { border-radius: 20px; margin-bottom: 26px; isolation: isolate; }
+.echo-public .epc-universe-cover > * { border-radius: inherit; overflow: hidden; }
+.echo-public .epc-universe-cover [data-testid="universe-cover-fallback"] { border-radius: inherit; }
+.echo-public .epc-universe-cover + .epc-overline { display: block; margin-top: 8px; }
+.echo-public .epc-share-cover, .echo-public .epc-share-cover > * { border-radius: 15px; }
+.echo-public .epc-back-row { margin-top: 24px; padding-top: 8px; }
+.echo-public [data-testid="private-share-cards"] + .epc-back-row { margin-top: 30px; }
+@media (max-width: 760px) {
+ .echo-public .epc-universe-cover { margin-bottom: 24px; }
+ .echo-public .epc-back-row { margin-top: 30px; padding-top: 10px; }
+}
