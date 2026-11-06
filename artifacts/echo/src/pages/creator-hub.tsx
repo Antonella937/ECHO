@@ -25,12 +25,14 @@ export default function CreatorHubPage() {
   const [publicationComposer,setPublicationComposer] = useState(false);
   const [publicationBusy,setPublicationBusy] = useState(false);
   const [publicationError,setPublicationError] = useState('');
+  const [publicationLoadError,setPublicationLoadError] = useState(false);
   const [publicationFilter,setPublicationFilter] = useState<'all'|Publication['kind']>('all');
   async function refreshPublications() {
     try {
       const result=await customFetch<{publications:Publication[]}>('/api/creator-hub/social/publications/me',{responseType:'json'});
       setPublications(result.publications);
-    } catch { setPublicationError('No pudimos cargar las publicaciones.'); }
+      setPublicationLoadError(false);
+    } catch { setPublicationLoadError(true); }
   }
   async function publishCreatorContent() {
     if (!publicationTitle.trim() || publicationBusy) return;
@@ -501,10 +503,11 @@ export default function CreatorHubPage() {
                 <div className="flex justify-end gap-2"><button type="button" onClick={()=>setPublicationComposer(false)} className="rounded-full border border-border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={publicationBusy||!publicationTitle.trim()} onClick={()=>void publishCreatorContent()} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{publicationBusy?'Publicando…':'Publicar'}</button></div>
               </div>}
               {publicationError && <p role="alert" className="text-sm text-destructive">{publicationError}</p>}
+              {publicationLoadError && <button type="button" onClick={()=>void refreshPublications()} className="text-xs text-muted-foreground underline underline-offset-4">No se pudo actualizar el contenido. Reintentar</button>}
               {publications.some(item=>item.pinned)&&<div className="space-y-2"><h3 className="font-semibold text-primary">📌 Destacados</h3><div className="grid grid-cols-3 gap-2">{publications.filter(item=>item.pinned).slice(0,3).map(item=><div key={item.id} className="min-w-0 rounded-xl border border-border bg-secondary/40 p-3"><p className="text-xs text-primary">{item.kind==='character'?'Personaje':item.kind==='world'?'Mundo':item.kind==='update'?'Actualización':'Publicación'}</p><p className="mt-1 break-words text-sm font-medium">{item.title}</p></div>)}</div></div>}
               <div className="flex flex-wrap gap-2">{([{id:'all',label:'Todo'},{id:'update',label:'Actualizaciones'},{id:'character',label:'Personajes'},{id:'world',label:'Mundos'},{id:'post',label:'Publicaciones'}] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationFilter(option.id)} className={`rounded-full px-3 py-2 text-xs ${publicationFilter===option.id?'bg-primary text-primary-foreground':'bg-secondary text-muted-foreground'}`}>{option.label}</button>)}</div>
               {publications.filter(item=>publicationFilter==='all'||item.kind===publicationFilter).map(item=><article key={item.id} className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-primary">{item.kind==='character'?'♙ Personaje':item.kind==='world'?'⬡ Mundo':item.kind==='update'?'📣 Actualización de ECHO':'Publicación'} {item.pinned?'· 📌':''}</span><span className="text-xs text-muted-foreground">{item.visibility==='public'?'Público':item.visibility==='followers'?'Seguidores':'Solo yo'}</span></div><h3 className="text-lg font-semibold">{item.title}</h3>{item.body&&<p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{item.body}</p>}<p className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('es-AR')}</p></article>)}
-              {publications.length===0&&<div className="rounded-2xl border border-dashed border-border px-5 py-10 text-center"><p className="font-semibold">Tu historia empieza acá</p><p className="mt-2 text-sm text-muted-foreground">Publicá un personaje, un mundo o una actualización de ECHO.</p></div>}
+              {publications.length===0&&!publicationLoadError&&<div className="rounded-2xl border border-dashed border-border px-5 py-10 text-center"><p className="font-semibold">Tu historia empieza acá</p><p className="mt-2 text-sm text-muted-foreground">Publicá un personaje, un mundo o una actualización de ECHO.</p></div>}
             </section>
 
             <div className="border-t border-border pt-5">
