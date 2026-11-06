@@ -23,6 +23,7 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [contextResult, setContextResult] = useState<Record<string, string>>({});
   if (targetId === 'owner') return null;
   const url = `/api/universe/relationships/trust/candidates?${new URLSearchParams({ universeId, actorId, targetId })}`;
   async function load() {
@@ -56,6 +57,18 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
       setError('No se pudo aprobar. Puede haber cambios pendientes de sincronización. Sincronizá y volvé a consultar.');
     } finally { setBusy(false); }
   }
+  async function analyze(item: Candidate) {
+    setBusy(true);
+    try {
+      const result = await customFetch<{ status: string; kind: string | null; rationale: string }>(
+        '/api/universe/relationships/trust/context?' + new URLSearchParams({ universeId }), {
+          method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actorId, targetId, sourceId: item.sourceId }),
+        });
+      setContextResult(old => ({ ...old, [item.sourceId]: (result.status === 'insufficient_evidence' ? 'Evidencia insuficiente' : 'Posible ' + (labels[result.kind ?? ''] ?? 'acontecimiento')) + ': ' + result.rationale }));
+    } catch { setError('El análisis con IA no está disponible ahora.'); }
+    finally { setBusy(false); }
+  }
   return <section className="mt-4 rounded-xl border border-border p-3" aria-label="Revisión de confianza">
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-semibold">Acontecimientos de confianza</p>
@@ -69,6 +82,8 @@ export function TrustReview({ actorId, targetId }: { actorId: string; targetId: 
         <p className="text-xs font-semibold">{labels[item.kind] ?? item.kind}</p>
         <p className="mt-1 whitespace-pre-wrap break-words text-xs">{item.excerpt}</p>
         <p className="mt-1 text-xs text-muted-foreground">Sugerencia sin verificar</p>
+        {contextResult[item.sourceId] && <p className="mt-2 text-xs">{contextResult[item.sourceId]}</p>}
+        <button type="button" disabled={busy} onClick={() => void analyze(item)} className="mt-2 mr-2 rounded-lg border border-border px-3 py-2 text-xs">Analizar contexto con IA</button>
         <button type="button" disabled={busy} onClick={() => void approve(item)} className="mt-2 rounded-lg border border-primary px-3 py-2 text-xs text-primary disabled:opacity-50">Confirmar acontecimiento</button>
       </li>)}
     </ul> : <p className="mt-3 text-xs text-muted-foreground">No hay sugerencias pendientes para este vínculo.</p>)}
