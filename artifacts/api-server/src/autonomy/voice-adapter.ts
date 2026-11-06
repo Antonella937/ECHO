@@ -25,6 +25,27 @@ export async function getVoiceOwnerControls(ownerId: string) {
     preference: row.preference };
 }
 
+/** Reserve a one-off narration against the same persistent owner budget. */
+export async function reserveVoiceNarration(ownerId: string, characterId: string, text: string): Promise<string | null> {
+  if (!await canUseBasicVoices(ownerId) || !text.trim() || text.length > 500) return null;
+  return db.transaction(async tx => {
+    const [budget] = await tx.select().from(echoVoiceBudgetsTable).where(eq(echoVoiceBudgetsTable.ownerId, ownerId)).for("update").limit(1);
+    if (!budget?.enabled || budget.maxDailyMessages <= 0) return null;
+    const [monthly] = await tx.select({ total: sql<number>`coalesce(sum(${echoVoiceUsageTable.characters}),0)` }).from(echoVoiceUsageTable)
+      .where(and(eq(echoVoiceUsageTable.ownerId, ownerId), eq(echoVoiceUsageTable.monthKey, month())));
+    const [daily] = await tx.select({ total: sql<number>`count(*)` }).from(echoVoiceUsageTable)
+      .where(and(eq(echoVoiceUsageTable.ownerId, ownerId), gte(echoVoiceUsageTable.createdAt, new Date(Date.now() - 86400000))));
+    if (Number(monthly?.total ?? 0) + text.length > budget.monthlyCharacterLimit || Number(daily?.total ?? 0) >= budget.maxDailyMessages) return null;
+    const id = randomUUID();
+    await tx.insert(echoVoiceUsageTable).values({ ownerId, messageId: id, monthKey: month(), characterId, characters: text.length, status: "reserved" });
+    return id;
+  });
+}
+export async function completeVoiceNarration(ownerId: string, id: string, succeeded: boolean) {
+  await db.update(echoVoiceUsageTable).set({ status: succeeded ? "succeeded" : "failed" })
+    .where(and(eq(echoVoiceUsageTable.ownerId, ownerId), eq(echoVoiceUsageTable.messageId, id)));
+}
+
 /** Atomic reservation before any provider request; failed jobs retain their reservation to avoid retry charges. */
 export async function dispatchAutonomousVoice(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }) {
   if (!await canUseBasicVoices(input.ownerId)) return;
