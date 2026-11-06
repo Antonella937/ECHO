@@ -13,3 +13,5 @@ export * from "./echo-memory-archive";
 export * from "./echo-relationship-ledger";
 
 export * from "./echo-voice-budget";
+
+export * from "./echo-subscriptions";
