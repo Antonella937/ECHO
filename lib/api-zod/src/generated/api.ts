@@ -365,6 +365,9 @@ export const GetAutonomySettingsResponse = zod.object({
   "username": zod.string(),
   "enabled": zod.boolean(),
   "dmEnabled": zod.boolean(),
+  "dmFrequency": zod.enum(["rarely", "sometimes", "frequently"]),
+  "dmMediaPreference": zod.enum(["text", "mixed", "voice"]),
+  "dmInstructions": zod.string(),
   "maxActionsPerDay": zod.number().int().min(1).max(getAutonomySettingsResponseCharactersItemMaxActionsPerDayMax),
   "minCooldownMinutes": zod.number().int().min(getAutonomySettingsResponseCharactersItemMinCooldownMinutesMin).max(getAutonomySettingsResponseCharactersItemMinCooldownMinutesMax)
 }))
@@ -392,6 +395,14 @@ export const UpdateAutonomySettingsBody = zod.union([zod.object({
   "enabled": zod.boolean(),
   "lane": zod.enum(["social", "dm"]).optional(),
   "universeId": zod.string().min(1).max(updateAutonomySettingsBodyTwoUniverseIdMax).default(updateAutonomySettingsBodyTwoUniverseIdDefault)
+}),zod.object({
+  "characterId": zod.string().min(1).max(120),
+  "dmPreferences": zod.object({
+    "dmFrequency": zod.enum(["rarely", "sometimes", "frequently"]),
+    "dmMediaPreference": zod.enum(["text", "mixed", "voice"]),
+    "dmInstructions": zod.string().max(600)
+  }),
+  "universeId": zod.string().min(1).max(120).default("primary")
 })])
 
 export const updateAutonomySettingsResponseUniverseIdMax = 120;
@@ -413,6 +424,9 @@ export const UpdateAutonomySettingsResponse = zod.object({
   "username": zod.string(),
   "enabled": zod.boolean(),
   "dmEnabled": zod.boolean(),
+  "dmFrequency": zod.enum(["rarely", "sometimes", "frequently"]),
+  "dmMediaPreference": zod.enum(["text", "mixed", "voice"]),
+  "dmInstructions": zod.string(),
   "maxActionsPerDay": zod.number().int().min(1).max(updateAutonomySettingsResponseCharactersItemMaxActionsPerDayMax),
   "minCooldownMinutes": zod.number().int().min(updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMin).max(updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMax)
 }))
