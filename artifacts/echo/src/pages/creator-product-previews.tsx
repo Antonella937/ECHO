@@ -288,20 +288,21 @@ export function CreatorUniversePreview() {
 }
 
 export function CreatorStorePreview() {
+  const t = useCreatorPreviewText();
   return (
     <PreviewShell>
       <PreviewHeading
-        eyebrow="Creator · más espacio"
-        title="Más lugar para"
-        accent="seguir creando."
-        description="Creator es el espacio para los perfiles. La capacidad depende de Free, Plus o Premium."
+        eyebrow={t("Creator · más espacio")}
+        title={t("Más lugar para")}
+        accent={t("seguir creando.")}
+        description={t("Creator es el espacio para los perfiles. La capacidad depende de Free, Plus o Premium.")}
       />
-      <PreviewNotice>Vista ilustrativa. Los perfiles Creator están disponibles en todos los planes; Plus y Premium amplían la capacidad de membresía.</PreviewNotice>
-      <section className="epc-store-layout" aria-label="Opciones ilustrativas de Creator">
+      <PreviewNotice>{t("Vista ilustrativa. Los perfiles Creator están disponibles en todos los planes; Plus y Premium amplían la capacidad de membresía.")}</PreviewNotice>
+      <section className="epc-store-layout" aria-label={t("Opciones ilustrativas de Creator")}>
         <article className="epc-creator-card">
-          <span className="epc-price-tag">MÁS CAPACIDAD</span>
+          <span className="epc-price-tag">{t("MÁS CAPACIDAD")}</span>
           <h2>Creator Hub</h2>
-          <p>Un espacio ampliado para desarrollar más universos y personajes, a medida que tus ideas crecen.</p>
+          <p>{t("Un espacio ampliado para desarrollar más universos y personajes, a medida que tus ideas crecen.")}</p>
           <div className="epc-creator-visual" aria-hidden="true">
             <div className="epc-creator-orbit epc-creator-orbit-a" /><div className="epc-creator-orbit epc-creator-orbit-b" />
             <span>e</span>
@@ -310,14 +311,14 @@ export function CreatorStorePreview() {
           <Link href="/creator-preview/pricing" className="ep-button epc-wide-link">Ver planes de ejemplo <ArrowRight size={15} /></Link>
         </article>
         <div className="epc-store-side">
-          <div className="epc-extras-head"><span className="ep-eyebrow">Extras por separado</span><p>Capacidad adicional, presentada de forma independiente.</p></div>
-          <article className="epc-extra-row"><span className="epc-extra-icon"><UsersRound size={18} /></span><div><h3>+1 personaje</h3><p>Un espacio adicional para un personaje.</p></div><span className="epc-extra-mark">EXTRA</span></article>
-          <article className="epc-extra-row"><span className="epc-extra-icon lilac"><Sparkles size={18} /></span><div><h3>+1 universo</h3><p>Un universo adicional para otra idea.</p></div><span className="epc-extra-mark">EXTRA</span></article>
-          <section className="epc-coming-panel" aria-label="Funciones futuras">
-            <span className="ep-overline">EN CAMINO</span>
-            <div className="epc-coming-item"><AudioLines size={16} /><strong>Voice</strong><span>Coming Soon</span></div>
-            <div className="epc-coming-item"><Video size={16} /><strong>Video</strong><span>Coming Soon</span></div>
-            <div className="epc-coming-item"><MessageCircle size={16} /><strong>Music</strong><span>Coming Soon</span></div>
+          <div className="epc-extras-head"><span className="ep-eyebrow">{t("Extras por separado")}</span><p>{t("Capacidad adicional, presentada de forma independiente.")}</p></div>
+          <article className="epc-extra-row"><span className="epc-extra-icon"><UsersRound size={18} /></span><div><h3>{t("+1 personaje")}</h3><p>{t("Un espacio adicional para un personaje.")}</p></div><span className="epc-extra-mark">EXTRA</span></article>
+          <article className="epc-extra-row"><span className="epc-extra-icon lilac"><Sparkles size={18} /></span><div><h3>{t("+1 universo")}</h3><p>{t("Un universo adicional para otra idea.")}</p></div><span className="epc-extra-mark">EXTRA</span></article>
+          <section className="epc-coming-panel" aria-label={t("Funciones futuras")}>
+            <span className="ep-overline">{t("EN CAMINO")}</span>
+            <div className="epc-coming-item"><AudioLines size={16} /><strong>Voice</strong><span>{t("Coming Soon")}</span></div>
+            <div className="epc-coming-item"><Video size={16} /><strong>Video</strong><span>{t("Coming Soon")}</span></div>
+            <div className="epc-coming-item"><MessageCircle size={16} /><strong>Music</strong><span>{t("Coming Soon")}</span></div>
           </section>
         </div>
       </section>
@@ -365,6 +366,7 @@ export function CreatorPrivacyPreview() {
 }
 
 export function CreatorLimitPreview() {
+  const t = useCreatorPreviewText();
   const { isLoaded, isSignedIn, user } = useUser();
   const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? live.data : undefined;
