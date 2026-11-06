@@ -14,10 +14,10 @@ export class StructuralLimitError extends Error {
   constructor(readonly code: "UNIVERSE_LIMIT_REACHED" | "CHARACTER_LIMIT_REACHED") { super(code); }
 }
 
-const planCaps = (plan: CreatorPlan, addonCharacters: number, addonUniverses: number) => ({
+export const creatorCapacity = (ownerId: string, plan: CreatorPlan, addonCharacters: number, addonUniverses: number) => ({
   // Beta seats use the creator capacity without changing billing entitlements.
-  maxUniverses: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || plan === "creator" ? 5 : 1) + addonUniverses,
-  maxCharacters: (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || plan === "creator" ? 25 : 5) + addonCharacters,
+  maxUniverses: lifetimeAccessForOwner(ownerId) ? 10000 : (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || plan === "creator" ? 5 : 1) + addonUniverses,
+  maxCharacters: lifetimeAccessForOwner(ownerId) ? 100000 : (process.env.ECHO_BETA_ACCESS_MODE === "three_seats" || plan === "creator" ? 25 : 5) + addonCharacters,
 });
 const asPlan = (value: unknown): CreatorPlan => value === "creator" ? "creator" : "free";
 
@@ -61,7 +61,7 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
     const current = existingRows.find(row => row.universeId === universeId);
     if (current?.archivedAt || current?.deletedAt) throw new Error("UNIVERSE_UNAVAILABLE");
     const retainedRows = existingRows.filter(row => !row.deletedAt);
-    const caps = planCaps(entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
+    const caps = creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
     const isNewUniverse = !current;
     if (isNewUniverse && (expectedRevision !== 0 || retainedRows.length >= caps.maxUniverses))
       throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
@@ -127,7 +127,7 @@ export async function createAdditionalUniverse(ownerId: string, name: string, st
     const entitlements = await lockEntitlement(tx, ownerId, asPlan(creatorSetup?.plan));
     // Serialize capacity checks by owner before reading the current counts.
     const rows = await tx.select().from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, ownerId), isNull(echoUniversesTable.deletedAt)));
-    const caps = planCaps(entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
+    const caps = creatorCapacity(ownerId, entitlements.plan, entitlements.addonCharacters, entitlements.addonUniverses);
     if (rows.length >= caps.maxUniverses) throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
     const characterCount = rows.reduce((total, row) => {
       const characters = row.state.characters;
