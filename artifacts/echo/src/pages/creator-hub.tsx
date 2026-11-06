@@ -85,7 +85,7 @@ export default function CreatorHubPage() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
       <header className="relative z-20 flex min-h-[88px] shrink-0 items-center justify-between gap-2 px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+24px)] text-foreground sm:min-h-[92px] lg:px-8 lg:pt-6">
-        <Link href="/" aria-label="Return to ECHO feed" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 text-sm font-medium backdrop-blur-md hover:bg-black/65"><ArrowLeft size={19} /><span className="hidden sm:inline">Return to ECHO feed</span><span className="sm:hidden">Volver</span></Link>
+        <Link href="/" aria-label="Volver al feed de ECHO" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 text-sm font-medium backdrop-blur-md hover:bg-black/65"><ArrowLeft size={19} /><span className="hidden sm:inline">Volver al feed de ECHO</span><span className="sm:hidden">Volver</span></Link>
         <Link href="/" aria-label="ECHO — ir al inicio" className="wordmark absolute left-1/2 -translate-x-1/2 text-[28px] leading-none text-foreground sm:text-[32px]">ECHO</Link>
         <h1 className="text-sm font-semibold text-muted-foreground sm:text-base">Creator Hub</h1>
       </header>
