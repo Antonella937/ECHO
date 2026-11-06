@@ -109,7 +109,7 @@ export function CreatorAccountPreview() {
       <section className="epc-account-layout" aria-label="Resumen ilustrativo de cuenta">
         <article className="epc-plan-panel">
           <div className="epc-panel-topline"><span>{account ? 'TU PLAN' : 'PLAN DE EJEMPLO'}</span><span className="epc-status">{account ? 'Activo · sin cobros' : 'Activo · ilustrativo'}</span></div>
-          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>Plan actual</span><h2>{account?.lifetimeAccess ? 'Premium · vitalicio' : String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
+          <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>Plan actual</span><h2>{account?.billingExempt ? 'Premium · vitalicio' : String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
           <p className="epc-panel-copy">Un comienzo para crear un universo privado y darle forma a sus personajes.</p>
           <div className="epc-capacity">
             <div><span>Universos</span><strong>{account ? `${account.universeCount} / ${account.maxUniverses}` : '1 universo'}</strong></div>
@@ -385,7 +385,7 @@ export function CreatorLimitPreview() {
           <div className="epc-modal-backdrop" aria-hidden="true" />
           <section className="epc-limit-dialog" role="dialog" aria-labelledby="epc-limit-title" aria-describedby="epc-limit-description">
             <div className="epc-limit-symbol"><UsersRound size={20} /></div>
-            <span className="ep-overline">TU CUENTA · PLAN {account.lifetimeAccess ? 'PREMIUM VITALICIO' : String(account.plan).toUpperCase()}</span>
+            <span className="ep-overline">TU CUENTA · PLAN {account.billingExempt ? 'PREMIUM VITALICIO' : String(account.plan).toUpperCase()}</span>
             <h2 id="epc-limit-title">{full ? <>Has llegado al límite<br />de personajes.</> : <>Aún tienes espacio<br />para crear.</>}</h2>
             <p id="epc-limit-description" data-testid="text-limit-usage">Usas {used} de {max} personajes y {account.universeCount} de {account.maxUniverses} universos. Las ampliaciones todavía no están a la venta.</p>
             <div className="epc-limit-meter"><div><span>Personajes</span><strong>{used} <small>/ {max}</small></strong></div><div className="epc-meter-track"><i style={{ transform: `scaleX(${ratio})`, transformOrigin: 'left' }} /></div><small>Capacidad real de tu cuenta</small></div>
