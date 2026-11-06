@@ -5,7 +5,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -265,7 +265,7 @@ export default function ConversationPage() {
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
-          <button type="button" onClick={() => requestVoiceReply()} aria-label={t("Pedir una nota de voz")} title={t("Pedir nota de voz")} className="ml-auto tap grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-request-voice"><Mic className="h-5 w-5" /></button>
+          <button type="button" onClick={() => endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })} aria-label={t("Ir al último mensaje")} title={t("Ir al último mensaje")} className="ml-auto tap grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-scroll-to-latest"><ChevronDown className="h-5 w-5" /></button>
         </div>
       </header>
 
