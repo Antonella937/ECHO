@@ -1,3 +1,4 @@
+import { useCreatorShareText } from '@/lib/creator-share-translations';
 import React, { useId, useState } from 'react';
 import { CharacterInitials, UniverseCover } from './visual-defaults';
 
@@ -22,10 +23,11 @@ const disabledBtn =
   'tap inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[rgba(239,220,232,.14)] bg-transparent px-3 text-[11px] font-semibold text-[#cbb9c5] opacity-55 cursor-not-allowed';
 
 function LinkRow({ label }: { label: string }) {
+  const t = useCreatorShareText();
   return (
     <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-[rgba(217,168,189,.22)] px-3 py-2">
-      <span className="text-[9px] uppercase tracking-[.13em] text-[#8f8790]">Enlace</span>
-      <span className="min-w-0 flex-1 text-[11px] text-[#8f8790]" aria-label={`Enlace de ${label} no disponible`}>
+      <span className="text-[9px] uppercase tracking-[.13em] text-[#8f8790]">{t("Enlace")}</span>
+      <span className="min-w-0 flex-1 text-[11px] text-[#8f8790]" aria-label={`${t("Enlace de")} ${t(label)} ${t("no disponible")}`}>
         No disponible
       </span>
     </div>
@@ -33,12 +35,13 @@ function LinkRow({ label }: { label: string }) {
 }
 
 function ShareActions({ label }: { label: string }) {
+  const t = useCreatorShareText();
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`Copiar enlace de ${label} (no disponible)`}>
+      <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`${t("Copiar enlace de")} ${t(label)} (${t("no disponible")})`}>
         Copiar enlace
       </button>
-      <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`Compartir ${label} (no disponible)`}>
+      <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`${t("Compartir")} ${t(label)} (${t("no disponible")})`}>
         Compartir
       </button>
     </div>
@@ -46,6 +49,7 @@ function ShareActions({ label }: { label: string }) {
 }
 
 export function PrivateShareCards({ universeName, description, creatorName, characters, initialCharacterId }: PrivateShareCardsProps) {
+  const t = useCreatorShareText();
   const selectId = useId();
   const noteId = useId();
   const [selectedId, setSelectedId] = useState<string | undefined>(
@@ -56,7 +60,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
   return (
     <section aria-labelledby={`${noteId}-h`} className="grid w-full min-w-0 gap-3 text-[#efdce8]" data-testid="private-share-cards">
       <div>
-        <h2 id={`${noteId}-h`} className="m-0 text-[22px] font-normal" style={{ fontFamily: SERIF }}>Tarjetas para compartir</h2>
+        <h2 id={`${noteId}-h`} className="m-0 text-[22px] font-normal" style={{ fontFamily: SERIF }}>{t("Tarjetas para compartir")}</h2>
         <p id={noteId} className="mt-1 mb-0 flex gap-2 text-[11px] leading-relaxed text-[#a59ba4]" data-testid="text-share-dependency">
           <span aria-hidden="true" className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#d9a8bd]" />
           Esta vista es privada y solo visible para ti. Compartir requiere un enlace autorizado que aún no está disponible.
@@ -65,7 +69,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
 
       <div className="grid min-w-0 gap-3 md:grid-cols-2">
         <article className={card} aria-labelledby={`${noteId}-u`} data-testid="card-share-universe">
-          <span className={overline}>Universo</span>
+          <span className={overline}>{t("Universo")}</span>
           <div className="mt-3 w-full overflow-hidden rounded-[14px]" style={{ containerType: 'inline-size' }}>
             <UniverseCover name={universeName} />
           </div>
@@ -73,17 +77,17 @@ export function PrivateShareCards({ universeName, description, creatorName, char
             {universeName}
           </h3>
           {description ? <p className="mt-1 mb-0 text-[11px] leading-relaxed text-[#a59ba4] [overflow-wrap:anywhere]">{description}</p> : null}
-          {creatorName ? <p className="mt-2 mb-0 text-[10px] text-[#8f8790]">Por {creatorName}</p> : null}
+          {creatorName ? <p className="mt-2 mb-0 text-[10px] text-[#8f8790]">{t("Por")} {creatorName}</p> : null}
           <LinkRow label="universo" />
           <ShareActions label="universo" />
         </article>
 
         <article className={card} aria-labelledby={`${noteId}-c`} data-testid="card-share-character">
           <div className="flex items-center justify-between gap-2">
-            <span className={overline}>Personaje</span>
+            <span className={overline}>{t("Personaje")}</span>
             {characters.length > 1 ? (
               <span className="min-w-0">
-                <label htmlFor={selectId} className="sr-only">Personaje de la tarjeta</label>
+                <label htmlFor={selectId} className="sr-only">{t("Personaje de la tarjeta")}</label>
                 <select
                   id={selectId}
                   value={selected?.id ?? ''}
@@ -111,14 +115,14 @@ export function PrivateShareCards({ universeName, description, creatorName, char
                   <h3 id={`${noteId}-c`} className="m-0 text-[21px] font-normal leading-tight [overflow-wrap:anywhere]" style={{ fontFamily: SERIF }}>
                     {selected.name}
                   </h3>
-                  <p className="mt-1 mb-0 text-[10px] text-[#8f8790] [overflow-wrap:anywhere]">En {universeName}</p>
+                  <p className="mt-1 mb-0 text-[10px] text-[#8f8790] [overflow-wrap:anywhere]">{t("En")} {universeName}</p>
                 </div>
               </div>
               <LinkRow label="personaje" />
               <ShareActions label="personaje" />
             </>
           ) : (
-            <p id={`${noteId}-c`} className="mt-4 mb-0 text-[11px] text-[#a59ba4]">Este universo aún no tiene personajes.</p>
+            <p id={`${noteId}-c`} className="mt-4 mb-0 text-[11px] text-[#a59ba4]">{t("Este universo aún no tiene personajes.")}</p>
           )}
         </article>
       </div>
