@@ -38,7 +38,12 @@ export function PersonalitySection({ config, set }: SectionProps) {
       <ListInput id="character-boundaries" label="Límites" value={p.boundaries} onChange={(boundaries) => upP({ boundaries })} comma={false} />
 
       <SubHead>Voz de audio · Catálogo gratuito</SubHead>
-      <Note>Elegí una voz para futuras notas de voz. La generación de audio todavía no está conectada. Estas voces Kokoro son en inglés.</Note>
+      <Note>Elegí una voz para futuras notas de voz. La generación de audio todavía no está conectada. Estas voces Kokoro son en inglés; la vista previa estará disponible cuando conectemos el motor.</Note>
+      <div className="mb-3 rounded-xl bg-secondary/50 p-3 text-xs" data-testid="basic-voice-selection-status">
+        {v.basicVoiceId && BASIC_VOICES.some(voice => voice.id === v.basicVoiceId)
+          ? <>Voz elegida: <strong>{BASIC_VOICES.find(voice => voice.id === v.basicVoiceId)?.label}</strong>. Guardá el personaje para conservarla.</>
+          : <>Todavía no elegiste una voz. Podés dejar esta configuración pendiente.</>}
+      </div>
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Voz básica del personaje" data-testid="basic-voice-catalog">
         {BASIC_VOICES.map(voice => (
           <button key={voice.id} type="button" role="radio" aria-checked={v.basicVoiceId === voice.id}
