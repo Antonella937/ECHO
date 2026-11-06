@@ -13,6 +13,7 @@ import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
 import { PushNotificationSettings } from '@/components/echo/push-notification-settings';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { LANGUAGES, setLanguage, useLanguage, useTranslation, type Language } from '@/lib/i18n';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -23,11 +24,20 @@ export default function SettingsPage() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const back = useBack();
+  const language = useLanguage();
+  const t = useTranslation();
 
   return (
     <div>
-      <TopBar title="Ajustes" onBack={back} />
+      <TopBar title={t("settings")} onBack={back} />
       <div className="px-4 pb-12 pt-5">
+        <section className="mb-7 rounded-2xl border border-primary/30 bg-card/60 p-4" aria-label={t("language")}>
+          <label htmlFor="echo-language" className="mb-2 block text-sm font-semibold text-primary">🌐 {t("language")}</label>
+          <p className="mb-3 text-xs text-muted-foreground">{t("languageDescription")}</p>
+          <select id="echo-language" value={language} onChange={event=>setLanguage(event.target.value as Language)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground">
+            {LANGUAGES.map(item=><option key={item.code} value={item.code}>{item.name}</option>)}
+          </select>
+        </section>
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tu cuenta</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
