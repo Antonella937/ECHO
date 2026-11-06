@@ -94,6 +94,34 @@ export default function ConversationPage() {
     };
   }, []);
 
+  const transcribeAudio = async (attachment: MessageAttachment): Promise<string> => {
+    const result = await customFetch<{ transcript: string }>('/api/storage/audio/transcribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectPath: attachment.url }), responseType: 'json',
+    });
+    return result.transcript;
+  };
+
+  const processUpload = async (key: string, file: File | Blob, threadId: string, durationSeconds?: number) => {
+    try {
+      const a = await uploadAttachment(file);
+      let transcript: string | undefined;
+      let transcriptionWarning: string | undefined;
+      if (a.type === 'audio') {
+        try { transcript = await transcribeAudio(a); }
+        catch { transcriptionWarning = 'El audio se guardó, pero no se pudo transcribir. Podés reintentar o escribir lo que dijiste.'; }
+      }
+      if (activeThreadRef.current === threadId) setPending(items => items.map(p => p.key === key ? {
+        ...p, uploading: false, error: undefined, transcript, transcriptionWarning,
+        attachment: { ...a, ...(durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(durationSeconds) } : {}) },
+      } : p));
+    } catch (error) {
+      if (activeThreadRef.current === threadId) setPending(items => items.map(p => p.key === key ? {
+        ...p, uploading: false, error: (error as Error).message || 'No se pudo subir.',
+      } : p));
+    }
+  };
+
   const addFiles = useCallback((files: (File | Blob)[], meta?: { durationSeconds?: number }) => {
     setError(null);
     try { validateAttachments(files, pendingRef.current.length); }
@@ -103,48 +131,32 @@ export default function ConversationPage() {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const entry: Pending = { key, kind: kindOf(f.type)!, preview: URL.createObjectURL(f), name: f instanceof File ? f.name : 'Nota de voz', uploading: true, file: f, durationSeconds: meta?.durationSeconds };
       setPending(p => [...p, entry]);
-      uploadAttachment(f).then(async a => {
-        let transcript: string | undefined;
-        let transcriptionWarning: string | undefined;
-        if (a.type === 'audio') {
-          try {
-            const result = await customFetch<{ transcript: string }>('/api/storage/audio/transcribe', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ objectPath: a.url }), responseType: 'json',
-            });
-            transcript = result.transcript;
-          } catch {
-            transcriptionWarning = 'El audio se guardó, pero la transcripción todavía no está disponible. El personaje no podrá interpretar su contenido.';
-          }
-        }
-        if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? {
-          ...x, uploading: false, transcript, transcriptionWarning,
-          attachment: { ...a, ...(meta?.durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(meta.durationSeconds) } : {}) },
-        } : x));
-      }, e => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, error: (e as Error).message || 'No se pudo subir.' } : x)); });
+      void processUpload(key, f, threadAtStart, meta?.durationSeconds);
     }
   }, []);
 
   const retryUpload = (key: string) => {
     const item = pendingRef.current.find(p => p.key === key);
     if (!item || item.uploading || !item.error) return;
-    const threadAtStart = activeThreadRef.current;
     setPending(items => items.map(p => p.key === key ? { ...p, uploading: true, error: undefined } : p));
-    uploadAttachment(item.file).then(
-      attachment => {
-        if (activeThreadRef.current !== threadAtStart) return;
-        setPending(items => items.map(p => p.key === key ? {
-          ...p, uploading: false,
-          attachment: { ...attachment, ...(p.durationSeconds && !attachment.durationSeconds ? { durationSeconds: Math.round(p.durationSeconds) } : {}) },
-        } : p));
-      },
-      error => {
-        if (activeThreadRef.current !== threadAtStart) return;
-        setPending(items => items.map(p => p.key === key ? {
-          ...p, uploading: false, error: (error as Error).message || 'No se pudo subir.',
-        } : p));
-      },
-    );
+    void processUpload(key, item.file, activeThreadRef.current, item.durationSeconds);
+  };
+
+  const retryTranscription = async (key: string) => {
+    const item = pendingRef.current.find(p => p.key === key);
+    if (!item?.attachment || item.uploading || item.attachment.type !== 'audio') return;
+    const threadAtStart = activeThreadRef.current;
+    setPending(items => items.map(p => p.key === key ? { ...p, uploading: true, transcriptionWarning: undefined } : p));
+    try {
+      const transcript = await transcribeAudio(item.attachment);
+      if (activeThreadRef.current === threadAtStart) setPending(items => items.map(p => p.key === key ? {
+        ...p, uploading: false, transcript, transcriptionWarning: undefined,
+      } : p));
+    } catch {
+      if (activeThreadRef.current === threadAtStart) setPending(items => items.map(p => p.key === key ? {
+        ...p, uploading: false, transcriptionWarning: 'No se pudo transcribir. Podés volver a intentar o escribir lo que dijiste.',
+      } : p));
+    }
   };
 
   const recorder = useVoiceRecorder(
@@ -306,7 +318,22 @@ export default function ConversationPage() {
             ))}
           </div>
         )}
-        {pending.some(p => p.transcriptionWarning) && (
+        {pending.some(p => p.transcriptionWarning && !p.uploading) && (
+          <div className="mb-2 space-y-1">
+            {pending.filter(p => p.transcriptionWarning && !p.uploading).map(p => (
+              <div key={p.key} className="rounded-lg border border-amber-500/40 px-3 py-2 text-xs">
+                <p>{p.transcriptionWarning}</p>
+                {p.attachment?.type === 'audio' && (
+                  <button type="button" onClick={() => void retryTranscription(p.key)}
+                    className="mt-1 rounded-md bg-secondary px-2 py-1 font-medium" data-testid={`button-retry-transcription-${p.key}`}>
+                    Reintentar transcripción
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {false && (
           <div role="status" className="mb-2 rounded-lg border border-amber-500/40 px-3 py-2 text-xs">
             {pending.filter(p => p.transcriptionWarning).map(p => <p key={p.key}>{p.transcriptionWarning}</p>)}
           </div>
