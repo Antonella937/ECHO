@@ -16,3 +16,10 @@ export async function canUseBasicVoices(ownerId: string): Promise<boolean> {
   const plan = await resolveEchoPlan(ownerId);
   return plan === "plus" || plan === "premium";
 }
+
+/** Membership capacity; Creator is a profile hub, not a paid tier. */
+export const ECHO_PLAN_CAPACITY: Readonly<Record<EchoPlan, { maxUniverses: number; maxCharacters: number }>> = Object.freeze({
+  free: { maxUniverses: 1, maxCharacters: 5 },
+  plus: { maxUniverses: 3, maxCharacters: 15 },
+  premium: { maxUniverses: 5, maxCharacters: 25 },
+});
