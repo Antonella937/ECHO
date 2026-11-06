@@ -1,0 +1,66 @@
+name: Test ECHO free voice synthesis ($0)
+
+on:
+  workflow_dispatch:
+    inputs:
+      voice_id:
+        description: "Selected free voice ID (use Dante's saved voice)"
+        required: true
+        type: choice
+        default: echo-m-02
+        options:
+          - echo-f-01
+          - echo-f-02
+          - echo-f-03
+          - echo-f-04
+          - echo-f-05
+          - echo-m-01
+          - echo-m-02
+          - echo-m-03
+          - echo-m-04
+          - echo-m-05
+
+permissions:
+  contents: write
+
+concurrency:
+  group: echo-voice-smoke-test
+  cancel-in-progress: false
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install offline Kokoro dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          python -m pip install kokoro soundfile
+      - name: Generate new fixed public test phrase
+        run: python scripts/test-basic-voice-synthesis.py --voice-id "${{ inputs.voice_id }}"
+      - name: Validate actual WAV
+        run: |
+          python - <<'PY'
+          import wave
+          from pathlib import Path
+          for p in Path("artifacts/echo/public/voice-tests").glob("*.wav"):
+              with wave.open(str(p), "rb") as w:
+                  assert w.getnframes() > 24000
+                  assert w.getframerate() == 24000
+                  assert w.getnchannels() == 1
+              print("Verified", p)
+          PY
+      - name: Publish generic test WAV only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/echo/public/voice-tests/*.wav
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish non-private Kokoro synthesis smoke test"
+            git push
+          fi
