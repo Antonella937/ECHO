@@ -95,6 +95,7 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
         displayName: character.name,
         username: character.handle,
         enabled: control.enabled,
+        dmEnabled: control.dmEnabled,
         maxActionsPerDay: control.maxActionsPerDay,
         minCooldownMinutes: control.minCooldownMinutes,
       };
@@ -135,7 +136,7 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
       if (update.enabled && !isAutonomyOwnerAuthorized(ownerId)) {
         res.status(403).json({ error: "AUTONOMY_OWNER_NOT_AUTHORIZED" }); return;
       }
-      await updateCharacterControl(ownerId, account.id, update.enabled, universeId);
+      await updateCharacterControl(ownerId, account.id, update.enabled, universeId, update.lane ?? "social");
     }
     res.json(await ownerSettings(ownerId, universeId));
   } catch (error) {
