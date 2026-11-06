@@ -67,7 +67,7 @@ export function AttractionReview({ actorId, targetId }: { actorId: string; targe
       <p className="text-xs">{item.excerpt}</p>
       <select aria-label={t("Acontecimiento")} className="mt-2 w-full rounded-lg border bg-background p-2 text-xs" value={selected[item.sourceId] ?? ''} onChange={e => setSelected(s => ({ ...s, [item.sourceId]: e.target.value }))}>
         <option value="">{t("Elegir acontecimiento")}</option>
-        {Object.entries(types).map(([value, label]) => <option key={value} value={value}{t(label)}</option>)}
+        {Object.entries(types).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
       </select>
       <button type="button" disabled={busy || !selected[item.sourceId]} onClick={() => void approve(item)} className="mt-2 rounded-lg border px-3 py-2 text-xs">{t("Confirmar")}</button>
     </li>)}</ul>}
