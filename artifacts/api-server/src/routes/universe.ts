@@ -14,6 +14,8 @@ import { universeAccountError } from "../lib/universeValidation";
 import { recordIncomingConversationEvents } from "../ai-engine/incoming-memory";
 import { approveRelationshipProgression } from "../lib/relationshipApproval";
 import { approveTrustEvent } from "../lib/relationshipTrustApproval";
+import { suggestTrustCandidates } from "../lib/relationshipTrustCandidates";
+import { echoRelationshipLedgerTable } from "@workspace/db";
 import type { TrustEventKind } from "../lib/relationshipTrust";
 import { sendNewOwnerPush } from "../lib/onesignal-push";
 
@@ -82,6 +84,36 @@ router.post("/universe/relationships/approve", async (req, res): Promise<void> =
     res.status(conflict ? 409 : 422).json(result); return;
   }
   res.json(result);
+});
+
+// Read-only candidate review. Never changes trust or marks evidence verified.
+router.get("/universe/relationships/trust/candidates", async (req, res): Promise<void> => {
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const actorId = req.query.actorId, targetId = req.query.targetId;
+  if (typeof actorId !== "string" || !actorId || actorId.length > 100 ||
+      typeof targetId !== "string" || !targetId || targetId.length > 100 ||
+      universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_TRUST_CANDIDATE_QUERY" }); return;
+  }
+  const scope = and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId));
+  const [universe] = await db.select().from(echoUniversesTable).where(scope).limit(1);
+  if (!universe || universe.archivedAt || universe.deletedAt) {
+    res.status(404).json({ error: "UNIVERSE_UNAVAILABLE" }); return;
+  }
+  const parsed = SaveUniverseBody.shape.state.safeParse(universe.state);
+  if (!parsed.success) {
+    res.status(422).json({ error: "INVALID_SAVED_STATE" }); return;
+  }
+  const [ledger] = await db.select().from(echoRelationshipLedgerTable).where(and(
+    eq(echoRelationshipLedgerTable.ownerId, req.userId!),
+    eq(echoRelationshipLedgerTable.universeId, universeId),
+    eq(echoRelationshipLedgerTable.actorId, actorId),
+    eq(echoRelationshipLedgerTable.targetId, targetId),
+  )).limit(1);
+  res.json({
+    revision: universe.revision,
+    candidates: suggestTrustCandidates(parsed.data, actorId, targetId, ledger?.consumedMessageIds ?? []),
+  });
 });
 
 // A saved direct message is required as evidence; the authenticated owner
