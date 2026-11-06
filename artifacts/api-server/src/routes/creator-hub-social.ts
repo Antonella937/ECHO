@@ -265,7 +265,10 @@ export function createCreatorHubSocialRouter(): IRouter {
     if (blocked.rowCount) { res.status(404).json({ error: "CONVERSATION_NOT_FOUND" }); return; }
     const messages = await pool.query(
       `SELECT id, sender_owner_id AS "senderOwnerId", recipient_owner_id AS "recipientOwnerId",
-       body, created_at AS "createdAt" FROM echo_creator_direct_messages
+       body, created_at AS "createdAt",
+       (SELECT COALESCE(json_agg(json_build_object('emoji',r.emoji,'ownerId',r.reactor_owner_id)),'[]'::json)
+        FROM echo_creator_message_reactions r WHERE r.message_id=echo_creator_direct_messages.id) AS reactions
+       FROM echo_creator_direct_messages
        WHERE (sender_owner_id=$1 AND recipient_owner_id=$2)
           OR (sender_owner_id=$2 AND recipient_owner_id=$1)
        ORDER BY created_at DESC, id DESC LIMIT 100`,
