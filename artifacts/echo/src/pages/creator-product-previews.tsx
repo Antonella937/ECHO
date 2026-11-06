@@ -22,7 +22,7 @@ import React, { useState } from 'react';
 import { UniverseCover } from '../components/echo/visual-defaults';
 import { PrivateShareCards } from '../components/echo/private-share-cards';
 import { hasCharacterImage, ownerScopedPreviewKey } from '../lib/visual-defaults';
-import { resolveMedia } from '../lib/media';
+import { useMediaResolver } from '../lib/media';
 import { useUser } from '@clerk/react';
 import {
   getGetCreatorAccountQueryKey,
@@ -96,6 +96,7 @@ export function CreatorAccountPreview() {
   const live = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? live.data : undefined;
   const usage = account?.usage;
+  const unlimited = Boolean(account && (account.maxCharacters >= 100000 || account.maxUniverses >= 10000));
   const heading = <PreviewHeading
         eyebrow={t("Cuenta · plan")}
         title={t("Tu espacio, a")}
@@ -115,9 +116,9 @@ export function CreatorAccountPreview() {
           <div className="epc-plan-name"><span className="epc-plan-monogram">e</span><div><span>{t("Plan actual")}</span><h2>{String(account?.plan ?? 'free').toUpperCase()}</h2></div></div>
           <p className="epc-panel-copy">{t("Un comienzo para crear un universo privado y darle forma a sus personajes.")}</p>
           <div className="epc-capacity">
-            <div><span>{t("Universos")}</span><strong>{account ? `${account.universeCount} / ${account.maxUniverses}` : t('1 universo')}</strong></div>
+            <div><span>{t("Universos")}</span><strong>{account ? `${account.universeCount} / ${unlimited ? '∞' : account.maxUniverses}` : t('1 universo')}</strong></div>
             <div className="epc-capacity-rule" aria-hidden="true"><i /></div>
-            <div><span>{t("Personajes")}</span><strong>{account ? `${account.characterCount} / ${account.maxCharacters}` : t('Hasta 5 personajes')}</strong></div>
+            <div><span>{t("Personajes")}</span><strong>{account ? `${account.characterCount} / ${unlimited ? '∞' : account.maxCharacters}` : t('Hasta 5 personajes')}</strong></div>
           </div>
           <Link href="/settings/subscriptions" className="ep-button epc-wide-link">Ver planes Free, Plus y Premium <ArrowRight size={15} /></Link>
         </article>
@@ -152,6 +153,8 @@ export function CreatorUniversePreview() {
   const { isLoaded, isSignedIn, user } = useUser();
   const accountQuery = useGetCreatorAccount({ query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getGetCreatorAccountQueryKey(), user?.id) } });
   const account = isSignedIn ? accountQuery.data : undefined;
+  const media = useMediaResolver();
+  const unlimited = Boolean(account && (account.maxCharacters >= 100000 || account.maxUniverses >= 10000));
   const activeUniverseId = user?.id ? getActiveUniverseId(user.id) : 'primary';
   const universesQuery = useListCreatorUniverses({ universeId: activeUniverseId }, {
     query: { enabled: isLoaded && Boolean(isSignedIn), queryKey: ownerScopedPreviewKey(getListCreatorUniversesQueryKey({ universeId: activeUniverseId }), user?.id) },
@@ -163,7 +166,7 @@ export function CreatorUniversePreview() {
   const activeUniverse = isSignedIn ? activeUniverseQuery.data?.state ?? null : null;
   const universeMetadata = universes.find(universe => universe.universeId === activeUniverseId);
   const universeName = universeMetadata?.name ?? activeUniverse?.creatorSetup?.universeName ?? (account ? '' : t('Casa de papel'));
-  const capacityPercent = account ? Math.min(100, Math.round(100 * account.characterCount / Math.max(1, account.maxCharacters))) : 60;
+  const capacityPercent = account ? (account.maxCharacters >= 100000 ? 0 : Math.min(100, Math.round(100 * account.characterCount / Math.max(1, account.maxCharacters)))) : 60;
   const createUniverse = useCreateCreatorUniverse();
   const [actionError, setActionError] = useState<string | null>(null);
   const [, navigate] = useLocation();
@@ -215,11 +218,11 @@ export function CreatorUniversePreview() {
           <h2>{universeName || t('Mi universo')}</h2>
           <p>{t("Un espacio privado para reunir personajes, ideas y conversaciones.")}</p>
           <div className="epc-universe-stats">
-            <div><span>{t("Universos usados")}</span><strong>{account ? `${account.universeCount} ` : '1 '}<small>/ {account?.maxUniverses ?? 1}</small></strong></div>
-            <div><span>{t("Personajes usados")}</span><strong>{account ? `${account.characterCount} ` : '3 '}<small>/ {account?.maxCharacters ?? 5}</small></strong></div>
+            <div><span>{t("Universos usados")}</span><strong>{account ? `${account.universeCount} ` : '1 '}<small>/ {unlimited ? '∞' : account?.maxUniverses ?? 1}</small></strong></div>
+            <div><span>{t("Personajes usados")}</span><strong>{account ? `${account.characterCount} ` : '3 '}<small>/ {unlimited ? '∞' : account?.maxCharacters ?? 5}</small></strong></div>
           </div>
-          <div className="epc-slot-label"><span>{account ? t("Capacidad de personajes") : t("Capacidad de ejemplo")}</span><span>{account ? `${account.characterCount} ${t('de')} ${account.maxCharacters}` : `3 ${t('de')} 5`}</span></div>
-          <div className="epc-capacity-track" role="progressbar" aria-label={t("Capacidad de personajes")} aria-valuemin={0} aria-valuemax={account?.maxCharacters ?? 5} aria-valuenow={account?.characterCount ?? 3}>
+          <div className="epc-slot-label"><span>{account ? t("Capacidad de personajes") : t("Capacidad de ejemplo")}</span><span>{account ? `${account.characterCount} ${t('de')} ${unlimited ? '∞' : account.maxCharacters}` : `3 ${t('de')} 5`}</span></div>
+          <div className="epc-capacity-track" role="progressbar" aria-label={t("Capacidad de personajes")} aria-valuemin={0} aria-valuemax={unlimited ? undefined : account?.maxCharacters ?? 5} aria-valuenow={account?.characterCount ?? 3}>
             <span style={{ width: `${capacityPercent}%` }} />
           </div>
           {account && <button type="button" className="epc-caption" onClick={() => void addUniverse()} disabled={createUniverse.isPending}>
@@ -232,7 +235,7 @@ export function CreatorUniversePreview() {
           <div className="epc-character-list">
             {account && activeUniverse ? activeUniverse.characters.filter(character => !character.archived).map(character => (
               <Link href={`/profile/${character.id}`} className="epc-character-row" key={character.id} data-testid={`link-creator-character-${character.id}`}>
-                {hasCharacterImage(character.avatar) ? <img className="epc-character-avatar epc-character-photo" alt="" src={resolveMedia(character.avatar, { sourceUniverseId: activeUniverseId, sourceCharacterId: character.id, sourceType: "avatar", sourceContentId: character.id })} /> : <span className="epc-character-avatar rose" aria-hidden="true">{character.name.trim().charAt(0).toUpperCase() || 'E'}</span>}
+                {hasCharacterImage(character.avatar) ? <img className="epc-character-avatar epc-character-photo" alt="" src={media(character.avatar, { sourceUniverseId: activeUniverseId, sourceCharacterId: character.id, sourceType: "avatar", sourceContentId: character.id })} /> : <span className="epc-character-avatar rose" aria-hidden="true">{character.name.trim().charAt(0).toUpperCase() || 'E'}</span>}
                 <span className="epc-character-name">{character.name}<small>@{character.handle}</small></span>
                 <ChevronRight size={16} aria-hidden="true" />
               </Link>
@@ -275,7 +278,7 @@ export function CreatorUniversePreview() {
           initialCharacterId={activeUniverse.currentCharacterId}
           characters={activeUniverse.characters.filter(character => !character.archived).map(character => ({
             id: character.id, name: character.name,
-            imageSrc: hasCharacterImage(character.avatar) ? resolveMedia(character.avatar, {
+            imageSrc: hasCharacterImage(character.avatar) ? media(character.avatar, {
               sourceUniverseId: activeUniverseId, sourceCharacterId: character.id,
               sourceType: 'avatar', sourceContentId: character.id,
             }) : undefined,
