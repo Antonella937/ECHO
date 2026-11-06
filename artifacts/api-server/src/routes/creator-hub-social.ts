@@ -153,7 +153,7 @@ export function createCreatorHubSocialRouter(): IRouter {
     );
     if (blocked.rowCount) { res.status(404).json({ error: "CONVERSATION_NOT_FOUND" }); return; }
     const permitted = await pool.query(
-      "SELECT 1 FROM echo_creator_message_requests WHERE status='accepted' AND ((sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1)) UNION SELECT 1 FROM echo_creator_direct_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) UNION SELECT 1 FROM echo_creator_voice_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) UNION SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1 AND message_privacy='everyone' LIMIT 1",
+      "SELECT 1 FROM echo_creator_message_requests WHERE status='accepted' AND ((sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1)) UNION SELECT 1 FROM echo_creator_direct_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) UNION SELECT 1 FROM echo_creator_voice_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) UNION SELECT 1 FROM echo_creator_profiles WHERE owner_id=$2 AND message_privacy='everyone' LIMIT 1",
       [req.userId, target],
     );
     if (!permitted.rowCount) { res.status(404).json({ error: "CONVERSATION_NOT_FOUND" }); return; }
