@@ -62,7 +62,7 @@ export default function ConversationPage() {
 
   useEffect(() => {
     if (unreadCount > 0) actions.markThreadRead(id);
-  }, [unreadCount, id, actions]);
+  }, [unreadCount, id, me.id, actions]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
