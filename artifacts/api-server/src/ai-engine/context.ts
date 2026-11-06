@@ -162,6 +162,27 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     .sort((a, b) => b.score - a.score || b.item.occurredAt.getTime() - a.item.occurredAt.getTime())
     .slice(0, 3).map(entry => ({ sourceId: entry.item.sourceId, kind: entry.item.kind,
       targetId: entry.item.targetId, text: entry.item.content.slice(0, 400), createdAt: entry.item.occurredAt })) : [];
+  // Recall older transcribed voice notes from this exact DM, even after they
+  // leave the last-ten-message window. The original attachment stays private;
+  // only its user-reviewed transcript (already persisted as message text) is used.
+  const olderVoiceNotes = dmTargetId ? state.messages
+    .filter(m => m.recipientId === actor.id && m.senderId === dmTargetId &&
+      !m.hiddenForIds?.includes(actor.id) &&
+      m.attachments?.some(a => a.type === 'audio') &&
+      m.text.includes('[Transcripción de nota de voz]:') &&
+      !messages.some(recent => recent.id === m.id))
+    .map(m => {
+      const transcript = m.text.split('[Transcripción de nota de voz]:').slice(1).join(' ').trim();
+      const terms = transcript.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [];
+      const score = terms.filter(term => queryTerms.has(term)).length;
+      return { message: m, transcript, score };
+    })
+    .filter(entry => entry.transcript && entry.score > 0)
+    .sort((a, b) => b.score - a.score ||
+      new Date(b.message.createdAt).getTime() - new Date(a.message.createdAt).getTime())
+    .slice(0, 3)
+    .map(entry => ({ sourceId: entry.message.id, text: entry.transcript.slice(0, 1000),
+      createdAt: entry.message.createdAt })) : [];
   // Relationship evolution begins with verifiable, actor-visible interaction
   // evidence, not guessed affection or automatic changes to trust/closeness.
   const relationshipEvidence = (c?.relationships ?? []).map(relationship => {
@@ -213,7 +234,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     routine: c ? { ...c.routine, localNow: localTime(now, c.routine.timezone), interpretation: 'probabilistic_context_not_commands' } : null,
     social: c?.social ?? null,
     memory: c ? { permanent: c.memory.permanent, relationships: c.memory.relationships,
-      recent: chronological, recalled, historicalRecalled, recentSummary: c.memory.recentSummary } : null,
+      recent: chronological, recalled, historicalRecalled, olderVoiceNotes, recentSummary: c.memory.recentSummary } : null,
     currentState: c ? { ...c.currentState, companions: c.currentState.companions.map(identityOf), provenance: 'manual_or_routine_not_observed_autonomy' } : null,
     recentSocial: {
       posts: relevantPosts.map(postText),
