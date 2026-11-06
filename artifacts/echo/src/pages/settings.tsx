@@ -7,7 +7,6 @@ import type { Appearance, ImageStyle } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
-import { PlanAndQuotaSettings } from '@/components/echo/plan-and-quota-settings';
 import { UniverseSelector } from '@/components/echo/universe-selector';
 import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
 import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
@@ -49,7 +48,7 @@ export default function SettingsPage() {
           </Link>
         </section>
 
-        <PlanAndQuotaSettings />
+        <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">Mi plan y suscripciones <span className="text-xs text-muted-foreground">Ver planes y complementos ›</span></Link>
 
         <section className="mt-9" aria-labelledby="identity-h">
           <h2 id="identity-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cuentas e identidad activa</h2>
@@ -62,7 +61,7 @@ export default function SettingsPage() {
         <section className="mt-9" aria-labelledby="creator-h">
           <h2 id="creator-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Creator y privacidad</h2>
           <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
-            <Link href="/creator-preview/account" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Mi plan y capacidad</Link>
+            <Link href="/settings/subscriptions" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Mi plan y suscripciones</Link>
             <Link href="/creator-preview/universes" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Mis universos y personajes</Link>
             <Link href="/creator-preview/privacy" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">Privacidad de personajes</Link>
           </div>
