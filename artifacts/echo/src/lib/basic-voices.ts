@@ -17,3 +17,8 @@ export const BASIC_VOICES = [
 ] as const;
 export type BasicVoiceId = typeof BASIC_VOICES[number]['id'];
 export function getBasicVoice(id: string) { return BASIC_VOICES.find(voice => voice.id === id) ?? null; }
+
+/** A preview is published only when its generated WAV is present in public/voice-previews.
+ * Until then the selector must not display an enabled play button.
+ */
+export const basicVoicePreviewPath = (id: BasicVoiceId) => `/voice-previews/${id}.wav`;
