@@ -1,3 +1,5 @@
+import { useCharacterRelationshipText } from '@/lib/character-relationship-translations';
+import { useLanguage } from '@/lib/i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Field, inputCls } from '@/components/echo/field';
 import { cn } from '@/lib/utils';
@@ -23,8 +25,9 @@ export function Text({ id, label, value, onChange, max, hint, testId, placeholde
 export function Area({ id, label, value, onChange, max, rows = 4, hint, testId, placeholder }: {
   id: string; label: string; value: string; onChange(v: string): void; max: number; rows?: number; hint?: ReactNode; testId?: string; placeholder?: string;
 }) {
+  const language = useLanguage();
   return (
-    <Field id={id} label={label} hint={hint ?? `${value.length.toLocaleString('es')}/${max.toLocaleString('es')}`}>
+    <Field id={id} label={label} hint={hint ?? `${value.length.toLocaleString(language)}/${max.toLocaleString(language)}`}>
       <textarea id={id} value={value} maxLength={max} rows={rows} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={areaCls} data-testid={testId ?? `input-${id}`} />
     </Field>
   );
@@ -34,6 +37,7 @@ export function Area({ id, label, value, onChange, max, rows = 4, hint, testId, 
 export function ListInput({ id, label, value, onChange, comma = true, max = 50, hint }: {
   id: string; label: string; value: string[]; onChange(v: string[]): void; comma?: boolean; max?: number; hint?: string;
 }) {
+  const t = useCharacterRelationshipText();
   const [raw, setRaw] = useState(() => value.join(comma ? ', ' : '\n'));
   const last = useRef(JSON.stringify(value));
   useEffect(() => {
@@ -44,7 +48,7 @@ export function ListInput({ id, label, value, onChange, comma = true, max = 50, 
   }, [value, comma]);
   const parse = (t: string) => t.split(comma ? /[\n,]/ : /\n/).map((s) => s.trim()).filter(Boolean).slice(0, max);
   return (
-    <Field id={id} label={label} hint={hint ?? `${comma ? 'Separá con comas o saltos de línea' : 'Una por línea'} · ${value.length}/${max}`}>
+    <Field id={id} label={label} hint={hint ?? `${comma ? t('Separá con comas o saltos de línea') : t('Una por línea')} · ${value.length}/${max}`}>
       <textarea id={id} value={raw} rows={comma ? 2 : 3} onChange={(e) => { const next = parse(e.target.value); setRaw(e.target.value); last.current = JSON.stringify(next); onChange(next); }} className={cn(areaCls, 'min-h-[64px]')} data-testid={`input-${id}`} />
     </Field>
   );
@@ -65,9 +69,10 @@ export function Select<T extends string>({ id, label, value, onChange, options, 
 export function NumberInput({ id, label, value, onChange, min, max, hint }: {
   id: string; label: string; value: number | null; onChange(v: number | null): void; min: number; max: number; hint?: string;
 }) {
+  const t = useCharacterRelationshipText();
   return (
     <Field id={id} label={label} hint={hint}>
-      <input id={id} type="number" inputMode="numeric" min={min} max={max} value={value ?? ''} placeholder="Sin definir"
+      <input id={id} type="number" inputMode="numeric" min={min} max={max} value={value ?? ''} placeholder={t("Sin definir")}
         onChange={(e) => { const t = e.target.value; if (!t) return onChange(null); const n = Math.round(Number(t)); if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n))); }}
         className={inputCls} data-testid={`input-${id}`} />
     </Field>
