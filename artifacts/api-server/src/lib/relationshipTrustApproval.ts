@@ -42,7 +42,7 @@ export async function approveTrustEvent(
     if (!result.applied) return reject(result.reason);
     const now = new Date();
     const updated = await tx.update(echoUniversesTable)
-      .set({ state: result.state, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: now })
+      .set({ state: { ...result.state }, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: now })
       .where(and(scope, eq(echoUniversesTable.revision, expectedRevision)))
       .returning({ revision: echoUniversesTable.revision });
     if (!updated[0]) throw new Error("TRUST_REVISION_RACE");
