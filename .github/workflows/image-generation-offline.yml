@@ -1,6 +1,13 @@
 name: ECHO image generation offline checks
 
 on:
+  push:
+    paths:
+      - 'artifacts/api-server/src/lib/imagePromptBuilder.ts'
+      - 'artifacts/api-server/src/routes/image-generation.ts'
+      - 'artifacts/api-server/tests/image-prompt-builder.test.ts'
+      - 'artifacts/api-server/package.json'
+      - '.github/workflows/image-generation-offline.yml'
   pull_request:
     paths:
       - 'artifacts/api-server/src/lib/imageGeneration*.ts'
