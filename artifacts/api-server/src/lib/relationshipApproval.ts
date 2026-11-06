@@ -38,7 +38,7 @@ export async function approveRelationshipProgression(
     const consumed = ledger?.consumedMessageIds ?? [];
     const result = applyApprovedClosenessProgression(
       parsed.data, actorId, targetId, now,
-      { lastAppliedAt: ledger?.lastAppliedAt ?? null, consumedMessageIds: consumed },
+      { lastAppliedAt: ledger && ledger.appliedCount > 0 ? ledger.lastAppliedAt : null, consumedMessageIds: consumed },
     );
     if (!result.applied)
       return { applied: false, reason: result.reason, revision: universe.revision };
