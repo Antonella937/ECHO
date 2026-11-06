@@ -535,13 +535,16 @@ components:
         categoryWeights: { $ref: "#/components/schemas/AiUsageCategoryWeight" }
     AutonomyCharacterControl:
       type: object
-      required: [characterId, displayName, username, enabled, dmEnabled, maxActionsPerDay, minCooldownMinutes]
+      required: [characterId, displayName, username, enabled, dmEnabled, dmFrequency, dmMediaPreference, dmInstructions, maxActionsPerDay, minCooldownMinutes]
       properties:
         characterId: { type: string }
         displayName: { type: string }
         username: { type: string }
         enabled: { type: boolean }
         dmEnabled: { type: boolean }
+        dmFrequency: { type: string, enum: [rarely, sometimes, frequently] }
+        dmMediaPreference: { type: string, enum: [text, mixed, voice] }
+        dmInstructions: { type: string }
         maxActionsPerDay: { type: integer, minimum: 1, maximum: 4 }
         minCooldownMinutes: { type: integer, minimum: 60, maximum: 1440 }
     AutonomySettings:
