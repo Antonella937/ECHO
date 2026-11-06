@@ -71,7 +71,7 @@ router.post("/voices/basic/attach-to-dm", requireAuth, async (req, res) => {
   const { universeId = "primary", characterId, messageId, objectPath } = req.body ?? {};
   if ([universeId, characterId, messageId, objectPath].some(v => typeof v !== "string") ||
       universeId.length > 128 || characterId.length > 128 || messageId.length > 128 ||
-      !/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(objectPath)) {
+      !/^\\/objects\\/[a-zA-Z0-9/_-]+$/.test(objectPath)) {
     res.status(400).json({ error: "INVALID_VOICE_ATTACHMENT" }); return;
   }
   try {
