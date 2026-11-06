@@ -1,3 +1,4 @@
+import { useRelationshipPresetText } from '@/lib/relationship-preset-translations';
 import { useRelationshipReviewText } from '@/lib/relationship-review-translations';
 import { useLanguage } from '@/lib/i18n';
 import { useState } from 'react';
@@ -11,6 +12,7 @@ type Result = { revision: number; proposals: Proposal[]; history: History[] };
 export function TransitionReview({ actorId, targetId }: { actorId: string; targetId: string }) {
   const t = useRelationshipReviewText();
   const language = useLanguage();
+  const presetText = useRelationshipPresetText();
   const { universeId, actions } = useSocial();
   const [data, setData] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,8 +29,8 @@ export function TransitionReview({ actorId, targetId }: { actorId: string; targe
   }
   async function approve(proposal: Proposal) {
     if (!data || busy) return;
-    const fromLabel = t(String(relationshipPresets[proposal.from as keyof typeof relationshipPresets] ?? proposal.from));
-    const toLabel = t(String(relationshipPresets[proposal.to as keyof typeof relationshipPresets] ?? proposal.to));
+    const fromLabel = presetText(String(relationshipPresets[proposal.from as keyof typeof relationshipPresets] ?? proposal.from));
+    const toLabel = presetText(String(relationshipPresets[proposal.to as keyof typeof relationshipPresets] ?? proposal.to));
     if (!window.confirm(`${t('¿Confirmás cambiar el vínculo de')} «${fromLabel}» ${t('a')} «${toLabel}»? ${t('Esto se guardará en su historia.')}`)) return;
     setBusy(true);
     let committed = false;
@@ -56,7 +58,7 @@ export function TransitionReview({ actorId, targetId }: { actorId: string; targe
     {notice && <p role="status" className="mt-2 text-xs">{notice}</p>}
     {data && <div className="mt-2 space-y-2">
       {data.proposals.length ? data.proposals.map(proposal => <div key={proposal.to} className="rounded-lg border p-2">
-        <p className="text-xs font-semibold">{t(String(relationshipPresets[proposal.from as keyof typeof relationshipPresets] ?? proposal.from))} → {t(String(relationshipPresets[proposal.to as keyof typeof relationshipPresets] ?? proposal.to))}</p>
+        <p className="text-xs font-semibold">{presetText(String(relationshipPresets[proposal.from as keyof typeof relationshipPresets] ?? proposal.from))} → {presetText(String(relationshipPresets[proposal.to as keyof typeof relationshipPresets] ?? proposal.to))}</p>
         <p className="mt-1 text-xs text-muted-foreground">{proposal.rationale}</p>
         <button type="button" disabled={busy} onClick={() => void approve(proposal)} className="mt-2 rounded-lg border px-3 py-2 text-xs">{t("Confirmar transición")}</button>
       </div>) : <p className="text-xs text-muted-foreground">{t("No hay transiciones sugeridas actualmente.")}</p>}
