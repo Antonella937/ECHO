@@ -34,7 +34,7 @@ export function AccountManager() {
         </div>
       </div>
       <Link href="/characters/new" className="mt-3 flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground" data-testid="button-create-character">
-        <Plus className="h-4 w-4" /> Crear personaje
+        <Plus className="h-4 w-4" /> {translate('Crear personaje')}
       </Link>
 
       <div className="mt-3 flex flex-col gap-2" role={tab === 'active' ? 'radiogroup' : undefined} aria-label={translate("Identidad activa")}>
@@ -64,7 +64,7 @@ export function AccountManager() {
                 <CharacterAvatar character={c} size={44} className={c.archived ? 'opacity-50' : undefined} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1 text-sm font-semibold"><span className="truncate">{c.name}</span><VerifiedBadge account={c} /></div>
-                  <div className="truncate text-xs text-muted-foreground">@{c.handle} · {accountTypes[c.accountType ?? 'personal']}</div>
+                  <div className="truncate text-xs text-muted-foreground">@{c.handle} · {translate(accountTypes[c.accountType ?? 'personal'])}</div>
                 </div>
                 {tab === 'active' && (
                   <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-full border', active ? 'border-primary bg-primary text-primary-foreground' : 'border-[hsl(240_4%_26%)]')}>
