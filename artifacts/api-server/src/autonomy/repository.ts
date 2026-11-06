@@ -25,8 +25,8 @@ export async function readOwnerControls(ownerId: string, universeId = "primary")
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
       dmEnabled: row.dmEnabled,
-      dmFrequency: row.dmFrequency,
-      dmMediaPreference: row.dmMediaPreference,
+      dmFrequency: (['rarely', 'sometimes', 'frequently'].includes(row.dmFrequency) ? row.dmFrequency : 'sometimes') as 'rarely' | 'sometimes' | 'frequently',
+      dmMediaPreference: (['text', 'mixed', 'voice'].includes(row.dmMediaPreference) ? row.dmMediaPreference : 'text') as 'text' | 'mixed' | 'voice',
       dmInstructions: row.dmInstructions,
       maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),
       minCooldownMinutes: Math.max(60, Math.min(1440, row.minCooldownMinutes)),
