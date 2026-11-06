@@ -5,7 +5,7 @@ import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { esES, enUS, ptBR, frFR, deDE, itIT, koKR, jaJP, zhCN } from '@clerk/localizations';
-import { useLanguage, getLanguage } from '@/lib/i18n';
+import { useLanguage, getLanguage, setLanguage, type Language } from '@/lib/i18n';
 import { PublicLanguageSelector } from '@/components/echo/public-language-selector';
 import { shadcn } from '@clerk/themes';
 import {
@@ -15,6 +15,7 @@ import {
   type UniverseEnvelope,
   setBaseUrl,
   setAuthTokenGetter,
+  customFetch,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -353,6 +354,39 @@ function ApiConnection({ children }: { children: ReactNode }) {
   return ready ? <>{children}</> : <EchoSplash />;
 }
 
+function InterfaceLanguageSync() {
+  const { user, isLoaded } = useUser();
+  const language = useLanguage();
+  const [readyForUser, setReadyForUser] = useState<string | null>(null);
+  const lastLanguage = useRef<Language>(language);
+  useEffect(() => {
+    if (!isLoaded || !user?.id) { setReadyForUser(null); return; }
+    let cancelled = false;
+    setReadyForUser(null);
+    void customFetch<{ language: Language | null }>('/api/account/interface-language', { responseType: 'json' })
+      .then(result => {
+        if (cancelled) return;
+        if (result.language) {
+          lastLanguage.current = result.language;
+          setLanguage(result.language);
+        } else {
+          lastLanguage.current = getLanguage();
+          // First device establishes the initial account preference.
+          void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language: lastLanguage.current }) }).catch(console.warn);
+        }
+        setReadyForUser(user.id);
+      })
+      .catch(error => { if (!cancelled) console.warn('ECHO language sync unavailable', error); });
+    return () => { cancelled = true; };
+  }, [isLoaded, user?.id]);
+  useEffect(() => {
+    if (!user?.id || readyForUser !== user.id || lastLanguage.current === language) return;
+    lastLanguage.current = language;
+    void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language }) }).catch(error => console.warn('ECHO language preference save failed', error));
+  }, [language, readyForUser, user?.id]);
+  return null;
+}
+
 function ClerkQueryCacheInvalidator() {
   const { addListener } = useClerk();
   const prevUserId = useRef<string | null | undefined>(undefined);
@@ -387,6 +421,7 @@ function ClerkRoutes() {
       <QueryClientProvider client={queryClient}>
         <ApiConnection>
         <ClerkQueryCacheInvalidator />
+        <InterfaceLanguageSync />
         <Switch>
           <Route path="/creator-preview" component={PublicReviewHub} />
           <Route path="/creator-preview/landing" component={() => <LandingPage previewMode />} />
