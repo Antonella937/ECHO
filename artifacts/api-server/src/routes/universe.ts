@@ -219,7 +219,7 @@ router.post("/universe/relationships/trust/context", async (req, res): Promise<v
   try {
     const assessment = await assessTrustContext(new FreeModelProvider(), {
       message: message.text, previousMessages,
-      relationshipDescription: [relation.description, relation.boundaries, relation.notes].filter(Boolean).join("\n"),
+      relationshipDescription: [relation.description].filter(Boolean).join("\n"),
     });
     res.json({ sourceId, ...assessment });
   } catch {
