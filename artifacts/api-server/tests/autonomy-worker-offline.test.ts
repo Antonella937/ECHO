@@ -19,6 +19,7 @@ test("disabled autonomy never reads targets or acquires a lease", async () => {
 
 test("worker uses stable keys, handles target failures, and releases lease", async () => {
   const keys: string[] = [];
+  const lanes: string[] = [];
   const released: string[] = [];
   const repository = {
     listLiveOptInTargets: async () => [
@@ -34,17 +35,19 @@ test("worker uses stable keys, handles target failures, and releases lease", asy
     tokenFactory: () => "offline-token",
     processCharacter: async (_ownerId, input) => {
       keys.push(input.idempotencyKey);
+      lanes.push(input.lane ?? "unspecified");
       if (input.characterId === "dante") throw new Error("synthetic failure");
       return { status: input.characterId === "mar" ? "executed" : "no_action" };
     },
   });
   const first = await run();
-  assert.deepEqual(first, { status: "completed", evaluated: 3, executed: 1, noAction: 1, failed: 1 });
+  assert.deepEqual(first, { status: "completed", evaluated: 6, executed: 2, noAction: 2, failed: 2 });
+  assert.deepEqual(lanes, ["dm", "dm", "dm", "social", "social", "social"]);
   const firstKeys = keys.slice();
   keys.length = 0;
   await run();
   assert.deepEqual(keys, firstKeys);
-  assert.equal(new Set(firstKeys).size, 3);
+  assert.equal(new Set(firstKeys).size, 6);
   assert.deepEqual(released, ["offline-token", "offline-token"]);
 });
 
