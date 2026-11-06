@@ -138,7 +138,7 @@ export default function CharacterEditorPage() {
 
         {mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
-          <BasicVoiceCatalogue />
+          <BasicVoiceCatalogue selectedVoiceId={config.voice.basicVoiceId} onSelect={(basicVoiceId) => set((c) => ({ ...c, voice: { ...c.voice, basicVoiceId } }))} />
           <VisualIdentity avatar={form.avatar} identity={identity} onBusy={setUploading}
             onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
