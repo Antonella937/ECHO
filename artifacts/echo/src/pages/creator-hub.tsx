@@ -149,7 +149,8 @@ export default function CreatorHubPage() {
   }
   const defaultUsername = (user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'creator').toLowerCase().replace(/[^a-z0-9._]/g, '');
   const savedUsername = typeof user?.unsafeMetadata?.creatorHubUsername === 'string' ? user.unsafeMetadata.creatorHubUsername : '';
-  const username = savedUsername || defaultUsername;
+  const [registeredUsername, setRegisteredUsername] = useState('');
+  const username = registeredUsername || savedUsername || defaultUsername;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
@@ -168,10 +169,12 @@ export default function CreatorHubPage() {
     if (!user) return;
     setSaving(true); setError('');
     try {
+      const registered = await customFetch<{ profile: { username: string } }>('/api/creator-hub/social/me', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName: alias, username: next, visibility: socialProfile?.visibility ?? 'private', messagePrivacy: socialProfile?.messagePrivacy ?? 'requests', bio: savedBio }) });
+      setRegisteredUsername(registered.profile.username);
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubUsername: next } });
       await user.reload();
       setEditing(false);
-    } catch { setError('No pudimos guardar el usuario. Intentá nuevamente.'); }
+    } catch (err) { setError(String(err).includes('409') || String(err).includes('USERNAME_ALREADY_IN_USE') ? 'Este @usuario ya está en uso. Elegí otro.' : 'No pudimos registrar el usuario. Intentá nuevamente.'); }
     finally { setSaving(false); }
   }
   // Social account preferences are stored server-side; Clerk metadata remains the
@@ -183,7 +186,7 @@ export default function CreatorHubPage() {
     if (!user?.id) return;
     let active = true;
     void customFetch<{ profile: { visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null }>('/api/creator-hub/social/me', { responseType: 'json' })
-      .then(data => { if (active) { setSocialProfile(data.profile); setSocialReady(true); } })
+      .then(data => { if (active) { setSocialProfile(data.profile); if (data.profile && 'username' in data.profile && typeof data.profile.username === 'string') setRegisteredUsername(data.profile.username); setSocialReady(true); } })
       .catch(() => { if (active) setSocialReady(false); });
     return () => { active = false; };
   }, [user?.id]);
