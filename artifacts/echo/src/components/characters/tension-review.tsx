@@ -31,15 +31,21 @@ export function TensionReview({ actorId, targetId }: { actorId: string; targetId
     finally { setBusy(false); }
   }
   async function approve(item: Candidate) {
-    if (revision === null || !selected[item.sourceId]) return;
+    if (revision === null || !selected[item.sourceId] || busy) return;
+    if (!window.confirm('¿Confirmás «' + (types[selected[item.sourceId] as keyof typeof types] ?? selected[item.sourceId]) + '»? Esto modificará la tensión y guardará el acontecimiento.')) return;
     setBusy(true);
     try {
-      await customFetch('/api/universe/relationships/tension/approve?' + new URLSearchParams({ universeId }), {
+      const approved = await customFetch<{ applied: boolean; delta: number }>('/api/universe/relationships/tension/approve?' + new URLSearchParams({ universeId }), {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actorId, targetId, sourceId: item.sourceId, kind: selected[item.sourceId], expectedRevision: revision }),
       });
-      setRevision(null); setItems([]); await actions.refreshAfterApproval();
-      setMessage('Acontecimiento confirmado. Revisá nuevamente para ver el historial.');
+      setRevision(null); setItems([]);
+      setMessage('Confirmado en el servidor (tensión ' + (approved.delta > 0 ? '+' : '') + approved.delta + '). Actualizando…');
+      await actions.refreshAfterApproval();
+      const latest = await customFetch<{ revision: number; candidates: Candidate[] }>('/api/universe/relationships/tension/candidates?' + query, { method: 'GET', responseType: 'json', cache: 'no-store' });
+      const past = await customFetch<{ entries: Entry[] }>('/api/universe/relationships/tension/history?' + query, { method: 'GET', responseType: 'json', cache: 'no-store' });
+      setItems(latest.candidates); setRevision(latest.revision); setHistory(past.entries);
+      setMessage('Acontecimiento confirmado. tensión ' + (approved.delta > 0 ? '+' : '') + approved.delta + '.');
     } catch { setRevision(null); setMessage('No se pudo confirmar. Sincronizá y volvé a consultar.'); }
     finally { setBusy(false); }
   }
