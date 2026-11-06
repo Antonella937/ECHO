@@ -16,7 +16,6 @@ import { useMediaResolver, timeAgo } from '@/lib/media';
 import { formatDuration, kindOf, uploadAttachment, validateAttachments, MAX_RECORDING_MS } from '@/lib/dm-attachments';
 import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { cn } from '@/lib/utils';
-import { threadIdFor } from '@/domain/types';
 import { postMedia } from '@/domain/post-media';
 import type { Message, MessageAttachment } from '@/domain/types';
 
@@ -39,7 +38,7 @@ export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
-  const { me, character, actions, dispatch, state } = useSocial();
+  const { me, character, actions, state } = useSocial();
   const other = character(id);
   const messages = useThreadMessages(id);
   const back = useBack();
@@ -191,24 +190,6 @@ export default function ConversationPage() {
   const canSend = !uploading && !failed && recorder.status === 'idle' && (!!text.trim() || ready.length > 0);
   const quoted = quoteId ? byId.get(quoteId) : undefined;
 
-  // Explicit, fixed-text demo only. No private conversation text leaves the app.
-  // This is the new Kokoro WAV produced by the zero-cost GitHub Actions test.
-  const canTestFreeVoice = other.configuration?.voice?.basicVoiceId === 'echo-m-02';
-  const sendVoiceDemo = () => {
-    if (!canTestFreeVoice) return;
-    const demoText = "Hey! This is a brand new voice message, generated just for this test. I'll remember what I said.";
-    dispatch({ type: 'message.sent', message: {
-      id: `voice-demo-${crypto.randomUUID()}`,
-      threadId: threadIdFor(me.id, other.id),
-      senderId: other.id, recipientId: me.id,
-      text: `[Transcripción de nota de voz]: ${demoText}`,
-      createdAt: new Date().toISOString(), storyId: null, postId: null,
-      readBy: [other.id], origin: 'user',
-      attachments: [{ id: `voice-demo-audio-${crypto.randomUUID()}`, type: 'audio',
-        url: '/voice-tests/echo-m-02.wav', mimeType: 'audio/wav' }],
-    } }, 'user');
-  };
-
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSend) return;
@@ -285,17 +266,6 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
-      {canTestFreeVoice && (
-        <div className="sticky bottom-[calc(5.5rem+var(--echo-keyboard-inset,0px))] z-40 mx-3 mb-2 rounded-xl border border-primary/40 bg-background p-3 shadow-lg" data-testid="free-voice-demo">
-          <button type="button" onClick={() => {
-            try { sendVoiceDemo(); setError(null); }
-            catch (e) { setError((e as Error).message || 'No se pudo agregar la nota de voz.'); }
-          }} className="relative z-50 flex min-h-12 w-full touch-manipulation items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" data-testid="button-send-voice-demo">
-            <Mic className="mr-2 h-4 w-4" /> Enviar audio de prueba de Dante
-          </button>
-          <p className="mt-1 text-center text-[11px] text-muted-foreground">Audio público de prueba · voz Eric · sin datos privados</p>
-        </div>
-      )}
       <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
