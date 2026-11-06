@@ -1,3 +1,4 @@
+import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from "react";
 import { useUser } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,6 +24,7 @@ const labels: Record<AutonomyDryRunResult["status"], string> = {
 };
 
 export function AutonomySettingsSection() {
+  const t = useAdvancedSettingsText();
   const { user } = useUser();
   const universeId = user?.id ? getActiveUniverseId(user.id) : "primary";
   const client = useQueryClient();
@@ -82,7 +84,7 @@ export function AutonomySettingsSection() {
       <div className="mt-3 divide-y divide-border rounded-2xl border border-border bg-card/60">
         <div className="flex items-center gap-3 p-4">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold">Bloqueo global</div>
+            <div className="text-sm font-semibold">{t("Bloqueo global")}</div>
             <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {settings?.globalKillSwitchEngaged === false ? settings.liveExecutionEnabled ? "Pausa general desactivada; los personajes habilitados pueden actuar." : "Pausa general desactivada; el motor en vivo sigue apagado." : "Pausa general activa para todas las cuentas."}
             </div>
@@ -91,12 +93,12 @@ export function AutonomySettingsSection() {
             checked={settings?.globalKillSwitchEngaged ?? true}
             disabled={!settings || update.isPending}
             onCheckedChange={setKillSwitch}
-            aria-label="Bloqueo global de autonomía"
+            aria-label={t("Bloqueo global de autonomía")}
             data-testid="switch-autonomy-kill-switch"
           />
         </div>
 
-        {query.isLoading && <div className="p-4 text-xs text-muted-foreground">Cargando controles privados…</div>}
+        {query.isLoading && <div className="p-4 text-xs text-muted-foreground">{t("Cargando controles privados…")}</div>}
         {query.isError && (
           <div role="alert" className="p-4 text-xs text-destructive">
             No se pudieron cargar los controles de autonomía. No se habilitó ninguna cuenta.
@@ -115,7 +117,7 @@ export function AutonomySettingsSection() {
               checked={character.enabled}
               disabled={update.isPending}
               onCheckedChange={(enabled) => setCharacter(character.characterId, enabled)}
-              aria-label={`Permitir autonomía futura para ${character.displayName}`}
+              aria-label={`${t("Permitir autonomía futura para")} ${character.displayName}`}
               data-testid={`switch-autonomy-character-${character.characterId}`}
             />
             <button
@@ -125,18 +127,18 @@ export function AutonomySettingsSection() {
               className="h-9 shrink-0 rounded-xl border border-border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
               data-testid={`button-autonomy-dry-run-${character.characterId}`}
             >
-              {dryRun.isPending ? "Simulando…" : "Simular"}
+              {t(dryRun.isPending ? 'Simulando…' : 'Simular')}
             </button>
           </div>
         ))}
       </div>
 
-      {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">La simulación no se completó.</p><p className="mt-1">Código: <code>{previewError}</code>. No se ejecutó ninguna acción social.</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>Copiar código de error</button></div>}
+      {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">La simulación no se completó.</p><p className="mt-1">{t('Código:')} <code>{previewError}</code>. No se ejecutó ninguna acción social.</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>{t("Copiar código de error")}</button></div>}
       {latest && (
         <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4" aria-live="polite" data-testid="autonomy-dry-run-result">
           <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-semibold">
-              {labels[latest.status]} · {latest.preview
+              {t(labels[latest.status])} · {latest.preview
                 ? latest.preview.decision.action === "draft" ? "borrador de texto"
                   : latest.preview.decision.action === "like" ? "me gusta propuesto"
                     : latest.preview.decision.action === "react" ? `reacción propuesta ${latest.preview.decision.reaction ?? ""}`
