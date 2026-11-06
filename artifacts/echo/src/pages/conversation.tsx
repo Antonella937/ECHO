@@ -41,6 +41,7 @@ export default function ConversationPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(pending); pendingRef.current = pending;
+  const activeThreadRef = useRef(id); activeThreadRef.current = id;
   const unreadCount = messages.filter((m) => m.recipientId === me.id && !m.readBy.includes(me.id)).length;
   const byId = useMemo(() => new Map(messages.map(m => [m.id, m])), [messages]);
   const lastMineId = useMemo(() => [...messages].reverse().find(m => m.senderId === me.id)?.id, [messages, me.id]);
@@ -97,13 +98,14 @@ export default function ConversationPage() {
     setError(null);
     try { validateAttachments(files, pendingRef.current.length); }
     catch (e) { setError((e as Error).message); return; }
+    const threadAtStart = activeThreadRef.current;
     for (const f of files) {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const entry: Pending = { key, kind: kindOf(f.type)!, preview: URL.createObjectURL(f), name: f instanceof File ? f.name : 'Nota de voz', uploading: true, durationSeconds: meta?.durationSeconds };
       setPending(p => [...p, entry]);
       uploadAttachment(f).then(
-        a => setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, attachment: { ...a, ...(meta?.durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(meta.durationSeconds) } : {}) } } : x)),
-        e => setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, error: (e as Error).message || 'No se pudo subir.' } : x)),
+        a => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, attachment: { ...a, ...(meta?.durationSeconds && !a.durationSeconds ? { durationSeconds: Math.round(meta.durationSeconds) } : {}) } } : x)); },
+        e => { if (activeThreadRef.current === threadAtStart) setPending(p => p.map(x => x.key === key ? { ...x, uploading: false, error: (e as Error).message || 'No se pudo subir.' } : x)); },
       );
     }
   }, []);
