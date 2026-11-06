@@ -12,7 +12,7 @@ export interface VoiceDecisionInput {
   ownerEnabled: boolean;
   /** Provider and private media pipeline are operational. */
   engineReady: boolean;
-  /** Explicit request in the latest incoming DM. */
+  /** Explicit request in the latest incoming DM. This is never authorization by itself. */
   requestedVoice?: boolean;
   /** Character's preferred frequency of spontaneous voice notes. */
   preference?: VoicePreference;
@@ -30,7 +30,8 @@ export function chooseVoiceDelivery(input: VoiceDecisionInput): VoiceDelivery {
     input.voiceMessagesToday >= input.maxVoiceMessagesPerDay ||
     input.messageLength < 1 || input.messageLength > 500 ||
     input.remainingCharacters < input.messageLength) return "text";
-  if (input.requestedVoice) return "voice";
+  // A request from any DM participant does not override the owner-controlled policy.
+  if (input.requestedVoice && input.preference !== "off") return "voice";
   const chance = input.preference === "frequent" ? 0.28 : input.preference === "occasional" ? 0.1 : 0;
   const draw = input.random?.() ?? Math.random();
   return draw >= 0 && draw < chance ? "voice" : "text";
