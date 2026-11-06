@@ -61,17 +61,26 @@ export const MediaScopeContext = createContext<MediaScope | null>(null);
  */
 const privateMediaCache = new Map<string, string>();
 const privateMediaPending = new Set<string>();
+const privateMediaFailures = new Map<string, number>();
+const PRIVATE_MEDIA_RETRY_MS = 10_000;
 const privateMediaListeners = new Set<() => void>();
 function loadPrivateMedia(url: string) {
   if (privateMediaCache.has(url) || privateMediaPending.has(url)) return;
+  if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
   privateMediaPending.add(url);
   void customFetch<Blob>(url, { responseType: 'blob' })
     .then(blob => {
-      if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/') && !blob.type.startsWith('audio/')) return;
+      if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/') && !blob.type.startsWith('audio/')) {
+        throw new Error('El servidor devolvió un formato de archivo no compatible.');
+      }
+      privateMediaFailures.delete(url);
       privateMediaCache.set(url, URL.createObjectURL(blob));
       privateMediaListeners.forEach(notify => notify());
     })
-    .catch(error => console.warn('No se pudo mostrar un archivo privado de ECHO.', error))
+    .catch(error => {
+      privateMediaFailures.set(url, Date.now());
+      console.warn('No se pudo mostrar un archivo privado de ECHO.', error);
+    })
     .finally(() => privateMediaPending.delete(url));
 }
 export function useMediaResolver() {
