@@ -7,6 +7,7 @@ import { useUser } from '@clerk/react';
 import { ArrowLeft, ExternalLink, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
 import { Link } from 'wouter';
 import { useCreatorTranslation } from '@/lib/i18n';
+import { useCreatorHubText } from '@/lib/creator-hub-translations';
 
 /**
  * Creator Hub is the real account owner's presentation, not a fictional identity.
@@ -16,6 +17,7 @@ import { useCreatorTranslation } from '@/lib/i18n';
 export default function CreatorHubPage() {
   const { user } = useUser();
   const ct = useCreatorTranslation();
+  const ht = useCreatorHubText();
   const [hubTab, setHubTab] = useState<'perfil' | 'explorar' | 'mensajes' | 'ajustes'>('perfil');
   type Publication = {id:string;kind:'character'|'world'|'update'|'post';title:string;body:string;visibility:'public'|'followers'|'private';pinned:boolean;coverPath?:string|null;createdAt:string};
   const [publications,setPublications] = useState<Publication[]>([]);
@@ -49,7 +51,7 @@ export default function CreatorHubPage() {
       await customFetch('/api/creator-hub/social/publications',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:publicationKind,title:publicationTitle.trim(),body:publicationBody,visibility:publicationVisibility,pinned:publicationPinned,coverPath})});
       setPublicationComposer(false);setPublicationTitle('');setPublicationBody('');setPublicationPinned(false);setPublicationFile(null);
       await refreshPublications();
-    } catch {setPublicationError('No se pudo publicar. Revisá tu perfil y volvé a intentar.');}
+    } catch {setPublicationError(ht("No se pudo publicar. Revisá tu perfil y volvé a intentar."));}
     finally {setPublicationBusy(false);}
   }
   useEffect(()=>{if(user?.id)void refreshPublications();},[user?.id]);
@@ -93,10 +95,10 @@ export default function CreatorHubPage() {
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubAvatarPosition: avatarPosition } });
       await user.reload();
       setAdjustingAvatar(false);
-    } catch { setProfileError('No pudimos guardar el encuadre. Intentá nuevamente.'); }
+    } catch { setProfileError(ht("No pudimos guardar el encuadre. Intentá nuevamente.")); }
     finally { setSavingPosition(false); }
   }
-  const defaultBio = 'Tu espacio para presentar los mundos, personajes e historias que creás.';
+  const defaultBio = ht('Tu espacio para presentar los mundos, personajes e historias que creás.');
   const savedBio = typeof user?.unsafeMetadata?.creatorHubBio === 'string' ? user.unsafeMetadata.creatorHubBio : '';
   const bio = savedBio || defaultBio;
   const [editingBio, setEditingBio] = useState(false);
@@ -127,13 +129,13 @@ export default function CreatorHubPage() {
   async function saveBio() {
     if (!user) return;
     const next = bioDraft.trim();
-    if (next.length > 500) { setProfileError('La biografía puede tener hasta 500 caracteres.'); return; }
+    if (next.length > 500) { setProfileError(ht("La biografía puede tener hasta 500 caracteres.")); return; }
     setSavingBio(true); setProfileError('');
     try {
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubBio: next } });
       await user.reload();
       setEditingBio(false);
-    } catch { setProfileError('No pudimos guardar la biografía. Intentá nuevamente.'); }
+    } catch { setProfileError(ht("No pudimos guardar la biografía. Intentá nuevamente.")); }
     finally { setSavingBio(false); }
   }
   const [editingName, setEditingName] = useState(false);
@@ -153,39 +155,39 @@ export default function CreatorHubPage() {
       try {
         const parsed = new URL(normalized);
         if (parsed.protocol !== 'https:' || !parsed.hostname.includes('.') || parsed.username || parsed.password || normalized.length > 500) throw new Error('invalid');
-      } catch { setProfileError('Ingresá un enlace HTTPS válido, por ejemplo instagram.com/tuusuario.'); return; }
+      } catch { setProfileError(ht("Ingresá un enlace HTTPS válido, por ejemplo instagram.com/tuusuario.")); return; }
     }
     setSavingLink(true); setProfileError('');
     try {
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubExternalLink: normalized } });
       await user.reload();
       setEditingLink(false);
-    } catch { setProfileError('No pudimos guardar el enlace. Probá de nuevo.'); }
+    } catch { setProfileError(ht("No pudimos guardar el enlace. Probá de nuevo.")); }
     finally { setSavingLink(false); }
   }
   async function saveName() {
     const next = nameDraft.trim();
-    if (next.length < 2 || next.length > 80) { setProfileError('El nombre debe tener entre 2 y 80 caracteres.'); return; }
+    if (next.length < 2 || next.length > 80) { setProfileError(ht("El nombre debe tener entre 2 y 80 caracteres.")); return; }
     if (!user) return;
     setSaving(true); setProfileError('');
     try {
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubDisplayName: next } });
       await user.reload(); setEditingName(false);
-    } catch { setProfileError('No pudimos guardar el nombre.'); }
+    } catch { setProfileError(ht("No pudimos guardar el nombre.")); }
     finally { setSaving(false); }
   }
   async function uploadPhoto(event: ChangeEvent<HTMLInputElement>, kind: 'avatar' | 'banner') {
     const file = event.target.files?.[0];
     if (!file || !user) return;
     event.target.value = '';
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024) { setProfileError('Elegí una imagen JPG, PNG o WebP de hasta 15 MB.'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024) { setProfileError(ht("Elegí una imagen JPG, PNG o WebP de hasta 15 MB.")); return; }
     setUploading(kind); setProfileError('');
     try {
       const data = await compressImage(file, kind === 'avatar' ? 900 : 1920, 0.85);
       const ref = await uploadPrivateImage(data);
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, [kind === 'avatar' ? 'creatorHubAvatar' : 'creatorHubBanner']: ref, ...(kind === 'avatar' ? { creatorHubAvatarPosition: { x: 50, y: 50 } } : {}) } });
       await user.reload();
-    } catch { setProfileError('No pudimos guardar la imagen. Probá nuevamente.'); }
+    } catch { setProfileError(ht("No pudimos guardar la imagen. Probá nuevamente.")); }
     finally { setUploading(null); }
   }
   const defaultUsername = (user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'creator').toLowerCase().replace(/[^a-z0-9._]/g, '');
@@ -206,7 +208,7 @@ export default function CreatorHubPage() {
   }, [user?.id]);
   async function saveUsername() {
     const next = draft.trim().toLowerCase().replace(/^@/, '');
-    if (!/^[a-z0-9._]{3,30}$/.test(next)) { setError('Usá entre 3 y 30 caracteres: letras minúsculas, números, puntos o guiones bajos.'); return; }
+    if (!/^[a-z0-9._]{3,30}$/.test(next)) { setError(ht("Usá entre 3 y 30 caracteres: letras minúsculas, números, puntos o guiones bajos.")); return; }
     if (!user) return;
     setSaving(true); setError('');
     try {
@@ -215,7 +217,7 @@ export default function CreatorHubPage() {
       await user.update({ unsafeMetadata: { ...user.unsafeMetadata, creatorHubUsername: next } });
       await user.reload();
       setEditing(false);
-    } catch (err) { setError(String(err).includes('409') || String(err).includes('USERNAME_ALREADY_IN_USE') ? 'Este @usuario ya está en uso. Elegí otro.' : 'No pudimos registrar el usuario. Intentá nuevamente.'); }
+    } catch (err) { setError(String(err).includes('409') || String(err).includes('USERNAME_ALREADY_IN_USE') ? ht("Este @usuario ya está en uso. Elegí otro.") : ht("No pudimos registrar el usuario. Intentá nuevamente.")); }
     finally { setSaving(false); }
   }
   // Social account preferences are stored server-side; Clerk metadata remains the
@@ -241,7 +243,7 @@ export default function CreatorHubPage() {
         headers: { 'Content-Type': 'application/json' },
       });
       setSocialProfile(result.profile);
-    } catch { setProfileError('No pudimos guardar la privacidad. Revisá que tu @usuario esté disponible y volvé a intentar.'); }
+    } catch { setProfileError(ht("No pudimos guardar la privacidad. Revisá que tu @usuario esté disponible y volvé a intentar.")); }
     finally { setSocialSaving(false); }
   }
   const [peopleQuery, setPeopleQuery] = useState('');
