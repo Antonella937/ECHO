@@ -12,7 +12,7 @@ router.get("/account/entitlements", requireAuth, async (req, res) => {
   try {
     const ownerId = req.userId!;
     const plan = await resolveEchoPlan(ownerId);
-    const ownerFounder = lifetimeAccessForOwner(ownerId) === "owner_lifetime";
+    const lifetimeAccess = lifetimeAccessForOwner(ownerId);
     const [budget] = await db.select().from(echoVoiceBudgetsTable).where(eq(echoVoiceBudgetsTable.ownerId, ownerId)).limit(1);
     const monthKey = new Date().toISOString().slice(0, 7);
     const [monthly] = await db.select({ used: sql<number>`coalesce(sum(${echoVoiceUsageTable.characters}),0)` })
@@ -24,7 +24,7 @@ router.get("/account/entitlements", requireAuth, async (req, res) => {
     const usedMessagesToday = Number(daily?.used ?? 0);
     const monthlyLimit = eligible ? (budget?.monthlyCharacterLimit ?? 0) : 0;
     const dailyLimit = eligible ? (budget?.maxDailyMessages ?? 0) : 0;
-    res.json({ plan, lifetimeAccess: ownerFounder ? "owner_lifetime" : null, billingExempt: ownerFounder, features: { basicVoices: eligible, customVoices: false, music: false, videos: false },
+    res.json({ plan, lifetimeAccess, billingExempt: lifetimeAccess !== null, features: { basicVoices: eligible, customVoices: false, music: false, videos: false },
       voice: { enabled: eligible && budget?.enabled === true, engineConfigured: Boolean(process.env.ECHO_KOKORO_TTS_URL),
         preference: eligible ? (budget?.preference ?? "off") : "off", monthlyCharacterLimit: monthlyLimit,
         usedCharacters, remainingCharacters: Math.max(0, monthlyLimit - usedCharacters),
