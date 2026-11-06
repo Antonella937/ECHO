@@ -29,7 +29,7 @@ const GenerateInput = Input.extend({
 /** Select one primary photo per mentioned person first, then fill remaining slots. */
 function sceneReferences(people: any[]): { paths: string[]; labels: string[] } {
   const valid = (value: unknown): value is string => typeof value === 'string'
-    && /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(value);
+    && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(value);
   const perPerson = people.map(person => [...new Set([
     person.avatar, ...(Array.isArray(person.identity?.referenceImages) ? person.identity.referenceImages : []),
   ].filter(valid))]);
@@ -49,7 +49,7 @@ function scenePrompt(people: any[], scene: string, style: keyof typeof imageStyl
       characters: people.map(person => ({ name: String(person.name ?? ''), identity: person.identity ?? {} })),
       scene, style,
     });
-  return base + (labels.length ? '\\nReference image order: ' +
+  return base + (labels.length ? '\nReference image order: ' +
     labels.map((name, index) => `image ${index + 1} = ${name}`).join('; ') +
     '. Match each reference ONLY to its named person.' : '');
 }
@@ -184,7 +184,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
     const people = resolveSceneCharacters(input.data.prompt, character, characters as any[]);
-    const { paths: references, labels } = sceneReferences(people);
+    const { paths: referencePaths, labels } = sceneReferences(people);
     const preparedPrompt = scenePrompt(people, input.data.prompt, selected, labels);
     const result = await generateCharacterImage({
       ownerId: req.userId!, universeId: input.data.universeId,
