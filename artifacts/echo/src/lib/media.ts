@@ -184,13 +184,21 @@ export async function uploadPrivateFile(file: Blob): Promise<import('@/domain/ty
     throw new Error('No se pudo conectar con Supabase para subir el audio. Comprobá la conexión o las restricciones de Safari.');
   }
   if (!upload.ok) {
-    if (upload.status === 400 || upload.status === 415 || upload.status === 422)
-      throw new Error(`Supabase rechazó el formato del audio (HTTP ${upload.status}). Revisá los tipos MIME permitidos en el bucket echo-media.`);
-    if (upload.status === 413)
-      throw new Error('Supabase rechazó el tamaño del archivo (HTTP 413).');
-    if (upload.status === 401 || upload.status === 403)
-      throw new Error(`Supabase rechazó la autorización de subida (HTTP ${upload.status}).`);
-    throw new Error(`Falló la transferencia al almacenamiento privado (HTTP ${upload.status}).`);
+    // A 400 from Supabase can mean a disallowed MIME type, an invalid signed URL,
+    // or a different storage policy. Don't guess: show the upstream error safely.
+    let reason = '';
+    try {
+      const body = await upload.text();
+      const parsed: unknown = JSON.parse(body);
+      if (parsed && typeof parsed === 'object') {
+        const detail = parsed as Record<string, unknown>;
+        const parts = [detail.error, detail.message].filter((value): value is string => typeof value === 'string');
+        reason = parts.join(': ').slice(0, 240);
+      }
+      if (!reason && body) reason = body.replace(/<[^>]*>/g, '').trim().slice(0, 180);
+    } catch { /* Some storage failures have no readable response body. */ }
+    const suffix = reason ? ` — ${reason}` : '';
+    throw new Error(`Supabase rechazó la subida (HTTP ${upload.status})${suffix}`);
   }
   const claimed = await customFetch<{ objectPath: string }>('/api/storage/uploads/claim', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
