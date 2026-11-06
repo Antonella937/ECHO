@@ -4,7 +4,9 @@ import { MotionConfig } from 'framer-motion';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
-import { esES } from '@clerk/localizations';
+import { esES, enUS, ptBR, frFR, deDE, itIT, koKR, jaJP, zhCN } from '@clerk/localizations';
+import { useLanguage, getLanguage } from '@/lib/i18n';
+import { PublicLanguageSelector } from '@/components/echo/public-language-selector';
 import { shadcn } from '@clerk/themes';
 import {
   getGetUniverseQueryKey,
@@ -158,6 +160,7 @@ function SignInPage() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-[440px]">
+        <div className="mb-4 flex justify-end"><PublicLanguageSelector /></div>
         <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
         <SignIn
           routing="path"
@@ -171,11 +174,12 @@ function SignInPage() {
 }
 
 function SignUpPage() {
+  const language = useLanguage();
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-[440px]">
         <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
-        <p className="mb-4 text-center text-sm text-muted-foreground">Antes de crear tu cuenta, <Link href="/beta-info" className="underline">leé la información de la beta privada</Link>.</p>
+        <p className="mb-4 text-center text-sm text-muted-foreground">{language === "es" ? "Antes de crear tu cuenta, " : "Before creating your account, "}<Link href="/beta-info" className="underline">{language === "es" ? "leé la información de la beta privada" : "read the private beta information"}</Link>.</p>
         <SignUp
           routing="path"
           path={`${basePath}/sign-up`}
@@ -367,6 +371,8 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
+  const language = useLanguage();
+  const clerkLocale = { es: esES, en: enUS, pt: ptBR, fr: frFR, de: deDE, it: itIT, ko: koKR, ja: jaJP, zh: zhCN }[language];
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
@@ -374,25 +380,7 @@ function ClerkRoutes() {
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
-      localization={{
-        ...esES,
-        signIn: {
-          ...esES.signIn,
-          start: {
-            ...(esES.signIn?.start ?? {}),
-            title: 'Te damos la bienvenida',
-            subtitle: 'Inicia sesión para volver a tu universo.',
-          },
-        },
-        signUp: {
-          ...esES.signUp,
-          start: {
-            ...(esES.signUp?.start ?? {}),
-            title: 'Crea tu espacio privado',
-            subtitle: 'Tus personajes y recuerdos estarán en tu cuenta.',
-          },
-        },
-      }}
+      localization={clerkLocale}
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
@@ -437,7 +425,7 @@ function App() {
   if (!clerkPubKey) throw new Error('Falta la clave pública de Clerk para iniciar ECHO.');
   useEffect(() => {
     if (!document.documentElement.classList.contains('theme-light')) document.documentElement.classList.add('dark');
-    document.documentElement.lang = 'es';
+    document.documentElement.lang = getLanguage();
   }, []);
   return (
     <MotionConfig reducedMotion="user">
