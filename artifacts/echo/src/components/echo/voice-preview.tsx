@@ -17,11 +17,13 @@ export function VoicePreview({ src, durationSeconds, uploading, error, onRetry, 
   const [playError, setPlayError] = useState(false);
 
   useEffect(() => {
+    audioRef.current?.pause();
+    audioRef.current?.load();
     setPlaying(false);
     setPosition(0);
     setDuration(durationSeconds ?? 0);
     setPlayError(false);
-  }, [src, durationSeconds]);
+  }, [src]);
 
   const toggle = async () => {
     const audio = audioRef.current;
@@ -36,7 +38,7 @@ export function VoicePreview({ src, durationSeconds, uploading, error, onRetry, 
       <audio
         ref={audioRef}
         src={src}
-        preload="metadata"
+        preload="auto"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => { setPlaying(false); setPosition(0); }}
