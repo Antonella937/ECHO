@@ -281,6 +281,11 @@ export default function ConversationPage() {
             ))}
           </ul>
         )}
+        {pending.some(p => p.transcriptionWarning) && (
+          <div role="status" className="mb-2 rounded-lg border border-amber-500/40 px-3 py-2 text-xs">
+            {pending.filter(p => p.transcriptionWarning).map(p => <p key={p.key}>{p.transcriptionWarning}</p>)}
+          </div>
+        )}
         {pending.some(p => p.error) && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="attachment-upload-error">
             {pending.filter(p => p.error).map(p => <p key={p.key} className="break-words">{p.error}</p>)}
