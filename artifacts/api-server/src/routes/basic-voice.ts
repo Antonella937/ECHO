@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canUseBasicVoices } from "../lib/entitlements";
+import { reserveVoiceNarration, completeVoiceNarration } from "../autonomy/voice-adapter";
 import { readUniverse } from "../lib/universeRepository";
 import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -44,18 +45,22 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
     const recent = (recentRequests.get(req.userId!) ?? []).filter(time => now - time < 60_000);
     if (recent.length >= 5) { res.status(429).json({ error: "VOICE_RATE_LIMITED" }); return; }
     recent.push(now); recentRequests.set(req.userId!, recent);
+    const reservation = await reserveVoiceNarration(req.userId!, characterId, text.trim());
+    if (!reservation) { res.status(429).json({ error: "VOICE_BUDGET_EXHAUSTED_OR_DISABLED" }); return; }
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
       body: JSON.stringify({ model: "kokoro", input: text.trim(), voice, response_format: "wav" }),
       signal: AbortSignal.timeout(45000),
     });
-    if (!response.ok) { res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
+    if (!response.ok) { await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
     const data = Buffer.from(await response.arrayBuffer());
     if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
         data.toString("ascii", 8, 12) !== "WAVE") {
+      await completeVoiceNarration(req.userId!, reservation, false);
       res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
     }
+    await completeVoiceNarration(req.userId!, reservation, true);
     res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Cache-Control", "private, no-store");
     res.send(data);
@@ -96,18 +101,22 @@ router.post("/voices/basic/listen", requireAuth, async (req, res) => {
     const recent = (recentRequests.get(req.userId!) ?? []).filter(time => now - time < 60_000);
     if (recent.length >= 5) { res.status(429).json({ error: "VOICE_RATE_LIMITED" }); return; }
     recent.push(now); recentRequests.set(req.userId!, recent);
+    const reservation = await reserveVoiceNarration(req.userId!, characterId, text);
+    if (!reservation) { res.status(429).json({ error: "VOICE_BUDGET_EXHAUSTED_OR_DISABLED" }); return; }
     const response = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json",
         ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
       body: JSON.stringify({ model: "kokoro", input: text, voice, response_format: "wav" }),
       signal: AbortSignal.timeout(45000),
     });
-    if (!response.ok) { res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
+    if (!response.ok) { await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
     const data = Buffer.from(await response.arrayBuffer());
     if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
       data.toString("ascii", 8, 12) !== "WAVE") {
+      await completeVoiceNarration(req.userId!, reservation, false);
       res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
     }
+    await completeVoiceNarration(req.userId!, reservation, true);
     res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Cache-Control", "private, no-store");
     res.send(data);
