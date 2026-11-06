@@ -39,7 +39,7 @@ export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
-  const { me, character, actions, state } = useSocial();
+  const { me, character, actions, dispatch, state } = useSocial();
   const other = character(id);
   const messages = useThreadMessages(id);
   const back = useBack();
@@ -197,7 +197,7 @@ export default function ConversationPage() {
   const sendVoiceDemo = () => {
     if (!canTestFreeVoice) return;
     const demoText = "Hey! This is a brand new voice message, generated just for this test. I'll remember what I said.";
-    actions.dispatch({ type: 'message.sent', message: {
+    dispatch({ type: 'message.sent', message: {
       id: `voice-demo-${crypto.randomUUID()}`,
       threadId: threadIdFor(me.id, other.id),
       senderId: other.id, recipientId: me.id,
