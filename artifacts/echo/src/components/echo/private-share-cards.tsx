@@ -17,7 +17,7 @@ export interface PrivateShareCardsProps {
 }
 
 const SERIF = "'Instrument Serif', Georgia, serif";
-const card = 'rounded-[18px] border border-[rgba(239,220,232,.1)] bg-[rgba(255,255,255,.025)] p-4';
+const card = 'min-w-0 rounded-[18px] border border-[rgba(239,220,232,.12)] bg-[rgba(255,255,255,.025)] p-4 sm:p-5';
 const overline = 'text-[9px] font-bold uppercase tracking-[.17em] text-[#d9a8bd]';
 const disabledBtn =
   'tap inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[rgba(239,220,232,.14)] bg-transparent px-3 text-[11px] font-semibold text-[#cbb9c5] opacity-55 cursor-not-allowed';
@@ -28,7 +28,7 @@ function LinkRow({ label }: { label: string }) {
     <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-[rgba(217,168,189,.22)] px-3 py-2">
       <span className="text-[9px] uppercase tracking-[.13em] text-[#8f8790]">{t("Enlace")}</span>
       <span className="min-w-0 flex-1 text-[11px] text-[#8f8790]" aria-label={`${t("Enlace de")} ${t(label)} ${t("no disponible")}`}>
-        No disponible
+        {t('no disponible')}
       </span>
     </div>
   );
@@ -39,10 +39,10 @@ function ShareActions({ label }: { label: string }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`${t("Copiar enlace de")} ${t(label)} (${t("no disponible")})`}>
-        Copiar enlace
+        {t('Copiar enlace')}
       </button>
       <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`${t("Compartir")} ${t(label)} (${t("no disponible")})`}>
-        Compartir
+        {t('Compartir')}
       </button>
     </div>
   );
@@ -63,14 +63,14 @@ export function PrivateShareCards({ universeName, description, creatorName, char
         <h2 id={`${noteId}-h`} className="m-0 text-[22px] font-normal" style={{ fontFamily: SERIF }}>{t("Tarjetas para compartir")}</h2>
         <p id={noteId} className="mt-1 mb-0 flex gap-2 text-[11px] leading-relaxed text-[#a59ba4]" data-testid="text-share-dependency">
           <span aria-hidden="true" className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#d9a8bd]" />
-          Esta vista es privada y solo visible para ti. Compartir requiere un enlace autorizado que aún no está disponible.
+          {t("Esta vista es privada y solo visible para ti. Compartir requiere un enlace autorizado que aún no está disponible.")}
         </p>
       </div>
 
-      <div className="grid min-w-0 gap-3 md:grid-cols-2">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
         <article className={card} aria-labelledby={`${noteId}-u`} data-testid="card-share-universe">
           <span className={overline}>{t("Universo")}</span>
-          <div className="mt-3 w-full overflow-hidden rounded-[14px]" style={{ containerType: 'inline-size' }}>
+          <div className="epc-share-cover mt-3 w-full overflow-hidden rounded-[14px]" style={{ containerType: 'inline-size' }}>
             <UniverseCover name={universeName} />
           </div>
           <h3 id={`${noteId}-u`} className="mt-3 mb-0 text-[21px] font-normal leading-tight [overflow-wrap:anywhere]" style={{ fontFamily: SERIF }}>
@@ -78,8 +78,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
           </h3>
           {description ? <p className="mt-1 mb-0 text-[11px] leading-relaxed text-[#a59ba4] [overflow-wrap:anywhere]">{description}</p> : null}
           {creatorName ? <p className="mt-2 mb-0 text-[10px] text-[#8f8790]">{t("Por")} {creatorName}</p> : null}
-          <LinkRow label="universo" />
-          <ShareActions label="universo" />
+          <div className="mt-auto"><LinkRow label="universo" /><ShareActions label="universo" /></div>
         </article>
 
         <article className={card} aria-labelledby={`${noteId}-c`} data-testid="card-share-character">
@@ -118,8 +117,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
                   <p className="mt-1 mb-0 text-[10px] text-[#8f8790] [overflow-wrap:anywhere]">{t("En")} {universeName}</p>
                 </div>
               </div>
-              <LinkRow label="personaje" />
-              <ShareActions label="personaje" />
+              <div className="mt-auto"><LinkRow label="personaje" /><ShareActions label="personaje" /></div>
             </>
           ) : (
             <p id={`${noteId}-c`} className="mt-4 mb-0 text-[11px] text-[#a59ba4]">{t("Este universo aún no tiene personajes.")}</p>
