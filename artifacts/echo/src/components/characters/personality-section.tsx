@@ -44,15 +44,27 @@ export function PersonalitySection({ config, set }: SectionProps) {
           ? <>Voz elegida: <strong>{BASIC_VOICES.find(voice => voice.id === v.basicVoiceId)?.label}</strong>. Guardá el personaje para conservarla.</>
           : <>Todavía no elegiste una voz. Podés dejar esta configuración pendiente.</>}
       </div>
-      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Voz básica del personaje" data-testid="basic-voice-catalog">
-        {BASIC_VOICES.map(voice => (
-          <button key={voice.id} type="button" role="radio" aria-checked={v.basicVoiceId === voice.id}
-            onClick={() => upV({ basicVoiceId: voice.id })}
-            className={`min-h-16 rounded-xl border p-3 text-left text-sm ${v.basicVoiceId === voice.id ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card'}`}
-            data-testid={`basic-voice-${voice.id}`}>
-            <span className="block font-semibold">{voice.label}</span>
-            <span className="text-xs text-muted-foreground">{voice.gender === 'female' ? 'Femenina' : 'Masculina'} · {voice.language}</span>
-          </button>
+      <div className="space-y-4" data-testid="basic-voice-catalog">
+        {(['female', 'male'] as const).map(gender => (
+          <fieldset key={gender}>
+            <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {gender === 'female' ? 'Voces femeninas' : 'Voces masculinas'}
+            </legend>
+            <div className="grid grid-cols-2 gap-2">
+              {BASIC_VOICES.filter(voice => voice.gender === gender).map(voice => (
+                <label key={voice.id} className={`relative flex min-h-16 cursor-pointer items-center rounded-xl border p-3 text-sm transition-colors ${v.basicVoiceId === voice.id ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card'}`}
+                  data-testid={`basic-voice-${voice.id}`}>
+                  <input type="radio" name="character-basic-voice" value={voice.id}
+                    checked={v.basicVoiceId === voice.id} onChange={() => upV({ basicVoiceId: voice.id })}
+                    className="sr-only" />
+                  <span className="block min-w-0">
+                    <span className="block font-semibold">{voice.label}{v.basicVoiceId === voice.id ? ' ✓' : ''}</span>
+                    <span className="block text-xs text-muted-foreground">{voice.language === 'en-US' ? 'Inglés · EE. UU.' : 'Inglés · Reino Unido'}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         ))}
       </div>
       <button type="button" className="mt-2 text-xs text-muted-foreground underline" onClick={() => upV({ basicVoiceId: undefined })}>Sin voz seleccionada</button>
