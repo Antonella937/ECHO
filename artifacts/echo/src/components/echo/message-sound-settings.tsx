@@ -1,8 +1,10 @@
+import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from 'react';
 import { Bell, Volume2 } from 'lucide-react';
 import { getSoundPreferences, saveSoundPreferences, playMessageSound, unlockMessageAudio, type SoundPreferences } from '@/lib/message-sounds';
 
 export function MessageSoundSettings() {
+  const t = useAdvancedSettingsText();
   const [prefs, setPrefs] = useState<SoundPreferences>(getSoundPreferences);
   const update = (kind: keyof SoundPreferences, checked: boolean) => {
     const next = { ...prefs, [kind]: checked };
@@ -17,17 +19,17 @@ export function MessageSoundSettings() {
         <Bell className="h-4 w-4" /> Sonidos de mensajes
       </h2>
       <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
-        <p className="mb-3 text-xs text-muted-foreground">Tonos suaves estilo iPhone, exclusivos de ECHO.</p>
+        <p className="mb-3 text-xs text-muted-foreground">{t("Tonos suaves estilo iPhone, exclusivos de ECHO.")}</p>
         {([{ key: 'incoming', label: 'Mensajes recibidos' }, { key: 'outgoing', label: 'Mensajes enviados' }, { key: 'notification', label: 'Notificaciones' }] as const).map(({ key, label }) => (
           <label key={key} className="flex min-h-12 items-center justify-between gap-3 border-b border-border/50 text-sm last:border-0">
-            <span>{label}</span>
+            <span>{t(label)}</span>
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={prefs[key]} onChange={e => update(key, e.target.checked)} />
           </label>
         ))}
         <button type="button" onClick={() => { unlockMessageAudio(); playMessageSound('incoming'); }} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold">
           <Volume2 className="h-4 w-4" /> Probar sonido
         </button>
-        <p className="mt-3 text-xs text-muted-foreground">Los sonidos funcionan mientras ECHO está abierto y el navegador permite audio. Las notificaciones push en segundo plano requieren una implementación aparte.</p>
+        <p className="mt-3 text-xs text-muted-foreground">{t("Los sonidos funcionan mientras ECHO está abierto y el navegador permite audio. Las notificaciones push en segundo plano requieren una implementación aparte.")}</p>
       </div>
     </section>
   );
