@@ -135,6 +135,11 @@ export function createCreatorHubSocialRouter(): IRouter {
     if (blocked.rowCount) { res.status(403).json({ error: "MESSAGES_NOT_ALLOWED" }); return; }
     const eligible = await pool.query("SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1", [parsed.data.targetOwnerId]);
     if (!eligible.rowCount) { res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+    const permission = await pool.query(
+      "SELECT 1 FROM echo_creator_message_requests WHERE status='accepted' AND ((sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1)) UNION SELECT 1 FROM echo_creator_direct_messages WHERE (sender_owner_id=$1 AND recipient_owner_id=$2) OR (sender_owner_id=$2 AND recipient_owner_id=$1) UNION SELECT 1 FROM echo_creator_profiles WHERE owner_id=$2 AND message_privacy='everyone' LIMIT 1",
+      [req.userId, parsed.data.targetOwnerId],
+    );
+    if (!permission.rowCount) { res.status(403).json({ error: "MESSAGE_REQUEST_REQUIRED" }); return; }
     if (parsed.data.typing) await pool.query("INSERT INTO echo_creator_typing_presence(sender_owner_id,recipient_owner_id,expires_at) VALUES($1,$2,now()+interval '6 seconds') ON CONFLICT(sender_owner_id,recipient_owner_id) DO UPDATE SET expires_at=excluded.expires_at", [req.userId, parsed.data.targetOwnerId]);
     else await pool.query("DELETE FROM echo_creator_typing_presence WHERE sender_owner_id=$1 AND recipient_owner_id=$2", [req.userId, parsed.data.targetOwnerId]);
     res.json({ ok: true });
