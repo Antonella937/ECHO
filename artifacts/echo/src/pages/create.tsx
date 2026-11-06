@@ -252,7 +252,7 @@ export default function CreatePage() {
             <div className="truncate text-sm font-semibold" data-testid="text-posting-as">{me.name} · @{me.handle}</div>
           </div>
           <Link href="/settings" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-4 text-xs font-semibold" data-testid="link-create-switch">
-            <RefreshCw className="h-3.5 w-3.5" /> Cambiar
+            <RefreshCw className="h-3.5 w-3.5" /> {t("Cambiar")}
           </Link>
         </div>
 
