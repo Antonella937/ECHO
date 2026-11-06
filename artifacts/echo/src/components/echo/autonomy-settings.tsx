@@ -32,6 +32,7 @@ export function AutonomySettingsSection() {
   const update = useUpdateAutonomySettings();
   const dryRun = useRunAutonomyDryRun();
   const [latest, setLatest] = useState<AutonomyDryRunResult | null>(null);
+  const [simulatingCharacterId, setSimulatingCharacterId] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const settings = query.data;
   const updateCache = (next: NonNullable<typeof settings>) => {
@@ -58,15 +59,17 @@ export function AutonomySettingsSection() {
       toast({ title: t("Este navegador no permite iniciar una simulación segura"), variant: "destructive" });
       return;
     }
+    setSimulatingCharacterId(characterId);
     dryRun.mutate(
       { data: { characterId, idempotencyKey: globalThis.crypto.randomUUID(), universeId } },
       {
-        onSuccess: (result) => { setPreviewError(null); setLatest(result); },
+        onSuccess: (result) => { setPreviewError(null); setLatest(result); setSimulatingCharacterId(null); },
         onError: (error) => {
           const candidate = error as { data?: { error?: unknown }; response?: { data?: { error?: unknown } }; message?: unknown };
           const code = candidate.data?.error ?? candidate.response?.data?.error;
           const safeCode = typeof code === "string" && /^[A-Z][A-Z0-9_]{2,80}$/.test(code) ? code : "AUTONOMY_PREVIEW_UNAVAILABLE";
           setPreviewError(safeCode);
+          setSimulatingCharacterId(null);
           toast({ title: t("No se pudo completar la simulación"), description: `${t("Código:")} ${safeCode}. ${t("No se ejecutó ninguna acción social.")}`, variant: "destructive" });
         },
       },
@@ -122,12 +125,12 @@ export function AutonomySettingsSection() {
             />
             <button
               type="button"
-              disabled={dryRun.isPending || query.isLoading}
+              disabled={(dryRun.isPending && simulatingCharacterId === character.characterId) || query.isLoading}
               onClick={() => runPreview(character.characterId)}
               className="h-9 shrink-0 rounded-xl border border-border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
               data-testid={`button-autonomy-dry-run-${character.characterId}`}
             >
-              {t(dryRun.isPending ? 'Simulando…' : 'Simular')}
+              {t(dryRun.isPending && simulatingCharacterId === character.characterId ? 'Simulando…' : 'Simular')}
             </button>
           </div>
         ))}
