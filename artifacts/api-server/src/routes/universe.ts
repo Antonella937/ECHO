@@ -16,6 +16,8 @@ import { approveRelationshipProgression } from "../lib/relationshipApproval";
 import { approveTrustEvent } from "../lib/relationshipTrustApproval";
 import { approveTensionEvent } from "../lib/relationshipTensionApproval";
 import { approveAttractionEvent } from "../lib/relationshipAttractionApproval";
+import { approveRelationshipTransition } from "../lib/relationshipTransitionApproval";
+import { proposeRelationshipTransitions, type RelationshipPreset } from "../lib/relationshipTransitions";
 import type { AttractionEventKind } from "../lib/relationshipAttraction";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { assessTrustContext } from "../lib/relationshipTrustContext";
@@ -392,6 +394,57 @@ router.post("/universe/relationships/attraction/approve", async (req, res): Prom
   const result = await approveAttractionEvent(
     req.userId!, universeId, actorId, targetId, sourceId,
     kind as AttractionEventKind, revision as number,
+  );
+  if (!result.applied) {
+    res.status(["REVISION_CONFLICT", "UNIVERSE_UNAVAILABLE"].includes(result.reason) ? 409 : 422).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.get("/universe/relationships/transitions", async (req, res): Promise<void> => {
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const actorId = req.query.actorId, targetId = req.query.targetId;
+  if (typeof actorId !== "string" || !actorId || actorId.length > 100 ||
+      typeof targetId !== "string" || !targetId || targetId.length > 100 || universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_TRANSITION_QUERY" }); return;
+  }
+  const [universe] = await db.select().from(echoUniversesTable).where(and(
+    eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId),
+  )).limit(1);
+  if (!universe || universe.archivedAt || universe.deletedAt) {
+    res.status(404).json({ error: "UNIVERSE_UNAVAILABLE" }); return;
+  }
+  const parsed = SaveUniverseBody.shape.state.safeParse(universe.state);
+  if (!parsed.success) { res.status(422).json({ error: "INVALID_SAVED_STATE" }); return; }
+  const proposals = proposeRelationshipTransitions(parsed.data, actorId, targetId);
+  const history = await db.select({
+    memoryId: echoMemoryArchiveTable.memoryId, content: echoMemoryArchiveTable.content,
+    occurredAt: echoMemoryArchiveTable.occurredAt,
+  }).from(echoMemoryArchiveTable).where(and(
+    eq(echoMemoryArchiveTable.ownerId, req.userId!), eq(echoMemoryArchiveTable.universeId, universeId),
+    eq(echoMemoryArchiveTable.characterId, actorId), eq(echoMemoryArchiveTable.targetId, targetId),
+    eq(echoMemoryArchiveTable.kind, "relationship_transition"),
+  )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(30);
+  res.json({ revision: universe.revision, proposals, history });
+});
+
+router.post("/universe/relationships/transitions/approve", async (req, res): Promise<void> => {
+  const body = req.body as Record<string, unknown> | null;
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const actorId = body?.actorId, targetId = body?.targetId;
+  const from = body?.from, to = body?.to, revision = body?.expectedRevision;
+  const presets: readonly string[] = ["stranger", "acquaintance", "friend", "close_friend", "family", "crush", "romantic_tension", "partner", "ex", "rival", "custom"];
+  if (typeof actorId !== "string" || !actorId || actorId.length > 100 ||
+      typeof targetId !== "string" || !targetId || targetId.length > 100 ||
+      typeof from !== "string" || !presets.includes(from) ||
+      typeof to !== "string" || !presets.includes(to) ||
+      !Number.isSafeInteger(revision) || (revision as number) < 1 || universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_TRANSITION_APPROVAL" }); return;
+  }
+  const result = await approveRelationshipTransition(
+    req.userId!, universeId, actorId, targetId,
+    from as RelationshipPreset, to as RelationshipPreset, revision as number,
   );
   if (!result.applied) {
     res.status(["REVISION_CONFLICT", "UNIVERSE_UNAVAILABLE"].includes(result.reason) ? 409 : 422).json(result);
