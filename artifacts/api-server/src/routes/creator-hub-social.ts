@@ -13,7 +13,7 @@ const profileSchema = z.object({
 }).strict();
 const searchSchema = z.object({ q: z.string().trim().min(2).max(80) }).strict();
 const targetSchema = z.object({ targetOwnerId: z.string().min(1).max(255) }).strict();
-const requestSchema = z.object({ requestId: z.string().uuid() }).strict();
+const requestSchema = z.object({ requestId: z.string().uuid(), action: z.enum(["accept", "reject"]) }).strict();
 
 export function createCreatorHubSocialRouter(): IRouter {
   const router: IRouter = Router();
