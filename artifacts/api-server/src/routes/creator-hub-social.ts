@@ -99,6 +99,23 @@ export function createCreatorHubSocialRouter(): IRouter {
     res.json({ profiles: result.rows });
   });
 
+  router.get("/creator-hub/social/profile/:ownerId", async (req, res) => {
+    const ownerId = req.params.ownerId;
+    if (!ownerId || ownerId.length > 255) { res.status(400).json({ error: "INVALID_OWNER" }); return; }
+    const result = await pool.query(
+      `SELECT p.display_name AS "displayName", p.username, p.visibility, p.bio,
+         EXISTS (SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$1 AND f.followed_owner_id=$2) AS following,
+         EXISTS (SELECT 1 FROM echo_creator_follow_requests r WHERE r.requester_owner_id=$1 AND r.target_owner_id=$2 AND r.status='pending') AS requested
+       FROM echo_creator_profiles p WHERE p.owner_id=$2
+       AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b WHERE
+         (b.blocker_owner_id=$1 AND b.blocked_owner_id=$2) OR
+         (b.blocker_owner_id=$2 AND b.blocked_owner_id=$1))`,
+      [req.userId, ownerId],
+    );
+    if (!result.rowCount) { res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
+    res.json({ profile: result.rows[0] });
+  });
+
   router.post("/creator-hub/social/follow", async (req, res) => {
     const parsed = targetSchema.safeParse(req.body);
     if (!parsed.success || parsed.data.targetOwnerId === req.userId) {
