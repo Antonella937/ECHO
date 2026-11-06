@@ -1,3 +1,4 @@
+import { validMediaHeader } from "../lib/mediaSafety";
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { pool } from "@workspace/db";
@@ -180,6 +181,32 @@ export function createCreatorHubSocialRouter(): IRouter {
         [req.userId, objectPath],
       );
       if (!owned.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
+      // A registered object is not proof of its type: independently inspect
+      // the private stored bytes before linking them to a human DM.
+      const supabaseBase = process.env.SUPABASE_URL?.replace(/\\/$/, "");
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseBase || !supabaseKey || !/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(supabaseBase)) {
+        await client.query("ROLLBACK"); res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); return;
+      }
+      const stored = await fetch(supabaseBase + "/storage/v1/object/echo-media/" + objectPath.slice("/objects/".length), {
+        headers: { Authorization: "Bearer " + supabaseKey, apikey: supabaseKey },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!stored.ok) { await client.query("ROLLBACK"); res.status(400).json({ error: "VOICE_UPLOAD_MISSING" }); return; }
+      const mime = (stored.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
+      if (!["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"].includes(mime)) {
+        await client.query("ROLLBACK"); res.status(415).json({ error: "VOICE_FORMAT_UNSUPPORTED" }); return;
+      }
+      const maxBytes = 15 * 1024 * 1024;
+      const length = Number(stored.headers.get("content-length"));
+      if (Number.isFinite(length) && length > maxBytes) {
+        await client.query("ROLLBACK"); res.status(413).json({ error: "VOICE_TOO_LARGE" }); return;
+      }
+      const bytes = Buffer.from(await stored.arrayBuffer());
+      if (!bytes.length || bytes.length > maxBytes || !validMediaHeader(bytes.subarray(0, 64), mime)) {
+        await client.query("ROLLBACK"); res.status(400).json({ error: "INVALID_VOICE_BYTES" }); return;
+      }
+
       const target = await client.query("SELECT message_privacy FROM echo_creator_profiles WHERE owner_id=$1 FOR UPDATE", [targetOwnerId]);
       if (!target.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
       const blocked = await client.query("SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)", [req.userId,targetOwnerId]);
