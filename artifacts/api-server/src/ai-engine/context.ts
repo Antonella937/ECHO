@@ -162,11 +162,12 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     .sort((a, b) => b.score - a.score || b.item.occurredAt.getTime() - a.item.occurredAt.getTime())
     .slice(0, 3).map(entry => ({ sourceId: entry.item.sourceId, kind: entry.item.kind,
       targetId: entry.item.targetId, text: entry.item.content.slice(0, 400), createdAt: entry.item.occurredAt })) : [];
-  // Recall older transcribed voice notes from this exact DM, even after they
+  // Recall both sent and received transcribed voice notes from this exact DM, even after they
   // leave the last-ten-message window. The original attachment stays private;
   // only its user-reviewed transcript (already persisted as message text) is used.
   const olderVoiceNotes = dmTargetId ? state.messages
-    .filter(m => m.recipientId === actor.id && m.senderId === dmTargetId &&
+    .filter(m => ((m.recipientId === actor.id && m.senderId === dmTargetId) ||
+      (m.senderId === actor.id && m.recipientId === dmTargetId)) &&
       !m.hiddenForIds?.includes(actor.id) &&
       m.attachments?.some(a => a.type === 'audio') &&
       m.text.includes('[Transcripción de nota de voz]:') &&
