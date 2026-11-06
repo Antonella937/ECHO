@@ -120,8 +120,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       {!inConversation && (
-        <nav className="echo-dark-surface fixed inset-x-0 bottom-0 z-40 px-3 pb-safe lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
-          <div className="mx-auto mb-1 flex h-[var(--nav-height)] max-w-[440px] items-center justify-around rounded-[26px] border border-border/80 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
+        <nav className="echo-dark-surface fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom,0px),0.25rem)] lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
+          <div className="mx-auto mb-0 flex h-[var(--nav-height)] max-w-[440px] items-center justify-around rounded-[26px] border border-border/80 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
             {items.map((it) => {
               const active = it.match(location);
               return (
