@@ -326,11 +326,12 @@ html.theme-light {
   [data-testid="form-composer"] { padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem); }
 }
 
-/* iOS Safari/PWA: use the visual viewport from first paint, not the
-   larger layout viewport that settles only after the first scroll. */
+/* Keep mobile navigation anchored to the viewport bottom from first paint.
+   Avoid visualViewport-derived top coordinates, which jump on iOS scroll. */
 @media (max-width: 1023px) {
   .echo-mobile-nav {
-    bottom: auto !important;
-    top: calc(var(--echo-visible-bottom, 100dvh) - var(--nav-height) - max(env(safe-area-inset-bottom, 0px), 0.25rem));
+    position: fixed;
+    top: auto;
+    bottom: 0;
   }
 }
