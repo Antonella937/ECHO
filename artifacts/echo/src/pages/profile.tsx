@@ -116,7 +116,7 @@ export default function ProfilePage() {
               <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Cambiar identidad")}
             </Link>
             <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character-me">
-              Ficha de personaje
+              {t("Ficha de personaje")}
             </Link>
           </div>
         ) : (
@@ -143,7 +143,7 @@ export default function ProfilePage() {
               <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Editar perfil")}
             </button>
             <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character">
-              Ficha de personaje
+              {t("Ficha de personaje")}
             </Link>
           </div>
         )}
