@@ -22,7 +22,7 @@ function PublicHeader({ previewMode = false }: { previewMode?: boolean }) {
   return (
     <header className="ep-nav">
       <Link href={publicPreviewHref('/', previewMode)} className="ep-brand" aria-label="ECHO, inicio" data-testid="link-echo-home">
-        <span className="ep-mark" aria-hidden="true">e</span><span>ECHO</span>
+        <span className="ep-mark" aria-hidden="true"><span>e</span></span><span>ECHO</span>
       </Link>
       <nav className="ep-navlinks" aria-label="Navigation"><PublicLanguageSelector />
         <Link href={publicPreviewHref('/pricing', previewMode)} data-testid="link-pricing">{t("Planes")}</Link>
