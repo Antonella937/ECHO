@@ -11,6 +11,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
   const inConversation = /^\/messages\/.+/.test(location);
+  // Creator Hub is a full-screen destination, not a feed panel.
+  if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
 
   const items = [
     { href: '/', label: 'Inicio', icon: Home, match: (l: string) => l === '/' },
