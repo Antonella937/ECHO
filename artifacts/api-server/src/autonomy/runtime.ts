@@ -46,6 +46,9 @@ export function startAutonomyBackgroundWorker() {
           now,
           lane: input.lane,
             });
+            if (outcome.status === "no_action" || outcome.status === "rate_limited" || outcome.status === "disabled") {
+              logger.info({ lane: input.lane ?? "social", status: outcome.status, reasonCode: outcome.reasonCode }, "Autonomy character skipped");
+            }
             if (outcome.status === "failed") logger.warn({ code: outcome.reasonCode }, "Autonomy character failed");
             return outcome;
           } catch (error) {
