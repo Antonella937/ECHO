@@ -38,7 +38,7 @@ export function AttractionReview({ actorId, targetId }: { actorId: string; targe
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actorId, targetId, sourceId: item.sourceId, kind: selected[item.sourceId], expectedRevision: revision }),
       });
-      setRevision(null); setItems([]); await actions.retrySync();
+      setRevision(null); setItems([]); await actions.refreshAfterApproval();
       setMessage('Acontecimiento confirmado. Revisá nuevamente para ver el historial.');
     } catch { setRevision(null); setMessage('No se pudo confirmar. Sincronizá y volvé a consultar.'); }
     finally { setBusy(false); }
