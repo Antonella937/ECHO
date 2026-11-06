@@ -12,6 +12,9 @@ export interface AutonomyCharacterControl {
   username: string;
   enabled: boolean;
   dmEnabled: boolean;
+  dmFrequency: "rarely" | "sometimes" | "frequently";
+  dmMediaPreference: "text" | "mixed" | "voice";
+  dmInstructions: string;
   /**
      * @minimum 1
      * @maximum 4
