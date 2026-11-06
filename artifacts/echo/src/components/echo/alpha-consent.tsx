@@ -1,3 +1,4 @@
+import { useAlphaConsentText } from '@/lib/alpha-consent-translations';
 import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
@@ -28,6 +29,7 @@ export interface AlphaConsentFormProps {
 
 /** Pure, controlled-internally form. Safe for SSR (renderToString) and browser tests. */
 export function AlphaConsentForm({ version, pending = false, error = null, onSubmit }: AlphaConsentFormProps) {
+  const t = useAlphaConsentText();
   const [checked, setChecked] = useState<Record<ConsentKey, boolean>>({
     adultDeclared: false, fictionAcknowledged: false, legalDraftAcknowledged: false,
   });
@@ -48,16 +50,14 @@ export function AlphaConsentForm({ version, pending = false, error = null, onSub
         });
       }}
     >
-      <span className="ep-eyebrow">Reconocimiento preliminar · versión {version}</span>
-      <h2 className="ep-step-title">Antes de entrar</h2>
+      <span className="ep-eyebrow">{t('Reconocimiento preliminar · versión ')}{version}</span>
+      <h2 className="ep-step-title">{t("Antes de entrar")}</h2>
       <aside className="epc-notice" role="note" data-testid="note-alpha-draft">
         <p>
-          <strong>BETA PRIVADA EN PREPARACIÓN.</strong> Estas confirmaciones son un reconocimiento preliminar de la fase alfa. No constituyen un
-          consentimiento de los documentos definitivos ni una verificación de edad. Los Términos de uso y la Política de privacidad
-          definitivos todavía no están disponibles. Registrar este reconocimiento no habilita las funciones externas ni compartir contenido.
+          <strong>{t("BETA PRIVADA EN PREPARACIÓN.")}</strong> {t('Estas confirmaciones son un reconocimiento preliminar de la fase alfa. No constituyen un consentimiento de los documentos definitivos ni una verificación de edad. Los Términos de uso y la Política de privacidad definitivos todavía no están disponibles. Registrar este reconocimiento no habilita las funciones externas ni compartir contenido.')}
         </p>
       </aside>
-      <p className="ep-field-hint">Antes de continuar, podés <Link href="/beta-info" className="underline">leer qué datos usa esta beta privada y cómo contactar al soporte</Link>. Esta información es preliminar y no reemplaza documentos legales definitivos.</p>
+      <p className="ep-field-hint">{t('Antes de continuar, podés ')}<Link href="/beta-info" className="underline" >{t('leer qué datos usa esta beta privada y cómo contactar al soporte')}</Link>{t('. Esta información es preliminar y no reemplaza documentos legales definitivos.')}</p>
       {keys.map(key => (
         <label key={key} className="ep-field" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
           <Checkbox
@@ -67,14 +67,14 @@ export function AlphaConsentForm({ version, pending = false, error = null, onSub
             data-testid={`checkbox-consent-${key}`}
             style={{ marginTop: 3 }}
           />
-          <span>{ALPHA_CONSENT_TEXTS[key]}</span>
+          <span>{t(ALPHA_CONSENT_TEXTS[key])}</span>
         </label>
       ))}
       {error && <p className="ep-form-error" role="alert" data-testid="status-consent-error">{error}</p>}
       <div className="ep-step-actions">
-        <span className="ep-field-hint">Las tres confirmaciones son obligatorias.</span>
+        <span className="ep-field-hint">{t("Las tres confirmaciones son obligatorias.")}</span>
         <button type="submit" className="ep-button" disabled={!all || pending} data-testid="button-record-alpha-draft">
-          {pending ? 'Registrando…' : 'Confirmar y continuar'}
+          {pending ? t('Registrando…') : t('Confirmar y continuar')}
         </button>
       </div>
     </form>
@@ -87,6 +87,7 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 /** Renders children only once the signed-in owner has a recorded alpha draft acknowledgement. */
 export function AlphaConsentBoundary({ children }: { children: React.ReactNode }) {
+  const t = useAlphaConsentText();
   const { isLoaded, isSignedIn, user } = useUser();
   const ownerId = user?.id ?? null;
   const queryClient = useQueryClient();
@@ -96,21 +97,21 @@ export function AlphaConsentBoundary({ children }: { children: React.ReactNode }
     mutation: { onSuccess: data => { queryClient.setQueryData(queryKey, data); } },
   });
 
-  if (!isLoaded) return <Frame><div className="ep-complete" role="status" data-testid="status-consent-loading"><span className="ep-eyebrow">Cargando…</span></div></Frame>;
+  if (!isLoaded) return <Frame><div className="ep-complete" role="status" data-testid="status-consent-loading"><span className="ep-eyebrow">{t("Cargando…")}</span></div></Frame>;
   if (!isSignedIn || !ownerId) return <>{children}</>;
   if (consent.isError) {
     return <Frame><div className="ep-complete" role="alert" data-testid="status-consent-load-error">
-      <span className="ep-eyebrow">No se pudo comprobar</span>
-      <h1>Vuelve a intentarlo.</h1>
-      <p>No pudimos leer el estado del borrador alfa. No se registró nada.</p>
-      <button type="button" className="ep-button" onClick={() => void consent.refetch()} data-testid="button-retry-consent">Reintentar</button>
+      <span className="ep-eyebrow">{t("No se pudo comprobar")}</span>
+      <h1>{t("Vuelve a intentarlo.")}</h1>
+      <p>{t("No pudimos leer el estado del borrador alfa. No se registró nada.")}</p>
+      <button type="button" className="ep-button" onClick={() => void consent.refetch()} data-testid="button-retry-consent">{t("Reintentar")}</button>
     </div></Frame>;
   }
   if (consent.isLoading || !consent.data) {
-    return <Frame><div className="ep-complete" role="status" data-testid="status-consent-loading"><span className="ep-eyebrow">Cargando ECHO…</span></div></Frame>;
+    return <Frame><div className="ep-complete" role="status" data-testid="status-consent-loading"><span className="ep-eyebrow">{t("Cargando ECHO…")}</span></div></Frame>;
   }
   if (consent.data.draftAcknowledged) return <>{children}</>;
-  const errorMessage = record.isError ? 'No se pudo registrar el borrador. Inténtalo de nuevo.' : null;
+  const errorMessage = record.isError ? t('No se pudo registrar el borrador. Inténtalo de nuevo.') : null;
   return (
     <Frame>
       <AlphaConsentForm
