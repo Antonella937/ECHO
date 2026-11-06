@@ -26,6 +26,19 @@ export function createCreatorHubSocialRouter(): IRouter {
     next();
   });
 
+  const languageSchema = z.object({ language: z.enum(["es", "en", "pt", "fr", "de", "it", "ko", "ja", "zh"]) }).strict();
+  router.get("/account/interface-language", async (req, res) => {
+    const user = await clerkClient.users.getUser(req.userId!);
+    const stored = user.privateMetadata?.echoInterfaceLanguage;
+    res.json({ language: typeof stored === "string" && languageSchema.shape.language.safeParse(stored).success ? stored : null });
+  });
+  router.put("/account/interface-language", async (req, res) => {
+    const parsed = languageSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_LANGUAGE" }); return; }
+    await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoInterfaceLanguage: parsed.data.language } });
+    res.json({ language: parsed.data.language });
+  });
+
   router.get("/creator-hub/social/me", async (req, res) => {
     const result = await pool.query(
       "SELECT display_name AS \"displayName\", username, visibility, message_privacy AS \"messagePrivacy\", bio FROM echo_creator_profiles WHERE owner_id=$1",
