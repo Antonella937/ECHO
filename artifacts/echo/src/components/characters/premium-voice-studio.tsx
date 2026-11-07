@@ -22,6 +22,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   useEffect(() => {
     if (!characterId) return;
     let cancelled = false;
@@ -31,9 +32,17 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     return ()=>{cancelled=true;};
   },[characterId,universeId]);
   const saveDraft=async()=>{
-    if(!characterId||saving||mode==='prompt'&&!prompt.trim()||mode==='reference')return;
+    if(!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent)))return;
     setSaving(true);setError('');setSaved(false);
     try {
+      if(mode==='reference' && file){
+        const ext=file.name.split('.').pop()?.toLowerCase();
+        const contentType=ext==='wav'?'audio/wav':ext==='mp3'?'audio/mpeg':'audio/mp4';
+        const signed=await customFetch<{uploadURL:string;objectPath:string}>('/api/voices/premium/reference/request-url',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,contentType,size:file.size,consentConfirmed:true})});
+        const response=await fetch(signed.uploadURL,{method:'PUT',headers:{'Content-Type':contentType},body:file});
+        if(!response.ok)throw Error('VOICE_UPLOAD_FAILED');
+        setUploadedPath(signed.objectPath);
+      }
       await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode,prompt,language:voiceLanguage,variantCount:count,consentConfirmed:mode==='reference'&&consent})});
       setSaved(true);
     } catch {setError(language==='es'?'No se pudo guardar el proyecto. Verificá tu acceso Premium y volvé a intentar.':'Could not save the project. Check Premium access and try again.');}
@@ -45,7 +54,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     if (!next) return;
     const valid = /\.(wav|mp3|m4a)$/i.test(next.name) && next.size <= 20 * 1024 * 1024;
     if (!valid) { setFile(null); setError('WAV / MP3 / M4A · max 20 MB'); return; }
-    setFile(next); setConsent(false);
+    setFile(next); setConsent(false);setUploadedPath(null);
   };
   return <section className="mt-6 space-y-4 rounded-2xl border border-primary/30 bg-card/60 p-4" data-testid="premium-voice-studio">
     <div className="flex items-center gap-2"><AudioLines className="h-5 w-5 text-primary"/><h3 className="text-sm font-semibold">{labels[0]}</h3></div>
@@ -69,9 +78,9 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1"/><span>{labels[13]}</span></label>
       <p className="text-xs text-muted-foreground">{labels[12]}</p>
-      <p className="text-xs text-muted-foreground">{language==='es'?'La carga y conservación segura del audio se habilitarán con el proveedor. Este archivo todavía no se sube ni se guarda.':'Secure reference audio upload and storage will be enabled with the provider. This file is not uploaded or saved yet.'}</p>
+      <p className="text-xs text-muted-foreground">{uploadedPath?(language==='es'?'Audio enviado a almacenamiento privado. La asociación definitiva al proyecto está pendiente.':'Audio uploaded to private storage. Linking it to the project is still pending.'):(language==='es'?'El audio solo se subirá cuando confirmes el consentimiento y guardes.':'Audio uploads only after you confirm consent and save.')}</p>
     </>}
-    <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||mode==='reference'} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
+    <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent))} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
     {saved&&<p role="status" className="text-xs text-primary">{language==='es'?'Proyecto guardado. Generación pendiente de activación.':'Project saved. Generation is not yet enabled.'}</p>}
     {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
     <button type="button" disabled className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground opacity-50"><RefreshCw className="h-4 w-4"/>{labels[8]} ({count})</button>
