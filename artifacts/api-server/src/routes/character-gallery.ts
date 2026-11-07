@@ -25,7 +25,7 @@ router.get("/character-gallery", async (req,res):Promise<void> => {
 });
 router.post("/character-gallery", async (req,res):Promise<void> => {
   const parsed=create.safeParse(req.body);
-  if(!parsed.success || !parsed.data.mediaRef.startsWith("private:")){res.status(400).json({error:"INVALID_GALLERY_PHOTO"});return;}
+  if(!parsed.success || !/^([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_.-]+$/.test(parsed.data.mediaRef)){res.status(400).json({error:"INVALID_GALLERY_PHOTO"});return;}
   try{
     if(!await belongs(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
     const [photo]=await db.insert(echoCharacterGalleryTable).values({...parsed.data,ownerId:req.userId!}).returning();res.status(201).json({photo});
