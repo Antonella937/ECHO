@@ -19,6 +19,7 @@ import { useMediaResolver, timeAgo } from '@/lib/media';
 import { CharacterAvatar } from './avatar';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { customFetch } from '@workspace/api-client-react';
 
 const DURATION = 10000;
 
@@ -80,7 +81,7 @@ export function StoryViewerProvider({ children }: { children: ReactNode }) {
 function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIndex: number; onClose(): void }) {
   const t = useStoryViewerText();
   const resolveMedia = useMediaResolver();
-  const { me, actions, state, character } = useSocial();
+  const { me, actions, state, character, universeId } = useSocial();
   const [, navigate] = useLocation();
   const [gi, setGi] = useState(startIndex);
   const [si, setSi] = useState(() => {
@@ -170,11 +171,22 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const mutualFollow = (a: string, b: string) => (state.follows[a] ?? []).includes(b) && (state.follows[b] ?? []).includes(a);
   const shareTargets = state.characters.filter(c => !c.archived && c.id !== me.id && mutualFollow(me.id, c.id) && mutualFollow(liveStory.authorId, c.id) && canViewStory(liveStory, c.id, state) && (c.name + ' ' + c.handle).toLowerCase().includes(shareSearch.toLowerCase()));
   const shareWith = async (targetId: string) => {
-    if (!isStoryActive(liveStory) || !mutualFollow(me.id, targetId) || !mutualFollow(liveStory.authorId, targetId) || !canViewStory(liveStory, targetId, state)) return;
-    // Block relationships and cross-owner visibility are not available in this
-    // client state. Until a server-side share authorization endpoint exists,
-    // fail closed rather than exposing a private or blocked character's story.
-    toast({ title: t('No se pudo compartir'), description: 'Compartir historias estará disponible cuando se verifiquen los bloqueos y la privacidad en el servidor.' });
+    if (!isStoryActive(liveStory) || !mutualFollow(me.id, targetId) ||
+        !mutualFollow(liveStory.authorId, targetId) || !canViewStory(liveStory, targetId, state)) return;
+    try {
+      const result = await customFetch<{ allowed: boolean }>('/api/stories/authorize-share', {
+        method: 'POST', responseType: 'json',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId, senderId: me.id, recipientId: targetId, storyId: liveStory.id }),
+      });
+      if (!result.allowed) throw new Error('Forbidden');
+      actions.sendMessage(targetId, '', { storyId: liveStory.id });
+      setShowShare(false);
+      setShareSearch('');
+      toast({ title: t('Historia compartida') });
+    } catch {
+      toast({ title: t('No se pudo compartir'), description: 'No se pudo verificar el permiso de compartir esta historia.' });
+    }
   };
   const myReaction = liveStory.reactions?.find((r) => r.actorId === me.id)?.value;
   const react = (value: string) => {
