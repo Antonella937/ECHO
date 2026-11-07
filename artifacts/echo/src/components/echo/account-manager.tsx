@@ -1,7 +1,7 @@
 import { useAccountManagementText } from '@/lib/account-management-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Check, Pencil, Plus, SlidersHorizontal } from 'lucide-react';
+import { Check, Pencil, Plus, SlidersHorizontal, Images } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { VerifiedBadge } from './verified-badge';
@@ -72,6 +72,7 @@ export function AccountManager() {
                   </span>
                 )}
               </button>
+              {!c.archived && <Link href={`/characters/${c.id}/gallery`} aria-label={`Galería de ${c.name}`} title="Galería del personaje" className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"><Images className="h-4 w-4" strokeWidth={1.8}/></Link>}
               <Link href={`/characters/${c.id}/edit`} aria-label={`${translate('Ficha de personaje de ')}${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`link-character-edit-${c.id}`}>
                 <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
               </Link>
