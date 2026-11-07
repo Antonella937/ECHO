@@ -76,18 +76,8 @@ export function createCreatorHubSocialRouter(): IRouter {
     const parsed = searchSchema.safeParse(req.query);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_SEARCH" }); return; }
     const q = parsed.data.q.replace(/^@+/, "").replace(/[\\%_]/g, "\\$&");
-    // Search Clerk as well as the social table: accounts are discoverable before
-    // they ever open Creator Hub. Only the minimal social profile is returned.
-    const lookup = parsed.data.q.replace(/^@+/, "").trim();
-    if (lookup.length >= 2) {
-      try {
-        const matches = await clerkClient.users.getUserList({ query: lookup, limit: 20 });
-        await Promise.all(matches.data.filter(user => user.id !== req.userId).map(user => ensureCreatorProfile(user.id)));
-      } catch (error) {
-        // A Clerk lookup outage must not hide already registered profiles.
-        console.warn('Creator Hub account discovery fallback unavailable', error instanceof Error ? error.message : 'unknown');
-      }
-    }
+    // Search only existing Creator Hub profiles. Never enumerate Clerk accounts or
+    // create profiles from another user's search query.
     const result = await pool.query(
       `SELECT p.owner_id AS "ownerId", p.display_name AS "displayName", p.username, p.visibility,
         EXISTS(SELECT 1 FROM echo_creator_follows f WHERE f.follower_owner_id=$1 AND f.followed_owner_id=p.owner_id) AS "following",
@@ -634,11 +624,17 @@ export function createCreatorHubSocialRouter(): IRouter {
          SELECT 1 FROM echo_creator_blocks b WHERE
            (b.blocker_owner_id=$1 AND b.blocked_owner_id=$2) OR
            (b.blocker_owner_id=$2 AND b.blocked_owner_id=$1)
-       ) AND (p.owner_id=$1 OR p.visibility='public'
+       ) AND (p.owner_id=$1 OR (EXISTS (
+         SELECT 1 FROM echo_creator_profiles cp WHERE cp.owner_id=$2
+         AND (cp.visibility='public' OR EXISTS (
+           SELECT 1 FROM echo_creator_follows allowed
+           WHERE allowed.follower_owner_id=$1 AND allowed.followed_owner_id=$2
+         ))
+       ) AND (p.visibility='public'
          OR (p.visibility='followers' AND EXISTS (
            SELECT 1 FROM echo_creator_follows f
            WHERE f.follower_owner_id=$1 AND f.followed_owner_id=$2
-         )))
+         ))))
        ORDER BY p.pinned DESC,p.created_at DESC LIMIT 100`,
       [req.userId,ownerId],
     );
