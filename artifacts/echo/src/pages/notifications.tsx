@@ -8,7 +8,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useLanguage } from '@/lib/i18n';
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
-import { TopBar } from '@/components/echo/top-bar';
+import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { EmptyState } from '@/components/echo/skeletons';
 import { useMediaResolver, timeAgo } from '@/lib/media';
@@ -34,6 +34,7 @@ const VERB: Record<Notification['kind'], string> = {
 
 export default function NotificationsPage() {
   const t = useNotificationsText();
+  const back = useBack();
   const officialText = useOfficialAnnouncementText();
   const language = useLanguage();
   const { user } = useUser();
@@ -103,6 +104,7 @@ export default function NotificationsPage() {
     <div>
       <TopBar
         title={t("Avisos")}
+        onBack={back}
         right={
           <button disabled={unread.length === 0} onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary disabled:cursor-default disabled:opacity-45" data-testid="button-mark-all-read">
               {t("Marcar todo como leído")}
