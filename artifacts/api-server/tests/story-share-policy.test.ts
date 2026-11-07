@@ -9,7 +9,7 @@ const allowed: StorySharePolicyInput = {
     { followerId: "recipient", followedId: "sender" },
     { followerId: "author", followedId: "recipient" },
     { followerId: "recipient", followedId: "author" },
-  ], blocks: [],
+  ], blocks: [], blocksVerified: true,
 };
 
 describe("story forwarding authorization", () => {
@@ -30,6 +30,9 @@ describe("story forwarding authorization", () => {
   it("rejects expired stories and close-friends ineligible recipients", () => {
     expect(canForwardStory({ ...allowed, storyActive: false })).toBe(false);
     expect(canForwardStory({ ...allowed, recipientCanViewStory: false })).toBe(false);
+  });
+  it("fails closed when block records have not been verified", () => {
+    expect(canForwardStory({ ...allowed, blocksVerified: false })).toBe(false);
   });
   it("rejects self-sends and incomplete relationships", () => {
     expect(canForwardStory({ ...allowed, recipientId: "sender" })).toBe(false);
