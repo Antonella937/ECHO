@@ -14,6 +14,7 @@ export interface Story {
   /** @maxItems 50 */
   mentionedAccountIds?: string[];
   reactions?: SocialReaction[];
+  likes?: string[];
   music?: StoryMusic;
   id: string;
   authorId: string;
