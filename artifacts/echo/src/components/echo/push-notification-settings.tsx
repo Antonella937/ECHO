@@ -62,7 +62,7 @@ export function PushNotificationSettings() {
       <p className="text-xs text-muted-foreground">{t("Elegí qué avisos querés recibir. Podés registrar este dispositivo para avisos push. El envío automático de eventos sigue en preparación.")}</p>
       <label className="flex items-center justify-between gap-3 text-sm font-semibold">
         <span className="flex items-center gap-2">{prefs.enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} {t("Activar avisos")}</span>
-        <input type="checkbox" checked={prefs.enabled} onChange={e => { const next = { ...prefs, enabled: e.target.checked }; update(next); void syncCreatorHubPush(next.enabled && next.categories.creatorHub).catch(() => setNotice(t("No se pudo activar OneSignal."))); }} className="h-5 w-5 accent-primary" />
+        <input type="checkbox" checked={prefs.enabled} onChange={e => { const next = { ...prefs, enabled: e.target.checked }; update(next); void syncCreatorHubPush(next.enabled && next.categories.creatorHub && typeof Notification !== "undefined" && Notification.permission === "granted").catch(() => setNotice(t("No se pudo activar OneSignal."))); }} className="h-5 w-5 accent-primary" />
       </label>
       {categories.map(([key, title]) => <label key={key} className="flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-sm">
         <span>{key === 'creatorHub' ? creatorCopy.setting : t(title)}</span>
