@@ -125,7 +125,10 @@ export function createUniverseSharingRouter(
     if (!row) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
     const state = row.state;
     const characters = Array.isArray(state.characters) ? state.characters as Array<Record<string, unknown>> : [];
-    const visible = characters.filter(ch => !ch.archived && (row.kind === "universe" || ch.id === row.character_id))
+    const privateRows = await db.execute(sql`SELECT character_id FROM echo_character_privacy
+      WHERE owner_id=${row.owner_id} AND universe_id=${row.universe_id} AND visibility='private'`);
+    const hidden = new Set(privateRows.rows.map(x => String(x.character_id)));
+    const visible = characters.filter(ch => !ch.archived && !hidden.has(String(ch.id)) && (row.kind === "universe" || ch.id === row.character_id))
       .map(ch => ({ id: ch.id, name: ch.name, handle: ch.handle, bio: ch.bio, occupation: ch.occupation }));
     if (!visible.length) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
     const setup = state.creatorSetup as Record<string, unknown> | undefined;
