@@ -1,3 +1,4 @@
+import { useCreatorHubDmStatus, useCreatorHubDmCopy, markCreatorHubDmRead } from '@/lib/creator-hub-notifications';
 import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
 import { useNotificationsText, useLocalizedNotificationExcerpt } from '@/lib/notifications-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
@@ -36,6 +37,8 @@ export default function NotificationsPage() {
   const officialText = useOfficialAnnouncementText();
   const language = useLanguage();
   const { user } = useUser();
+  const creatorDm = useCreatorHubDmStatus();
+  const creatorDmCopy = useCreatorHubDmCopy();
   const [creatorPosts, setCreatorPosts] = useState<Array<{ id: string; ownerId: string; displayName: string; title: string; body: string; createdAt: string }>>([]);
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [serverRead, setServerRead] = useState<string[]>([]);
@@ -115,6 +118,21 @@ export default function NotificationsPage() {
           if (!next) setOfficialUpdates([]);
         }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? officialText.subscribed : officialText.muted}</button>
       </div>}
+      {creatorDm.enabled && creatorDm.items.some(item => item.unread) && <section className="px-4 pt-4" aria-label={creatorDmCopy.title}>
+        <h2 className="mb-2 text-sm font-semibold">💬 {creatorDmCopy.title}</h2>
+        <div className="space-y-2">{creatorDm.items.filter(item => item.unread).map(item =>
+          <button key={item.ownerId} type="button" className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left"
+            onClick={() => {
+              if (user?.id) void markCreatorHubDmRead(user.id, item.ownerId).catch(() => {});
+              sessionStorage.setItem('echo:open-creator-chat', item.ownerId);
+              navigate('/creator-hub');
+            }}>
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.displayName}</span>
+              <span className="block truncate text-xs text-muted-foreground">{item.kind === 'voice' ? creatorDmCopy.voice : item.preview || creatorDmCopy.message}</span></span>
+            <span className="text-xs text-muted-foreground">{timeAgo(item.createdAt)}</span>
+          </button>)}</div>
+      </section>}
       {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {officialText.title}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
@@ -129,7 +147,7 @@ export default function NotificationsPage() {
           <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
         </details>)}</div>
       </section>}
-      {list.length === 0 && officialUpdates.length === 0 && creatorPosts.length === 0 ? (
+      {list.length === 0 && officialUpdates.length === 0 && creatorPosts.length === 0 && !(creatorDm.enabled && creatorDm.items.some(item => item.unread)) ? (
         <EmptyState title={t("Todo en calma")} body={t("Cuando alguien comente, responda o te escriba, aparecerá aquí.")} />
       ) : (
         <div className="px-1 pt-3">
