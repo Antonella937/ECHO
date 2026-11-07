@@ -198,7 +198,16 @@ function FirstWelcomeDialog() {
     const localKey = 'echo-welcome-claimed:' + user.id;
     const claim = (event: Event) => {
       const detail = (event as CustomEvent<{ userId: string }>).detail;
-      if (detail?.userId !== user.id || requested || localStorage.getItem(localKey)) return;
+      if (detail?.userId !== user.id || requested) return;
+      // Give the founder one local design review even if an earlier deployment
+      // already marked the account welcome as delivered.
+      const founderPreviewKey = 'echo-founder-welcome-review-v1:' + user.id;
+      if (user.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && !localStorage.getItem(founderPreviewKey)) {
+        localStorage.setItem(founderPreviewKey, '1');
+        setOpen(true);
+        return;
+      }
+      if (localStorage.getItem(localKey)) return;
       requested = true;
       void customFetch<{ show: boolean }>('/api/creator-hub/social/claim-welcome', {
         method: 'POST', responseType: 'json',
