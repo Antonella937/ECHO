@@ -33,6 +33,31 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [references,setReferences]=useState<{id:string;contentType:string;size:number}[]>([]);
   const [playingUrl,setPlayingUrl]=useState<string | null>(null);
+  const [generationAvailable,setGenerationAvailable]=useState(false);
+  const [samples,setSamples]=useState<{id:string;status:string}[]>([]);
+  const [sampleUrl,setSampleUrl]=useState<string|null>(null);
+  const [projectId,setProjectId]=useState<string|null>(null);
+  const [generating,setGenerating]=useState(false);
+  const loadProject=async()=>{
+    if(!characterId)return;
+    const data=await customFetch<{project:{id:string}|null;samples:{id:string;status:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
+    setGenerationAvailable(data.generationAvailable);setSamples(data.samples);setProjectId(data.project?.id??null);
+  };
+  const generate=async()=>{
+    if(!characterId||generating)return;
+    setGenerating(true);setError('');
+    try{
+      await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode:'prompt',prompt,language:voiceLanguage,variantCount:count,consentConfirmed:false})});
+      await customFetch('/api/voices/premium/generate',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId})});
+      await loadProject();
+    }catch{setError(language==='es'?'No se pudieron generar las muestras. Revisá los límites o la configuración de ElevenLabs.':'Could not generate previews. Check limits or ElevenLabs configuration.');}
+    finally{setGenerating(false);}
+  };
+  const playSample=async(id:string)=>{
+    try{const data=await customFetch<{url:string}>(`/api/voices/premium/samples/${id}/play`,{responseType:'json'});setSampleUrl(data.url);}
+    catch{setError(language==='es'?'No se pudo reproducir la muestra.':'Could not play preview.');}
+  };
+
   const loadReferences=async()=>{
     if(!characterId)return;
     const data=await customFetch<{references:{id:string;contentType:string;size:number}[]}>(`/api/voices/premium/references?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
@@ -59,7 +84,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       .catch(()=>{});
     return ()=>{cancelled=true;};
   },[characterId,universeId]);
-  useEffect(()=>{void loadReferences().catch(()=>{});},[characterId,universeId]);
+  useEffect(()=>{void loadReferences().catch(()=>{});void loadProject().catch(()=>{});},[characterId,universeId]);
   const saveDraft=async()=>{
     if(!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent)))return;
     setSaving(true);setError('');setSaved(false);
@@ -117,9 +142,10 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent))} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
     {saved&&<p role="status" className="text-xs text-primary">{language==='es'?'Proyecto guardado. Generación pendiente de activación.':'Project saved. Generation is not yet enabled.'}</p>}
     {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
-    <button type="button" disabled className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground opacity-50"><RefreshCw className="h-4 w-4"/>{labels[8]} ({count})</button>
+    <button type="button" disabled={!generationAvailable||!characterId||generating||mode!=='prompt'||prompt.trim().length<20||prompt.length>1000} onClick={()=>void generate()} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"><RefreshCw className="h-4 w-4"/>{generating?'…':labels[8]} ({count})</button>
+    {samples.filter(x=>x.status==='ready').length>0&&<div className="space-y-2 text-sm"><p>{language==='es'?'Muestras generadas':'Generated previews'}</p>{samples.filter(x=>x.status==='ready').map((sample,i)=><button type="button" key={sample.id} onClick={()=>void playSample(sample.id)} className="mr-2 rounded-lg border px-3 py-2">{language==='es'?'Escuchar muestra':'Play preview'} {i+1}</button>)}{sampleUrl&&<audio controls src={sampleUrl} className="w-full"/>}<p className="text-xs text-muted-foreground">{language==='es'?'La selección definitiva se habilitará después de conectar la activación individual.':'Final selection will be available after per-character activation is connected.'}</p></div>}
     {!characterId&&<p className="text-xs text-muted-foreground">{language==='es'?'Guardá primero el personaje para asociarle un proyecto de voz.':'Save the character before creating a voice project.'}</p>}
-    <p className="text-xs text-muted-foreground">{labels[9]}</p>
+    {!generationAvailable&&<p className="text-xs text-muted-foreground">{labels[9]}</p>}
     <p className="text-xs text-muted-foreground">{labels[16]} {labels[17]}</p>
   </section>;
 }
