@@ -123,6 +123,33 @@ router.get("/music/youtube/search", async (req, res) => {
   }
 });
 
+
+// Feed.fm Clips is a prospective licensed provider. This adapter is intentionally
+// inactive until contract, territorial rights, and provider API credentials are verified.
+// Never proxy copyrighted tracks or invent playback URLs.
+router.get("/music/clips/status", (_req, res) => {
+  res.json({
+    provider: "feed_fm_clips",
+    integration: "prepared",
+    enabled: false,
+    contractVerified: false,
+    argentinaRightsVerified: false,
+    catalogAccess: false,
+    playableClips: false,
+    chargeableRequestsEnabled: false,
+    supportedDurationsSeconds: [15, 30],
+    note: "Awaiting licensing, territorial approval and official API integration.",
+  });
+});
+router.get("/music/clips/search", (_req, res) => {
+  res.status(503).json({
+    error: "LICENSED_CLIPS_NOT_AVAILABLE",
+    provider: "feed_fm_clips",
+    charged: false,
+    items: [],
+  });
+});
+
 router.post("/music/generate", (_req, res) => {
   res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", charged: false });
 });
