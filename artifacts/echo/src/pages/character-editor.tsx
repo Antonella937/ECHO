@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { useCharacterEditorText } from '@/lib/character-editor-translations';
 import { BasicFields, type BasicForm } from '@/components/characters/basic-fields';
 import { BasicVoiceCatalogue } from '@/components/characters/basic-voice-catalogue';
+import { PremiumVoiceStudio } from '@/components/characters/premium-voice-studio';
 import { VisualIdentity } from '@/components/characters/visual-identity';
 import type { IdentityReference } from '@/domain/types';
 import { IdentitySection } from '@/components/characters/identity-section';
@@ -141,6 +142,7 @@ export default function CharacterEditorPage() {
         {mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
           <BasicVoiceCatalogue selectedVoiceId={config.voice.basicVoiceId} onSelect={(basicVoiceId) => set((c) => ({ ...c, voice: { ...c.voice, basicVoiceId } }))} />
+          <PremiumVoiceStudio />
           <VisualIdentity avatar={form.avatar} identity={identity} onBusy={setUploading}
             onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
