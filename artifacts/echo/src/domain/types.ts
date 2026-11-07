@@ -52,7 +52,10 @@ export interface Character {
 
 export type PostMedia = import('@workspace/api-client-react').PostMedia;
 
+export interface MusicClip { trackId: string; title: string; startSeconds: number; clipSeconds: 15 | 30; }
+
 export interface Post {
+  musicClip?: MusicClip;
   taggedAccountIds?: string[];
   commentsEnabled?: boolean;
   pinned?: boolean;
@@ -90,6 +93,7 @@ export interface Comment {
 }
 
 export interface Story {
+  musicClip?: MusicClip;
   closeFriendsOnly?: boolean;
   allowedViewerIds?: string[];
   displayMetrics?: { views?: number | null };
