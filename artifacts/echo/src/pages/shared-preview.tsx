@@ -9,6 +9,15 @@ export default function SharedPreviewPage() {
   const [error, setError] = useState('');
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState('');
+  const [joined, setJoined] = useState('');
+  const [joining, setJoining] = useState(false);
+  const join = async () => {
+    setJoining(true); setError('');
+    try { const result = await customFetch<{ownerId:string;universeId:string}>('/api/universe/shared/' + encodeURIComponent(token) + '/join', { method: 'POST', responseType: 'json' });
+      setJoined('/collaboration/' + encodeURIComponent(result.ownerId) + '/' + encodeURIComponent(result.universeId));
+    } catch { setError('Este enlace no es una invitación de colaboración o ya no está disponible.'); }
+    finally { setJoining(false); }
+  };
   const importCopy = async () => {
     setImporting(true); setError('');
     try { const result = await customFetch<{kind:string;universeId:string;importedCount:number}>('/api/universe/shared/' + encodeURIComponent(token) + '/import', { method: 'POST', responseType: 'json' });
@@ -36,6 +45,8 @@ export default function SharedPreviewPage() {
         {ch.bio && <p className="mt-2 text-sm text-muted-foreground">{ch.bio}</p>}
       </article>)}</div>
       <p className="mt-6 text-xs text-muted-foreground">La copia incluye los datos públicos básicos de los personajes, sin mensajes, recuerdos, imágenes privadas ni acceso al universo original.</p>
+      {joined && <Link href={joined} className="mt-4 block text-primary underline">Abrir mundo compartido</Link>}
+      {data.kind === "universe" && !joined && <button type="button" disabled={joining} onClick={() => void join()} className="mt-4 ml-2 rounded-full border border-primary px-5 py-3 text-primary disabled:opacity-50">{joining ? "Uniéndote…" : "Unirme como colaboradora"}</button>}
       {imported ? <p role="status" className="mt-4 text-primary">{imported}</p> : <button type="button" disabled={importing} onClick={() => void importCopy()} className="mt-4 rounded-full bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{importing ? "Importando…" : "Importar una copia a mi cuenta"}</button>}
     </>}
   </main>;
