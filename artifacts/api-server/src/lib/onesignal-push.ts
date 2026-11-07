@@ -55,7 +55,7 @@ export async function sendCreatorHubDmPush(input: {
   try {
     const { clerkClient } = await import("@clerk/express");
     const recipient = await clerkClient.users.getUser(input.recipientOwnerId);
-    if (recipient.privateMetadata?.echoCreatorHubNotifications === false) return;
+    if (recipient.privateMetadata?.echoCreatorHubNotifications === false || recipient.privateMetadata?.echoCreatorHubPushEnabled !== true) return;
     const language = typeof recipient.privateMetadata?.echoInterfaceLanguage === "string"
       ? recipient.privateMetadata.echoInterfaceLanguage : "es";
     const translations: Record<string, { text: string; voice: string }> = {
