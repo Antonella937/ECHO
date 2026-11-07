@@ -653,6 +653,17 @@ export function createCreatorHubSocialRouter(): IRouter {
     await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoCreatorNotificationReads: ids } });
     res.json({ ids });
   });
+  // Account-level, one-time onboarding. No public post or social notification is created.
+  router.post("/creator-hub/social/claim-welcome", async (req, res) => {
+    const user = await clerkClient.users.getUser(req.userId!);
+    if (user.privateMetadata?.echoWelcomeShown === true) {
+      res.json({ show: false }); return;
+    }
+    await clerkClient.users.updateUserMetadata(req.userId!, {
+      privateMetadata: { echoWelcomeShown: true },
+    });
+    res.json({ show: true });
+  });
   const announcementPreferenceSchema = z.object({ subscribed: z.boolean() }).strict();
   router.get("/creator-hub/social/announcement-subscription", async (req, res) => {
     const user = await clerkClient.users.getUser(req.userId!);
