@@ -271,6 +271,21 @@ export default function CreatorHubPage() {
   // Social account preferences are stored server-side; Clerk metadata remains the
   // source for the existing visual profile until explicit profile synchronization.
   const [socialProfile, setSocialProfile] = useState<{ visibility: 'private' | 'public'; messagePrivacy: 'everyone' | 'requests' | 'nobody' } | null>(null);
+  const [followCounts, setFollowCounts] = useState<{ followers: number; following: number } | null>(null);
+  useEffect(() => {
+    if (!user?.id) { setFollowCounts(null); return; }
+    let active = true;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      void customFetch<{ followers: number; following: number }>('/api/creator-hub/social/follow-counts', { responseType: 'json' })
+        .then(data => { if (active) setFollowCounts(data); })
+        .catch(() => {});
+    };
+    refresh();
+    const interval = setInterval(refresh, 15000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { active = false; clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
+  }, [user?.id]);
   const [socialSaving, setSocialSaving] = useState(false);
   const [socialReady, setSocialReady] = useState(false);
   useEffect(() => {
@@ -601,6 +616,10 @@ export default function CreatorHubPage() {
               </div>
               <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground sm:hidden" role="img" aria-label={ht(socialProfile?.visibility === "public" ? "Perfil público" : "Perfil privado")} title={ht(socialProfile?.visibility === "public" ? "Perfil público" : "Perfil privado")}>{socialProfile?.visibility === "public" ? <ShieldCheck size={16} /> : <LockKeyhole size={16} />}</span>
                <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-secondary/70 px-3 py-1 text-xs font-semibold text-foreground sm:inline-flex">{socialProfile?.visibility === "private" && <LockKeyhole size={13} />}{ht(socialProfile?.visibility === "public" ? "Perfil público" : "Perfil privado")}</span>
+            </div>
+            <div className="flex items-center gap-6 px-1 text-sm" aria-label={ht("Estadísticas de seguimiento")}>
+              <span className="flex items-baseline gap-1.5"><strong className="font-semibold tabular-nums text-foreground">{followCounts?.followers ?? '—'}</strong><span className="text-muted-foreground">{ct("followers")}</span></span>
+              <span className="flex items-baseline gap-1.5"><strong className="font-semibold tabular-nums text-foreground">{followCounts?.following ?? '—'}</strong><span className="text-muted-foreground">{ht("Seguidos")}</span></span>
             </div>
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
             {editingBio ? <div className="space-y-2"><div className="flex items-center gap-2" role="toolbar" aria-label={ht("Formato de biografía")}><button type="button" onClick={() => formatBio('**', '**')} aria-label={ht("Negrita")} title={ht("Negrita")} className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold">B</button><button type="button" onClick={() => formatBio('*', '*')} aria-label={ht("Cursiva")} title={ht("Cursiva")} className="rounded-lg border border-border px-3 py-1.5 text-sm italic">I</button><button type="button" onClick={() => formatBio('__', '__')} aria-label={ht("Subrayado")} title={ht("Subrayado")} className="rounded-lg border border-border px-3 py-1.5 text-sm underline">U</button></div><textarea ref={bioInputRef} aria-label={ht("Biografía de Creator Hub")} value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder={ht("Contá algo sobre vos…")} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 {ht("caracteres")}</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">{ct("cancel")}</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{ht(savingBio ? 'Guardando…' : 'Guardar biografía')}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 max-w-fit whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{renderBio(bio)}</p><button type="button" aria-label={ht("Editar biografía")} title={ht("Editar biografía")} onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
