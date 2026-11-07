@@ -127,6 +127,7 @@ export const PreviewCharacterDecisionResponse = zod.object({
   "text": zod.string().max(previewCharacterDecisionResponseDecisionTextMax).nullable(),
   "reason": zod.string().min(1).max(previewCharacterDecisionResponseDecisionReasonMax).describe('Brief explanation'),
   "suggestedDelayMinutes": zod.number().int().min(previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMin).max(previewCharacterDecisionResponseDecisionSuggestedDelayMinutesMax),
+  "galleryPhotoId": zod.string().max(120).nullish(),
   "reaction": zod.string().max(previewCharacterDecisionResponseDecisionReactionMax).nullish(),
   "contextSections": zod.array(zod.enum(['identity', 'personality', 'relationships', 'routine', 'social', 'memory', 'currentState', 'recentSocial'])).max(previewCharacterDecisionResponseDecisionContextSectionsMax)
 }),
