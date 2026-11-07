@@ -1,4 +1,4 @@
-import { useNotificationsText } from '@/lib/notifications-translations';
+import { useNotificationsText, useLocalizedNotificationExcerpt } from '@/lib/notifications-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useMemo } from 'react';
 import { useLocation } from 'wouter';
@@ -91,6 +91,7 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
   resolveMedia: ReturnType<typeof useMediaResolver>;
 }) {
     const t = useNotificationsText();
+    const localizeExcerpt = useLocalizedNotificationExcerpt();
     const actor = character(n.actorId);
     const others = n.actorIds.filter((a) => a !== n.actorId).map(character).filter(Boolean);
     const post = n.postId ? state.posts.find((p) => p.id === n.postId) : undefined;
@@ -106,7 +107,7 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
             <span className="font-semibold">{actor.handle}</span><VerifiedBadge account={actor} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" />
             {others.length > 0 && <span className="text-foreground/85" data-testid={`text-notification-group-${n.id}`}>{others.length === 1 ? `${t(" y ")}${others[0]!.handle}` : `${t(" y ")}${others.length}${t(" más")}`}</span>}
             {others.length === 0 && n.count > 1 && <span className="text-muted-foreground"> ({n.count})</span>} <span className="text-foreground/85">{t(VERB[n.kind])}</span>
-            {n.excerpt && <span className="text-muted-foreground">: {n.excerpt}</span>}
+            {n.excerpt && <span className="text-muted-foreground">: {localizeExcerpt(n.excerpt)}</span>}
             <span className="ml-1.5 text-xs text-muted-foreground/80">{timeAgo(n.createdAt)}</span>
           </span>
           {post && postMedia(post).length > 0 && post.media?.[0]?.type !== 'video' && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />}
