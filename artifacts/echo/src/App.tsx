@@ -1,3 +1,4 @@
+import { refreshCreatorHubDmStatus } from '@/lib/creator-hub-notifications';
 import { useWelcomeText } from '@/lib/welcome-translations';
 import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -245,6 +246,20 @@ function FirstWelcomeDialog() {
   </div>;
 }
 
+function CreatorHubDmObserver() {
+  const { user } = useUser();
+  useEffect(() => {
+    if (!user?.id) return;
+    const id = user.id;
+    const refresh = () => { if (document.visibilityState === 'visible') void refreshCreatorHubDmStatus(id).catch(() => {}); };
+    refresh();
+    const timer = window.setInterval(refresh, 20000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [user?.id]);
+  return null;
+}
+
 function ProtectedRouter() {
   const [location] = useLocation();
   useEffect(() => {
@@ -253,6 +268,7 @@ function ProtectedRouter() {
   return (
     <Shell>
       <MessageSoundObserver />
+      <CreatorHubDmObserver />
       <OfficialUpdateObserver />
       <FirstWelcomeDialog />
       <FounderSurprise />
