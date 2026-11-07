@@ -1,4 +1,7 @@
 import { Router, type IRouter } from "express";
+import { randomUUID } from "node:crypto";
+import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
+import { ECHO_AUDIO_POLICY } from "../lib/entitlements";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canUseBasicVoices } from "../lib/entitlements";
 import { reserveVoiceNarration, completeVoiceNarration } from "../autonomy/voice-adapter";
@@ -16,6 +19,20 @@ const voices: Record<string, string> = {
 };
 const router: IRouter = Router();
 const recentRequests = new Map<string, number[]>();
+/** WAV RIFF byte rate is at offset 28; reject any audio longer than the plan limit. */
+function wavDurationSeconds(data: Buffer): number {
+  if (data.length < 44 || data.toString("ascii",0,4)!=="RIFF" || data.toString("ascii",8,12)!=="WAVE") return Infinity;
+  const byteRate=data.readUInt32LE(28);
+  if (!byteRate) return Infinity;
+  let offset=12;
+  while(offset+8<=data.length) {
+    const chunkSize=data.readUInt32LE(offset+4);
+    if(data.toString("ascii",offset,offset+4)==="data") return chunkSize/byteRate;
+    offset+=8+chunkSize+(chunkSize%2);
+  }
+  return Infinity;
+}
+
 
 /** Synthesizes a new phrase, not a static sample. No provider means no charge and no fake audio. */
 router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
@@ -47,23 +64,42 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
     recent.push(now); recentRequests.set(req.userId!, recent);
     const reservation = await reserveVoiceNarration(req.userId!, characterId, text.trim());
     if (!reservation) { res.status(429).json({ error: "VOICE_BUDGET_EXHAUSTED_OR_DISABLED" }); return; }
+    const audioRequestKey = randomUUID();
+    const audioCredit = await reserveCharacterAudioCredit({ ownerId:req.userId!,characterId,requestKey:audioRequestKey,engine:"kokoro",requestedSeconds:ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds });
+    if (!audioCredit.allowed) {
+      await completeVoiceNarration(req.userId!,reservation,false);
+      res.status(429).json({error:audioCredit.reason,remainingCredits:audioCredit.remaining});return;
+    }
+    try {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
       body: JSON.stringify({ model: "kokoro", input: text.trim(), voice, response_format: "wav" }),
       signal: AbortSignal.timeout(45000),
     });
-    if (!response.ok) { await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
+    if (!response.ok) { await refundFailedCharacterAudio(req.userId!,audioRequestKey); await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
     const data = Buffer.from(await response.arrayBuffer());
     if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
         data.toString("ascii", 8, 12) !== "WAVE") {
+      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
       await completeVoiceNarration(req.userId!, reservation, false);
       res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
+    }
+    const seconds=wavDurationSeconds(data);
+    if (!Number.isFinite(seconds) || seconds<=0 || seconds>ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds) {
+      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
+      await completeVoiceNarration(req.userId!,reservation,false);
+      res.status(502).json({error:"VOICE_AUDIO_EXCEEDS_30_SECONDS"});return;
     }
     await completeVoiceNarration(req.userId!, reservation, true);
     res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Cache-Control", "private, no-store");
     res.send(data);
+    } catch (error) {
+      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
+      await completeVoiceNarration(req.userId!,reservation,false).catch(()=>{});
+      throw error;
+    }
   } catch (error) {
     req.log.warn({ err: error instanceof Error ? error.name : "unknown" }, "Basic voice synthesis unavailable");
     res.status(503).json({ error: "VOICE_SYNTHESIS_UNAVAILABLE" });
@@ -103,23 +139,42 @@ router.post("/voices/basic/listen", requireAuth, async (req, res) => {
     recent.push(now); recentRequests.set(req.userId!, recent);
     const reservation = await reserveVoiceNarration(req.userId!, characterId, text);
     if (!reservation) { res.status(429).json({ error: "VOICE_BUDGET_EXHAUSTED_OR_DISABLED" }); return; }
+    const audioRequestKey = randomUUID();
+    const audioCredit = await reserveCharacterAudioCredit({ ownerId:req.userId!,characterId,requestKey:audioRequestKey,engine:"kokoro",requestedSeconds:ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds });
+    if (!audioCredit.allowed) {
+      await completeVoiceNarration(req.userId!,reservation,false);
+      res.status(429).json({error:audioCredit.reason,remainingCredits:audioCredit.remaining});return;
+    }
+    try {
     const response = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json",
         ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
       body: JSON.stringify({ model: "kokoro", input: text, voice, response_format: "wav" }),
       signal: AbortSignal.timeout(45000),
     });
-    if (!response.ok) { await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
+    if (!response.ok) { await refundFailedCharacterAudio(req.userId!,audioRequestKey); await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
     const data = Buffer.from(await response.arrayBuffer());
     if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
       data.toString("ascii", 8, 12) !== "WAVE") {
+      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
       await completeVoiceNarration(req.userId!, reservation, false);
       res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
+    }
+    const seconds=wavDurationSeconds(data);
+    if (!Number.isFinite(seconds) || seconds<=0 || seconds>ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds) {
+      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
+      await completeVoiceNarration(req.userId!,reservation,false);
+      res.status(502).json({error:"VOICE_AUDIO_EXCEEDS_30_SECONDS"});return;
     }
     await completeVoiceNarration(req.userId!, reservation, true);
     res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Cache-Control", "private, no-store");
     res.send(data);
+    } catch (error) {
+      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
+      await completeVoiceNarration(req.userId!,reservation,false).catch(()=>{});
+      throw error;
+    }
   } catch (error) {
     req.log.warn({ err: error instanceof Error ? error.name : "unknown" }, "Voice listening unavailable");
     res.status(503).json({ error: "VOICE_LISTEN_UNAVAILABLE" });
