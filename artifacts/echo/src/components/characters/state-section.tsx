@@ -48,7 +48,7 @@ export function StateSection({ config, set, selfId }: SectionProps & { selfId?: 
 
       <div className="mt-6 rounded-2xl border border-border p-3">
         <button type="button" onClick={() => { try { setPreview(deriveRoutineContext(config, new Date())); setError(''); } catch { setError(t('Revisá la zona horaria antes de consultar la rutina.')); } }} className="tap flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-secondary px-2 py-2 text-sm font-semibold" data-testid="button-preview-routine-state">
-          <CalendarClock className="h-4 w-4" /> Ver qué sugiere la rutina ahora
+          <CalendarClock className="h-4 w-4" /> {t("Ver qué sugiere la rutina ahora")}
         </button>
         {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
         {preview && (
