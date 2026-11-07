@@ -20,6 +20,7 @@ export interface SocialActions {
   pinPost(id: string, pinned: boolean): void;
   movePinnedPost(id: string, direction: -1 | 1): void;
   reactStory(id: string, value: string): void;
+  toggleStoryLike(id: string): void;
   saveHighlight(highlight: StoryHighlight, expected?: StoryHighlight): void;
   deleteHighlight(id: string): void;
   reactMessage(id: string, value: string): void;
@@ -254,6 +255,11 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         coordinator.current?.edit(s => ({ ...s, messages: s.messages.map(m => m.id === id &&
           [m.senderId, m.recipientId].includes(myId())
           ? { ...m, hiddenForIds: [...new Set([...(m.hiddenForIds ?? []), myId()])] } : m) }));
+      },
+      toggleStoryLike(id) {
+        const story = cur().stories.find(s => s.id === id);
+        if (!story || !canViewStory(story, myId(), cur()) || !isStoryActive(story) || story.authorId === myId()) return;
+        coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, likes: (st.likes ?? []).includes(myId()) ? (st.likes ?? []).filter(actor => actor !== myId()) : [...(st.likes ?? []), myId()] } : st) }));
       },
       reactStory(id, value) {
         const story = cur().stories.find(s => s.id === id);
