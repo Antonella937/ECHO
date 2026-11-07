@@ -1,3 +1,4 @@
+import { useCreatorHubDmStatus, useCreatorHubDmCopy, markCreatorHubDmRead, refreshCreatorHubDmStatus } from '@/lib/creator-hub-notifications';
 import { HumanVoicePlayback, HumanVoiceRecorder } from '@/components/echo/human-voice-note';
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { compressImage, uploadPrivateImage, uploadPublicationImage, useMediaResolver } from '@/lib/media';
@@ -33,6 +34,10 @@ export default function CreatorHubPage() {
   const { user } = useUser();
   const ct = useCreatorTranslation();
   const ht = useCreatorHubText();
+  const dmStatus = useCreatorHubDmStatus();
+  const dmCopy = useCreatorHubDmCopy();
+  const unreadDmPeers = new Set(dmStatus.items.filter(item => item.unread).map(item => item.ownerId));
+  const [dmPreferenceSaving, setDmPreferenceSaving] = useState(false);
   const [hubTab, setHubTab] = useState<'perfil' | 'explorar' | 'mensajes' | 'ajustes'>('perfil');
   type Publication = {id:string;kind:'character'|'world'|'update'|'post';title:string;body:string;visibility:'public'|'followers'|'private';pinned:boolean;coverPath?:string|null;createdAt:string};
   const [publications,setPublications] = useState<Publication[]>([]);
@@ -451,6 +456,7 @@ export default function CreatorHubPage() {
     ]);
     setChatMessages(history.messages);
     setOtherTyping(presence.typing);
+    if (user?.id && history.messages.some(item => item.senderOwnerId === ownerId)) void markCreatorHubDmRead(user.id, ownerId).catch(() => {});
   }
   useEffect(() => {
     if (!activeChat) return;
@@ -483,6 +489,7 @@ export default function CreatorHubPage() {
   const [chatError, setChatError] = useState('');
   async function openHumanChat(ownerId: string, name: string) {
     setActiveChat({ ownerId, name }); setChatMessages([]); setChatError('');
+    if (user?.id) void markCreatorHubDmRead(user.id, ownerId).catch(() => {});
     try {
       const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
       setChatMessages(result.messages); setOtherTyping(false);
@@ -650,9 +657,23 @@ export default function CreatorHubPage() {
               {editingLink ? <div className="flex items-center gap-2"><ExternalLink size={16} className="shrink-0 text-muted-foreground" /><input aria-label={ht("Enlace externo de Creator Hub")} type="url" value={linkDraft} maxLength={500} onChange={e => setLinkDraft(e.target.value)} placeholder="https://instagram.com/tuusuario" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" /><button type="button" disabled={savingLink} onClick={() => void saveLink()} aria-label={ht("Guardar enlace")} className="p-2 text-primary disabled:opacity-50"><Check size={18}/></button><button type="button" onClick={() => setEditingLink(false)} aria-label={ht("Cancelar enlace")} className="p-2"><X size={18}/></button></div> : <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><ExternalLink size={16} className="shrink-0" />{externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate font-medium text-primary underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary/80">{(() => { try { const url = new URL(externalLink); const handle = url.pathname.split('/').filter(Boolean)[0]; return /(^|\.)instagram\.com$/i.test(url.hostname) && handle ? `Instagram · @${handle}` : url.hostname.replace(/^www\./, ''); } catch { return 'Ver enlace'; } })()}</a> : <span>{ht("Enlace externo opcional")}</span>}<button type="button" aria-label={ht("Editar enlace externo")} onClick={() => {setLinkDraft(externalLink);setProfileError('');setEditingLink(true);}} className="shrink-0 rounded-full p-1 hover:text-foreground"><Pencil size={15}/></button></div>}
             </div>
             <nav aria-label={ht("Secciones de Creator Hub")} className="grid grid-cols-4 gap-1 rounded-2xl border border-border bg-secondary/30 p-1.5">
-              {([{id:'perfil',label:'Perfil',Icon:UserRound},{id:'explorar',label:'Explorar',Icon:Compass},{id:'mensajes',label:'Mensajes',Icon:MessagesSquare},{id:'ajustes',label:'Ajustes',Icon:Settings2}] as const).map(tab => <button key={tab.id} type="button" aria-current={hubTab === tab.id ? 'page' : undefined} onClick={() => setHubTab(tab.id)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] sm:flex-row sm:gap-2 sm:text-sm ${hubTab === tab.id ? 'bg-primary/15 font-semibold text-primary' : 'text-muted-foreground hover:bg-secondary'}`}><tab.Icon size={17}/><span>{ht(tab.label)}</span></button>)}
+              {([{id:'perfil',label:'Perfil',Icon:UserRound},{id:'explorar',label:'Explorar',Icon:Compass},{id:'mensajes',label:'Mensajes',Icon:MessagesSquare},{id:'ajustes',label:'Ajustes',Icon:Settings2}] as const).map(tab => <button key={tab.id} type="button" aria-current={hubTab === tab.id ? 'page' : undefined} onClick={() => setHubTab(tab.id)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] sm:flex-row sm:gap-2 sm:text-sm ${hubTab === tab.id ? 'bg-primary/15 font-semibold text-primary' : 'text-muted-foreground hover:bg-secondary'}`}><tab.Icon size={17}/><span>{ht(tab.label)}</span>{tab.id === 'mensajes' && dmStatus.items.some(item => item.unread) && <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground" aria-label="Unread Creator Hub messages">{dmStatus.items.filter(item => item.unread).length}</span>}</button>)}
             </nav>
             {hubTab === 'ajustes' && <div className="space-y-4">
+            <div className="rounded-2xl border border-border p-4">
+              <label className="flex items-center justify-between gap-3">
+                <span><span className="block text-sm font-semibold">{dmCopy.setting}</span><span className="mt-1 block text-xs text-muted-foreground">{dmCopy.description}</span></span>
+                <input type="checkbox" className="h-5 w-5 accent-primary" checked={dmStatus.enabled} disabled={dmPreferenceSaving}
+                  onChange={async event => {
+                    setDmPreferenceSaving(true);
+                    try {
+                      await customFetch('/api/creator-hub/social/dm-notifications/preferences', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: event.target.checked }) });
+                      if (user?.id) await refreshCreatorHubDmStatus(user.id);
+                    } catch { setInboxError(ht("No se pudieron guardar los ajustes.")); }
+                    finally { setDmPreferenceSaving(false); }
+                  }} />
+              </label>
+            </div>
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <h3 className="font-semibold">{ht("Privacidad de Creator Hub")}</h3>
               {!socialReady ? <p className="text-sm text-muted-foreground">{ht("Los ajustes sociales estarán disponibles cuando se habilite el servidor de Creator Hub.")}</p> : <>
@@ -689,7 +710,7 @@ export default function CreatorHubPage() {
             <div className="rounded-2xl border border-border p-4 space-y-3">
               <div className="flex items-center justify-between"><h4 className="font-semibold">{ct("conversations")}</h4><button type="button" className="text-xs text-primary" onClick={() => void refreshConversations()}>{ct("refresh")}</button></div>
               {conversations.length === 0 && <p className="text-sm text-muted-foreground">{ht("Todavía no tenés conversaciones. Buscá una persona en Explorar para empezar.")}</p>}
-              {conversations.map(person => <button key={person.ownerId} type="button" onClick={() => void openHumanChat(person.ownerId,person.displayName)} className="flex w-full items-center justify-between rounded-xl bg-secondary/50 px-4 py-3 text-left text-sm hover:bg-secondary"><span>{person.displayName} <span className="text-muted-foreground">@{person.username}</span></span><MessageCircle size={17} className="text-primary"/></button>)}
+              {conversations.map(person => <button key={person.ownerId} type="button" onClick={() => void openHumanChat(person.ownerId,person.displayName)} className="flex w-full items-center justify-between rounded-xl bg-secondary/50 px-4 py-3 text-left text-sm hover:bg-secondary"><span>{person.displayName} <span className="text-muted-foreground">@{person.username}</span></span><span className="flex items-center gap-2">{unreadDmPeers.has(person.ownerId) && <span className="h-2.5 w-2.5 rounded-full bg-primary" aria-label="Unread message" />}<MessageCircle size={17} className="text-primary"/></span></button>)}
             </div>
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{ht("Bandeja de solicitudes")}</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">{ct("refresh")}</button></div>
