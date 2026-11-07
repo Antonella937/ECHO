@@ -74,6 +74,7 @@ router.post("/voices/premium/reference/request-url",async(req,res)=>{
   const uploadURL=relative?new URL(relative.startsWith("http")?relative:relative.startsWith("/storage/v1/")?`${base}${relative}`:`${base}/storage/v1/${relative.replace(/^[/]/,"")}`).toString()
    :payload.token?`${base}/storage/v1/object/upload/sign/echo-media/${path}?token=${encodeURIComponent(payload.token)}`:null;
   if(!uploadURL||!uploadURL.startsWith(`${base}/storage/v1/object/upload/sign/echo-media/`)){res.status(502).json({error:"VOICE_UPLOAD_SIGN_INVALID"});return;}
+  await pool.query("INSERT INTO echo_voice_references(owner_id,universe_id,character_id,object_path,content_type,expected_size) VALUES($1,$2,$3,$4,$5,$6)",[req.userId,parsed.data.universeId,parsed.data.characterId,path,parsed.data.contentType,parsed.data.size]);
   res.json({uploadURL,objectPath:path});
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
@@ -91,12 +92,15 @@ router.post("/voices/premium/reference/verify",async(req,res)=>{
   const base=process.env.SUPABASE_URL?.replace(new RegExp("/$"),"");
   const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!base||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
+  const owned=await pool.query("SELECT expected_size FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND object_path=$4 AND content_type=$5",[req.userId,parsed.data.universeId,parsed.data.characterId,parsed.data.objectPath,parsed.data.contentType]);
+  if(!owned.rowCount){res.status(404).json({error:"VOICE_REFERENCE_NOT_OWNED"});return;}
   const response=await fetch(`${base}/storage/v1/object/echo-media/${parsed.data.objectPath}`,{headers:{Authorization:`Bearer ${secret}`,apikey:secret},signal:AbortSignal.timeout(20000)});
   if(!response.ok){res.status(404).json({error:"VOICE_AUDIO_NOT_FOUND"});return;}
   const bytes=Buffer.from(await response.arrayBuffer());
   const {validMediaHeader}=await import("../lib/mediaSafety");
   const mime=(response.headers.get("content-type")??"").split(";")[0].toLowerCase();
-  if(mime!==parsed.data.contentType||!bytes.length||bytes.length>20*1024*1024||!validMediaHeader(bytes.subarray(0,64),mime)){res.status(400).json({error:"INVALID_UPLOADED_VOICE_AUDIO"});return;}
+  if(mime!==parsed.data.contentType||!bytes.length||bytes.length!==Number(owned.rows[0].expected_size)||bytes.length>20*1024*1024||!validMediaHeader(bytes.subarray(0,64),mime)){res.status(400).json({error:"INVALID_UPLOADED_VOICE_AUDIO"});return;}
+  await pool.query("UPDATE echo_voice_references SET status='ready',verified_at=now() WHERE owner_id=$1 AND object_path=$2",[req.userId,parsed.data.objectPath]);
   res.json({verified:true,objectPath:parsed.data.objectPath});
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
