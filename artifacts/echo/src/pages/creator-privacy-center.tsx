@@ -78,8 +78,8 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
     })),
   });
   const disableSharing = useMutation({
-    mutationFn: () => requestJson<{ sharingEnabled: boolean }>(sharingUrl(universeId), {
-      method: 'PUT', body: JSON.stringify({ sharingEnabled: false }),
+    mutationFn: (enabled: boolean) => requestJson<{ sharingEnabled: boolean }>(sharingUrl(universeId), {
+      method: 'PUT', body: JSON.stringify({ sharingEnabled: enabled }),
     }),
     onSuccess: data => queryClient.setQueryData(sharingKey, data),
   });
@@ -121,11 +121,11 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
               ? <button type="button" className="epc-text-control" onClick={() => void sharingQuery.refetch()} data-testid="button-retry-sharing">{t("Reintentar")}</button>
               : sharing === undefined ? <span className="epc-state-pill">{t("Cargando…")}</span>
               : <button type="button" className={`epc-toggle ${sharing ? 'is-on' : ''}`} role="switch" aria-checked={sharing}
-                  aria-label={t(sharing ? 'Desactivar compartir' : 'Activar compartir (bloqueado)')}
-                  disabled={!sharing || disableSharing.isPending}
-                  onClick={() => { if (sharing) disableSharing.mutate(); }} data-testid="toggle-universe-sharing"><i /></button>}
+                  aria-label={sharing ? 'Desactivar compartir' : 'Activar compartir'}
+                  disabled={disableSharing.isPending}
+                  onClick={() => disableSharing.mutate(!sharing)} data-testid="toggle-universe-sharing"><i /></button>}
           </div>
-          <p>{t(sharing ? 'El compartir está activo; solo puedes desactivarlo.' : 'Privado. Activar compartir no está disponible.')}</p>
+          <p>{sharing ? 'Compartir está habilitado. Solo quien tenga un enlace autorizado podrá ver una vista limitada.' : 'Privado. Activá compartir para generar enlaces de vista previa.'}</p>
           {disableSharing.isError && <p className="ep-form-error" role="alert">{t("No se pudo desactivar. Inténtalo de nuevo.")}</p>}
           {consent?.draftAcknowledged && <small className="epc-caption" data-testid="text-consent-record">
             {t('Borrador alfa registrado')}{consent.acknowledgedAt ? ` ${t('el')} ${new Date(consent.acknowledgedAt).toLocaleDateString(language)}` : ''} · {t('versión')} {consent.version}. {t('No es consentimiento legal.')}
