@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause } from 'lucide-react';
+import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
@@ -12,6 +12,27 @@ export default function EchoMusicPage() {
   const back = useBack();
   const { me } = useSocial();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
+  const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
+  const [localAudioError, setLocalAudioError] = useState('');
+  useEffect(() => () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); }, []);
+  function importAudio(file: File | undefined) {
+    if (!file) return;
+    if (!['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/webm'].includes(file.type) || file.size > 30 * 1024 * 1024) {
+      setLocalAudioError('Elegí un archivo de audio compatible de hasta 30 MB.');
+      return;
+    }
+    audioRef.current?.pause();
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(file);
+    objectUrlRef.current = url;
+    setLocalAudioUrl(url);
+    setLocalAudioError('');
+    setElapsed(0);
+    setActualDuration(0);
+    setPlaying(false);
+    setPlayerOpen(true);
+  }
   const [playerOpen, setPlayerOpen] = useState(false);
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
   const [libraryError, setLibraryError] = useState('');
@@ -36,7 +57,7 @@ export default function EchoMusicPage() {
       setLibrary(next);
     } catch { setLibraryError('No se pudo eliminar el borrador.'); }
   }
-  const [audioUrl] = useState<string | null>(null);
+  const audioUrl = localAudioUrl;
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [actualDuration, setActualDuration] = useState(0);
@@ -105,6 +126,9 @@ export default function EchoMusicPage() {
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
         <div className="mt-5 flex justify-center"><button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? 'Pausar' : 'Reproducir'} className="grid h-20 w-20 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-9 w-9 fill-current" /> : <Play className="ml-1 h-9 w-9 fill-current" />}</button></div>
       </div>
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 p-3 text-sm font-semibold"><Upload className="h-4 w-4" /> Probar con un audio propio<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm" className="sr-only" onChange={event => { importAudio(event.target.files?.[0]); event.target.value = ''; }} /></label>
+      {localAudioError && <p role="alert" className="text-sm text-red-200">{localAudioError}</p>}
+      {audioUrl && <p className="text-center text-xs text-white/60">Audio local de prueba: no se guarda ni se publica.</p>}
       {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />La canción está preparada, pero la generación de audio todavía no está activada. Cuando ElevenLabs devuelva un archivo, esta pantalla reproducirá el sonido real y la barra avanzará con él.</div>}
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">Ver prompt preparado</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
@@ -126,6 +150,8 @@ export default function EchoMusicPage() {
       {vocalMode==='singing' && <label className="block space-y-1 text-sm">Letra original<textarea className={field} value={lyrics} maxLength={5000} rows={5} onChange={e=>setLyrics(e.target.value)} placeholder="Escribí tu letra acá..." /></label>}
       <button type="submit" disabled={preparing} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 font-semibold text-primary-foreground"><WandSparkles className="h-4 w-4"/> {preparing ? "Preparando…" : "Preparar canción · gratis"}</button>
     </form>
+    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-card/60 p-3 text-sm font-semibold"><Upload className="h-4 w-4" /> Probar reproductor con audio propio<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm" className="sr-only" onChange={event => { importAudio(event.target.files?.[0]); event.target.value = ''; }} /></label>
+    {localAudioError && <p role="alert" className="text-sm text-destructive">{localAudioError}</p>}
     {prepareError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{prepareError}</p>}
     {preview && <section className="rounded-2xl border border-border bg-card/60 p-4" aria-live="polite"><h2 className="text-sm font-semibold">Solicitud preparada · {title} · {durationSeconds}s</h2><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{preview}</pre><p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/> Generación no activada. Sin cargos.</p></section>}
     <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">Los prompts se guardan solo en este dispositivo. Todavía no son canciones ni se sincronizan con tu cuenta.</p>
