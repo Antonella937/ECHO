@@ -10,6 +10,7 @@ import { AccountManager } from '@/components/echo/account-manager';
 import { UniverseSelector } from '@/components/echo/universe-selector';
 import { AutonomySettingsSection } from '@/components/echo/autonomy-settings';
 import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
+import { MusicConnectionsSection } from '@/components/echo/music-connections-section';
 import { PushNotificationSettings } from '@/components/echo/push-notification-settings';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -94,6 +95,8 @@ export default function SettingsPage() {
         <AutonomySettingsSection />
 
         <MessageSoundSettings />
+
+        <MusicConnectionsSection />
 
         <PushNotificationSettings />
 
