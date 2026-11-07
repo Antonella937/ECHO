@@ -44,18 +44,46 @@ export default function EchoMusicPage() {
   const [playerOpen, setPlayerOpen] = useState(false);
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
   const [libraryError, setLibraryError] = useState('');
+  const [cloudLibraryAvailable, setCloudLibraryAvailable] = useState(false);
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(libraryKey(me.id)) ?? '[]') as unknown;
       setLibrary(Array.isArray(stored) ? stored.filter((item): item is MusicDraftRecord => !!item && typeof item === 'object' && typeof item.title === 'string' && (item.status === 'draft' || (item.status === 'saved_audio' && typeof item.audioPath === 'string')) && item.characterId === me.id).slice(0, 50) : []);
     } catch { setLibrary([]); }
   }, [me.id]);
+  useEffect(() => {
+    let active = true;
+    void customFetch<{ items: Array<MusicDraftRecord & { createdAt: string }> }>('/api/music/library', { responseType: 'json' })
+      .then(result => {
+        if (!active) return;
+        setCloudLibraryAvailable(true);
+        const cloudItems = result.items.filter(item => item.characterId === me.id);
+        setLibrary(current => {
+          const merged = [...cloudItems, ...current.filter(local => !cloudItems.some(remote => remote.id === local.id))].slice(0, 100);
+          return merged;
+        });
+      }).catch(() => { if (active) setCloudLibraryAvailable(false); });
+    return () => { active = false; };
+  }, [me.id]);
+  async function syncDraft(record: MusicDraftRecord) {
+    try {
+      await customFetch('/api/music/library', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: record.id, characterId: record.characterId, title: record.title,
+          prompt: record.prompt, durationSeconds: record.durationSeconds, status: record.status,
+          audioPath: record.audioPath ?? null }), responseType: 'json' });
+      setCloudLibraryAvailable(true);
+    } catch {
+      setCloudLibraryAvailable(false);
+      setLibraryError('Guardado en este dispositivo. La sincronización en la nube está pendiente.');
+    }
+  }
   function saveDraft(record: MusicDraftRecord) {
     try {
       const next = [record, ...library.filter(item => item.id !== record.id)].slice(0, 50);
       localStorage.setItem(libraryKey(me.id), JSON.stringify(next));
       setLibrary(next);
       setLibraryError('');
+      void syncDraft(record);
     } catch { setLibraryError('No se pudo guardar el borrador en este dispositivo.'); }
   }
   async function saveCurrentAudio() {
@@ -82,6 +110,7 @@ export default function EchoMusicPage() {
       const next = library.filter(item => item.id !== id);
       localStorage.setItem(libraryKey(me.id), JSON.stringify(next));
       setLibrary(next);
+      void customFetch('/api/music/library/' + encodeURIComponent(id), { method: 'DELETE', responseType: 'json' }).catch(() => setLibraryError('Eliminado de este dispositivo, pero no se pudo sincronizar la eliminación.'));
     } catch { setLibraryError('No se pudo eliminar el borrador.'); }
   }
   const audioUrl = resolvedSavedAudio || localAudioUrl;
@@ -186,7 +215,7 @@ export default function EchoMusicPage() {
     {localAudioError && <p role="alert" className="text-sm text-destructive">{localAudioError}</p>}
     {prepareError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{prepareError}</p>}
     {preview && <section className="rounded-2xl border border-border bg-card/60 p-4" aria-live="polite"><h2 className="text-sm font-semibold">Solicitud preparada · {title} · {durationSeconds}s</h2><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{preview}</pre><p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/> Generación no activada. Sin cargos.</p></section>}
-    <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">El índice de esta biblioteca se guarda en este dispositivo. Los audios que guardes se suben al almacenamiento privado de ECHO; aún no hay sincronización de la biblioteca entre dispositivos.</p>
+    <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">Los audios se guardan en almacenamiento privado. {cloudLibraryAvailable ? 'Biblioteca conectada a tu cuenta.' : 'Biblioteca local; sincronización en la nube pendiente.'}</p>
       {libraryError && <p role="alert" className="mt-2 text-xs text-destructive">{libraryError}</p>}
       {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">Todavía no preparaste canciones.</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null); setElapsed(0); setActualDuration(0); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio privado guardado' : 'Borrador'} · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">Eliminar</button></div>)}</div>}
     </section>
