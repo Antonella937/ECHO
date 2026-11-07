@@ -110,22 +110,22 @@ export default function NotificationsPage() {
           setOfficialSubscribed(next);
           void customFetch('/api/creator-hub/social/announcement-subscription', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscribed: next }) }).catch(() => setOfficialSubscribed(!next));
           if (!next) setOfficialUpdates([]);
-        }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? (language === 'en' ? 'Subscribed' : 'Suscripto') : (language === 'en' ? 'Muted' : 'Silenciado')}</button>
+        }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? officialText.subscribed : officialText.muted}</button>
       </div>
       {user?.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && <section className="mx-4 mt-3 rounded-xl border border-dashed border-primary/50 bg-card p-3">
-        <p className="text-xs font-semibold text-primary">{language === 'en' ? 'Founder-only · Session preview' : 'Solo fundadora · Vista previa de sesión'}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{language === 'en' ? 'Nothing is published or sent to other accounts.' : 'No se publica nada ni se envía a otras cuentas.'}</p>
+        <p className="text-xs font-semibold text-primary">{officialText.previewHeading}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{officialText.previewDescription}</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => window.dispatchEvent(new Event('echo:preview-official-notification'))}>{language === 'en' ? 'Preview floating alert' : 'Probar aviso flotante'}</button>
-          <button type="button" className="rounded-full border border-border px-3 py-2 text-xs font-semibold" onClick={() => setPreview(previous => !previous)}>{language === 'en' ? 'Preview notification cards' : 'Probar tarjetas de avisos'}</button>
+          <button type="button" className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => window.dispatchEvent(new Event('echo:preview-official-notification'))}>{officialText.previewToastButton}</button>
+          <button type="button" className="rounded-full border border-border px-3 py-2 text-xs font-semibold" onClick={() => setPreview(previous => !previous)}>{officialText.previewCardsButton}</button>
         </div>
         {preview && <div className="mt-3 space-y-2" aria-label="Preview notifications">
-          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">📣 ECHO · {officialText.update}</span><p className="mt-1 text-sm font-semibold">{language === 'en' ? 'Preview: an official announcement was published' : 'Vista previa: se publicó un anuncio oficial'}</p><p className="text-xs text-muted-foreground">{language === 'en' ? 'Sample only · not delivered' : 'Solo ejemplo · no enviado'}</p></div>
-          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">👥 Creator Hub</span><p className="mt-1 text-sm font-semibold">{language === 'en' ? 'A creator you follow published a new post' : 'Un creador que seguís publicó una novedad'}</p><p className="text-xs text-muted-foreground">{language === 'en' ? 'Sample only · not delivered' : 'Solo ejemplo · no enviado'}</p></div>
+          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">📣 ECHO · {officialText.update}</span><p className="mt-1 text-sm font-semibold">{officialText.previewOfficialCard}</p><p className="text-xs text-muted-foreground">{officialText.previewSample}</p></div>
+          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">👥 Creator Hub</span><p className="mt-1 text-sm font-semibold">{officialText.previewCreatorCard}</p><p className="text-xs text-muted-foreground">{officialText.previewSample}</p></div>
         </div>}
       </section>}
       {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
-        <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2>
+        <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {officialText.title}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
           <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label="Unread"/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
           <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
