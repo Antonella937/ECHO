@@ -7,6 +7,10 @@ import { Link } from 'wouter';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import './public-surface.css';
 import { useOnboardingText } from '@/lib/onboarding-translations';
+import { useLanguage } from '@/lib/i18n';
+import { useMemo } from 'react';
+const validationCopy: Record<string,Record<string,string>> = {"es":{"Escribe al menos 2 caracteres.":"Escribe al menos 2 caracteres.","Usa 60 caracteres o menos.":"Usa 60 caracteres o menos.","Escribe el nombre visible.":"Escribe el nombre visible.","El usuario necesita al menos 3 caracteres.":"El usuario necesita al menos 3 caracteres.","Usa 30 caracteres o menos.":"Usa 30 caracteres o menos.","Usa letras, números, puntos o guiones bajos.":"Usa letras, números, puntos o guiones bajos.","La biografía puede tener hasta 160 caracteres.":"La biografía puede tener hasta 160 caracteres."},"en":{"Escribe al menos 2 caracteres.":"At least 2 characters required.","Usa 60 caracteres o menos.":"Use 60 characters or fewer.","Escribe el nombre visible.":"Enter a display name.","El usuario necesita al menos 3 caracteres.":"Username must have at least 3 characters.","Usa 30 caracteres o menos.":"Use 30 characters or fewer.","Usa letras, números, puntos o guiones bajos.":"Use letters, numbers, dots or underscores.","La biografía puede tener hasta 160 caracteres.":"Bio must be 160 characters or fewer."},"pt":{"Escribe al menos 2 caracteres.":"Digite pelo menos 2 caracteres.","Usa 60 caracteres o menos.":"Use no máximo 60 caracteres.","Escribe el nombre visible.":"Digite um nome de exibição.","El usuario necesita al menos 3 caracteres.":"O nome de usuário precisa de pelo menos 3 caracteres.","Usa 30 caracteres o menos.":"Use no máximo 30 caracteres.","Usa letras, números, puntos o guiones bajos.":"Use letras, números, pontos ou sublinhados.","La biografía puede tener hasta 160 caracteres.":"A biografia deve ter no máximo 160 caracteres."},"fr":{"Escribe al menos 2 caracteres.":"Saisissez au moins 2 caractères.","Usa 60 caracteres o menos.":"Utilisez 60 caractères maximum.","Escribe el nombre visible.":"Saisissez un nom affiché.","El usuario necesita al menos 3 caracteres.":"Le nom d’utilisateur doit comporter au moins 3 caractères.","Usa 30 caracteres o menos.":"Utilisez 30 caractères maximum.","Usa letras, números, puntos o guiones bajos.":"Utilisez des lettres, chiffres, points ou traits de soulignement.","La biografía puede tener hasta 160 caracteres.":"La biographie doit contenir 160 caractères maximum."},"de":{"Escribe al menos 2 caracteres.":"Mindestens 2 Zeichen eingeben.","Usa 60 caracteres o menos.":"Maximal 60 Zeichen verwenden.","Escribe el nombre visible.":"Anzeigenamen eingeben.","El usuario necesita al menos 3 caracteres.":"Der Benutzername benötigt mindestens 3 Zeichen.","Usa 30 caracteres o menos.":"Maximal 30 Zeichen verwenden.","Usa letras, números, puntos o guiones bajos.":"Buchstaben, Zahlen, Punkte oder Unterstriche verwenden.","La biografía puede tener hasta 160 caracteres.":"Die Biografie darf höchstens 160 Zeichen enthalten."},"it":{"Escribe al menos 2 caracteres.":"Inserisci almeno 2 caratteri.","Usa 60 caracteres o menos.":"Usa al massimo 60 caratteri.","Escribe el nombre visible.":"Inserisci un nome visualizzato.","El usuario necesita al menos 3 caracteres.":"Il nome utente deve contenere almeno 3 caratteri.","Usa 30 caracteres o menos.":"Usa al massimo 30 caratteri.","Usa letras, números, puntos o guiones bajos.":"Usa lettere, numeri, punti o trattini bassi.","La biografía puede tener hasta 160 caracteres.":"La biografia può contenere al massimo 160 caratteri."},"ko":{"Escribe al menos 2 caracteres.":"최소 2자 이상 입력하세요.","Usa 60 caracteres o menos.":"60자 이하로 입력하세요.","Escribe el nombre visible.":"표시 이름을 입력하세요.","El usuario necesita al menos 3 caracteres.":"사용자 이름은 최소 3자 이상이어야 합니다.","Usa 30 caracteres o menos.":"30자 이하로 입력하세요.","Usa letras, números, puntos o guiones bajos.":"영문자, 숫자, 마침표 또는 밑줄을 사용하세요.","La biografía puede tener hasta 160 caracteres.":"소개는 160자 이하로 입력하세요."},"ja":{"Escribe al menos 2 caracteres.":"2文字以上入力してください。","Usa 60 caracteres o menos.":"60文字以内で入力してください。","Escribe el nombre visible.":"表示名を入力してください。","El usuario necesita al menos 3 caracteres.":"ユーザー名は3文字以上必要です。","Usa 30 caracteres o menos.":"30文字以内で入力してください。","Usa letras, números, puntos o guiones bajos.":"英数字、ピリオド、アンダースコアを使用してください。","La biografía puede tener hasta 160 caracteres.":"自己紹介は160文字以内で入力してください。"},"zh":{"Escribe al menos 2 caracteres.":"请至少输入2个字符。","Usa 60 caracteres o menos.":"请使用不超过60个字符。","Escribe el nombre visible.":"请输入显示名称。","El usuario necesita al menos 3 caracteres.":"用户名至少需要3个字符。","Usa 30 caracteres o menos.":"请使用不超过30个字符。","Usa letras, números, puntos o guiones bajos.":"请使用字母、数字、句点或下划线。","La biografía puede tener hasta 160 caracteres.":"简介不能超过160个字符。"}};
+
 
 export type CreatorPlan = 'free' | 'creator';
 
@@ -26,19 +30,22 @@ export interface OnboardingPageProps {
   onEnter: () => void;
 }
 
-const onboardingSchema = z.object({
+const createOnboardingSchema = (t: (key: string) => string) => z.object({
   plan: z.enum(['free', 'creator']),
-  universeName: z.string().trim().min(2, 'Escribe al menos 2 caracteres.').max(60, 'Usa 60 caracteres o menos.'),
-  displayName: z.string().trim().min(1, 'Escribe el nombre visible.').max(60, 'Usa 60 caracteres o menos.'),
-  username: z.string().trim().min(3, 'El usuario necesita al menos 3 caracteres.').max(30, 'Usa 30 caracteres o menos.')
-    .regex(/^[a-zA-Z0-9._]+$/, 'Usa letras, números, puntos o guiones bajos.'),
-  bio: z.string().trim().max(160, 'La biografía puede tener hasta 160 caracteres.'),
+  universeName: z.string().trim().min(2, t("Escribe al menos 2 caracteres.")).max(60, t("Usa 60 caracteres o menos.")),
+  displayName: z.string().trim().min(1, t("Escribe el nombre visible.")).max(60, t("Usa 60 caracteres o menos.")),
+  username: z.string().trim().min(3, t("El usuario necesita al menos 3 caracteres.")).max(30, t("Usa 30 caracteres o menos."))
+    .regex(/^[a-zA-Z0-9._]+$/, t("Usa letras, números, puntos o guiones bajos.")),
+  bio: z.string().trim().max(160, t("La biografía puede tener hasta 160 caracteres.")),
 });
 
-type OnboardingValues = z.infer<typeof onboardingSchema>;
+type OnboardingValues = z.infer<ReturnType<typeof createOnboardingSchema>>;
 
 export default function OnboardingPage({ saving, error, onComplete, onEnter }: OnboardingPageProps) {
   const t = useOnboardingText();
+  const language = useLanguage();
+  const validationText = (key: string) => validationCopy[language]?.[key] ?? validationCopy.en[key] ?? key;
+  const onboardingSchema = useMemo(() => createOnboardingSchema(validationText), [language]);
   const [step, setStep] = useState(0);
   const [complete, setComplete] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
