@@ -1,3 +1,4 @@
+import { MusicClipPlayer } from './music-clip-player';
 import { useFeedText } from '@/lib/feed-translations';
 import { useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
@@ -83,6 +84,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </div>
       )}
 
+      {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact /></div>}
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
           <Heart className={cn('h-[25px] w-[25px] transition-transform', liked && 'scale-110 fill-primary text-primary')} strokeWidth={1.6} />
