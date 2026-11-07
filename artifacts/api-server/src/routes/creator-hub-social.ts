@@ -105,6 +105,14 @@ export function createCreatorHubSocialRouter(): IRouter {
     );
     if (!result.rowCount) { res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
     const profile = result.rows[0];
+    // Private accounts remain discoverable, but their biography and media are
+    // visible only to accepted followers or the account owner.
+    const canViewPrivateProfile = ownerId === req.userId || profile.visibility === "public" || profile.following;
+    if (!canViewPrivateProfile) {
+      res.json({ profile: { ...profile, bio: "", avatarRef: null, bannerRef: null, avatarPosition: null,
+        verificationRole: lifetimeAccessForOwner(ownerId), roleLabel: null } });
+      return;
+    }
     try {
       const account = await clerkClient.users.getUser(ownerId);
       const metadata = account.unsafeMetadata ?? {};
@@ -561,6 +569,15 @@ export function createCreatorHubSocialRouter(): IRouter {
       );
       if (!result.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "REQUEST_NOT_FOUND" }); return; }
       if (action === "accept") {
+        const blocked = await client.query(
+          "SELECT 1 FROM echo_creator_blocks WHERE (blocker_owner_id=$1 AND blocked_owner_id=$2) OR (blocker_owner_id=$2 AND blocked_owner_id=$1)",
+          [result.rows[0].requester_owner_id, req.userId],
+        );
+        if (blocked.rowCount) {
+          await client.query("ROLLBACK");
+          res.status(404).json({ error: "REQUEST_NOT_FOUND" });
+          return;
+        }
         await client.query(
           "INSERT INTO echo_creator_follows(follower_owner_id,followed_owner_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
           [result.rows[0].requester_owner_id, req.userId],
