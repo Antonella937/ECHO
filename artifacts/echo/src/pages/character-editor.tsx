@@ -15,7 +15,6 @@ import { BasicFields, type BasicForm } from '@/components/characters/basic-field
 import { BasicVoiceCatalogue } from '@/components/characters/basic-voice-catalogue';
 import { PremiumVoiceStudio } from '@/components/characters/premium-voice-studio';
 import { VisualIdentity } from '@/components/characters/visual-identity';
-import { CharacterPostGallery } from '@/components/characters/post-gallery';
 import type { IdentityReference } from '@/domain/types';
 import { IdentitySection } from '@/components/characters/identity-section';
 import { PersonalitySection } from '@/components/characters/personality-section';
@@ -144,7 +143,6 @@ export default function CharacterEditorPage() {
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
           <BasicVoiceCatalogue selectedVoiceId={config.voice.basicVoiceId} onSelect={(basicVoiceId) => set((c) => ({ ...c, voice: { ...c.voice, basicVoiceId } }))} />
           <PremiumVoiceStudio characterId={account?.id} />
-          <CharacterPostGallery characterId={account?.id} />
           <VisualIdentity avatar={form.avatar} identity={identity} onBusy={setUploading}
             onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
