@@ -1,6 +1,8 @@
 import { useAccountManagementText } from '@/lib/account-management-translations';
 import { useEffect, useRef, useState } from 'react';
-import { Archive, ArchiveRestore } from 'lucide-react';
+import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { deletionBlockReason } from '@/domain/character-core';
+import { useCharacterAccountActionsText } from '@/lib/character-account-actions-translations';
 import { useSocial } from '@/store/social-store';
 import { Sheet } from './sheet';
 import { AvatarPicker } from './avatar-picker';
@@ -23,6 +25,7 @@ interface Props {
 
 export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
   const t = useAccountManagementText();
+  const actionText = useCharacterAccountActionsText();
   const { state, character, actions } = useSocial();
   const account = accountId ? character(accountId) : undefined;
   const isNew = !accountId;
@@ -37,6 +40,8 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteHandle, setDeleteHandle] = useState('');
   const saving = useRef(false);
   const original = useRef<AccountInput | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -54,10 +59,13 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setFollowing(account?.displayMetrics?.following?.toString() ?? '');
     setError(null);
     setConfirmArchive(false);
+    setConfirmDelete(false);
+    setDeleteHandle('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, accountId]);
 
   const real = account ? realFollowCounts(state, account.id) : { followers: 0, following: 0 };
+  const deletionBlock = account ? deletionBlockReason(state, account.id) : null;
 
   const save = () => {
     if (saving.current || uploading) return;
@@ -94,6 +102,19 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
       if (archived) onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t("No se pudo completar."));
+    }
+  };
+
+  const deleteAccount = () => {
+    if (!account || deletionBlock || deleteHandle.trim() !== `@${account.handle}`) return;
+    try {
+      actions.deleteAccount(account.id);
+      toast({ title: actionText('Cuenta eliminada') });
+      setConfirmDelete(false);
+      setDeleteHandle('');
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : actionText('No se pudo completar.'));
     }
   };
 
@@ -172,6 +193,22 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
               <Archive className="h-4 w-4" /> Archivar cuenta
             </button>
           )}
+          <div className="mt-3">
+            {deletionBlock ? (
+              <p className="rounded-2xl bg-secondary/60 p-3 text-sm text-muted-foreground" data-testid="text-account-delete-blocked">{actionText('No se puede eliminar:')} {deletionBlock}</p>
+            ) : confirmDelete ? (
+              <div className="rounded-2xl border border-destructive/40 p-4" data-testid="panel-confirm-delete-account">
+                <label htmlFor="account-delete-handle" className="text-sm text-muted-foreground">{actionText('Esto es permanente. Escribí')} <b className="text-foreground">@{account.handle}</b> {actionText('para confirmar.')}</label>
+                <input id="account-delete-handle" value={deleteHandle} onChange={(e) => setDeleteHandle(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} className={`${inputCls} mt-3`} data-testid="input-account-delete-handle" />
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => { setConfirmDelete(false); setDeleteHandle(''); }} className="h-11 flex-1 rounded-xl bg-secondary text-sm">{actionText('Cancelar')}</button>
+                  <button type="button" disabled={deleteHandle.trim() !== `@${account.handle}`} onClick={deleteAccount} className="h-11 flex-1 rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground disabled:opacity-50" data-testid="button-confirm-delete-account">{actionText('Eliminar')}</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => { setConfirmArchive(false); setConfirmDelete(true); }} className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-destructive/40 text-sm text-destructive" data-testid="button-delete-account"><Trash2 className="h-4 w-4" /> {actionText('Eliminar cuenta sin uso')}</button>
+            )}
+          </div>
         </div>
       )}
     </Sheet>
