@@ -17,21 +17,23 @@ const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 export default function MessagesPage() {
   const t = useMessagesText();
   const { me, state, character, actions } = useSocial();
-  const [showSaved, setShowSaved] = useState(false);
+  const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get("tab") === "favorites");
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
+  const backToInbox = () => { if (showSaved) { setShowSaved(false); window.history.replaceState(null, "", "/messages"); } else navigate("/"); };
+  const toggleFavorites = () => { setShowSaved(value => { const next = !value; window.history.replaceState(null, "", next ? "/messages?tab=favorites" : "/messages"); return next; }); };
 
   return (
     <div>
       <TopBar
         title={t("Mensajes")}
-        onBack={() => navigate("/")}
+        onBack={backToInbox}
         sub={`${t("Bandeja de")} ${me.name}`}
         right={
           <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setShowSaved(v => !v)} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
+          <button type="button" onClick={toggleFavorites} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
           <button
             onClick={() => setComposing(true)}
             aria-label={t("Nueva conversación")}
