@@ -540,67 +540,102 @@ function InterfaceLanguageSync() {
   const { user, isLoaded } = useUser();
   const language = useLanguage();
   const [readyForUser, setReadyForUser] = useState<string | null>(null);
-  const lastLanguage = useRef<Language>(language);
+  // The account's confirmed language is authoritative; never save a stale render
+  // when applying an incoming preference from another device.
+  const confirmed = useRef<Language | null>(null);
+  const pending = useRef<Language | null>(null);
+  const applyingRemote = useRef(false);
+  const writeSequence = useRef(Promise.resolve());
+  const accountId = user?.id;
   useEffect(() => {
-    if (!isLoaded || !user?.id) { setReadyForUser(null); sessionStorage.removeItem('echo:language-ready-user'); return; }
+    if (!isLoaded || !accountId) {
+      setReadyForUser(null);
+      sessionStorage.removeItem('echo:language-ready-user');
+      confirmed.current = null;
+      return;
+    }
     let cancelled = false;
     setReadyForUser(null);
     sessionStorage.removeItem('echo:language-ready-user');
+    confirmed.current = null;
+    pending.current = null;
     void customFetch<{ language: Language | null }>('/api/account/interface-language', { responseType: 'json' })
       .then(result => {
         if (cancelled) return;
         if (result.language) {
-          lastLanguage.current = result.language;
+          confirmed.current = result.language;
+          applyingRemote.current = true;
           setLanguage(result.language);
         } else {
-          lastLanguage.current = getLanguage();
-          // First device establishes the initial account preference.
-          void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language: lastLanguage.current }) }).catch(console.warn);
+          const first = getLanguage();
+          confirmed.current = first;
+          void customFetch('/api/account/interface-language', {
+            method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ language: first }),
+          }).catch(error => console.warn('ECHO initial language save failed', error));
         }
-        setReadyForUser(user.id);
-        sessionStorage.setItem('echo:language-ready-user', user.id);
-        window.dispatchEvent(new CustomEvent('echo:account-language-ready', { detail: { userId: user.id } }));
+        setReadyForUser(accountId);
+        sessionStorage.setItem('echo:language-ready-user', accountId);
+        window.dispatchEvent(new CustomEvent('echo:account-language-ready', { detail: { userId: accountId } }));
       })
       .catch(error => { if (!cancelled) console.warn('ECHO language sync unavailable', error); });
     return () => { cancelled = true; };
-  }, [isLoaded, user?.id]);
+  }, [isLoaded, accountId]);
+
   useEffect(() => {
-    if (!user?.id || readyForUser !== user.id || lastLanguage.current === language) return;
-    lastLanguage.current = language;
-    void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language }) }).catch(error => console.warn('ECHO language preference save failed', error));
-  }, [language, readyForUser, user?.id]);
-  // Keep the same account language across already-open devices, not only at login.
+    if (!accountId || readyForUser !== accountId || confirmed.current === null) return;
+    if (applyingRemote.current) {
+      if (language === confirmed.current) applyingRemote.current = false;
+      return;
+    }
+    if (language === confirmed.current || language === pending.current) return;
+    const selected = language;
+    pending.current = selected;
+    // Serialize writes so a slower previous request cannot overwrite a newer choice.
+    writeSequence.current = writeSequence.current.catch(() => {}).then(async () => {
+      await customFetch('/api/account/interface-language', {
+        method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: selected }),
+      });
+      if (pending.current === selected) {
+        confirmed.current = selected;
+        pending.current = null;
+      }
+    }).catch(error => {
+      if (pending.current === selected) pending.current = null;
+      console.warn('ECHO language preference save failed', error);
+    });
+  }, [language, readyForUser, accountId]);
+
   useEffect(() => {
-    if (!user?.id || readyForUser !== user.id) return;
+    if (!accountId || readyForUser !== accountId) return;
     let active = true;
     let busy = false;
     const refresh = async () => {
-      if (busy || document.visibilityState === 'hidden') return;
+      if (busy || document.visibilityState === 'hidden' || pending.current !== null) return;
       busy = true;
       try {
         const result = await customFetch<{ language: Language | null }>('/api/account/interface-language', { responseType: 'json' });
-        if (!active || !result.language) return;
-        // Never overwrite a local selection while its save is in flight.
-        if (lastLanguage.current !== getLanguage()) return;
-        if (result.language !== getLanguage()) {
-          lastLanguage.current = result.language;
+        if (!active || !result.language || pending.current !== null) return;
+        if (result.language !== confirmed.current) {
+          confirmed.current = result.language;
+          applyingRemote.current = true;
           setLanguage(result.language);
         }
       } catch (error) { console.warn('ECHO language refresh unavailable', error); }
       finally { busy = false; }
     };
     const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
-    const onFocus = () => { void refresh(); };
-    const timer = window.setInterval(() => { void refresh(); }, 20000);
+    const timer = window.setInterval(onVisible, 20000);
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onFocus);
+    window.addEventListener('focus', onVisible);
     return () => {
       active = false;
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('focus', onVisible);
     };
-  }, [user?.id, readyForUser]);
+  }, [accountId, readyForUser]);
   return null;
 }
 
