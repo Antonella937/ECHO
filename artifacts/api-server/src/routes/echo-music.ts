@@ -168,10 +168,9 @@ function composeElevenMusicRequest(draft: z.infer<typeof musicGenerationRequest>
     draft.vocalMode === "instrumental"
       ? "Instrumental only, no singing or spoken words."
       : `Sung vocals in language ${draft.language}.`,
-    draft.vocalMode === "singing" && draft.lyrics && `Use these original lyrics:\\n${draft.lyrics}`,
-  ].filter(Boolean).join("\\n");
+    draft.vocalMode === "singing" && draft.lyrics && `Use these original lyrics:\n${draft.lyrics}`,
+  ].filter(Boolean).join("\n");
   return {
-    endpoint: "https://api.elevenlabs.io/v1/music",
     model_id: "music_v2_5" as const,
     prompt: prompt.slice(0, 4100),
     music_length_ms: draft.durationSeconds * 1000,
@@ -190,12 +189,13 @@ router.post("/music/generate/preview", (req, res) => {
     activated: false,
     charged: false,
     request: composeElevenMusicRequest(parsed.data),
+    endpoint: "POST /v1/music",
     note: "Request preview only. No ElevenLabs API call was made.",
   });
 });
 
 router.post("/music/generate", (_req, res) => {
-  res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", charged: false });
+  res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", provider: "elevenlabs_music", charged: false, retryable: false });
 });
 
 export default router;
