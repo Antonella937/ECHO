@@ -28,10 +28,13 @@ const repository: LiveAutonomyRepository = {
 };
 
 export function startAutonomyBackgroundWorker() {
+  let lastSocialSlotAttempted = -1;
   return startAutonomyWorker({
     enabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
     tick: async () => {
+      const socialSlot = Math.floor(Date.now() / (30 * 60_000));
       const result = await runAutonomyWorkerTick({
+        socialTickDue: socialSlot !== lastSocialSlotAttempted,
         enabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
         repository: {
           listLiveOptInTargets,
@@ -62,6 +65,7 @@ export function startAutonomyBackgroundWorker() {
         },
       });
       if (result.status === "completed") {
+        lastSocialSlotAttempted = socialSlot;
         logger.info({
           evaluated: result.evaluated,
           executed: result.executed,
