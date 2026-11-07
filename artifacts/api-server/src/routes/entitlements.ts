@@ -24,7 +24,7 @@ router.get("/account/entitlements", requireAuth, async (req, res) => {
     const usedMessagesToday = Number(daily?.used ?? 0);
     const monthlyLimit = eligible ? (budget?.monthlyCharacterLimit ?? 0) : 0;
     const dailyLimit = eligible ? (budget?.maxDailyMessages ?? 0) : 0;
-    res.json({ plan, lifetimeAccess, billingExempt: lifetimeAccess !== null, features: { basicVoices: eligible, customVoices: false, music: false, videos: false },
+    res.json({ plan, lifetimeAccess, billingExempt: lifetimeAccess !== null, features: { basicVoices: eligible, customVoices: plan === "premium", music: false, videos: false },
       voice: { enabled: eligible && budget?.enabled === true, engineConfigured: Boolean(process.env.ECHO_KOKORO_TTS_URL),
         preference: eligible ? (budget?.preference ?? "off") : "off", monthlyCharacterLimit: monthlyLimit,
         usedCharacters, remainingCharacters: Math.max(0, monthlyLimit - usedCharacters),
