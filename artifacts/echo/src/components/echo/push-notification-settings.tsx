@@ -1,3 +1,4 @@
+import { customFetch } from '@workspace/api-client-react';
 import { useCreatorHubDmCopy } from '@/lib/creator-hub-notifications';
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from 'react';
@@ -30,6 +31,9 @@ export function PushNotificationSettings() {
   const ownerId = user?.id ?? '';
   const [prefs, setPrefs] = useState(() => ownerId ? readPushPreferences(ownerId) : defaults);
   const [notice, setNotice] = useState('');
+  const syncCreatorHubPush = async (enabled: boolean) => {
+    await customFetch("/api/creator-hub/social/dm-notifications/push-preference", { method: "PUT", responseType: "json", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+  };
   const update = (next: PushPreferences) => {
     setPrefs(next);
     if (ownerId) localStorage.setItem('echo:push-preferences:' + ownerId, JSON.stringify(next));
@@ -48,7 +52,8 @@ export function PushNotificationSettings() {
       const allowed = await client.Notifications.requestPermission();
       if (!allowed) { setNotice(t("No se concedió permiso para notificaciones.")); return; }
       update({ ...prefs, enabled: true });
-      setNotice(t("Permiso activado. La entrega automática de eventos requiere conectar el servidor de ECHO."));
+      await syncCreatorHubPush(prefs.categories.creatorHub);
+      setNotice(creatorCopy.setting);
     } catch (error) { setNotice(error instanceof Error ? error.message : t("No se pudo activar OneSignal.")); }
   };
   return <section className="mt-9" aria-labelledby="push-h">
@@ -57,11 +62,11 @@ export function PushNotificationSettings() {
       <p className="text-xs text-muted-foreground">{t("Elegí qué avisos querés recibir. Podés registrar este dispositivo para avisos push. El envío automático de eventos sigue en preparación.")}</p>
       <label className="flex items-center justify-between gap-3 text-sm font-semibold">
         <span className="flex items-center gap-2">{prefs.enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} {t("Activar avisos")}</span>
-        <input type="checkbox" checked={prefs.enabled} onChange={e => update({ ...prefs, enabled: e.target.checked })} className="h-5 w-5 accent-primary" />
+        <input type="checkbox" checked={prefs.enabled} onChange={e => { const next = { ...prefs, enabled: e.target.checked }; update(next); void syncCreatorHubPush(next.enabled && next.categories.creatorHub).catch(() => setNotice(t("No se pudo activar OneSignal."))); }} className="h-5 w-5 accent-primary" />
       </label>
       {categories.map(([key, title]) => <label key={key} className="flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-sm">
         <span>{key === 'creatorHub' ? creatorCopy.setting : t(title)}</span>
-        <input type="checkbox" disabled={!prefs.enabled} checked={prefs.categories[key]} onChange={e => update({ ...prefs, categories: { ...prefs.categories, [key]: e.target.checked } })} className="h-5 w-5 accent-primary" />
+        <input type="checkbox" disabled={!prefs.enabled} checked={prefs.categories[key]} onChange={e => { const next = { ...prefs, categories: { ...prefs.categories, [key]: e.target.checked } }; update(next); if (key === "creatorHub") void syncCreatorHubPush(next.enabled && next.categories.creatorHub).catch(() => setNotice(t("No se pudo activar OneSignal."))); }} className="h-5 w-5 accent-primary" />
       </label>)}
       <button type="button" onClick={() => void request()} className="rounded-xl border border-border px-3 py-2 text-xs font-semibold">{t("Activar notificaciones en este dispositivo")}</button>
       {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
