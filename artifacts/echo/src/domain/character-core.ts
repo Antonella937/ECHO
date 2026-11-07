@@ -121,7 +121,6 @@ export function deleteUnusedAccount(state: SocialState, id: string): SocialState
     mentionedAccountIds: s.mentionedAccountIds?.filter(x => x !== id),
     allowedViewerIds: s.allowedViewerIds?.filter(x => x !== id),
     likes: s.likes?.filter(x => x !== id),
-    reactions: s.reactions?.filter(r => r.actorId !== id),
   }));
   const storyIds = new Set(stories.map(s => s.id));
   const follows = Object.fromEntries(Object.entries(state.follows)
