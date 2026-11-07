@@ -41,10 +41,10 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
       <Search className="h-4 w-4 text-primary" /> {showSearch ? 'Cerrar búsqueda' : 'Buscar canción en YouTube'}
     </button>
     {showSearch && <div className="mt-3 rounded-xl border border-border p-3">
-      <form onSubmit={e => { e.preventDefault(); void searchYouTube(); }} className="flex gap-2">
-        <input value={searchQuery} maxLength={100} onChange={e => setSearchQuery(e.target.value)} placeholder="Canción o artista" aria-label="Buscar canción en YouTube" className="h-11 min-w-0 flex-1 rounded-lg bg-secondary px-3 text-sm" />
-        <button type="submit" disabled={searching || searchQuery.trim().length < 3} className="rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{searching ? 'Buscando…' : 'Buscar'}</button>
-      </form>
+      <div className="flex gap-2">
+        <input value={searchQuery} maxLength={100} onChange={e => setSearchQuery(e.target.value)} placeholder="Canción o artista" aria-label="Buscar canción en YouTube" onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); void searchYouTube(); } }} className="h-11 min-w-0 flex-1 rounded-lg bg-secondary px-3 text-sm" />
+        <button type="button" onClick={() => void searchYouTube()} disabled={searching || searchQuery.trim().length < 3} className="rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{searching ? 'Buscando…' : 'Buscar'}</button>
+      </div>
       {searchError && <p role="alert" className="mt-2 text-xs text-destructive">{searchError}</p>}
       {results.length > 0 && <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto">{results.map(item => <li key={item.videoId} className="flex items-center gap-3 rounded-lg p-2 hover:bg-secondary">
         {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" loading="lazy" className="h-12 w-16 shrink-0 rounded-md object-cover" />}
