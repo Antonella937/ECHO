@@ -3,7 +3,7 @@ import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload } f
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
-import { CharacterAvatar } from '@/components/echo/avatar';
+import { resolveMedia } from '@/lib/media';
 
 type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' };
 const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
@@ -118,7 +118,7 @@ export default function EchoMusicPage() {
     </header>
     <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-9 py-8">
       <div className="mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 shadow-2xl">
-        <CharacterAvatar character={me} size={340} className="max-w-full" />
+        {me.avatar ? <img src={resolveMedia(me.avatar)} alt={`Portada de ${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
       </div>
       <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
       <div>
