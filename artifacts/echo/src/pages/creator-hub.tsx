@@ -404,7 +404,7 @@ export default function CreatorHubPage() {
         body: JSON.stringify({ targetOwnerId: ownerId, body: requestDraft.trim() }),
       });
       if (result.status === 'requested') { const notice = ht("Solicitud enviada. Aparecerá en la bandeja de esa persona."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); setRequestComposerOpen(false); setRequestDraft(''); }
-      else { setSelectedPersonId(null); setHubTab('mensajes'); setPeopleFeedback(ht("Podés escribirle.")); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? ht("esta persona")); }
+      else { setRequestComposerOpen(false); setRequestDraft(''); setSelectedPersonId(null); setHubTab('mensajes'); setPeopleFeedback(ht("Mensaje enviado.")); const person = peopleResults.find(item => item.ownerId === ownerId); await refreshConversations(); await openHumanChat(ownerId, person?.displayName ?? ht("esta persona")); }
     } catch { const notice = ht("No se pudo enviar la solicitud. Puede que la persona no acepte mensajes."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); }
     finally { setPeopleBusy(false); }
   }
@@ -452,7 +452,7 @@ export default function CreatorHubPage() {
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
   async function openHumanChat(ownerId: string, name: string) {
-    setActiveChat({ ownerId, name }); setChatError('');
+    setActiveChat({ ownerId, name }); setChatMessages([]); setChatError('');
     try {
       const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
       setChatMessages(result.messages); setOtherTyping(false);
@@ -621,7 +621,7 @@ export default function CreatorHubPage() {
             {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
               <div className="flex items-center justify-between"><h3 className="font-semibold">{ht("Chat con")} {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">{ct("refresh")}</button></div>
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
-                {chatMessages.length === 0 && <p className="text-xs text-muted-foreground">{ct("noMessages")}</p>}
+                {chatError ? <p role="alert" className="text-xs text-destructive">{chatError}</p> : chatMessages.length === 0 && <p className="text-xs text-muted-foreground">{ct("noMessages")}</p>}
                 {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.kind === "voice" && message.objectPath ? <HumanVoicePlayback objectPath={message.objectPath} durationSeconds={message.durationSeconds ?? 0} /> : message.body}</div>
                   <div className="flex flex-wrap gap-1 pt-1">
