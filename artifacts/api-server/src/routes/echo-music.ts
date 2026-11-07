@@ -2,7 +2,9 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db, echoMediaTable, echoMusicLibraryTable } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { pipeMedia } from "../lib/pipeMedia";
 
 /**
  * ECHO Music add-on: offline preparation only.
@@ -86,6 +88,65 @@ router.delete("/music/library/:id", async (req, res) => {
     req.log.error({ err: error }, "Music library delete failed");
     res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
   }
+});
+
+// Publishing is explicit. Library files stay private unless published by their owner.
+router.post("/music/library/:id/publish", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
+  try {
+    const [track] = await db.select().from(echoMusicLibraryTable).where(and(
+      eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, id.data))).limit(1);
+    if (!track || track.status !== "saved_audio" || !track.audioPath) {
+      res.status(404).json({ error: "SAVED_AUDIO_REQUIRED" }); return;
+    }
+    const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
+      eq(echoMediaTable.objectPath, track.audioPath), eq(echoMediaTable.ownerId, req.userId!))).limit(1);
+    if (!owned) { res.status(403).json({ error: "AUDIO_NOT_OWNED" }); return; }
+    const [published] = await db.update(echoMusicLibraryTable).set({ publishedAt: new Date() }).where(and(
+      eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, id.data))).returning();
+    res.json({ item: published });
+  } catch (error) { req.log.error({ err: error }, "Music publish failed"); res.status(503).json({ error: "MUSIC_PUBLISH_UNAVAILABLE" }); }
+});
+router.post("/music/library/:id/unpublish", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
+  try {
+    await db.update(echoMusicLibraryTable).set({ publishedAt: null }).where(and(
+      eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, id.data)));
+    res.json({ unpublished: true });
+  } catch (error) { req.log.error({ err: error }, "Music unpublish failed"); res.status(503).json({ error: "MUSIC_UNPUBLISH_UNAVAILABLE" }); }
+});
+router.get("/music/published", async (req, res) => {
+  try {
+    const items = await db.select({
+      id: echoMusicLibraryTable.id, characterId: echoMusicLibraryTable.characterId,
+      title: echoMusicLibraryTable.title, durationSeconds: echoMusicLibraryTable.durationSeconds,
+      publishedAt: echoMusicLibraryTable.publishedAt,
+    }).from(echoMusicLibraryTable).where(isNotNull(echoMusicLibraryTable.publishedAt))
+      .orderBy(desc(echoMusicLibraryTable.publishedAt)).limit(100);
+    res.json({ items });
+  } catch (error) { req.log.error({ err: error }, "Published music listing failed"); res.status(503).json({ error: "MUSIC_CATALOG_UNAVAILABLE" }); }
+});
+router.get("/music/published/:id/audio", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
+  try {
+    const [track] = await db.select().from(echoMusicLibraryTable).where(and(
+      eq(echoMusicLibraryTable.id, id.data), isNotNull(echoMusicLibraryTable.publishedAt))).limit(1);
+    if (!track?.audioPath) { res.status(404).json({ error: "TRACK_NOT_PUBLISHED" }); return; }
+    const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
+      eq(echoMediaTable.objectPath, track.audioPath), eq(echoMediaTable.ownerId, track.ownerId))).limit(1);
+    if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+    const storage = new ObjectStorageService();
+    const file = await storage.getObjectEntityFile(media.objectPath);
+    const response = await storage.downloadObject(file, 0, req.headers.range);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(response.status);
+    if (response.body) pipeMedia(response.body, res, error => req.log.warn({ err: error }, "Music stream interrupted"));
+    else res.end();
+  } catch (error) { req.log.error({ err: error }, "Music stream failed"); if (!res.headersSent) res.status(503).json({ error: "MUSIC_STREAM_UNAVAILABLE" }); }
 });
 
 router.get("/music/status", (_req, res) => {
