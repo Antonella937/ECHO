@@ -271,7 +271,7 @@ function CreatorHubDmObserver() {
     window.addEventListener('pointerdown', onInteraction, { passive: true });
     window.addEventListener('keydown', onInteraction);
     void refresh();
-    const timer = window.setInterval(() => { void refresh(); }, 20000);
+    const timer = window.setInterval(() => { void refresh(); }, 5000);
     const onVisibility = () => { void refresh(); };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
