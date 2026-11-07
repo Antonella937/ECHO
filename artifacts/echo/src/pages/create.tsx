@@ -4,6 +4,7 @@ import { useUser } from '@clerk/react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { ChevronLeft, ChevronRight, ImagePlus, MapPin, Music2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
 import { AccountMultiPicker } from '@/components/echo/account-multi-picker';
+import { MusicSelectorPreview } from '@/components/echo/music-selector-preview';
 import { MentionSuggestions } from '@/components/echo/mention-suggestions';
 import { MAX_POST_MEDIA, validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
@@ -422,16 +423,11 @@ export default function CreatePage() {
         {mode === 'story' && (
           <div className="mt-3 grid gap-3">
             <AccountMultiPicker value={mentioned} onChange={setMentioned} label={t("Mencionar cuentas")} excludeId={me.id} max={50} testId="picker-story-mentions" />
-            <div className="rounded-2xl border border-input bg-card px-4 py-3">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground"><Music2 className="h-3.5 w-3.5" /> Música · solo metadatos</div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <input value={musicTitle} onChange={(e) => setMusicTitle(e.target.value.slice(0, 160))} placeholder={t("Canción")} aria-label={t("Título de la canción")} className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-title" />
-                <input value={musicArtist} onChange={(e) => setMusicArtist(e.target.value.slice(0, 160))} placeholder={t("Artista")} aria-label={t("Artista")} className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid="input-music-artist" />
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">{t("Se muestra como etiqueta. No se reproduce audio ni se conecta ningún servicio de música.")}</p>
-            </div>
+            <MusicSelectorPreview title={musicTitle} artist={musicArtist} onTitleChange={setMusicTitle} onArtistChange={setMusicArtist} story />
           </div>
         )}
+
+        {mode === 'post' && <div className="mt-3"><MusicSelectorPreview title={musicTitle} artist={musicArtist} onTitleChange={setMusicTitle} onArtistChange={setMusicArtist} story={false} /></div>}
 
         {mode === 'post' && (
           <>
