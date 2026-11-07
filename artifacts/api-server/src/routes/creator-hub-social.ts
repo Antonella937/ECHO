@@ -380,7 +380,7 @@ export function createCreatorHubSocialRouter(): IRouter {
   // Request initiation is separate from sending a message. No message body is
   // accepted here and no recipient inbox is exposed to the sender.
   router.post("/creator-hub/social/message-requests", async (req, res) => {
-    const parsed = targetSchema.safeParse(req.body);
+    const parsed = targetSchema.extend({ body: z.string().trim().min(1).max(2000) }).strict().safeParse(req.body);
     if (!parsed.success || parsed.data.targetOwnerId === req.userId) {
       res.status(400).json({ error: "INVALID_TARGET" }); return;
     }
@@ -416,9 +416,9 @@ export function createCreatorHubSocialRouter(): IRouter {
       );
       if (rejected.rowCount) { await client.query("ROLLBACK"); res.status(403).json({ error: "REQUEST_NOT_ALLOWED" }); return; }
       await client.query(
-        `INSERT INTO echo_creator_message_requests(sender_owner_id,recipient_owner_id)
-         VALUES($1,$2) ON CONFLICT DO NOTHING`,
-        [req.userId, parsed.data.targetOwnerId],
+        `INSERT INTO echo_creator_message_requests(sender_owner_id,recipient_owner_id,preview_body)
+         VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,
+        [req.userId, parsed.data.targetOwnerId, parsed.data.body],
       );
       await client.query("COMMIT");
       res.json({ status: "requested" });
@@ -454,7 +454,7 @@ export function createCreatorHubSocialRouter(): IRouter {
   router.get("/creator-hub/social/message-requests", async (req, res) => {
     const result = await pool.query(
       `SELECT r.id, r.sender_owner_id AS "senderOwnerId",
-       p.display_name AS "displayName", p.username, r.created_at AS "createdAt"
+       p.display_name AS "displayName", p.username, r.preview_body AS "previewBody", r.created_at AS "createdAt"
        FROM echo_creator_message_requests r
        JOIN echo_creator_profiles p ON p.owner_id=r.sender_owner_id
        WHERE r.recipient_owner_id=$1 AND r.status='pending'
