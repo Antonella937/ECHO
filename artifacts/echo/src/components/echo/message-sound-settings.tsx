@@ -16,7 +16,7 @@ export function MessageSoundSettings() {
   return (
     <section className="mt-9" aria-labelledby="message-sounds-h">
       <h2 id="message-sounds-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        <Bell className="h-4 w-4" /> Sonidos de mensajes
+        <Bell className="h-4 w-4" /> {t("Sonidos de mensajes")}
       </h2>
       <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
         <p className="mb-3 text-xs text-muted-foreground">{t("Tonos suaves estilo iPhone, exclusivos de ECHO.")}</p>
@@ -27,7 +27,7 @@ export function MessageSoundSettings() {
           </label>
         ))}
         <button type="button" onClick={() => { unlockMessageAudio(); playMessageSound('incoming'); }} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold">
-          <Volume2 className="h-4 w-4" /> Probar sonido
+          <Volume2 className="h-4 w-4" /> {t("Probar sonido")}
         </button>
         <p className="mt-3 text-xs text-muted-foreground">{t("Los sonidos funcionan mientras ECHO está abierto y el navegador permite audio. Las notificaciones push en segundo plano requieren una implementación aparte.")}</p>
       </div>
