@@ -78,6 +78,28 @@ router.post("/voices/premium/reference/request-url",async(req,res)=>{
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
 
+
+// Confirm a reference upload only after checking the private object's bytes.
+// The audio is not attached to a voice project until its metadata is persisted.
+const claimReference = key.extend({objectPath:z.string().regex(/^voice-studio\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i),contentType:voiceMime,consentConfirmed:z.literal(true)}).strict();
+router.post("/voices/premium/reference/verify",async(req,res)=>{
+ const parsed=claimReference.safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_REFERENCE"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!await checkCharacter(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const base=process.env.SUPABASE_URL?.replace(new RegExp("/$"),"");
+  const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
+  const response=await fetch(`${base}/storage/v1/object/echo-media/${parsed.data.objectPath}`,{headers:{Authorization:`Bearer ${secret}`,apikey:secret},signal:AbortSignal.timeout(20000)});
+  if(!response.ok){res.status(404).json({error:"VOICE_AUDIO_NOT_FOUND"});return;}
+  const bytes=Buffer.from(await response.arrayBuffer());
+  const {validMediaHeader}=await import("../lib/mediaSafety");
+  const mime=(response.headers.get("content-type")??"").split(";")[0].toLowerCase();
+  if(mime!==parsed.data.contentType||!bytes.length||bytes.length>20*1024*1024||!validMediaHeader(bytes.subarray(0,64),mime)){res.status(400).json({error:"INVALID_UPLOADED_VOICE_AUDIO"});return;}
+  res.json({verified:true,objectPath:parsed.data.objectPath});
+ }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
+});
 router.post("/voices/premium/generate",requireAuth,(_req,res)=>{
  res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_NOT_CONFIGURED",charged:false});
 });
