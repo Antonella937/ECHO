@@ -125,14 +125,14 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           <PostMetricsEditor post={post} actualComments={commentCount} />
         </div>
         {post.caption && (
-          <p className="mt-1.5 text-[14.5px] leading-relaxed text-foreground/90" data-testid={`text-caption-${post.id}`}>
+          <p className="mt-1.5 whitespace-pre-wrap break-words text-[14.5px] leading-relaxed text-foreground/90" data-testid={`text-caption-${post.id}`}>
             <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold text-foreground">{author.handle}</Link>
             <SocialText text={post.caption} />
           </p>
         )}
         {tagged.length > 0 && (
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted-foreground" data-testid={`text-tagged-${post.id}`}>
-            <UserRound className="h-3.5 w-3.5" strokeWidth={1.8} /> {t("Con")}
+          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-5 text-muted-foreground" data-testid={`text-tagged-${post.id}`}>
+            <UserRound className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} /><span>{t("Con")}</span>
             {tagged.map((c, i) => c && (
               <Link key={c.id} href={`/profile/${c.id}`} className="font-semibold text-foreground" data-testid={`link-tagged-${post.id}-${c.id}`}>@{c.handle}{i < tagged.length - 1 ? ',' : ''}</Link>
             ))}
