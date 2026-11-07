@@ -70,6 +70,59 @@ router.post("/music/prepare", (req, res) => {
   });
 });
 
+
+// Public YouTube search uses the server-side API key. No Google account connection,
+// music playback, downloading, or paid music generation occurs in this endpoint.
+const youtubeSearchQuery = z.object({
+  q: z.string().trim().min(3).max(100),
+});
+router.get("/music/youtube/search", async (req, res) => {
+  const parsed = youtubeSearchQuery.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "INVALID_SEARCH_QUERY" });
+    return;
+  }
+  const apiKey = process.env.YOUTUBE_API_KEY?.trim();
+  if (!apiKey) {
+    res.status(503).json({ error: "YOUTUBE_SEARCH_NOT_CONFIGURED" });
+    return;
+  }
+  try {
+    const url = new URL("https://www.googleapis.com/youtube/v3/search");
+    url.searchParams.set("part", "snippet");
+    url.searchParams.set("type", "video");
+    url.searchParams.set("videoEmbeddable", "true");
+    url.searchParams.set("maxResults", "10");
+    url.searchParams.set("q", parsed.data.q);
+    const response = await fetch(url, {
+      headers: { "X-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) {
+      res.status(response.status === 403 || response.status === 429 ? 503 : 502)
+        .json({ error: "YOUTUBE_SEARCH_UNAVAILABLE" });
+      return;
+    }
+    const data = await response.json() as {
+      items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string; thumbnails?: { medium?: { url?: string } } } }>;
+    };
+    const items = (data.items ?? []).flatMap((item) => {
+      const videoId = item.id?.videoId;
+      if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) return [];
+      return [{
+        videoId,
+        title: item.snippet?.title ?? "",
+        artist: item.snippet?.channelTitle ?? "",
+        thumbnailUrl: item.snippet?.thumbnails?.medium?.url ?? null,
+        watchUrl: "https://www.youtube.com/watch?v=" + videoId,
+      }];
+    });
+    res.json({ items, playbackEnabled: false, audioExtractionAllowed: false });
+  } catch {
+    res.status(502).json({ error: "YOUTUBE_SEARCH_UNAVAILABLE" });
+  }
+});
+
 router.post("/music/generate", (_req, res) => {
   res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", charged: false });
 });
