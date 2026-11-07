@@ -1163,6 +1163,7 @@ components:
         mentionedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
         closeFriendsOnly: { type: boolean }
         allowedViewerIds: { type: array, maxItems: 500, items: { type: string } }
+        likes: { type: array, uniqueItems: true, maxItems: 500, items: { type: string } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         music: { $ref: "#/components/schemas/StoryMusic" }
         id: { type: string }
