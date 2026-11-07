@@ -53,6 +53,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     .slice(0,20).map(photo => {
       const analysis = photo.visionStatus === 'complete' ? photo.visionAnalysis : null;
       return {
+        id: photo.id,
         note: photo.description.slice(0,240),
         scene: typeof analysis?.sceneDescription === 'string' ? analysis.sceneDescription.slice(0,360) : '',
         setting: typeof analysis?.setting === 'string' ? analysis.setting.slice(0,140) : '',
