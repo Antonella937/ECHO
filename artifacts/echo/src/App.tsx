@@ -1,4 +1,4 @@
-import { refreshCreatorHubDmStatus } from '@/lib/creator-hub-notifications';
+import { refreshCreatorHubDmStatus, type CreatorHubDmNotice } from '@/lib/creator-hub-notifications';
 import { useWelcomeText } from '@/lib/welcome-translations';
 import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -251,11 +251,36 @@ function CreatorHubDmObserver() {
   useEffect(() => {
     if (!user?.id) return;
     const id = user.id;
-    const refresh = () => { if (document.visibilityState === 'visible') void refreshCreatorHubDmStatus(id).catch(() => {}); };
-    refresh();
-    const timer = window.setInterval(refresh, 20000);
-    document.addEventListener('visibilitychange', refresh);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+    let active = true;
+    let initialized = false;
+    let previous = new Map<string, string>();
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const status = await refreshCreatorHubDmStatus(id);
+        if (!active) return;
+        const next = new Map<string, string>(status.items.map((item: CreatorHubDmNotice) => [item.ownerId, item.messageId]));
+        if (initialized && status.enabled && status.items.some((item: CreatorHubDmNotice) =>
+          item.unread && previous.has(item.ownerId) && previous.get(item.ownerId) !== item.messageId
+        )) playMessageSound('creatorHub');
+        previous = next;
+        initialized = true;
+      } catch { /* A failed poll must not play a sound or mark messages read. */ }
+    };
+    const onInteraction = () => unlockMessageAudio();
+    window.addEventListener('pointerdown', onInteraction, { passive: true });
+    window.addEventListener('keydown', onInteraction);
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 20000);
+    const onVisibility = () => { void refresh(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pointerdown', onInteraction);
+      window.removeEventListener('keydown', onInteraction);
+    };
   }, [user?.id]);
   return null;
 }
