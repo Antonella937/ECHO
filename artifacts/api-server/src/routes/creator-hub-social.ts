@@ -1,3 +1,4 @@
+import { sendCreatorHubDmPush } from "../lib/onesignal-push";
 import { validMediaHeader } from "../lib/mediaSafety";
 import { Router, type IRouter } from "express";
 import { z } from "zod";
@@ -306,6 +307,9 @@ export function createCreatorHubSocialRouter(): IRouter {
       );
       await client.query("COMMIT");
       res.status(201).json({ voiceMessage: result.rows[0] });
+      void pool.query("SELECT display_name FROM echo_creator_profiles WHERE owner_id=$1", [req.userId]).then(sender =>
+        sendCreatorHubDmPush({ recipientOwnerId: targetOwnerId, senderName: sender.rows[0]?.display_name ?? "Creator Hub", messageId: String(result.rows[0].id), kind: "voice" })
+      ).catch(() => undefined);
     } catch(error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
   });
@@ -367,6 +371,9 @@ export function createCreatorHubSocialRouter(): IRouter {
       );
       await client.query("COMMIT");
       res.status(201).json({ message: result.rows[0] });
+      void pool.query("SELECT display_name FROM echo_creator_profiles WHERE owner_id=$1", [req.userId]).then(sender =>
+        sendCreatorHubDmPush({ recipientOwnerId: parsed.data.targetOwnerId, senderName: sender.rows[0]?.display_name ?? "Creator Hub", messageId: String(result.rows[0].id), kind: "text" })
+      ).catch(() => undefined);
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
   });
