@@ -185,7 +185,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
     body:JSON.stringify({model_id:"eleven_multilingual_ttv_v2",voice_description:project.prompt,auto_generate_text:true})
    });
   }finally{clearTimeout(timer);}
-  if(!response.ok){res.status(502).json({error:"ELEVENLABS_VOICE_DESIGN_FAILED",providerStatus:response.status,charged:"unknown"});return;}
+  if(!response.ok){console.error("[voice-design] ElevenLabs request rejected",{providerStatus:response.status,category:response.status===402?"PAYMENT_REQUIRED":response.status===401||response.status===403?"AUTH_OR_PERMISSION":response.status===429?"RATE_OR_CREDIT_LIMIT":"PROVIDER_REJECTED"});res.status(502).json({error:"ELEVENLABS_VOICE_DESIGN_FAILED",providerStatus:response.status,charged:"unknown"});return;}
   const data=await response.json() as {previews?:{audio_base_64:string;generated_voice_id:string;media_type?:string}[]};
   const previews=(data.previews??[]).slice(0,project.variant_count);
   const base=process.env.SUPABASE_URL?.replace(/\/$/,"");
