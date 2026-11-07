@@ -115,12 +115,6 @@ export default function NotificationsPage() {
           if (!next) setOfficialUpdates([]);
         }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? officialText.subscribed : officialText.muted}</button>
       </div>}
-      {user?.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && <div className="px-4 pt-3">
-        <button type="button" onClick={() => window.dispatchEvent(new Event('echo:preview-welcome'))}
-          className="rounded-full border border-primary/40 px-4 py-2 text-xs font-semibold text-primary">
-          {language === 'es' ? '🖤 Ver bienvenida de ECHO' : '🖤 ' + ({ en:'Preview ECHO welcome', pt:'Ver boas-vindas ao ECHO', fr:'Voir le message de bienvenue ECHO', de:'ECHO-Willkommen ansehen', it:'Anteprima benvenuto ECHO', ko:'ECHO 환영 메시지 보기', ja:'ECHOの歓迎メッセージを見る', zh:'查看 ECHO 欢迎消息' } as Record<string,string>)[language]}
-        </button>
-      </div>}
       {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {officialText.title}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
