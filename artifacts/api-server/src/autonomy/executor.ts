@@ -17,6 +17,7 @@ import {
   echoAutonomyRunsTable,
   echoUniversesTable,
   echoMemoryArchiveTable,
+  echoCharacterGalleryTable,
 } from "@workspace/db";
 import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled, isAutonomyOwnerAuthorized } from "./constants";
 import type { Opportunity } from "./policy";
@@ -444,6 +445,37 @@ export async function executeAutonomyDecision(input: {
         eq(echoAutonomyRunsTable.id, run.id),
       ));
       return { status: "no_action", reasonCode: "MODEL_SELECTED_NONE" };
+    }
+
+    // A post is chosen by the existing autonomy model first. Only then consider
+    // an owner-approved, contextually relevant gallery image. No random attachments.
+    if (input.decision.action === "draft" && input.decision.situation === "post" && mutation.targetId) {
+      const caption = input.decision.text?.trim() ?? "";
+      const tokens = (value: string) => new Set((value.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+        .filter(word => !new Set(["para","with","that","this","from","como","sobre","pero","foto","photo","image","esta","este","just","some","about","have","will","there"]).has(word)));
+      const captionWords = tokens(caption);
+      if (captionWords.size) {
+        const gallery = await tx.select().from(echoCharacterGalleryTable).where(and(
+          eq(echoCharacterGalleryTable.ownerId,input.ownerId),
+          eq(echoCharacterGalleryTable.universeId,universeId),
+          eq(echoCharacterGalleryTable.characterId,input.characterId),
+          eq(echoCharacterGalleryTable.reserved,false),
+        )).for("update");
+        const candidates = gallery.filter(photo => (photo.reusable || photo.usedCount === 0) &&
+          (photo.usedCount === 0 || !photo.lastUsedAt || now.getTime() - photo.lastUsedAt.getTime() >= 30 * DAY_MS))
+          .map(photo => ({ photo, score: [...tokens(photo.description)].filter(word => captionWords.has(word)).length }))
+          .filter(item => item.score >= 2).sort((a,b) => b.score - a.score || a.photo.usedCount - b.photo.usedCount);
+        if (candidates.length && candidates[0].score > (candidates[1]?.score ?? 0)) {
+          const selected = candidates[0].photo;
+          const post = mutation.state.posts.find(item => item.id === mutation.targetId);
+          if (post) {
+            post.image = selected.mediaRef;
+            await tx.update(echoCharacterGalleryTable).set({
+              usedCount: sql`${echoCharacterGalleryTable.usedCount} + 1`, lastUsedAt: now,
+            }).where(eq(echoCharacterGalleryTable.id,selected.id));
+          }
+        }
+      }
     }
 
     const [saved] = await tx.update(echoUniversesTable).set({
