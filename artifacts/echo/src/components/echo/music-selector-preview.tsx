@@ -1,16 +1,21 @@
 import { Music2, Search, Check, ExternalLink } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { parseYouTubeVideoId, youtubeWatchUrl } from '@/lib/youtube-music';
 
-export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistChange, story }: {
+export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistChange, story, selectedTrack, onTrackChange }: {
   title: string;
   artist: string;
   onTitleChange: (value: string) => void;
   onArtistChange: (value: string) => void;
   story: boolean;
+  selectedTrack?: { id: string; title: string; characterId: string; durationSeconds: number; startSeconds: number; clipSeconds: 15 | 30 } | null;
+  onTrackChange?: (track: { id: string; title: string; characterId: string; durationSeconds: number; startSeconds: number; clipSeconds: 15 | 30 } | null) => void;
 }) {
   const [youtubeLink, setYoutubeLink] = useState('');
+  const [sharedTracks, setSharedTracks] = useState<Array<{ id: string; title: string; characterId: string; durationSeconds: number }>>([]);
+  const [libraryError, setLibraryError] = useState('');
+  useEffect(() => { let active = true; void customFetch<{ items: typeof sharedTracks }>('/api/music/published', { responseType: 'json' }).then(data => { if (active) setSharedTracks(data.items); }).catch(() => { if (active) setLibraryError('No se pudo cargar el catálogo de ECHO Music.'); }); return () => { active = false; }; }, []);
   const [showSearch, setShowSearch] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,7 +43,14 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
   const partial = Boolean(title.trim()) !== Boolean(artist.trim());
   return <section className="rounded-2xl border border-input bg-card p-4" aria-label="ECHO Music">
     <div className="flex items-center gap-2 text-sm font-semibold"><Music2 className="h-4 w-4 text-primary" /> Música</div>
-    <p className="mt-1 text-xs text-muted-foreground">Agregá una etiqueta musical gratis. Por ahora no incluye audio.</p>
+    <p className="mt-1 text-xs text-muted-foreground">Elegí una canción compartida en ECHO para preparar un fragmento de audio, o agregá una etiqueta musical.</p>
+    <div className="mt-3 rounded-xl border border-border bg-secondary/50 p-3">
+      <p className="text-xs font-semibold">Canciones compartidas en ECHO</p>
+      {libraryError && <p className="mt-2 text-xs text-destructive">{libraryError}</p>}
+      {sharedTracks.length === 0 ? <p className="mt-2 text-xs text-muted-foreground">Todavía no hay canciones compartidas.</p> : <select className="mt-2 h-11 w-full rounded-xl bg-card px-3 text-sm" value={selectedTrack?.id ?? ''} onChange={e => { const track = sharedTracks.find(item => item.id === e.target.value); onTrackChange?.(track ? { ...track, startSeconds: 0, clipSeconds: 15 } : null); if (track) { onTitleChange(track.title); onArtistChange('ECHO Music'); } }} aria-label="Seleccionar canción de ECHO Music"><option value="">Sin canción de ECHO Music</option>{sharedTracks.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select>}
+      {selectedTrack && <div className="mt-3 space-y-2"><div className="flex gap-2">{([15,30] as const).map(seconds => <button key={seconds} type="button" className={`rounded-full px-3 py-2 text-xs ${selectedTrack.clipSeconds === seconds ? 'bg-primary text-primary-foreground' : 'bg-card'}`} onClick={() => onTrackChange?.({ ...selectedTrack, clipSeconds: seconds, startSeconds: Math.min(selectedTrack.startSeconds, Math.max(0, selectedTrack.durationSeconds - seconds)) })}>{seconds} s</button>)}</div><input aria-label="Inicio del fragmento musical" type="range" min={0} max={Math.max(0, selectedTrack.durationSeconds - selectedTrack.clipSeconds)} value={selectedTrack.startSeconds} step={1} onChange={e => onTrackChange?.({ ...selectedTrack, startSeconds: Number(e.target.value) })} className="w-full accent-primary"/><p className="text-xs text-muted-foreground">Desde {selectedTrack.startSeconds}s · {selectedTrack.clipSeconds}s de música</p><button type="button" onClick={() => onTrackChange?.(null)} className="text-xs underline">Quitar selección</button></div>}
+      <p className="mt-2 text-xs text-muted-foreground">La selección es una vista previa: todavía no se adjunta a la publicación.</p>
+    </div>
     <button type="button" onClick={() => setShowSearch(v => !v)} className="mt-3 flex h-11 w-full items-center gap-2 rounded-xl border border-border bg-secondary px-3 text-left text-sm" aria-expanded={showSearch}>
       <Search className="h-4 w-4 text-primary" /> {showSearch ? 'Cerrar búsqueda' : 'Buscar canción en YouTube'}
     </button>
