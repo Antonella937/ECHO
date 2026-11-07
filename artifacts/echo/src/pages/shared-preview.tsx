@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { customFetch } from '@workspace/api-client-react';
 
-type Shared = { kind: 'universe' | 'character'; universeName: string; description: string; characters: Array<{ id: string; name: string; handle?: string; bio?: string; occupation?: string }>; importAvailable: false };
+type Shared = { kind: 'universe' | 'character'; universeName: string; description: string; characters: Array<{ id: string; name: string; handle?: string; bio?: string; occupation?: string }>; importAvailable: boolean; collaborationInvite: boolean };
 export default function SharedPreviewPage() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<Shared | null>(null);
@@ -46,8 +46,8 @@ export default function SharedPreviewPage() {
       </article>)}</div>
       <p className="mt-6 text-xs text-muted-foreground">La copia incluye los datos públicos básicos de los personajes, sin mensajes, recuerdos, imágenes privadas ni acceso al universo original.</p>
       {joined && <Link href={joined} className="mt-4 block text-primary underline">Abrir mundo compartido</Link>}
-      {data.kind === "universe" && !joined && <button type="button" disabled={joining} onClick={() => void join()} className="mt-4 ml-2 rounded-full border border-primary px-5 py-3 text-primary disabled:opacity-50">{joining ? "Uniéndote…" : "Unirme como colaboradora"}</button>}
-      {imported ? <p role="status" className="mt-4 text-primary">{imported}</p> : <button type="button" disabled={importing} onClick={() => void importCopy()} className="mt-4 rounded-full bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{importing ? "Importando…" : "Importar una copia a mi cuenta"}</button>}
+      {data.kind === "universe" && data.collaborationInvite && !joined && <button type="button" disabled={joining} onClick={() => void join()} className="mt-4 ml-2 rounded-full border border-primary px-5 py-3 text-primary disabled:opacity-50">{joining ? "Uniéndote…" : "Unirme como colaboradora"}</button>}
+      {imported ? <p role="status" className="mt-4 text-primary">{imported}</p> : data.importAvailable ? <button type="button" disabled={importing} onClick={() => void importCopy()} className="mt-4 rounded-full bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{importing ? "Importando…" : "Importar una copia a mi cuenta"}</button> : null}
     </>}
   </main>;
 }
