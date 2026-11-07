@@ -50,6 +50,7 @@ import HelpCenterPage from '@/pages/help-center';
 import SupportAdminPage from '@/pages/support-admin';
 import NotFound from '@/pages/not-found';
 import CharacterEditorPage from '@/pages/character-editor';
+import CharacterGalleryPage from '@/pages/character-gallery';
 import LandingPage from '@/pages/landing';
 import PricingPage from '@/pages/pricing';
 import FaqPage from '@/pages/faq';
@@ -319,6 +320,7 @@ function ProtectedRouter() {
           <Route path="/search" component={SearchPage} />
           <Route path="/characters/new" component={CharacterEditorPage} />
           <Route path="/characters/:id/edit" component={CharacterEditorPage} />
+          <Route path="/characters/:id/gallery" component={CharacterGalleryPage} />
           <Route component={NotFound} />
         </Switch>
       </RoutedErrorBoundary>
