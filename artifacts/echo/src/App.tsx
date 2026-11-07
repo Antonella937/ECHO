@@ -219,11 +219,19 @@ function FirstWelcomeDialog() {
     };
     // The welcome waits until the signed-in account's language has loaded.
     window.addEventListener('echo:account-language-ready', claim);
+    const openPreview = () => { if (user.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ') setOpen(true); };
+    window.addEventListener('echo:preview-welcome', openPreview);
     // Language sync can finish before this component mounts.
     if (sessionStorage.getItem('echo:language-ready-user') === user.id) {
       claim(new CustomEvent('echo:account-language-ready', { detail: { userId: user.id } }));
     }
-    return () => { active = false; window.removeEventListener('echo:account-language-ready', claim); };
+    const readyCheck = window.setInterval(() => {
+      if (sessionStorage.getItem('echo:language-ready-user') === user.id) {
+        window.clearInterval(readyCheck);
+        claim(new CustomEvent('echo:account-language-ready', { detail: { userId: user.id } }));
+      }
+    }, 400);
+    return () => { active = false; window.clearInterval(readyCheck); window.removeEventListener('echo:account-language-ready', claim); window.removeEventListener('echo:preview-welcome', openPreview); };
   }, [user?.id]);
   if (!open) return null;
   return <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-5" role="presentation">
