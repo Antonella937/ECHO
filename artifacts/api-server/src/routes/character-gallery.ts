@@ -6,8 +6,8 @@ import { requireAuth } from "../middlewares/requireAuth";
 
 const id = z.string().min(1).max(120);
 const scope = z.object({ universeId: id, characterId: id });
-const create = scope.extend({ mediaRef: z.string().min(1).max(2048), reusable: z.boolean().default(false) }).strict();
-const change = z.object({ reusable: z.boolean().optional(), reserved: z.boolean().optional() }).strict().refine(v => v.reusable !== undefined || v.reserved !== undefined);
+const create = scope.extend({ mediaRef: z.string().min(1).max(2048), reusable: z.boolean().default(false), description: z.string().max(500).default("") }).strict();
+const change = z.object({ reusable: z.boolean().optional(), reserved: z.boolean().optional(), description: z.string().max(500).optional() }).strict().refine(v => v.reusable !== undefined || v.reserved !== undefined || v.description !== undefined);
 const router: IRouter = Router();
 router.use("/character-gallery", requireAuth);
 async function belongs(ownerId: string, universeId: string, characterId: string) {
