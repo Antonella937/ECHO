@@ -49,11 +49,11 @@ export function PushNotificationSettings() {
     } catch (error) { setNotice(error instanceof Error ? error.message : t("No se pudo activar OneSignal.")); }
   };
   return <section className="mt-9" aria-labelledby="push-h">
-    <h2 id="push-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Bell className="h-4 w-4" /> Notificaciones del celular</h2>
+    <h2 id="push-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Bell className="h-4 w-4" /> {t("Notificaciones del celular")}</h2>
     <div className="mt-3 space-y-3 rounded-2xl border border-border bg-card/60 p-4">
       <p className="text-xs text-muted-foreground">{t("Elegí qué avisos querés recibir. Podés registrar este dispositivo para avisos push. El envío automático de eventos sigue en preparación.")}</p>
       <label className="flex items-center justify-between gap-3 text-sm font-semibold">
-        <span className="flex items-center gap-2">{prefs.enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} Activar avisos</span>
+        <span className="flex items-center gap-2">{prefs.enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} {t("Activar avisos")}</span>
         <input type="checkbox" checked={prefs.enabled} onChange={e => update({ ...prefs, enabled: e.target.checked })} className="h-5 w-5 accent-primary" />
       </label>
       {categories.map(([key, title]) => <label key={key} className="flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-sm">
