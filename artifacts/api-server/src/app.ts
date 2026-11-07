@@ -61,9 +61,19 @@ app.use(clerkMiddleware({
   secretKey: process.env.CLERK_SECRET_KEY,
 }));
 
-// Private beta: only explicitly invited Clerk identities may access API data.
-// Configure ECHO_BETA_ALLOWED_USER_IDS as up to three comma-separated Clerk user IDs.
-// Production fails closed when the allowlist is absent or invalid.
+// Launch readiness: public access is opt-in, never inferred from missing beta settings.
+// Existing private-beta deployments keep their current admission behavior.
+const accessMode = process.env.ECHO_ACCESS_MODE?.trim() ?? "private_beta";
+const publicLaunchApproved = process.env.ECHO_PUBLIC_LAUNCH_APPROVED === "true";
+if (!["private_beta", "public"].includes(accessMode)) {
+  throw new Error("ECHO_ACCESS_MODE must be private_beta or public");
+}
+if (accessMode === "public" && !publicLaunchApproved) {
+  throw new Error("Public access requires ECHO_PUBLIC_LAUNCH_APPROVED=true");
+}
+if (accessMode === "public" && process.env.NODE_ENV !== "production") {
+  throw new Error("Public access requires NODE_ENV=production");
+}
 const betaIdsRaw = process.env.ECHO_BETA_ALLOWED_USER_IDS?.trim() ?? "";
 const betaIds = betaIdsRaw.split(",").map(id => id.trim()).filter(Boolean);
 const betaConfigured = betaIds.length > 0 && betaIds.length <= 3 &&
@@ -72,10 +82,10 @@ const betaSeatMode = process.env.ECHO_BETA_ACCESS_MODE === "three_seats";
 if (process.env.NODE_ENV === "production" && permittedOrigins.length === 0) {
   throw new Error("ECHO_ALLOWED_ORIGINS must specify the production frontend origin");
 }
-if (process.env.NODE_ENV === "production" && !betaConfigured && !betaSeatMode) {
+if (process.env.NODE_ENV === "production" && accessMode === "private_beta" && !betaConfigured && !betaSeatMode) {
   throw new Error("ECHO_BETA_ALLOWED_USER_IDS must contain 1 to 3 distinct Clerk user IDs in production");
 }
-app.use("/api", betaSeatMode ? privateBetaSeats : (req, res, next) => {
+const betaAllowlistGate: express.RequestHandler = (req, res, next) => {
   if (req.path === "/healthz") return next();
   if (!betaConfigured && process.env.NODE_ENV !== "production") return next();
   res.setHeader("Cache-Control", "private, no-store");
@@ -83,7 +93,17 @@ app.use("/api", betaSeatMode ? privateBetaSeats : (req, res, next) => {
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
   if (!betaIds.includes(userId)) { res.status(403).json({ error: "PRIVATE_BETA_ACCESS_REQUIRED" }); return; }
   next();
-});
+};
+const publicAccountGate: express.RequestHandler = (req, res, next) => {
+  if (req.path === "/healthz") return next();
+  res.setHeader("Cache-Control", "private, no-store");
+  if (!getAuth(req).userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  next();
+};
+app.use("/api", accessMode === "public" ? publicAccountGate : betaSeatMode ? privateBetaSeats : betaAllowlistGate);
 
 // Register a private Creator Hub profile as soon as an account uses ECHO, not when Creator Hub opens.
 app.use("/api", async (req, _res, next) => {
