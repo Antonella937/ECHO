@@ -5,6 +5,7 @@ export const echoCharacterGalleryTable = pgTable("echo_character_gallery", {
   universeId: text("universe_id").notNull(),
   characterId: text("character_id").notNull(),
   mediaRef: text("media_ref").notNull(),
+  description: text("description").notNull().default(""),
   reusable: boolean("reusable").notNull().default(false),
   reserved: boolean("reserved").notNull().default(false),
   usedCount: integer("used_count").notNull().default(0),
