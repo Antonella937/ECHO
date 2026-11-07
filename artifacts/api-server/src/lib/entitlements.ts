@@ -23,3 +23,10 @@ export const ECHO_PLAN_CAPACITY: Readonly<Record<EchoPlan, { maxUniverses: numbe
   plus: { maxUniverses: 3, maxCharacters: 15 },
   premium: { maxUniverses: 5, maxCharacters: 25 },
 });
+
+/** Monthly character-generated audio quota. Incoming user voice notes are free of this quota. */
+export const ECHO_AUDIO_POLICY = Object.freeze({
+ monthlyCredits: { free: 0, plus: 30, premium: 100 } as const,
+ maxGeneratedAudioSeconds: 30,
+ creditsPerGeneratedAudio: 1,
+});
