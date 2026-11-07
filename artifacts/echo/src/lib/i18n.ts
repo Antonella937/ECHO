@@ -29,7 +29,7 @@ function initial():Language {
 }
 let language:Language=initial();
 const listeners=new Set<()=>void>();
-export function setLanguage(next:Language){language=next;try{localStorage.setItem(key,next)}catch{};if(typeof document!=='undefined')document.documentElement.lang=next;listeners.forEach(fn=>fn());}
+export function setLanguage(next:Language, source:'user'|'account'='user'){language=next;try{localStorage.setItem(key,next)}catch{};if(typeof document!=='undefined')document.documentElement.lang=next;listeners.forEach(fn=>fn());if(source==='user'&&typeof window!=='undefined')window.dispatchEvent(new CustomEvent('echo:language-user-selected',{detail:{language:next}}));}
 export function getLanguage(){return language;}
 export function useLanguage(){return useSyncExternalStore(cb=>{listeners.add(cb);return()=>listeners.delete(cb);},getLanguage,getLanguage);}
 export function useTranslation(){const lang=useLanguage();return (key:TranslationKey)=>translations[lang][key]||translations.es[key];}
