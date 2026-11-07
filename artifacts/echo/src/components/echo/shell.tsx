@@ -31,7 +31,7 @@ function useCreatorNotificationCount() {
       } catch { if (active) setCount(0); }
     };
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 30000);
+    const interval = setInterval(() => { void refresh(); }, 10000);
     const onFocus = () => { void refresh(); };
     window.addEventListener('focus', onFocus);
     return () => { active = false; clearInterval(interval); window.removeEventListener('focus', onFocus); };
