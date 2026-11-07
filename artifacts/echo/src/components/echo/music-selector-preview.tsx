@@ -1,7 +1,7 @@
 import { Music2, Search, Check, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
-import { parseYouTubeVideoId, youtubeWatchUrl } from '@/lib/youtube-music';
+import { parseYouTubeVideoId } from '@/lib/youtube-music';
 
 export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistChange, story, selectedTrack, onTrackChange }: {
   title: string;
@@ -80,13 +80,6 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
     {partial && <p role="status" className="mt-2 text-xs text-primary">Completá canción y artista para poder publicar, o borrá ambos campos.</p>}
     {title.trim() && artist.trim() && <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-primary" /> Etiqueta lista: {artist} — {title}</p>}
     {!story && <p className="mt-2 text-xs text-muted-foreground">Las etiquetas de música para publicaciones todavía no se guardan.</p>}
-    <details className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-      <summary className="cursor-pointer">Enlace oficial y conexiones</summary>
-      <label className="mt-3 block" htmlFor="echo-youtube-link">Enlace de YouTube (opcional)</label>
-      <input id="echo-youtube-link" value={youtubeLink} onChange={e => setYoutubeLink(e.target.value.slice(0, 500))} placeholder="https://www.youtube.com/watch?v=..." className="mt-2 h-11 w-full min-w-0 rounded-lg bg-secondary px-3 text-sm" />
-      {videoId ? <a className="mt-2 block text-primary underline" href={youtubeWatchUrl(videoId)} target="_blank" rel="noopener noreferrer">Abrir video en YouTube</a> : youtubeLink.trim() ? <p className="mt-2">Ingresá un enlace válido de YouTube.</p> : null}
-      <p className="mt-3">Buscador YouTube: conectado · Cuenta YouTube: sin vincular · Spotify: pendiente.</p>
-    </details>
     <p className="mt-3 text-xs text-muted-foreground">ECHO Music add-on: reproducción autorizada y generación con IA, próximamente.</p>
   </section>;
 }
