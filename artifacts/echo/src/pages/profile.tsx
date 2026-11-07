@@ -57,7 +57,7 @@ export default function ProfilePage() {
     <div>
       <TopBar
         title={`@${person.handle}`}
-        onBack={isMe ? undefined : back}
+        onBack={back}
         right={
           isMe && (
             <>
