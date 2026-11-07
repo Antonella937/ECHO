@@ -182,11 +182,24 @@ function SignInPage() {
 
 function SignUpPage() {
   const language = useLanguage();
+  const betaCopy: Record<Language, [string,string]> = {
+    es: ["Antes de crear tu cuenta, ", "leé la información de la beta privada"],
+    en: ["Before creating your account, ", "read the private beta information"],
+    pt: ["Antes de criar sua conta, ", "leia as informações da beta privada"],
+    fr: ["Avant de créer votre compte, ", "consultez les informations sur la bêta privée"],
+    de: ["Bevor du dein Konto erstellst, ", "lies die Informationen zur privaten Beta"],
+    it: ["Prima di creare il tuo account, ", "leggi le informazioni sulla beta privata"],
+    ko: ["계정을 만들기 전에 ", "비공개 베타 안내를 읽어주세요"],
+    ja: ["アカウントを作成する前に、", "プライベートベータの案内をご確認ください"],
+    zh: ["创建账户前，请", "阅读私人测试版说明"],
+  };
+  const [betaPrefix, betaLink] = betaCopy[language];
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-[440px]">
+        <div className="mb-4 flex justify-end"><PublicLanguageSelector /></div>
         <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
-        <p className="mb-4 text-center text-sm text-muted-foreground">{language === "es" ? "Antes de crear tu cuenta, " : "Before creating your account, "}<Link href="/beta-info" className="underline">{language === "es" ? "leé la información de la beta privada" : "read the private beta information"}</Link>.</p>
+        <p className="mb-4 text-center text-sm text-muted-foreground">{betaPrefix}<Link href="/beta-info" className="underline">{betaLink}</Link>.</p>
         <SignUp
           routing="path"
           path={`${basePath}/sign-up`}
