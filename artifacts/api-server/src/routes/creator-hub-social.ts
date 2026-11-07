@@ -5,6 +5,7 @@ import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { clerkClient } from "@clerk/express";
 import { ensureCreatorProfile } from "../lib/creatorProfileBootstrap";
+import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 
 // These are account profiles, not simulated characters. The authenticated Clerk
 // identity is always taken from the server, never from a request body.
@@ -113,7 +114,23 @@ export function createCreatorHubSocialRouter(): IRouter {
       [req.userId, ownerId],
     );
     if (!result.rowCount) { res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
-    res.json({ profile: result.rows[0] });
+    const profile = result.rows[0];
+    try {
+      const account = await clerkClient.users.getUser(ownerId);
+      const metadata = account.unsafeMetadata ?? {};
+      const avatarRef = typeof metadata.creatorHubAvatar === "string" ? metadata.creatorHubAvatar : null;
+      const bannerRef = typeof metadata.creatorHubBanner === "string" ? metadata.creatorHubBanner : null;
+      const position = metadata.creatorHubAvatarPosition;
+      const avatarPosition = position && typeof position === "object" && !Array.isArray(position) &&
+        typeof (position as { x?: unknown }).x === "number" && typeof (position as { y?: unknown }).y === "number"
+        ? { x: (position as { x: number }).x, y: (position as { y: number }).y } : null;
+      const role = lifetimeAccessForOwner(ownerId);
+      res.json({ profile: { ...profile, avatarRef, bannerRef, avatarPosition,
+        verificationRole: role, roleLabel: role === "owner_lifetime" ? "CEO & Founder of ECHO" : role === "founder_lifetime" ? "First ECHO Tester" : null } });
+    } catch (error) {
+      console.warn("Creator profile media unavailable", error instanceof Error ? error.message : "unknown");
+      res.json({ profile: { ...profile, verificationRole: lifetimeAccessForOwner(ownerId), roleLabel: lifetimeAccessForOwner(ownerId) === "owner_lifetime" ? "CEO & Founder of ECHO" : lifetimeAccessForOwner(ownerId) === "founder_lifetime" ? "First ECHO Tester" : null } });
+    }
   });
 
   router.post("/creator-hub/social/follow", async (req, res) => {
