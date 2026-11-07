@@ -8,6 +8,14 @@ export const imageStyleInstructions: Record<ImageGenerationStyle, string> = {
   cinematic: 'Photorealistic cinematic still, dramatic naturalistic light, deep shadows, realistic proportions.',
 };
 
+/** Reference photos establish anatomy and identity, never a mandatory outfit. */
+export const identityVsStylingInstruction = [
+  'Use reference images strictly to preserve each person’s identity: facial structure, facial features, skin tone, natural hair characteristics, body build and proportions, distinctive tattoos, scars, birthmarks and characteristic piercings.',
+  'Clothes, dresses, shoes, headphones, hats, jewelry, bags, props, makeup, temporary hairstyles, poses, lighting and backgrounds in reference images are NOT fixed identity traits.',
+  'Choose clothing and accessories fresh for the requested scene; do not automatically copy the reference outfit or repeat signature garments or headphones.',
+  'When a scene explicitly requests a different outfit, styling or accessory, follow the scene while keeping the person recognizable.',
+].join(' ');
+
 export interface ImagePromptIdentity {
   facialDescription?: unknown;
   bodyDescription?: unknown;
@@ -31,7 +39,7 @@ export function buildCharacterImagePrompt(input: {
   return [
     'Create a believable real photograph, not an illustration, doll, render or beauty-filtered image.',
     imageStyleInstructions[input.style],
-    'Keep the same character identity, facial proportions, distinctive marks and physical details as the provided references.',
+    identityVsStylingInstruction,
     `Character: ${input.name.slice(0, 160)}.`,
     ...descriptions,
     `Scene: ${scene}.`,
@@ -64,7 +72,8 @@ export function buildMultiCharacterImagePrompt(input: {
     'Create one believable real photograph, not an illustration or render.',
     imageStyleInstructions[input.style],
     `The photograph must contain ${input.characters.length} distinct named people. Preserve each individual identity.`,
-    'Do not merge, swap, average, or transfer faces, hairstyles, tattoos, body features or other traits between people.',
+    'Do not merge, swap, average, or transfer faces, natural hair characteristics, tattoos, body features or other traits between people.',
+    identityVsStylingInstruction,
     ...identities,
     `Scene: ${scene}.`,
     'Natural anatomy, authentic skin texture and lighting; no beauty-filtered or plastic faces.',
