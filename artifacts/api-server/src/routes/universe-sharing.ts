@@ -98,9 +98,11 @@ export function createUniverseSharingRouter(
     )).limit(1);
     if (!universe || !universe.sharingEnabled) { res.status(403).json({ error: "SHARING_DISABLED" }); return; }
     const inherited = await db.execute(sql`SELECT recipient_character_id FROM echo_import_provenance
-      WHERE recipient_owner_id=${req.userId!} AND recipient_universe_id=${params.data.universeId}
-      AND (recipient_character_id='' OR recipient_character_id=${body.data.characterId ?? ''}) LIMIT 1`);
-    if (inherited.rows.length) { res.status(403).json({error:"ORIGINAL_CREATOR_ONLY"}); return; }
+      WHERE recipient_owner_id=${req.userId!} AND recipient_universe_id=${params.data.universeId}`);
+    const importedIds = new Set(inherited.rows.map(row => String(row.recipient_character_id)));
+    if (importedIds.has("") || (body.data.kind === "character" && importedIds.has(body.data.characterId!))) {
+      res.status(403).json({error:"ORIGINAL_CREATOR_ONLY"}); return;
+    }
     const characters = Array.isArray(universe.state.characters) ? universe.state.characters as Array<{id?:string;archived?:boolean}> : [];
     if (body.data.kind === "character" && !characters.some(x => x.id === body.data.characterId && !x.archived)) {
       res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
@@ -110,6 +112,11 @@ export function createUniverseSharingRouter(
         WHERE owner_id=${req.userId!} AND universe_id=${params.data.universeId}
         AND character_id=${body.data.characterId!} AND visibility='private' LIMIT 1`);
       if (privateRows.rows.length) { res.status(403).json({ error: "CHARACTER_PRIVATE" }); return; }
+    }
+    if (body.data.kind === "universe" && importedIds.size > 0) {
+      // Mixed worlds must never redistribute a recipient's imported characters.
+      // Until granular export selection is supported, fail closed.
+      res.status(403).json({ error: "WORLD_CONTAINS_IMPORTED_CHARACTERS" }); return;
     }
     const token = randomBytes(32).toString("base64url");
     const hash = createHash("sha256").update(token).digest("hex");
