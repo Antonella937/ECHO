@@ -294,7 +294,7 @@ export function CreatorUniversePreview() {
         </div>
       </section>
       {isLoaded && isSignedIn && user && activeUniverse && universeMetadata && !universeMetadata.archived && (
-        <PrivateShareCards key={`${user.id}:${activeUniverseId}`}
+        <PrivateShareCards key={`${user.id}:${activeUniverseId}`} universeId={activeUniverseId}
           universeName={universeName}
           description={universeMetadata.description || activeUniverse.creatorSetup?.universeDescription}
           creatorName={user.fullName || user.username || undefined}
