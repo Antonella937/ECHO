@@ -19,6 +19,7 @@ import { socialFollowsRouter } from "./social-follows";
 import { socialReadRouter } from "./social-reads";
 import { storySharesRouter } from "./story-shares";
 import { characterBlocksRouter } from "./character-blocks";
+import { interfaceLanguageRouter } from "./interface-language";
 import { createOwnerConsentRouter } from "./owner-consent";
 import { createConsentSafetyGate } from "../middlewares/consentSafety";
 
@@ -46,5 +47,6 @@ router.use(socialFollowsRouter);
 router.use(socialReadRouter);
 router.use(storySharesRouter);
 router.use(characterBlocksRouter);
+router.use(interfaceLanguageRouter);
 
 export default router;
