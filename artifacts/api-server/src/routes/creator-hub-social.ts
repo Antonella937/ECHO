@@ -653,6 +653,19 @@ export function createCreatorHubSocialRouter(): IRouter {
     await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoCreatorNotificationReads: ids } });
     res.json({ ids });
   });
+  const announcementPreferenceSchema = z.object({ subscribed: z.boolean() }).strict();
+  router.get("/creator-hub/social/announcement-subscription", async (req, res) => {
+    const user = await clerkClient.users.getUser(req.userId!);
+    res.json({ subscribed: user.privateMetadata?.echoOfficialAnnouncementsSubscribed !== false });
+  });
+  router.put("/creator-hub/social/announcement-subscription", async (req, res) => {
+    const parsed = announcementPreferenceSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_SUBSCRIPTION" }); return; }
+    await clerkClient.users.updateUserMetadata(req.userId!, {
+      privateMetadata: { echoOfficialAnnouncementsSubscribed: parsed.data.subscribed },
+    });
+    res.json({ subscribed: parsed.data.subscribed });
+  });
   // Public official announcements are readable by any signed-in ECHO user.
   // The founder-only publication rule below prevents other creators from impersonating ECHO.
   // Public creator posts from accounts this member follows; private posts are never exposed.
@@ -673,6 +686,10 @@ export function createCreatorHubSocialRouter(): IRouter {
     res.json({ publications: result.rows });
   });
   router.get("/creator-hub/social/official-updates", async (req, res) => {
+    const user = await clerkClient.users.getUser(req.userId!);
+    if (user.privateMetadata?.echoOfficialAnnouncementsSubscribed === false) {
+      res.json({ updates: [], subscribed: false }); return;
+    }
     const result = await pool.query(
       `SELECT id,title,body,created_at AS "createdAt"
        FROM echo_creator_publications
