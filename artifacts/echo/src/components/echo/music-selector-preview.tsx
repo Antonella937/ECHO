@@ -12,6 +12,7 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
 }) {
   const [youtubeLink, setYoutubeLink] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -32,6 +33,7 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
     onArtistChange(normalizeArtist(item.artist).slice(0, 160));
     setYoutubeLink(item.watchUrl);
     setShowSearch(false);
+    setShowPlayer(false);
   };
   const partial = Boolean(title.trim()) !== Boolean(artist.trim());
   return <section className="rounded-2xl border border-input bg-card p-4" aria-label="ECHO Music">
@@ -57,6 +59,12 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
       <input value={title} onChange={e => onTitleChange(e.target.value.slice(0, 160))} placeholder="Canción" aria-label="Título de la canción" className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-sm" data-testid="input-music-title" />
       <input value={artist} onChange={e => onArtistChange(e.target.value.slice(0, 160))} placeholder="Artista" aria-label="Artista" className="h-11 min-w-0 rounded-xl bg-secondary px-3 text-sm" data-testid="input-music-artist" />
     </div>
+    {videoId && <div className="mt-3 rounded-xl border border-border p-3">
+      <p className="text-xs font-semibold">Vista previa · reproductor oficial de YouTube</p>
+      <p className="mt-1 text-xs text-muted-foreground">Reproduce el video desde YouTube; no extrae audio ni agrega un fragmento a la historia publicada.</p>
+      <button type="button" onClick={() => setShowPlayer(v => !v)} className="mt-2 h-10 rounded-lg bg-secondary px-3 text-xs font-semibold">{showPlayer ? 'Cerrar reproductor' : 'Escuchar en YouTube'}</button>
+      {showPlayer && <div className="mt-3 aspect-video overflow-hidden rounded-lg bg-black"><iframe title={'Reproductor oficial de ' + title} src={'https://www.youtube-nocookie.com/embed/' + videoId + '?playsinline=1'} className="h-full w-full" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div>}
+    </div>}
     {partial && <p role="status" className="mt-2 text-xs text-primary">Completá canción y artista para poder publicar, o borrá ambos campos.</p>}
     {title.trim() && artist.trim() && <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-primary" /> Etiqueta lista: {artist} — {title}</p>}
     {!story && <p className="mt-2 text-xs text-muted-foreground">Las etiquetas de música para publicaciones todavía no se guardan.</p>}
