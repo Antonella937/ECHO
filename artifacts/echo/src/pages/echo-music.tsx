@@ -5,7 +5,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 
-type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string };
+type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string; publishedAt?: string | null };
 const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
 
 export default function EchoMusicPage() {
@@ -46,6 +46,9 @@ export default function EchoMusicPage() {
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [publishedTracks, setPublishedTracks] = useState<Array<{ id: string; characterId: string; title: string; durationSeconds: number }>>([]);
+  const [loadingSharedId, setLoadingSharedId] = useState<string | null>(null);
   const [libraryError, setLibraryError] = useState('');
   const [cloudLibraryAvailable, setCloudLibraryAvailable] = useState(false);
   useEffect(() => {
@@ -68,6 +71,41 @@ export default function EchoMusicPage() {
       }).catch(() => { if (active) setCloudLibraryAvailable(false); });
     return () => { active = false; };
   }, [me.id]);
+  async function togglePublish(item: MusicDraftRecord) {
+    if (publishingId || item.status !== 'saved_audio') return;
+    setPublishingId(item.id); setLibraryError('');
+    try {
+      const publish = !item.publishedAt;
+      await customFetch('/api/music/library/' + encodeURIComponent(item.id) + (publish ? '/publish' : '/unpublish'), { method: 'POST', responseType: 'json' });
+      setLibrary(current => current.map(track => track.id === item.id ? { ...track, publishedAt: publish ? new Date().toISOString() : null } : track));
+      const result = await customFetch<{ items: typeof publishedTracks }>('/api/music/published', { responseType: 'json' });
+      setPublishedTracks(result.items);
+    } catch { setLibraryError('No se pudo actualizar la publicación de esta canción.'); }
+    finally { setPublishingId(null); }
+  }
+  async function playSharedTrack(item: { id: string; title: string; durationSeconds: number }) {
+    if (loadingSharedId) return;
+    setLoadingSharedId(item.id); setLibraryError('');
+    try {
+      const blob = await customFetch<Blob>('/api/music/published/' + encodeURIComponent(item.id) + '/audio', { responseType: 'blob' });
+      if (!blob.type.startsWith('audio/')) throw new Error('Formato de audio no compatible');
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+      setLocalAudioUrl(url); setSavedAudioPath(null); setSelectedAudioFile(null);
+      setTitle(item.title); setPreview(''); setElapsed(0); setActualDuration(0); setClipStart(0);
+      setPlayerOpen(true);
+    } catch { setLibraryError('No se pudo cargar el audio compartido.'); }
+    finally { setLoadingSharedId(null); }
+  }
+  useEffect(() => {
+    if (studioTab !== 'library') return;
+    let active = true;
+    void customFetch<{ items: typeof publishedTracks }>('/api/music/published', { responseType: 'json' })
+      .then(result => { if (active) setPublishedTracks(result.items); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [studioTab]);
   async function syncDraft(record: MusicDraftRecord) {
     try {
       await customFetch('/api/music/library', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -234,8 +272,10 @@ export default function EchoMusicPage() {
           <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
           <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio guardado' : 'Prompt preparado'} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? 'Escuchar canción' : 'Ver borrador'}</p></div>
         </button>
+        {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? 'Dejar privado' : 'Compartir'}</button>}
         <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>
       </article>)}</div>}
+      <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-base font-semibold">Canciones compartidas en ECHO</h2><p className="text-xs text-muted-foreground">Solo se escuchan las canciones que sus propietarios publicaron expresamente.</p>{publishedTracks.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay canciones compartidas.</p> : publishedTracks.map(item => <button key={item.id} type="button" disabled={!!loadingSharedId} onClick={() => void playSharedTrack(item)} className="flex w-full items-center gap-3 rounded-xl bg-secondary p-3 text-left"><Play className="h-5 w-5 text-primary"/><span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span><span className="text-xs text-muted-foreground">{loadingSharedId === item.id ? 'Cargando…' : formatTime(item.durationSeconds)}</span></button>)}</section>
       <p className="text-xs text-muted-foreground">Eliminar un registro no borra todavía el archivo privado del almacenamiento.</p>
     </section> : <>
     <div className="rounded-2xl border border-border bg-card/60 p-5">
