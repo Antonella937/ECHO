@@ -299,7 +299,7 @@ export async function runAutonomyLiveCycle(
     const cadence = control.dmFrequency === "frequently" ? 60 : control.dmFrequency === "rarely" ? 360 : 180;
     const phase = [...character.id].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) % cadence, 0);
     const minute = Math.floor(now.getTime() / 60_000);
-    if ((minute - phase + cadence) % cadence >= 2) {
+    if (((minute - phase) % cadence + cadence) % cadence >= 10) {
       return { status: "no_action", reasonCode: "DM_FREQUENCY_WINDOW", characterId: character.id, runId: null, model: null };
     }
   }
