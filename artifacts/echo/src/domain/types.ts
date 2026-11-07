@@ -99,6 +99,8 @@ export interface Story {
   displayMetrics?: { views?: number | null };
   mentionedAccountIds?: string[];
   reactions?: SocialReaction[];
+  /** Story likes are separate from emoji reactions and never send a DM. */
+  likes?: CharacterId[];
   music?: import('@workspace/api-client-react').StoryMusic;
   id: string;
   authorId: CharacterId;
