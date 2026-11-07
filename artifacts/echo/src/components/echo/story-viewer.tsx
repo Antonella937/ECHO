@@ -93,6 +93,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [reply, setReply] = useState('');
   const [showViewers, setShowViewers] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [shareSearch, setShareSearch] = useState('');
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const swipeStartY = useRef<number | null>(null);
@@ -145,7 +147,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     };
   }, [next, prev, onClose, editingMetrics]);
 
-  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || editingMetrics || confirmDelete;
+  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showShare || editingMetrics || confirmDelete;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -164,6 +166,12 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const active = isStoryActive(liveStory);
   const mentioned = (liveStory.mentionedAccountIds ?? []).map(character).filter((c): c is NonNullable<typeof c> => !!c);
   const hasLiked = (liveStory.likes ?? []).includes(me.id);
+  const shareTargets = state.characters.filter(c => !c.archived && c.id !== me.id && canViewStory(liveStory, c.id, state) && (c.name + ' ' + c.handle).toLowerCase().includes(shareSearch.toLowerCase()));
+  const shareWith = (targetId: string) => {
+    if (!isStoryActive(liveStory) || !canViewStory(liveStory, targetId, state)) return;
+    try { actions.sendMessage(targetId, '', { storyId: liveStory.id }); setShowShare(false); setShareSearch(''); toast({ title: t('Historia compartida') }); }
+    catch (e) { toast({ title: t('No se pudo compartir'), description: (e as Error).message }); }
+  };
   const myReaction = liveStory.reactions?.find((r) => r.actorId === me.id)?.value;
   const react = (value: string) => {
     try {
@@ -256,6 +264,14 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           </button>
         </div>
 
+        {showShare && <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={t('Compartir historia')}>
+          <div className="flex max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-card p-4 text-foreground" data-testid="story-share-picker">
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Compartir historia')}</h2><button type="button" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" onClick={() => setShowShare(false)} aria-label={t('Cerrar')}><X size={20}/></button></div>
+            <input value={shareSearch} onChange={e => setShareSearch(e.target.value)} placeholder={t('Buscar personaje')} aria-label={t('Buscar personaje')} className="mb-3 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{shareTargets.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{t('No hay personajes disponibles para compartir esta historia.')}</p> : shareTargets.map(target => <button type="button" key={target.id} onClick={() => shareWith(target.id)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-secondary" data-testid={`share-story-with-${target.id}`}><CharacterAvatar character={target} size={40}/><span className="min-w-0 flex-1 truncate text-sm font-medium">{target.name} <span className="text-muted-foreground">@{target.handle}</span></span><Send size={18} className="text-primary"/></button>)}</div>
+            <p className="mt-3 text-xs text-muted-foreground">{t('Solo aparecen personajes que pueden ver esta historia.')}</p>
+          </div>
+        </div>}
         {confirmDelete && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 px-6" role="alertdialog" aria-modal="true" aria-label={t("Eliminar historia")}>
           <div className="w-full max-w-sm rounded-3xl bg-card p-5 text-foreground">
             <h2 className="text-lg font-semibold">{t("¿Eliminar esta historia?")}</h2>
@@ -371,6 +387,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 aria-label={t("Responder a la historia")}
               />
               {active && <button type="button" onClick={() => actions.toggleStoryLike(story.id)} aria-label={hasLiked ? t('Quitar me gusta') : t('Me gusta')} aria-pressed={hasLiked} title={hasLiked ? t('Quitar me gusta') : t('Me gusta')} className={cn('tap grid h-12 w-12 shrink-0 place-items-center rounded-full', hasLiked ? 'text-red-500' : 'text-foreground')} data-testid="button-story-like"><Heart className="h-7 w-7" fill={hasLiked ? 'currentColor' : 'none'} strokeWidth={1.8} /></button>}
+              {active && <button type="button" onClick={() => setShowShare(true)} aria-label={t("Compartir historia")} title={t("Compartir historia")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full" data-testid="button-story-share"><Send className="h-6 w-6" strokeWidth={1.8}/></button>}
               <button
                 type="submit"
                 disabled={!reply.trim()}
