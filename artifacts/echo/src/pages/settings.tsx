@@ -98,6 +98,8 @@ export default function SettingsPage() {
 
         <MusicConnectionsSection />
 
+        <Link href="/music" className="mt-3 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold">ECHO Music Studio <span className="text-xs text-muted-foreground">Preparar canciones ›</span></Link>
+
         <PushNotificationSettings />
 
         <section className="mt-9" aria-labelledby="support-h">
