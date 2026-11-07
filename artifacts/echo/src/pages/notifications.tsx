@@ -40,7 +40,6 @@ export default function NotificationsPage() {
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [serverRead, setServerRead] = useState<string[]>([]);
   const [officialSubscribed, setOfficialSubscribed] = useState(true);
-  const [preview, setPreview] = useState(false);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
@@ -112,18 +111,6 @@ export default function NotificationsPage() {
           if (!next) setOfficialUpdates([]);
         }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? officialText.subscribed : officialText.muted}</button>
       </div>
-      {user?.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && <section className="mx-4 mt-3 rounded-xl border border-dashed border-primary/50 bg-card p-3">
-        <p className="text-xs font-semibold text-primary">{officialText.previewHeading}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{officialText.previewDescription}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => window.dispatchEvent(new Event('echo:preview-official-notification'))}>{officialText.previewToastButton}</button>
-          <button type="button" className="rounded-full border border-border px-3 py-2 text-xs font-semibold" onClick={() => setPreview(previous => !previous)}>{officialText.previewCardsButton}</button>
-        </div>
-        {preview && <div className="mt-3 space-y-2" aria-label="Preview notifications">
-          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">📣 ECHO · {officialText.update}</span><p className="mt-1 text-sm font-semibold">{officialText.previewOfficialCard}</p><p className="text-xs text-muted-foreground">{officialText.previewSample}</p></div>
-          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">👥 Creator Hub</span><p className="mt-1 text-sm font-semibold">{officialText.previewCreatorCard}</p><p className="text-xs text-muted-foreground">{officialText.previewSample}</p></div>
-        </div>}
-      </section>}
       {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {officialText.title}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
