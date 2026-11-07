@@ -463,7 +463,15 @@ export async function executeAutonomyDecision(input: {
         )).for("update");
         const candidates = gallery.filter(photo => (photo.reusable || photo.usedCount === 0) &&
           (photo.usedCount === 0 || !photo.lastUsedAt || now.getTime() - photo.lastUsedAt.getTime() >= 30 * DAY_MS))
-          .map(photo => ({ photo, score: [...tokens(photo.description)].filter(word => captionWords.has(word)).length }))
+          .map(photo => {
+            const vision = photo.visionStatus === "complete" && photo.visionAnalysis ? photo.visionAnalysis : null;
+            const scene = vision && typeof vision.sceneDescription === "string" ? vision.sceneDescription : "";
+            const setting = vision && typeof vision.setting === "string" ? vision.setting : "";
+            const activities = vision && Array.isArray(vision.activities) ? vision.activities.filter((v):v is string => typeof v === "string").join(" ") : "";
+            const details = vision && Array.isArray(vision.notableDetails) ? vision.notableDetails.filter((v):v is string => typeof v === "string").join(" ") : "";
+            const context = [photo.description, scene, setting, activities, details].join(" ");
+            return { photo, score: [...tokens(context)].filter(word => captionWords.has(word)).length };
+          })
           .filter(item => item.score >= 2).sort((a,b) => b.score - a.score || a.photo.usedCount - b.photo.usedCount);
         if (candidates.length && candidates[0].score > (candidates[1]?.score ?? 0)) {
           const selected = candidates[0].photo;
