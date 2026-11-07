@@ -1,4 +1,6 @@
 import { useAccountManagementText } from '@/lib/account-management-translations';
+import { useLanguage } from '@/lib/i18n';
+import { galleryLabels } from '@/lib/gallery-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Check, Pencil, Plus, SlidersHorizontal, Images } from 'lucide-react';
@@ -13,6 +15,7 @@ import { cn } from '@/lib/utils';
 /** Identity switcher + account management (active / archived). */
 export function AccountManager() {
   const translate = useAccountManagementText();
+  const galleryLabel = galleryLabels[useLanguage()].title;
   const { state, me, actions } = useSocial();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<'active' | 'archived'>('active');
