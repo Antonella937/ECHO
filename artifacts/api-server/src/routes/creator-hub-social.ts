@@ -105,14 +105,6 @@ export function createCreatorHubSocialRouter(): IRouter {
     );
     if (!result.rowCount) { res.status(404).json({ error: "PROFILE_NOT_FOUND" }); return; }
     const profile = result.rows[0];
-    // Private accounts remain discoverable, but their biography and media are
-    // visible only to accepted followers or the account owner.
-    const canViewPrivateProfile = ownerId === req.userId || profile.visibility === "public" || profile.following;
-    if (!canViewPrivateProfile) {
-      res.json({ profile: { ...profile, bio: "", avatarRef: null, bannerRef: null, avatarPosition: null,
-        verificationRole: lifetimeAccessForOwner(ownerId), roleLabel: null } });
-      return;
-    }
     try {
       const account = await clerkClient.users.getUser(ownerId);
       const metadata = account.unsafeMetadata ?? {};
@@ -641,17 +633,11 @@ export function createCreatorHubSocialRouter(): IRouter {
          SELECT 1 FROM echo_creator_blocks b WHERE
            (b.blocker_owner_id=$1 AND b.blocked_owner_id=$2) OR
            (b.blocker_owner_id=$2 AND b.blocked_owner_id=$1)
-       ) AND (p.owner_id=$1 OR (EXISTS (
-         SELECT 1 FROM echo_creator_profiles cp WHERE cp.owner_id=$2
-         AND (cp.visibility='public' OR EXISTS (
-           SELECT 1 FROM echo_creator_follows allowed
-           WHERE allowed.follower_owner_id=$1 AND allowed.followed_owner_id=$2
-         ))
-       ) AND (p.visibility='public'
+       ) AND (p.owner_id=$1 OR p.visibility='public'
          OR (p.visibility='followers' AND EXISTS (
            SELECT 1 FROM echo_creator_follows f
            WHERE f.follower_owner_id=$1 AND f.followed_owner_id=$2
-         ))))
+         )))
        ORDER BY p.pinned DESC,p.created_at DESC LIMIT 100`,
       [req.userId,ownerId],
     );
