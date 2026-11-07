@@ -1,3 +1,4 @@
+import { MusicClipPlayer } from './music-clip-player';
 import { useStoryViewerText } from '@/lib/story-viewer-translations';
 import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -282,7 +283,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex flex-col items-center gap-2 px-6 text-center">
-          {liveStory.music && (
+          {liveStory.musicClip && <div className="pointer-events-auto w-full max-w-xs"><MusicClipPlayer key={liveStory.id} clip={liveStory.musicClip} compact /></div>}
+          {liveStory.music && !liveStory.musicClip && (
             <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 py-1.5 text-xs backdrop-blur" title={t("Solo metadatos: no se reproduce audio")} data-testid={`text-story-music-${story.id}`}>
               <Music2 className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="truncate"><b className="font-semibold">{liveStory.music.title}</b> · {liveStory.music.artist}</span>
