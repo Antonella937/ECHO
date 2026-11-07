@@ -210,6 +210,10 @@ function FirstWelcomeDialog() {
     };
     // The welcome waits until the signed-in account's language has loaded.
     window.addEventListener('echo:account-language-ready', claim);
+    // Language sync can finish before this component mounts.
+    if (sessionStorage.getItem('echo:language-ready-user') === user.id) {
+      claim(new CustomEvent('echo:account-language-ready', { detail: { userId: user.id } }));
+    }
     return () => { active = false; window.removeEventListener('echo:account-language-ready', claim); };
   }, [user?.id]);
   if (!open) return null;
@@ -480,9 +484,10 @@ function InterfaceLanguageSync() {
   const [readyForUser, setReadyForUser] = useState<string | null>(null);
   const lastLanguage = useRef<Language>(language);
   useEffect(() => {
-    if (!isLoaded || !user?.id) { setReadyForUser(null); return; }
+    if (!isLoaded || !user?.id) { setReadyForUser(null); sessionStorage.removeItem('echo:language-ready-user'); return; }
     let cancelled = false;
     setReadyForUser(null);
+    sessionStorage.removeItem('echo:language-ready-user');
     void customFetch<{ language: Language | null }>('/api/account/interface-language', { responseType: 'json' })
       .then(result => {
         if (cancelled) return;
@@ -495,6 +500,7 @@ function InterfaceLanguageSync() {
           void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language: lastLanguage.current }) }).catch(console.warn);
         }
         setReadyForUser(user.id);
+        sessionStorage.setItem('echo:language-ready-user', user.id);
         window.dispatchEvent(new CustomEvent('echo:account-language-ready', { detail: { userId: user.id } }));
       })
       .catch(error => { if (!cancelled) console.warn('ECHO language sync unavailable', error); });
