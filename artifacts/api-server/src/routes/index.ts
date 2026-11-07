@@ -17,6 +17,7 @@ import { creatorHubSocialRouter } from "./creator-hub-social";
 import { characterPrivacyRouter } from "./character-privacy";
 import { socialFollowsRouter } from "./social-follows";
 import { socialReadRouter } from "./social-reads";
+import { storySharesRouter } from "./story-shares";
 import { createOwnerConsentRouter } from "./owner-consent";
 import { createConsentSafetyGate } from "../middlewares/consentSafety";
 
@@ -42,5 +43,6 @@ router.use(creatorHubSocialRouter);
 router.use(characterPrivacyRouter);
 router.use(socialFollowsRouter);
 router.use(socialReadRouter);
+router.use(storySharesRouter);
 
 export default router;
