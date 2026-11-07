@@ -13,6 +13,8 @@ import type { Comment } from '@/domain/types';
 export function CommentList({ postId, onReply, highlightId }: { postId: string; onReply(c: Comment): void; highlightId?: string | null }) {
   const t = usePostInteractionsText();
   const { state } = useSocial();
+  const post = state.posts.find((p) => p.id === postId);
+  const visualCount = Math.max(0, Math.floor(Number(post?.displayMetrics?.comments) || 0));
   const { roots, replies } = useMemo(() => {
     const all = state.comments.filter((c) => c.postId === postId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const ids = new Set(all.map((c) => c.id));
@@ -24,8 +26,16 @@ export function CommentList({ postId, onReply, highlightId }: { postId: string; 
   if (!roots.length)
     return (
       <div className="py-12 text-center" data-testid="empty-comments">
-        <p className="font-display text-lg font-light">{t("Todavía no hay comentarios")}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{t("Di algo bonito. O algo cierto.")}</p>
+        {visualCount > 0 ? (
+          <>
+            <p className="font-display text-lg font-light">{visualCount.toLocaleString()} {t("Comentarios contabilizados sin mensajes visibles")}</p>
+          </>
+        ) : (
+          <>
+            <p className="font-display text-lg font-light">{t("Todavía no hay comentarios")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("Di algo bonito. O algo cierto.")}</p>
+          </>
+        )}
       </div>
     );
 
