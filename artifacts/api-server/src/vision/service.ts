@@ -307,6 +307,13 @@ export function buildVisionPostSummary(postId: string, caption: string,
 export class VisionService {
   constructor(private readonly provider: VisionProvider = visionProvider) {}
 
+  async analyzeGalleryPhoto(ownerId: string, universeId: string, photoId: string, mediaRef: string): Promise<VisionAnalysis> {
+    const result = await analyzeOne(ownerId, universeId, "gallery", photoId, {
+      id: photoId, type: "image", url: mediaRef, position: 0,
+    }, this.provider);
+    return result.analysis;
+  }
+
   async analyzePost(ownerId: string, state: SocialState, postId: string, universeId = "primary") {
     if (!ownerId) throw new VisionError("AUTHENTICATION_REQUIRED", 401);
     const post = state.posts.find((item) => item.id === postId);
