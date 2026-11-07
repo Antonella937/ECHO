@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import paddleBillingRouter from "./paddle-billing";
-import spotifyConnectionRouter from "./spotify-connection";
 import supportRouter from "./support";
 import universeRouter from "./universe";
 import universeSharingRouter from "./universe-sharing";
@@ -32,7 +31,6 @@ router.use(createOwnerConsentRouter());
 
 router.use(healthRouter);
 router.use(paddleBillingRouter);
-router.use(spotifyConnectionRouter);
 router.use(supportRouter);
 router.use(universeRouter);
 router.use(universeSharingRouter);
