@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { useLanguage } from '@/lib/i18n';
-const copy = {"es":["{heading}","{description}","Volver al inicio"],"en":["Nothing echoes here","This page does not exist.","Back to home"],"pt":["Nada ecoa por aqui","Esta página não existe.","Voltar ao início"],"fr":["Aucun écho ici","Cette page n’existe pas.","Retour à l’accueil"],"de":["Hier hallt nichts wider","Diese Seite existiert nicht.","Zur Startseite"],"it":["Qui non risuona nulla","Questa pagina non esiste.","Torna alla home"],"ko":["여기에는 메아리가 없어요","이 페이지는 존재하지 않습니다.","홈으로 돌아가기"],"ja":["ここには何も響きません","このページは存在しません。","ホームに戻る"],"zh":["这里没有回响","此页面不存在。","返回首页"]} as Record<string, readonly [string,string,string]>;
+const copy = {"es":["Aquí no hay ecos","Esta página no existe.","Volver al inicio"],"en":["Nothing echoes here","This page does not exist.","Back to home"],"pt":["Nada ecoa por aqui","Esta página não existe.","Voltar ao início"],"fr":["Aucun écho ici","Cette page n’existe pas.","Retour à l’accueil"],"de":["Hier hallt nichts wider","Diese Seite existiert nicht.","Zur Startseite"],"it":["Qui non risuona nulla","Questa pagina non esiste.","Torna alla home"],"ko":["여기에는 메아리가 없어요","이 페이지는 존재하지 않습니다.","홈으로 돌아가기"],"ja":["ここには何も響きません","このページは存在しません。","ホームに戻る"],"zh":["这里没有回响","此页面不存在。","返回首页"]} as Record<string, readonly [string,string,string]>;
 
 export default function NotFound() {
   const language = useLanguage();
