@@ -757,6 +757,7 @@ components:
         text: { type: [string, "null"], maxLength: 2000 }
         reason: { type: string, minLength: 1, maxLength: 400, description: Brief explanation, not hidden reasoning }
         suggestedDelayMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        galleryPhotoId: { type: [string, 'null'], maxLength: 120, description: Optional explicitly selected eligible gallery photo for autonomous posts }
         reaction: { type: [string, "null"], maxLength: 32 }
         contextSections:
           type: array
