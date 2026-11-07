@@ -251,6 +251,13 @@ export default function ConversationPage() {
     window.setTimeout(() => el.classList.remove('ring-2', 'ring-primary/50', 'rounded-2xl'), 1400);
   };
 
+  useEffect(() => {
+    const savedId = new URLSearchParams(window.location.search).get('saved');
+    if (!savedId || !messages.some(m => m.id === savedId)) return;
+    const frame = window.requestAnimationFrame(() => jumpTo(savedId));
+    return () => window.cancelAnimationFrame(frame);
+  }, [id, messages.length]);
+
   return (
     <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
