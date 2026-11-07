@@ -638,6 +638,18 @@ export function createCreatorHubSocialRouter(): IRouter {
     pinned: z.boolean().default(false),
     coverPath: z.string().regex(new RegExp("^/objects/uploads/[0-9a-f-]{36}$", "i")).nullable().default(null),
   }).strict();
+  // Public official announcements are readable by any signed-in ECHO user.
+  // The founder-only publication rule below prevents other creators from impersonating ECHO.
+  router.get("/creator-hub/social/official-updates", async (req, res) => {
+    const result = await pool.query(
+      `SELECT id,title,body,created_at AS "createdAt"
+       FROM echo_creator_publications
+       WHERE owner_id=$1 AND kind='update' AND visibility='public'
+       ORDER BY created_at DESC LIMIT 30`,
+      [founderOwnerId],
+    );
+    res.json({ updates: result.rows });
+  });
   router.post("/creator-hub/social/publications", async (req, res) => {
     const parsed = publicationSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({error:"INVALID_PUBLICATION"}); return; }
