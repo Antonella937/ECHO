@@ -58,7 +58,7 @@ export default function NotificationsPage() {
         right={
           unread.length > 0 && (
             <button onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary" data-testid="button-mark-all-read">
-              Marcar todo como leído
+              {t("Marcar todo como leído")}
             </button>
           )
         }
