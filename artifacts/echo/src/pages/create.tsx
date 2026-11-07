@@ -221,7 +221,7 @@ export default function CreatePage() {
       const cover = items.find((m) => m.type === 'image');
       if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
       toast({ title: t('Publicado'), description: `${t('Como')} ${me.name}` });
-      navigate(`/p/${id}`);
+      navigate(`/p/${id}`, { replace: true });
     } catch (err) {
       setError((err as Error).message || t('No se pudo publicar.'));
     }
