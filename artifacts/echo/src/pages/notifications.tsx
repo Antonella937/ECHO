@@ -37,12 +37,15 @@ export default function NotificationsPage() {
   const [creatorPosts, setCreatorPosts] = useState<Array<{ id: string; ownerId: string; displayName: string; title: string; body: string; createdAt: string }>>([]);
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [serverRead, setServerRead] = useState<string[]>([]);
+  const [officialSubscribed, setOfficialSubscribed] = useState(true);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
     const key = 'echo-official-read:' + user.id;
+    void customFetch<{ subscribed: boolean }>('/api/creator-hub/social/announcement-subscription', { responseType: 'json' })
+      .then(data => { if (active) setOfficialSubscribed(data.subscribed); }).catch(() => {});
     void customFetch<{ ids: string[] }>('/api/creator-hub/social/notification-reads', { responseType: 'json' })
       .then(data => { if (active) setServerRead(data.ids); }).catch(() => {});
     try { setCreatorRead(JSON.parse(localStorage.getItem('echo-creator-read:' + user.id) || '[]')); } catch { setCreatorRead([]); }
@@ -97,7 +100,16 @@ export default function NotificationsPage() {
           </button>
         }
       />
-      {officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}>
+      <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+        <div><p className="text-sm font-semibold">📣 ECHO · {language === 'en' ? 'Official announcements' : 'Anuncios oficiales'}</p><p className="text-xs text-muted-foreground">{language === 'en' ? 'Updates from ECHO’s founder, separate from following.' : 'Novedades de la fundadora, sin necesidad de seguirla.'}</p></div>
+        <button type="button" aria-pressed={officialSubscribed} onClick={() => {
+          const next = !officialSubscribed;
+          setOfficialSubscribed(next);
+          void customFetch('/api/creator-hub/social/announcement-subscription', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscribed: next }) }).catch(() => setOfficialSubscribed(!next));
+          if (!next) setOfficialUpdates([]);
+        }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? (language === 'en' ? 'Subscribed' : 'Suscripto') : (language === 'en' ? 'Muted' : 'Silenciado')}</button>
+      </div>
+      {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
           <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label="Unread"/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
