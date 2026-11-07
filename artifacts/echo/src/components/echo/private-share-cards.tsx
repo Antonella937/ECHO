@@ -1,5 +1,6 @@
 import { useCreatorShareText } from '@/lib/creator-share-translations';
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
+import { customFetch } from '@workspace/api-client-react';
 import { CharacterInitials, UniverseCover } from './visual-defaults';
 
 export interface PrivateShareCharacter {
@@ -14,6 +15,7 @@ export interface PrivateShareCardsProps {
   creatorName?: string | null;
   characters: PrivateShareCharacter[];
   initialCharacterId?: string;
+  universeId: string;
 }
 
 const SERIF = "'Instrument Serif', Georgia, serif";
@@ -22,33 +24,65 @@ const overline = 'text-[9px] font-bold uppercase tracking-[.17em] text-[#d9a8bd]
 const disabledBtn =
   'tap inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[rgba(239,220,232,.14)] bg-transparent px-3 text-[11px] font-semibold text-[#cbb9c5] opacity-55 cursor-not-allowed';
 
-function LinkRow({ label }: { label: string }) {
+function LinkRow({ label, link }: { label: string; link?: string }) {
   const t = useCreatorShareText();
   return (
     <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-[rgba(217,168,189,.22)] px-3 py-2">
       <span className="text-[9px] uppercase tracking-[.13em] text-[#8f8790]">{t("Enlace")}</span>
       <span className="min-w-0 flex-1 text-[11px] text-[#8f8790]" aria-label={`${t("Enlace de")} ${t(label)} ${t("no disponible")}`}>
-        {t('no disponible')}
+        {link || t('no disponible')}
       </span>
     </div>
   );
 }
 
-function ShareActions({ label }: { label: string }) {
+function ShareActions({ label, universeId, kind, characterId }: { label: string; universeId: string; kind: 'universe' | 'character'; characterId?: string }) {
   const t = useCreatorShareText();
-  return (
+  const [link, setLink] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { setLink(''); setError(''); }, [universeId, kind, characterId]);
+  const generate = async () => {
+    setBusy(true); setError('');
+    try {
+      const result = await customFetch<{ token: string }>('/api/universe/' + encodeURIComponent(universeId) + '/share-links', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, ...(characterId ? { characterId } : {}) }), responseType: 'json',
+      });
+      const url = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + '/shared/' + result.token;
+      setLink(url);
+      return url;
+    } catch { setError('No se pudo generar el enlace. Activá compartir universo desde Privacidad.'); return ''; }
+    finally { setBusy(false); }
+  };
+  const copy = async () => { const url = link || await generate(); if (url) { try { await navigator.clipboard.writeText(url); } catch { setError('No se pudo copiar automáticamente.'); } } };
+  const share = async () => {
+    const url = link || await generate();
+    if (!url) return;
+    if (navigator.share) { try { await navigator.share({ title: label, url }); } catch { /* cancelled */ } }
+    else { try { await navigator.clipboard.writeText(url); } catch { setError('No se pudo compartir automáticamente.'); } }
+  };
+  const revoke = async () => {
+    if (!link) return;
+    const token = link.split('/').pop()!;
+    setBusy(true);
+    try {
+      await customFetch('/api/universe/' + encodeURIComponent(universeId) + '/share-links/' + token, { method: 'DELETE' });
+      setLink('');
+    } catch { setError('No se pudo revocar el enlace.'); }
+    finally { setBusy(false); }
+  };
+  return <div className="mt-3">
+    <LinkRow label={label} link={link} />
     <div className="mt-3 flex flex-wrap gap-2">
-      <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`${t("Copiar enlace de")} ${t(label)} (${t("no disponible")})`}>
-        {t('Copiar enlace')}
-      </button>
-      <button type="button" disabled aria-disabled="true" className={disabledBtn} aria-label={`${t("Compartir")} ${t(label)} (${t("no disponible")})`}>
-        {t('Compartir')}
-      </button>
+      <button type="button" disabled={busy} onClick={() => void copy()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{busy ? 'Generando…' : t('Copiar enlace')}</button>
+      <button type="button" disabled={busy} onClick={() => void share()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{t('Compartir')}</button>
+      {link && <button type="button" disabled={busy} onClick={() => void revoke()} className="min-h-11 rounded-full border border-border px-3 text-xs">Revocar enlace</button>}
     </div>
-  );
+    {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
+  </div>;
 }
 
-export function PrivateShareCards({ universeName, description, creatorName, characters, initialCharacterId }: PrivateShareCardsProps) {
+export function PrivateShareCards({ universeName, description, creatorName, characters, initialCharacterId, universeId }: PrivateShareCardsProps) {
   const t = useCreatorShareText();
   const selectId = useId();
   const noteId = useId();
@@ -78,7 +112,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
           </h3>
           {description ? <p className="mt-1 mb-0 text-[11px] leading-relaxed text-[#a59ba4] [overflow-wrap:anywhere]">{description}</p> : null}
           {creatorName ? <p className="mt-2 mb-0 text-[10px] text-[#8f8790]">{t("Por")} {creatorName}</p> : null}
-          <div className="mt-auto"><LinkRow label="universo" /><ShareActions label="universo" /></div>
+          <div className="mt-auto"><ShareActions label="universo" universeId={universeId} kind="universe" /></div>
         </article>
 
         <article className={card} aria-labelledby={`${noteId}-c`} data-testid="card-share-character">
@@ -117,7 +151,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
                   <p className="mt-1 mb-0 text-[10px] text-[#8f8790] [overflow-wrap:anywhere]">{t("En")} {universeName}</p>
                 </div>
               </div>
-              <div className="mt-auto"><LinkRow label="personaje" /><ShareActions label="personaje" /></div>
+              <div className="mt-auto"><ShareActions label="personaje" universeId={universeId} kind="character" characterId={selected.id} /></div>
             </>
           ) : (
             <p id={`${noteId}-c`} className="mt-4 mb-0 text-[11px] text-[#a59ba4]">{t("Este universo aún no tiene personajes.")}</p>
