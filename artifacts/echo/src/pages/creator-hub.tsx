@@ -282,6 +282,18 @@ export default function CreatorHubPage() {
   const [peopleQuery, setPeopleQuery] = useState('');
   const [peopleResults, setPeopleResults] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const profileReturnScroll = useRef(0);
+  const openPersonProfile = (ownerId: string) => {
+    profileReturnScroll.current = window.scrollY;
+    setProfileMessageFeedback('');
+    setSelectedPersonId(ownerId);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+  const closePersonProfile = () => {
+    setSelectedPersonId(null);
+    setProfileMessageFeedback('');
+    requestAnimationFrame(() => window.scrollTo({ top: profileReturnScroll.current, behavior: 'instant' }));
+  };
   const selectedPerson = peopleResults.find(person => person.ownerId === selectedPersonId);
   const [viewedProfile, setViewedProfile] = useState<{ displayName: string; username: string; visibility: string; bio: string | null; following: boolean; requested: boolean } | null>(null);
   const [viewedPosts, setViewedPosts] = useState<Publication[]>([]);
@@ -332,7 +344,7 @@ export default function CreatorHubPage() {
     finally { setPeopleBusy(false); }
   }
   async function requestMessage(ownerId: string) {
-    setPeopleBusy(true); setPeopleFeedback(''); setProfileMessageFeedback('');
+    setPeopleBusy(true); setPeopleFeedback(''); setProfileMessageFeedback(ht('Enviando solicitud…'));
     try {
       const result = await customFetch<{ status: 'requested' | 'allowed' | 'accepted' }>('/api/creator-hub/social/message-requests', {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
@@ -438,9 +450,9 @@ export default function CreatorHubPage() {
     : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
   if (selectedPersonId) {
     const person = viewedProfile ?? selectedPerson;
-    return <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-background text-foreground" style={{ WebkitTextSizeAdjust: '100%' }}>
+    return <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-background text-foreground" style={{ WebkitTextSizeAdjust: '100%', touchAction: 'pan-y' }}>
       <header className="flex items-center gap-4 border-b border-border px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+20px)]">
-        <button type="button" onClick={() => { setSelectedPersonId(null); setProfileMessageFeedback(''); }} aria-label={ct("back")} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-secondary"><ArrowLeft size={22}/></button>
+        <button type="button" onClick={closePersonProfile} aria-label={ct("back")} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-secondary"><ArrowLeft size={22}/></button>
         <span className="text-lg font-semibold">{ht("Perfil")}</span>
       </header>
       <main className="mx-auto w-full max-w-2xl min-w-0 px-5 py-8">
@@ -527,7 +539,7 @@ export default function CreatorHubPage() {
               {peopleResults.map(person => (
                 <div key={person.ownerId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
                   <div className="min-w-0"><p className="truncate text-sm font-medium">{person.displayName}</p><p className="truncate text-xs text-muted-foreground">@{person.username} · {ht(person.visibility === 'private' ? 'Privado' : 'Público')}</p></div>
-                  <button type="button" onClick={() => setSelectedPersonId(person.ownerId)} className="rounded-full border border-primary/40 px-3 py-2 text-xs font-medium text-primary">{ht("Ver perfil")}</button>
+                  <button type="button" onClick={() => openPersonProfile(person.ownerId)} className="rounded-full border border-primary/40 px-3 py-2 text-xs font-medium text-primary">{ht("Ver perfil")}</button>
                 </div>
               ))}
             </div>
