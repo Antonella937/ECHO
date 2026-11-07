@@ -50,6 +50,34 @@ router.put("/voices/premium/projects",async(req,res)=>{
   res.json({project:result.rows[0],generationAvailable:false});
  }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
 });
+
+const voiceMime = z.enum(["audio/wav","audio/mpeg","audio/mp4"]);
+const voiceUploadRequest = key.extend({ contentType:voiceMime, size:z.number().int().min(1).max(20*1024*1024), consentConfirmed:z.literal(true) }).strict();
+router.post("/voices/premium/reference/request-url",async(req,res)=>{
+ const parsed=voiceUploadRequest.safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_AUDIO"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!await checkCharacter(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const base=process.env.SUPABASE_URL?.replace(/\\/$/,"");
+  const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(base)||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
+  const {randomUUID}=await import("node:crypto");
+  const path=`voice-studio/${randomUUID()}/${randomUUID()}`;
+  const response=await fetch(`${base}/storage/v1/object/upload/sign/echo-media/${path}`,{
+   method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},
+   body:JSON.stringify({upsert:false}),signal:AbortSignal.timeout(10000)
+  });
+  if(!response.ok){res.status(502).json({error:"VOICE_UPLOAD_SIGN_FAILED"});return;}
+  const payload=await response.json() as {url?:string;signedURL?:string;token?:string};
+  const relative=payload.url??payload.signedURL;
+  const uploadURL=relative?new URL(relative.startsWith("http")?relative:`${base}/storage/v1/${relative.replace(/^\\/?(?:storage\\/v1\\/)?/,"")}`).toString()
+   :payload.token?`${base}/storage/v1/object/upload/sign/echo-media/${path}?token=${encodeURIComponent(payload.token)}`:null;
+  if(!uploadURL||!uploadURL.startsWith(`${base}/storage/v1/object/upload/sign/echo-media/`)){res.status(502).json({error:"VOICE_UPLOAD_SIGN_INVALID"});return;}
+  res.json({uploadURL,objectPath:path});
+ }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
+});
+
 router.post("/voices/premium/generate",requireAuth,(_req,res)=>{
  res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_NOT_CONFIGURED",charged:false});
 });
