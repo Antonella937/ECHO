@@ -26,7 +26,7 @@ export const VisionAnalysisSchema = z.object({
 
 export type VisionAnalysis = z.infer<typeof VisionAnalysisSchema>;
 
-export type VisionEntityType = "post" | "story";
+export type VisionEntityType = "post" | "story" | "gallery";
 
 export interface VisionContext {
   /** Keys use `${entityType}:${entityId}:${mediaId}`; no media URLs or bytes. */
