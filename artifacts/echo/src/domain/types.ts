@@ -139,6 +139,7 @@ export type NotificationKind =
   | 'mention'
   | 'message'
   | 'story_reply'
+  | 'story_like'
   | 'follow';
 
 export interface Notification {
