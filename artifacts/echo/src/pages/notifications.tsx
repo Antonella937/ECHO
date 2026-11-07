@@ -1,3 +1,4 @@
+import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
 import { useNotificationsText, useLocalizedNotificationExcerpt } from '@/lib/notifications-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,6 +33,7 @@ const VERB: Record<Notification['kind'], string> = {
 
 export default function NotificationsPage() {
   const t = useNotificationsText();
+  const officialText = useOfficialAnnouncementText();
   const language = useLanguage();
   const { user } = useUser();
   const [creatorPosts, setCreatorPosts] = useState<Array<{ id: string; ownerId: string; displayName: string; title: string; body: string; createdAt: string }>>([]);
@@ -101,7 +103,7 @@ export default function NotificationsPage() {
         }
       />
       <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
-        <div><p className="text-sm font-semibold">📣 ECHO · {language === 'en' ? 'Official announcements' : 'Anuncios oficiales'}</p><p className="text-xs text-muted-foreground">{language === 'en' ? 'Updates from ECHO’s founder, separate from following.' : 'Novedades de la fundadora, sin necesidad de seguirla.'}</p></div>
+        <div><p className="text-sm font-semibold">📣 ECHO · {officialText.title}</p><p className="text-xs text-muted-foreground">{officialText.detail}</p></div>
         <button type="button" aria-pressed={officialSubscribed} onClick={() => {
           const next = !officialSubscribed;
           setOfficialSubscribed(next);
@@ -109,7 +111,7 @@ export default function NotificationsPage() {
           if (!next) setOfficialUpdates([]);
         }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? (language === 'en' ? 'Subscribed' : 'Suscripto') : (language === 'en' ? 'Muted' : 'Silenciado')}</button>
       </div>
-      {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}>
+      {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
           <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label="Unread"/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
@@ -117,7 +119,7 @@ export default function NotificationsPage() {
         </details>)}</div>
       </section>}
       {creatorPosts.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Followed creators' : 'Creadores que seguís'}>
-        <h2 className="mb-2 text-sm font-semibold">👥 {language === 'en' ? 'From creators you follow' : 'De creadores que seguís'}</h2>
+        <h2 className="mb-2 text-sm font-semibold">👥 {officialText.following}</h2>
         <div className="space-y-2">{creatorPosts.slice(0, 15).map(item => <details key={item.id} onToggle={e => { if (!e.currentTarget.open || !user?.id) return; saveServerRead(item.id); const next = [...new Set([...creatorRead, item.id])]; setCreatorRead(next); localStorage.setItem('echo-creator-read:' + user.id, JSON.stringify(next)); }} className="rounded-xl border border-border bg-card p-3">
           <summary className="cursor-pointer text-sm font-semibold">{!creatorRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary"/>}<span className="text-muted-foreground">@{item.displayName} · </span>{item.title}</summary>
           <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
