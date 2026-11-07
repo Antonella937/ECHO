@@ -33,6 +33,7 @@ function safeErrorCode(error: unknown) {
 
 export async function runAutonomyWorkerTick(input: {
   enabled: boolean;
+  socialTickDue?: boolean;
   repository: AutonomyWorkerRepository;
   processCharacter: (
     ownerId: string,
@@ -77,7 +78,7 @@ export async function runAutonomyWorkerTick(input: {
       }
     }
     // Spontaneous activity retains its slower cadence and separate idempotency namespace.
-    if (slot % (SOCIAL_INTERVAL_MS / AUTONOMY_WORKER_INTERVAL_MS) === 0) {
+    if (input.socialTickDue ?? (slot % (SOCIAL_INTERVAL_MS / AUTONOMY_WORKER_INTERVAL_MS) === 0)) {
       for (const target of targets) {
         if (target.socialEnabled === false) continue;
         const hash = createHash("sha256").update(`social:${socialSlot}:${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex");
