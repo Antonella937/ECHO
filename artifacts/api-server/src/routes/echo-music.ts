@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { db, echoMediaTable, echoMusicLibraryTable } from "@workspace/db";
+import { and, desc, eq } from "drizzle-orm";
 
 /**
  * ECHO Music add-on: offline preparation only.
@@ -23,6 +25,67 @@ const router: IRouter = Router();
 router.use("/music", requireAuth, (_req, res, next) => {
   res.setHeader("Cache-Control", "private, no-store");
   next();
+});
+
+const libraryItem = z.object({
+  id: z.string().uuid(),
+  characterId: z.string().min(1).max(128),
+  title: z.string().trim().min(1).max(120),
+  prompt: z.string().max(5000).default(""),
+  durationSeconds: z.number().int().min(0).max(3600),
+  status: z.enum(["draft", "saved_audio"]),
+  audioPath: z.string().max(500).nullable().optional(),
+}).strict().refine(item => item.status !== "saved_audio" || !!item.audioPath);
+router.get("/music/library", async (req, res) => {
+  try {
+    const items = await db.select().from(echoMusicLibraryTable)
+      .where(eq(echoMusicLibraryTable.ownerId, req.userId!))
+      .orderBy(desc(echoMusicLibraryTable.createdAt)).limit(100);
+    res.json({ items });
+  } catch (error) {
+    req.log.error({ err: error }, "Music library read failed");
+    res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
+  }
+});
+router.post("/music/library", async (req, res) => {
+  const parsed = libraryItem.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_LIBRARY_ITEM" }); return; }
+  const item = parsed.data;
+  if (item.audioPath) {
+    if (!/^\\/objects\\/uploads\\/[a-f0-9-]+$/i.test(item.audioPath)) {
+      res.status(400).json({ error: "INVALID_AUDIO_PATH" }); return;
+    }
+    const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+      .where(and(eq(echoMediaTable.objectPath, item.audioPath), eq(echoMediaTable.ownerId, req.userId!))).limit(1);
+    if (!owned) { res.status(403).json({ error: "AUDIO_NOT_OWNED" }); return; }
+  }
+  try {
+    const [saved] = await db.insert(echoMusicLibraryTable).values({
+      ownerId: req.userId!, id: item.id, characterId: item.characterId,
+      title: item.title, prompt: item.prompt, durationSeconds: item.durationSeconds,
+      status: item.status, audioPath: item.audioPath ?? null,
+    }).onConflictDoUpdate({
+      target: [echoMusicLibraryTable.ownerId, echoMusicLibraryTable.id],
+      set: { title: item.title, prompt: item.prompt, durationSeconds: item.durationSeconds,
+        status: item.status, audioPath: item.audioPath ?? null },
+    }).returning();
+    res.json({ item: saved });
+  } catch (error) {
+    req.log.error({ err: error }, "Music library save failed");
+    res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
+  }
+});
+router.delete("/music/library/:id", async (req, res) => {
+  const parsed = z.string().uuid().safeParse(req.params.id);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
+  try {
+    await db.delete(echoMusicLibraryTable).where(and(
+      eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, parsed.data)));
+    res.json({ deleted: true, audioFileDeleted: false });
+  } catch (error) {
+    req.log.error({ err: error }, "Music library delete failed");
+    res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
+  }
 });
 
 router.get("/music/status", (_req, res) => {
