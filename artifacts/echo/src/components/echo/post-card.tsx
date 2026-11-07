@@ -111,9 +111,9 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
               </>
             )}
           </button>
-        ) : (
+        ) : shownCount(post.displayMetrics?.likes, post.likes.length) === 0 ? (
           <p className="text-[14px] text-muted-foreground">{t("Sé la primera persona en darle me gusta")}</p>
-        )}
+        ) : null}
         <div className="mt-1 flex items-center gap-3 text-[13px] text-muted-foreground">
           <span data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> {t("me gusta")}</span>
           <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.comments, commentCount))}</span> {t("comentarios")}</span>
