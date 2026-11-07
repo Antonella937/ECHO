@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { useLanguage, type Language } from '@/lib/i18n';
+import { galleryLabels } from '@/lib/gallery-translations';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
 import { ImagePlus, Trash2 } from 'lucide-react';
 
@@ -32,7 +33,7 @@ export function CharacterPostGallery({characterId,universeId='primary'}:{charact
   <button type="button" disabled={busy} onClick={()=>picker.current?.click()} className="mb-4 flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground"><ImagePlus size={17}/>{t[2]}</button>
   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map(photo=><div key={photo.id} className="rounded-xl border border-border p-2">
     <img src={resolve(photo.mediaRef)} alt="" className="aspect-square w-full rounded-lg object-cover"/>
-    <textarea aria-label={lang==='es'?'Descripción de la foto':'Photo description'} placeholder={lang==='es'?'Qué muestra esta foto…':'What does this photo show…'} defaultValue={photo.description} key={photo.id+photo.description} maxLength={500} rows={2} disabled={busy} onBlur={e=>{if(e.target.value!==photo.description)void patch(photo,{description:e.target.value})}} className="mt-2 w-full resize-none rounded-lg border border-border bg-background p-2 text-xs"/><p className="my-2 text-xs text-muted-foreground">{photo.usedCount?t[5]+' · '+photo.usedCount:t[6]}</p>
+    <textarea aria-label={galleryLabels[lang].description} placeholder={galleryLabels[lang].description+'…'} defaultValue={photo.description} key={photo.id+photo.description} maxLength={500} rows={2} disabled={busy} onBlur={e=>{if(e.target.value!==photo.description)void patch(photo,{description:e.target.value})}} className="mt-2 w-full resize-none rounded-lg border border-border bg-background p-2 text-xs"/><p className="my-2 text-xs text-muted-foreground">{photo.usedCount?t[5]+' · '+photo.usedCount:t[6]}</p>
     <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={photo.reusable} disabled={busy} onChange={e=>void patch(photo,{reusable:e.target.checked})}/>{t[3]}</label>
     <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={photo.reserved} disabled={busy} onChange={e=>void patch(photo,{reserved:e.target.checked})}/>{t[4]}</label>
     <button type="button" disabled={busy} onClick={()=>void remove(photo)} className="flex items-center gap-1 text-xs text-destructive"><Trash2 size={13}/>{t[7]}</button>
