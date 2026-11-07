@@ -27,6 +27,7 @@ import { SocialStoreProvider } from '@/store/social-store';
 import { StoryViewerProvider } from '@/components/echo/story-viewer';
 import { Shell } from '@/components/echo/shell';
 import { MessageSoundObserver } from '@/components/echo/message-sound-observer';
+import { AppIconBadge } from '@/components/echo/app-icon-badge';
 import { FounderSurprise } from '@/components/echo/founder-surprise';
 import { AppearanceSync } from '@/components/echo/appearance-sync';
 import HashtagPage from '@/pages/hashtag';
@@ -294,6 +295,7 @@ function ProtectedRouter() {
   return (
     <Shell>
       <MessageSoundObserver />
+      <AppIconBadge />
       <CreatorHubDmObserver />
       <OfficialUpdateObserver />
       <FirstWelcomeDialog />
