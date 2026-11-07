@@ -40,6 +40,7 @@ export default function NotificationsPage() {
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [serverRead, setServerRead] = useState<string[]>([]);
   const [officialSubscribed, setOfficialSubscribed] = useState(true);
+  const [preview, setPreview] = useState(false);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
@@ -111,6 +112,18 @@ export default function NotificationsPage() {
           if (!next) setOfficialUpdates([]);
         }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? (language === 'en' ? 'Subscribed' : 'Suscripto') : (language === 'en' ? 'Muted' : 'Silenciado')}</button>
       </div>
+      {user?.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && <section className="mx-4 mt-3 rounded-xl border border-dashed border-primary/50 bg-card p-3">
+        <p className="text-xs font-semibold text-primary">{language === 'en' ? 'Founder-only · Session preview' : 'Solo fundadora · Vista previa de sesión'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{language === 'en' ? 'Nothing is published or sent to other accounts.' : 'No se publica nada ni se envía a otras cuentas.'}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => window.dispatchEvent(new Event('echo:preview-official-notification'))}>{language === 'en' ? 'Preview floating alert' : 'Probar aviso flotante'}</button>
+          <button type="button" className="rounded-full border border-border px-3 py-2 text-xs font-semibold" onClick={() => setPreview(previous => !previous)}>{language === 'en' ? 'Preview notification cards' : 'Probar tarjetas de avisos'}</button>
+        </div>
+        {preview && <div className="mt-3 space-y-2" aria-label="Preview notifications">
+          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">📣 ECHO · {officialText.update}</span><p className="mt-1 text-sm font-semibold">{language === 'en' ? 'Preview: an official announcement was published' : 'Vista previa: se publicó un anuncio oficial'}</p><p className="text-xs text-muted-foreground">{language === 'en' ? 'Sample only · not delivered' : 'Solo ejemplo · no enviado'}</p></div>
+          <div className="rounded-xl border border-border p-3"><span className="text-xs text-primary">👥 Creator Hub</span><p className="mt-1 text-sm font-semibold">{language === 'en' ? 'A creator you follow published a new post' : 'Un creador que seguís publicó una novedad'}</p><p className="text-xs text-muted-foreground">{language === 'en' ? 'Sample only · not delivered' : 'Solo ejemplo · no enviado'}</p></div>
+        </div>}
+      </section>}
       {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
