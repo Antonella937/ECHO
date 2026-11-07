@@ -1,3 +1,4 @@
+import { useCreatorHubDmCopy } from '@/lib/creator-hub-notifications';
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from 'react';
 import { useUser } from '@clerk/react';
@@ -9,10 +10,11 @@ const categories = [
   ['likes', 'Me gusta'],
   ['comments', 'Comentarios y respuestas'],
   ['mentions', 'Menciones y etiquetas'],
+  ['creatorHub', 'Creator Hub'],
 ] as const;
 export type PushCategory = typeof categories[number][0];
 export type PushPreferences = { enabled: boolean; categories: Record<PushCategory, boolean> };
-const defaults: PushPreferences = { enabled: false, categories: { messages: true, likes: true, comments: true, mentions: true } };
+const defaults: PushPreferences = { enabled: false, categories: { messages: true, likes: true, comments: true, mentions: true, creatorHub: true } };
 export function readPushPreferences(ownerId: string): PushPreferences {
   try {
     const raw = localStorage.getItem('echo:push-preferences:' + ownerId);
@@ -23,6 +25,7 @@ export function readPushPreferences(ownerId: string): PushPreferences {
 }
 export function PushNotificationSettings() {
   const t = useAdvancedSettingsText();
+  const creatorCopy = useCreatorHubDmCopy();
   const { user } = useUser();
   const ownerId = user?.id ?? '';
   const [prefs, setPrefs] = useState(() => ownerId ? readPushPreferences(ownerId) : defaults);
@@ -57,7 +60,7 @@ export function PushNotificationSettings() {
         <input type="checkbox" checked={prefs.enabled} onChange={e => update({ ...prefs, enabled: e.target.checked })} className="h-5 w-5 accent-primary" />
       </label>
       {categories.map(([key, title]) => <label key={key} className="flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-sm">
-        <span>{t(title)}</span>
+        <span>{key === 'creatorHub' ? creatorCopy.setting : t(title)}</span>
         <input type="checkbox" disabled={!prefs.enabled} checked={prefs.categories[key]} onChange={e => update({ ...prefs, categories: { ...prefs.categories, [key]: e.target.checked } })} className="h-5 w-5 accent-primary" />
       </label>)}
       <button type="button" onClick={() => void request()} className="rounded-xl border border-border px-3 py-2 text-xs font-semibold">{t("Activar notificaciones en este dispositivo")}</button>
