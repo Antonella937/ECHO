@@ -335,14 +335,14 @@ export default function EchoMusicPage() {
     </header>
     <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-9 py-8">
       <div className="mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-[0_25px_80px_rgba(0,0,0,0.55)]">
-        {coverUrl ? <img src={coverUrl} alt={`Portada de ${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
+        {coverUrl ? <img src={coverUrl} alt={`${t("Portada de ")}${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
       </div>
       <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
       {audioUrl && actualDuration > 0 && <section className="rounded-xl border border-white/20 bg-white/10 p-4 space-y-3">
         <p className="text-sm font-semibold">{t("Elegir fragmento para compartir")}</p>
         <div className="flex gap-2">{([15, 30] as const).map(seconds => <button key={seconds} type="button" onClick={() => { setClipLength(seconds); setClipStart(start => Math.min(start, Math.max(0, actualDuration - seconds))); }} className={`rounded-full px-4 py-2 text-sm ${clipLength === seconds ? 'bg-white text-black' : 'border border-white/30'}`}>{seconds} s</button>)}</div>
         <input type="range" aria-label={t("Inicio del fragmento")} min={0} max={Math.max(0, actualDuration - Math.min(clipLength, actualDuration))} step={1} value={clipStart} onChange={event => { const next = Number(event.target.value); setClipStart(next); if (audioRef.current) audioRef.current.currentTime = next; setElapsed(next); }} className="w-full accent-white" />
-        <p className="text-xs text-white/70">Fragmento: {formatTime(clipStart)} – {formatTime(clipEnd)}. Los fragmentos de canciones publicadas se pueden adjuntar desde Crear publicación o historia.</p>
+        <p className="text-xs text-white/70">{t("Fragmento: ")}{formatTime(clipStart)} – {formatTime(clipEnd)}. {t("Los fragmentos de canciones publicadas se pueden adjuntar desde Crear publicación o historia.")}</p>
         <button type="button" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = clipStart; audioRef.current.dataset.clipPreview = 'true'; } setElapsed(clipStart); void audioRef.current?.play().catch(() => setPlaying(false)); }} className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold">{t("Escuchar fragmento")}</button>
       </section>}
       <div>
