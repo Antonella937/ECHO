@@ -64,7 +64,8 @@ export default function CreatePage() {
   const firstIsVideo = items[0]?.type === 'video';
   const tooManyForStory = mode === 'story' && items.length > 1;
   const storyVideo = mode === 'story' && items.some((m) => m.type === 'video');
-  const musicPartial = mode === 'story' && !!musicTitle.trim() !== !!musicArtist.trim();
+  const musicPartial = mode === 'story' && !selectedMusicTrack && !!musicTitle.trim() !== !!musicArtist.trim();
+  const musicClip = selectedMusicTrack ? { trackId: selectedMusicTrack.id, title: selectedMusicTrack.title, startSeconds: selectedMusicTrack.startSeconds, clipSeconds: selectedMusicTrack.clipSeconds } : undefined;
 
   const pick = (replace: number | null) => {
     if (busy) return;
@@ -209,14 +210,14 @@ export default function CreatePage() {
         }
         if (storyVideo) { setError(t('Las historias admiten solo fotos.')); return; }
         if (musicPartial) { setError(t("Completá título y artista de la música, o dejá ambos vacíos.")); return; }
-        actions.createStory({ image, caption, closeFriendsOnly, ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
+        actions.createStory({ image, caption, closeFriendsOnly, ...(musicClip ? { musicClip } : {}), ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: t('Historia publicada'), description: `${t('Como')} ${me.name}` });
         navigate('/');
         return;
       }
       validatePostMedia(items);
-      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), commentsEnabled });
+      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
       const cover = items.find((m) => m.type === 'image');
       if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
       toast({ title: t('Publicado'), description: `${t('Como')} ${me.name}` });
