@@ -527,7 +527,7 @@ export default function CreatorHubPage() {
               {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
               <div className="shrink-0"><HumanVoiceRecorder key={activeChat.ownerId} targetOwnerId={activeChat.ownerId} onSent={() => refreshHumanChat(activeChat.ownerId)} /></div>
               <div className="flex shrink-0 gap-2 pb-[env(safe-area-inset-bottom,0px)]"><input aria-label={ht("Escribí un mensaje…")} value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder={ht("Escribí un mensaje…")} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{ct("send")}</button></div>
-            </div>}
+            </div>
 
     </div>;
   }
