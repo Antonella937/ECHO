@@ -13,6 +13,14 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const universeId = scope?.universeId ?? 'primary';
   const language = useLanguage();
   const labels: readonly string[] = language === 'es' ? copy.es : copy.en;
+  const [access,setAccess]=useState<'loading'|'allowed'|'locked'>('loading');
+  useEffect(()=>{
+    let cancelled=false;
+    void customFetch<{features:{customVoices:boolean}}>('/api/account/entitlements',{responseType:'json'})
+      .then(data=>{if(!cancelled)setAccess(data.features.customVoices?'allowed':'locked');})
+      .catch(()=>{if(!cancelled)setAccess('locked');});
+    return()=>{cancelled=true;};
+  },[]);
   const [mode, setMode] = useState<'prompt' | 'reference'>('prompt');
   const [prompt, setPrompt] = useState('');
   const [voiceLanguage, setVoiceLanguage] = useState('en');
@@ -79,6 +87,8 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     if (!valid) { setFile(null); setError('WAV / MP3 / M4A · max 20 MB'); return; }
     setFile(next); setConsent(false);setUploadedPath(null);
   };
+  if(access==='loading')return <section className="mt-6 rounded-2xl border border-border p-4 text-xs text-muted-foreground">{language==='es'?'Comprobando acceso a Voice Studio…':'Checking Voice Studio access…'}</section>;
+  if(access==='locked')return <section className="mt-6 space-y-2 rounded-2xl border border-primary/30 bg-card/60 p-4" data-testid="premium-voice-studio-locked"><div className="flex items-center gap-2"><AudioLines className="h-5 w-5 text-primary"/><h3 className="text-sm font-semibold">Voice Studio · Premium</h3></div><p className="text-xs text-muted-foreground">{language==='es'?'La generación de voces mediante descripción y la clonación con audio de referencia son exclusivas de ECHO Premium.':'Voice creation from a description and reference-audio voice cloning are exclusive to ECHO Premium.'}</p></section>;
   return <section className="mt-6 space-y-4 rounded-2xl border border-primary/30 bg-card/60 p-4" data-testid="premium-voice-studio">
     <div className="flex items-center gap-2"><AudioLines className="h-5 w-5 text-primary"/><h3 className="text-sm font-semibold">{labels[0]}</h3></div>
     <p className="text-xs text-muted-foreground">{labels[1]}</p>
