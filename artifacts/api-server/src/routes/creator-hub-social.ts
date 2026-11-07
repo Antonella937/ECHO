@@ -371,6 +371,63 @@ export function createCreatorHubSocialRouter(): IRouter {
     finally { client.release(); }
   });
 
+  // Creator Hub notification preferences and cross-device read receipts are private to the signed-in account.
+  router.get("/creator-hub/social/dm-notifications", async (req, res) => {
+    const user = await clerkClient.users.getUser(req.userId!);
+    const enabled = user.privateMetadata?.echoCreatorHubNotifications !== false;
+    const raw = user.privateMetadata?.echoCreatorHubDmReadAt;
+    const readAt = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+    const result = await pool.query(
+      `WITH incoming AS (
+        SELECT sender_owner_id AS peer_id, created_at, id::text AS message_id, body AS preview, 'text' AS kind
+        FROM echo_creator_direct_messages WHERE recipient_owner_id=$1
+        UNION ALL
+        SELECT sender_owner_id AS peer_id, created_at, message_id::text AS message_id, '' AS preview, 'voice' AS kind
+        FROM echo_creator_voice_messages WHERE recipient_owner_id=$1
+      )
+      SELECT DISTINCT ON (i.peer_id) i.peer_id AS "ownerId", p.display_name AS "displayName",
+        p.username, i.created_at AS "createdAt", i.message_id AS "messageId",
+        i.preview, i.kind
+      FROM incoming i JOIN echo_creator_profiles p ON p.owner_id=i.peer_id
+      WHERE NOT EXISTS (SELECT 1 FROM echo_creator_blocks b WHERE
+        (b.blocker_owner_id=$1 AND b.blocked_owner_id=i.peer_id)
+        OR (b.blocker_owner_id=i.peer_id AND b.blocked_owner_id=$1))
+      ORDER BY i.peer_id, i.created_at DESC, i.message_id DESC LIMIT 100`,
+      [req.userId],
+    );
+    const items = result.rows.map(row => ({
+      ...row,
+      unread: new Date(row.createdAt).getTime() > new Date(typeof readAt[row.ownerId] === "string" ? readAt[row.ownerId] as string : "1970-01-01").getTime(),
+    }));
+    res.json({ enabled, items });
+  });
+  router.put("/creator-hub/social/dm-notifications/preferences", async (req, res) => {
+    const parsed = z.object({ enabled: z.boolean() }).strict().safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_PREFERENCES" }); return; }
+    await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoCreatorHubNotifications: parsed.data.enabled } });
+    res.json({ enabled: parsed.data.enabled });
+  });
+  router.put("/creator-hub/social/dm-notifications/read", async (req, res) => {
+    const parsed = z.object({ ownerId: z.string().min(1).max(255) }).strict().safeParse(req.body);
+    if (!parsed.success || parsed.data.ownerId === req.userId) { res.status(400).json({ error: "INVALID_PEER" }); return; }
+    const latest = await pool.query(
+      `SELECT MAX(created_at) AS latest FROM (
+        SELECT created_at FROM echo_creator_direct_messages WHERE recipient_owner_id=$1 AND sender_owner_id=$2
+        UNION ALL
+        SELECT created_at FROM echo_creator_voice_messages WHERE recipient_owner_id=$1 AND sender_owner_id=$2
+      ) messages`, [req.userId, parsed.data.ownerId],
+    );
+    const user = await clerkClient.users.getUser(req.userId!);
+    const previous = user.privateMetadata?.echoCreatorHubDmReadAt;
+    const receipts = previous && typeof previous === "object" && !Array.isArray(previous) ? previous as Record<string, string> : {};
+    const latestTime = latest.rows[0]?.latest;
+    if (latestTime) {
+      const next = { ...receipts, [parsed.data.ownerId]: new Date(latestTime).toISOString() };
+      await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoCreatorHubDmReadAt: Object.fromEntries(Object.entries(next).slice(-100)) } });
+    }
+    res.json({ ok: true });
+  });
+
   router.get("/creator-hub/social/messages/:targetOwnerId", async (req, res) => {
     const target = req.params.targetOwnerId;
     if (!target || target === req.userId || target.length > 255) {
