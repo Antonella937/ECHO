@@ -445,6 +445,28 @@ export default function CreatorHubPage() {
   }
   const [activeChat, setActiveChat] = useState<{ ownerId: string; name: string } | null>(null);
   const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderOwnerId: string; body: string; createdAt: string; kind?: "text" | "voice"; objectPath?: string; durationSeconds?: number; reactions?: Array<{ emoji: string; ownerId: string }> }>>([]);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatInitialScrollRef = useRef<string | null>(null);
+  const chatLastMessageRef = useRef<string | null>(null);
+  const chatFollowBottomRef = useRef(true);
+  useEffect(() => {
+    const ownerId = activeChat?.ownerId;
+    if (!ownerId || !chatMessages.length) return;
+    const element = chatScrollRef.current;
+    if (!element) return;
+    const lastId = chatMessages[chatMessages.length - 1].id;
+    if (chatInitialScrollRef.current !== ownerId) {
+      element.scrollTop = element.scrollHeight;
+      chatInitialScrollRef.current = ownerId;
+      chatLastMessageRef.current = lastId;
+      chatFollowBottomRef.current = true;
+      return;
+    }
+    if (lastId !== chatLastMessageRef.current) {
+      if (chatFollowBottomRef.current) element.scrollTop = element.scrollHeight;
+      chatLastMessageRef.current = lastId;
+    }
+  }, [activeChat?.ownerId, chatMessages]);
   const [chatDraft, setChatDraft] = useState('');
   const [otherTyping, setOtherTyping] = useState(false);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -494,7 +516,13 @@ export default function CreatorHubPage() {
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
   async function openHumanChat(ownerId: string, name: string) {
-    setActiveChat({ ownerId, name }); setChatMessages([]); setChatError('');
+    if (activeChat?.ownerId !== ownerId) {
+      chatInitialScrollRef.current = null;
+      chatLastMessageRef.current = null;
+      chatFollowBottomRef.current = true;
+      setChatMessages([]);
+    }
+    setActiveChat({ ownerId, name }); setChatError('');
     if (user?.id) void markCreatorHubDmRead(user.id, ownerId).catch(() => {});
     try {
       const result = await customFetch<{ messages: typeof chatMessages }>('/api/creator-hub/social/messages/' + encodeURIComponent(ownerId), { responseType: 'json' });
@@ -562,7 +590,7 @@ export default function CreatorHubPage() {
       </header>
             <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-4 sm:px-6">
               <div className="flex items-center justify-between"><h3 className="font-semibold">{ht("Chat con")} {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">{ct("refresh")}</button></div>
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-secondary/30 p-4" data-testid="creator-hub-chat-messages">
+              <div ref={chatScrollRef} onScroll={event => { const el = event.currentTarget; chatFollowBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; }} className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-secondary/30 p-4" data-testid="creator-hub-chat-messages">
                 {chatError ? <p role="alert" className="text-xs text-destructive">{chatError}</p> : chatMessages.length === 0 && <p className="text-xs text-muted-foreground">{ct("noMessages")}</p>}
                 {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.kind === "voice" && message.objectPath ? <HumanVoicePlayback objectPath={message.objectPath} durationSeconds={message.durationSeconds ?? 0} /> : message.body}</div>
