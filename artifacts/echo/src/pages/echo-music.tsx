@@ -130,7 +130,7 @@ export default function EchoMusicPage() {
   function importAudio(file: File | undefined) {
     if (!file) return;
     if (!['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/webm'].includes(file.type) || file.size > 30 * 1024 * 1024) {
-      setLocalAudioError('Elegí un archivo de audio compatible de hasta 30 MB.');
+      setLocalAudioError(t("Elegí un archivo de audio compatible de hasta 30 MB."));
       return;
     }
     audioRef.current?.pause();
@@ -185,7 +185,7 @@ export default function EchoMusicPage() {
       setLibrary(current => current.map(track => track.id === item.id ? { ...track, publishedAt: publish ? new Date().toISOString() : null } : track));
       const result = await customFetch<{ items: typeof publishedTracks }>('/api/music/published', { responseType: 'json' });
       setPublishedTracks(result.items);
-    } catch { setLibraryError('No se pudo actualizar la publicación de esta canción.'); }
+    } catch { setLibraryError(t("No se pudo actualizar la publicación de esta canción.")); }
     finally { setPublishingId(null); }
   }
   async function playSharedTrack(item: { id: string; title: string; durationSeconds: number }) {
@@ -200,7 +200,7 @@ export default function EchoMusicPage() {
       setLocalAudioUrl(url); setSavedAudioPath(null); setSelectedAudioFile(null);
       setTitle(item.title); setPreview(''); setElapsed(0); setActualDuration(0); setClipStart(0);
       setPlayerOpen(true);
-    } catch { setLibraryError('No se pudo cargar el audio compartido.'); }
+    } catch { setLibraryError(t("No se pudo cargar el audio compartido.")); }
     finally { setLoadingSharedId(null); }
   }
   useEffect(() => {
@@ -220,7 +220,7 @@ export default function EchoMusicPage() {
       setCloudLibraryAvailable(true);
     } catch {
       setCloudLibraryAvailable(false);
-      setLibraryError('Guardado en este dispositivo. La sincronización en la nube está pendiente.');
+      setLibraryError(t("Guardado en este dispositivo. La sincronización en la nube está pendiente."));
     }
   }
   function saveDraft(record: MusicDraftRecord) {
@@ -230,7 +230,7 @@ export default function EchoMusicPage() {
       setLibrary(next);
       setLibraryError('');
       void syncDraft(record);
-    } catch { setLibraryError('No se pudo guardar el borrador en este dispositivo.'); }
+    } catch { setLibraryError(t("No se pudo guardar el borrador en este dispositivo.")); }
   }
   async function saveCurrentAudio() {
     if (!selectedAudioFile || savingAudio) return;
@@ -248,7 +248,7 @@ export default function EchoMusicPage() {
       saveDraft(record);
       setSavedAudioPath(attachment.url);
     } catch (error) {
-      setLocalAudioError(error instanceof Error ? error.message : 'No se pudo guardar el audio.');
+      setLocalAudioError(error instanceof Error ? error.message : t("No se pudo guardar el audio."));
     } finally { setSavingAudio(false); }
   }
   function deleteDraft(id: string) {
@@ -256,8 +256,8 @@ export default function EchoMusicPage() {
       const next = library.filter(item => item.id !== id);
       localStorage.setItem(libraryKey(me.id), JSON.stringify(next));
       setLibrary(next);
-      void customFetch('/api/music/library/' + encodeURIComponent(id), { method: 'DELETE', responseType: 'json' }).catch(() => setLibraryError('Eliminado de este dispositivo, pero no se pudo sincronizar la eliminación.'));
-    } catch { setLibraryError('No se pudo eliminar el borrador.'); }
+      void customFetch('/api/music/library/' + encodeURIComponent(id), { method: 'DELETE', responseType: 'json' }).catch(() => setLibraryError(t("Eliminado de este dispositivo, pero no se pudo sincronizar la eliminación.")));
+    } catch { setLibraryError(t("No se pudo eliminar el borrador.")); }
   }
   const audioUrl = resolvedSavedAudio || localAudioUrl;
   const filteredLibrary = library.filter(item => item.status === libraryFilter).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
@@ -308,14 +308,14 @@ export default function EchoMusicPage() {
         }),
         responseType: 'json',
       });
-      if (result.charged || result.status !== 'dry_run') throw new Error('La preparación devolvió un estado inesperado.');
+      if (result.charged || result.status !== 'dry_run') throw new Error(t("La preparación devolvió un estado inesperado."));
       setPreview(result.request.prompt);
       saveDraft({ id: crypto.randomUUID(), title: title.trim(), prompt: result.request.prompt, characterId: me.id, createdAt: new Date().toISOString(), durationSeconds, status: 'draft' });
       setElapsed(0);
       setPlaying(false);
       setPlayerOpen(true);
     } catch (err) {
-      setPrepareError(err instanceof Error ? err.message : 'No se pudo preparar la canción.');
+      setPrepareError(err instanceof Error ? err.message : t("No se pudo preparar la canción."));
     } finally {
       setPreparing(false);
     }
@@ -327,7 +327,7 @@ export default function EchoMusicPage() {
     </div>
     <header className="relative z-10 flex items-center justify-between">
       <button type="button" onClick={() => { audioRef.current?.pause(); setPlaying(false); setPlayerOpen(false); }} aria-label={t("Volver al estudio")} className="grid h-11 w-11 place-items-center"><ChevronDown className="h-7 w-7" /></button>
-      <span className="text-center text-sm font-semibold">ECHO Music · {audioUrl ? 'Reproduciendo' : 'Preparada'}</span>
+      <span className="text-center text-sm font-semibold">ECHO Music · {audioUrl ? t("Reproduciendo") : t("Preparada")}</span>
       <span className="w-11" />
     </header>
     <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-9 py-8">
@@ -345,9 +345,9 @@ export default function EchoMusicPage() {
       <div>
         <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label={t("Progreso de la canción")} className="w-full accent-white disabled:opacity-40" />
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
-        <div className="mt-5 flex justify-center"><button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? 'Pausar' : 'Reproducir'} className="grid h-20 w-20 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-9 w-9 fill-current" /> : <Play className="ml-1 h-9 w-9 fill-current" />}</button></div>
+        <div className="mt-5 flex justify-center"><button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? t("Pausar") : t("Reproducir")} className="grid h-20 w-20 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-9 w-9 fill-current" /> : <Play className="ml-1 h-9 w-9 fill-current" />}</button></div>
       </div>
-      {selectedAudioFile && !savedAudioPath && <button type="button" disabled={savingAudio} onClick={() => void saveCurrentAudio()} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{savingAudio ? 'Guardando en almacenamiento privado…' : 'Guardar este audio en ECHO'}</button>}
+      {selectedAudioFile && !savedAudioPath && <button type="button" disabled={savingAudio} onClick={() => void saveCurrentAudio()} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{savingAudio ? t("Guardando en almacenamiento privado…") : t("Guardar este audio en ECHO")}</button>}
       {savedAudioPath && <p className="text-center text-xs text-white/70">{t("Audio guardado en almacenamiento privado. Aparece en tu biblioteca de este dispositivo.")}</p>}
       <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 p-3 text-sm font-semibold"><Upload className="h-4 w-4" /> Probar con un audio propio<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm" className="sr-only" onChange={event => { importAudio(event.target.files?.[0]); event.target.value = ''; }} /></label>
       {localAudioError && <p role="alert" className="text-sm text-red-200">{localAudioError}</p>}
@@ -365,22 +365,22 @@ export default function EchoMusicPage() {
     {studioTab === 'library' ? <section className="space-y-5">
       <div className="rounded-2xl border border-border bg-card/60 p-5">
         <div className="flex items-center gap-3"><Disc3 className="h-7 w-7 text-primary" /><div><h1 className="text-xl font-bold">{t("Mi biblioteca")}</h1><p className="text-xs text-muted-foreground">{library.filter(item => item.status === 'saved_audio').length} canciones guardadas · {library.filter(item => item.status === 'draft').length} borradores</p></div></div>
-        <p className="mt-3 text-xs text-muted-foreground">{cloudLibraryAvailable ? 'Biblioteca conectada a tu cuenta de ECHO.' : 'Sincronización pendiente: también se muestran los registros locales.'}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{cloudLibraryAvailable ? t("Biblioteca conectada a tu cuenta de ECHO.") : t("Sincronización pendiente: también se muestran los registros locales.")}</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={() => setLibraryFilter('saved_audio')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'saved_audio' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Canciones guardadas")}</button>
         <button type="button" onClick={() => setLibraryFilter('draft')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'draft' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Borradores")}</button>
       </div>
       {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
-      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? 'Todavía no guardaste canciones' : 'Todavía no tenés borradores'}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? 'Probá con un audio propio y guardalo en ECHO.' : 'Prepará una canción con un prompt para verla acá.'}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-3">
+      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-3">
         <button type="button" onClick={() => openLibraryItem(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
-          <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio guardado' : 'Prompt preparado'} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? 'Escuchar canción' : 'Ver borrador'}</p></div>
+          <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? t("Escuchar canción") : t("Ver borrador")}</p></div>
         </button>
-        {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? 'Dejar privado' : 'Compartir'}</button>}
+        {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir")}</button>}
         <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>
       </article>)}</div>}
-      <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-base font-semibold">{t("Canciones compartidas en ECHO")}</h2><p className="text-xs text-muted-foreground">{t("Solo se escuchan las canciones que sus propietarios publicaron expresamente.")}</p>{publishedTracks.length === 0 ? <p className="text-sm text-muted-foreground">{t("Todavía no hay canciones compartidas.")}</p> : publishedTracks.map(item => <button key={item.id} type="button" disabled={!!loadingSharedId} onClick={() => void playSharedTrack(item)} className="flex w-full items-center gap-3 rounded-xl bg-secondary p-3 text-left"><Play className="h-5 w-5 text-primary"/><span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span><span className="text-xs text-muted-foreground">{loadingSharedId === item.id ? 'Cargando…' : formatTime(item.durationSeconds)}</span></button>)}</section>
+      <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-base font-semibold">{t("Canciones compartidas en ECHO")}</h2><p className="text-xs text-muted-foreground">{t("Solo se escuchan las canciones que sus propietarios publicaron expresamente.")}</p>{publishedTracks.length === 0 ? <p className="text-sm text-muted-foreground">{t("Todavía no hay canciones compartidas.")}</p> : publishedTracks.map(item => <button key={item.id} type="button" disabled={!!loadingSharedId} onClick={() => void playSharedTrack(item)} className="flex w-full items-center gap-3 rounded-xl bg-secondary p-3 text-left"><Play className="h-5 w-5 text-primary"/><span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span><span className="text-xs text-muted-foreground">{loadingSharedId === item.id ? t("Cargando…") : formatTime(item.durationSeconds)}</span></button>)}</section>
       <p className="text-xs text-muted-foreground">{t("Eliminar un registro no borra todavía el archivo privado del almacenamiento.")}</p>
     </section> : <>
     <div className="rounded-2xl border border-border bg-card/60 p-5">
@@ -402,9 +402,9 @@ export default function EchoMusicPage() {
     {localAudioError && <p role="alert" className="text-sm text-destructive">{localAudioError}</p>}
     {prepareError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{prepareError}</p>}
     {preview && <section className="rounded-2xl border border-border bg-card/60 p-4" aria-live="polite"><h2 className="text-sm font-semibold">Solicitud preparada · {title} · {durationSeconds}s</h2><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{preview}</pre><p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/> Generación no activada. Sin cargos.</p></section>}
-    <section className="hidden rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">{t("Mi biblioteca · borradores")}</h2><p className="mt-1 text-xs text-muted-foreground">Los audios se guardan en almacenamiento privado. {cloudLibraryAvailable ? 'Biblioteca conectada a tu cuenta.' : 'Biblioteca local; sincronización en la nube pendiente.'}</p>
+    <section className="hidden rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">{t("Mi biblioteca · borradores")}</h2><p className="mt-1 text-xs text-muted-foreground">Los audios se guardan en almacenamiento privado. {cloudLibraryAvailable ? t("Biblioteca conectada a tu cuenta.") : t("Biblioteca local; sincronización en la nube pendiente.")}</p>
       {libraryError && <p role="alert" className="mt-2 text-xs text-destructive">{libraryError}</p>}
-      {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">{t("Todavía no preparaste canciones.")}</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null); setElapsed(0); setActualDuration(0); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio privado guardado' : 'Borrador'} · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">{t("Eliminar")}</button></div>)}</div>}
+      {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">{t("Todavía no preparaste canciones.")}</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null); setElapsed(0); setActualDuration(0); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio privado guardado") : t("Borrador")} · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">{t("Eliminar")}</button></div>)}</div>}
     </section>
     <div className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">{t("Música para historias y publicaciones")}</h2><p className="mt-2 text-xs text-muted-foreground">{t("Feed.fm Clips: integración preparada, sin activar ni contratar. La reproducción de fragmentos de 15 o 30 segundos se habilitará únicamente después de confirmar el contrato, los derechos para Argentina y el acceso oficial al catálogo. YouTube: búsqueda disponible, sin derechos de reproducción de audio sobre fotos.")}</p></div>
     </>}
