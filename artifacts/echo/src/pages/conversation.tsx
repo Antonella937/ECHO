@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Link, useLocation, useParams } from 'wouter';
 import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
+import { useStoryViewer } from '@/components/echo/story-viewer';
+import { canViewStory, isStoryActive } from '@/domain/social-features';
 import { useThreadMessages } from '@/hooks/use-social-selectors';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { EmptyState } from '@/components/echo/skeletons';
@@ -513,6 +515,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   };
   useEffect(() => () => clearPress(), []);
   const resolveMedia = useMediaResolver();
+  const { openStoryList } = useStoryViewer();
   const story = m.storyId ? state.stories.find((s) => s.id === m.storyId) : undefined;
   const post = m.postId ? state.posts.find((p) => p.id === m.postId) : undefined;
   const reactions = m.reactions ?? [];
@@ -525,9 +528,9 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
           <span className="text-[11px] text-muted-foreground">{story?.reactions?.some(r => r.actorId === m.senderId && r.value === m.text) || REACTIONS.includes(m.text)
             ? (mine ? t('Reaccionaste a su historia') : t('Reaccionó a tu historia'))
-            : (mine ? t('Respondiste a su historia') : t('Respondió a tu historia'))}</span>
-          {story ? (
-            <img src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })} alt="Historia" className="h-36 w-24 rounded-xl object-cover opacity-90" />
+            : !m.text ? t('Historia compartida') : (mine ? t('Respondiste a su historia') : t('Respondió a tu historia'))}</span>
+          {story && canViewStory(story, meId, state) && isStoryActive(story) ? (
+            <button type="button" onClick={() => openStoryList(story.authorId, [story.id])} aria-label={t("Historia")}><img src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })} alt="Historia" className="h-36 w-24 rounded-xl object-cover opacity-90" /></button>
           ) : (
             <span className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">{t("Historia no disponible")}</span>
           )}
