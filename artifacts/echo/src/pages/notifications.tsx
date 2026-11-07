@@ -23,6 +23,7 @@ const VERB: Record<Notification['kind'], string> = {
   mention: 'te ha mencionado',
   message: 'te ha escrito',
   story_reply: 'ha respondido a tu historia',
+  story_like: 'le ha gustado tu historia',
   follow: 'ahora te sigue',
 };
 
@@ -44,7 +45,7 @@ export default function NotificationsPage() {
     if (n.kind === 'message' || n.kind === 'story_reply') navigate(`/messages/${n.actorId}`);
     else if (n.postId) navigate(`/p/${n.postId}${n.commentId ? `?c=${n.commentId}` : ''}`);
     else if (n.storyId && state.stories.some(s => s.id === n.storyId))
-      openStoryList(n.actorId, [n.storyId]);
+      openStoryList(state.stories.find(s => s.id === n.storyId)!.authorId, [n.storyId]);
     else navigate(`/profile/${n.actorId}`);
   };
 
