@@ -128,7 +128,10 @@ export function createUniverseSharingRouter(
     const privateRows = await db.execute(sql`SELECT character_id FROM echo_character_privacy
       WHERE owner_id=${row.owner_id} AND universe_id=${row.universe_id} AND visibility='private'`);
     const hidden = new Set(privateRows.rows.map(x => String(x.character_id)));
-    const visible = characters.filter(ch => !ch.archived && !hidden.has(String(ch.id)) && (row.kind === "universe" || ch.id === row.character_id))
+    const importedRows = await db.execute(sql`SELECT recipient_character_id FROM echo_import_provenance
+      WHERE recipient_owner_id=${row.owner_id} AND recipient_universe_id=${row.universe_id}`);
+    const inherited = new Set(importedRows.rows.map(x => String(x.recipient_character_id)));
+    const visible = characters.filter(ch => !ch.archived && !hidden.has(String(ch.id)) && !inherited.has(String(ch.id)) && !inherited.has("") && (row.kind === "universe" || ch.id === row.character_id))
       .map(ch => ({ id: ch.id, name: ch.name, handle: ch.handle, bio: ch.bio, occupation: ch.occupation }));
     if (!visible.length) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
     const setup = state.creatorSetup as Record<string, unknown> | undefined;
@@ -149,9 +152,16 @@ export function createUniverseSharingRouter(
       AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
     const source = rows.rows[0] as { owner_id:string; universe_id:string; kind:string; character_id:string|null; state:Record<string,unknown> } | undefined;
     if (!source || source.owner_id === req.userId) { res.status(403).json({ error: "IMPORT_NOT_ALLOWED" }); return; }
+    const privacyRows = await db.execute(sql`SELECT character_id FROM echo_character_privacy
+      WHERE owner_id=${source.owner_id} AND universe_id=${source.universe_id} AND visibility='private'`);
+    const hidden = new Set(privacyRows.rows.map(x => String(x.character_id)));
+    const originRows = await db.execute(sql`SELECT recipient_character_id FROM echo_import_provenance
+      WHERE recipient_owner_id=${source.owner_id} AND recipient_universe_id=${source.universe_id}`);
+    const inherited = new Set(originRows.rows.map(x => String(x.recipient_character_id)));
+    if (inherited.has('')) {res.status(403).json({error:"ORIGINAL_CREATOR_ONLY"});return;}
     const state = source.state;
     const originals = Array.isArray(state.characters) ? state.characters as Array<Record<string,unknown>> : [];
-    const chosen = originals.filter(ch => !ch.archived && ch.id !== "nela" &&
+    const chosen = originals.filter(ch => !ch.archived && !hidden.has(String(ch.id)) && !inherited.has(String(ch.id)) && ch.id !== "nela" &&
       (source.kind === "universe" || ch.id === source.character_id));
     if (!chosen.length) { res.status(422).json({ error: "NO_IMPORTABLE_CHARACTERS" }); return; }
     // Reuse the recipient's own identity as the primary account; never copy the sender's owner identity.
