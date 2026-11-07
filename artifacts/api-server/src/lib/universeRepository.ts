@@ -44,7 +44,7 @@ export async function readUniverse(ownerId: string, universeId = "primary") {
 }
 
 /** Atomic compare-and-swap plus owner-wide capacity checks under an entitlement row lock. */
-export async function writeUniverse(ownerId: string, state: Record<string, unknown>, expectedRevision: number, universeId = "primary") {
+export async function writeUniverse(ownerId: string, state: Record<string, unknown>, expectedRevision: number, universeId = "primary", afterSave?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<void>) {
   const membershipPlan = await resolveEchoPlan(ownerId);
   return db.transaction(async (tx) => {
     const initialRows = await tx.select().from(echoUniversesTable)
@@ -118,12 +118,13 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
         }
       }
       await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
+      if (afterSave) await afterSave(tx);
     }
     return saved;
   });
 }
 
-export async function createAdditionalUniverse(ownerId: string, name: string, state: Record<string, unknown>) {
+export async function createAdditionalUniverse(ownerId: string, name: string, state: Record<string, unknown>, afterCreate?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], universeId: string) => Promise<void>) {
   const membershipPlan = await resolveEchoPlan(ownerId);
   return db.transaction(async (tx) => {
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
@@ -153,6 +154,7 @@ export async function createAdditionalUniverse(ownerId: string, name: string, st
     }).onConflictDoNothing().returning({ state: echoUniversesTable.state, revision: echoUniversesTable.revision });
     if (!saved[0]) throw new Error("UNIVERSE_CREATE_CONFLICT");
     await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
+    if (afterCreate) await afterCreate(tx, universeId);
     await tx.update(echoCreatorEntitlementsTable)
       .set({ updatedAt: new Date() }).where(eq(echoCreatorEntitlementsTable.ownerId, ownerId));
     return { universeId, ...saved[0] };
