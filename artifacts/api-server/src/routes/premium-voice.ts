@@ -148,7 +148,9 @@ router.delete("/voices/premium/references/:id",async(req,res)=>{
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
 
-router.post("/voices/premium/generate",requireAuth,(_req,res)=>{
+router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
+ try{if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}}
+ catch{res.status(503).json({error:"ENTITLEMENTS_UNAVAILABLE",charged:false});return;}
  res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_NOT_CONFIGURED",charged:false});
 });
 router.post("/voices/premium/select",requireAuth,async(req,res)=>{
