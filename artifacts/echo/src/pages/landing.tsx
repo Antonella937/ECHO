@@ -39,7 +39,7 @@ function PublicFooter({ previewMode = false, signature }: { previewMode?: boolea
   return (
     <footer className="ep-footer echo-signature-host">
       <div className="ep-footer-inner">
-        <span>© ECHO · Un espacio privado para tus personajes</span>
+        <span>© ECHO · {t("Un espacio privado para tus personajes")}</span>
         <div className="ep-footer-links">
           <Link href={publicPreviewHref('/pricing', previewMode)}>{t("Planes")}</Link>
           <Link href={publicPreviewHref('/faq', previewMode)}>{t("Preguntas frecuentes")}</Link>
@@ -66,7 +66,7 @@ export default function LandingPage({ previewMode = false }: { previewMode?: boo
               <Link href={publicPreviewHref('/sign-up', previewMode)} className="ep-button" data-testid="link-create-account">{t("Crear mi espacio")}<ArrowRight size={16} /></Link>
               <Link href={publicPreviewHref('/pricing', previewMode)} className="ep-text-link" data-testid="link-explore-plans">{t("Conocer los planes")}<ArrowRight size={15} /></Link>
             </div>
-            <div className="ep-private-note"><LockKeyhole size={14} /> Un universo privado asociado a tu cuenta</div>
+            <div className="ep-private-note"><LockKeyhole size={14} /> {t("Un universo privado asociado a tu cuenta")}</div>
           </div>
           <div className="ep-hero-art" aria-label="Ilustración abstracta de un universo personal" role="img">
             <div className="ep-orbit ep-orbit-one" /><div className="ep-orbit ep-orbit-two" /><div className="ep-orbit ep-orbit-three" />
@@ -102,7 +102,7 @@ export default function LandingPage({ previewMode = false }: { previewMode?: boo
           </div>
           <div className="ep-beta-strip">
             <div><h3>{t("Empieza con espacio para crecer")}</h3><p>{t("Free incluye un universo y hasta cinco personajes. Creator ofrece más capacidad para que tu mundo siga creciendo.")}</p></div>
-            <Link href={publicPreviewHref('/pricing', previewMode)} className="ep-text-link" data-testid="link-see-plan-details">Ver qué incluye cada plan <ArrowRight size={15} /></Link>
+            <Link href={publicPreviewHref('/pricing', previewMode)} className="ep-text-link" data-testid="link-see-plan-details">{t("Ver qué incluye cada plan")} <ArrowRight size={15} /></Link>
           </div>
         </section>
 
