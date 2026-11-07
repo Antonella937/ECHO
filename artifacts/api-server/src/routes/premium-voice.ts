@@ -5,7 +5,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { SaveUniverseBody } from "@workspace/api-zod";
 import { resolveEchoPlan } from "../lib/entitlements";
-import { elevenLabsVoiceStatus } from "../lib/elevenLabsVoice";
+import { elevenLabsVoiceStatus, elevenLabsHeaders } from "../lib/elevenLabsVoice";
 
 const router: IRouter = Router();
 router.use("/voices/premium", requireAuth, (_req,res,next) => {res.setHeader("Cache-Control","private, no-store");next();});
@@ -150,9 +150,79 @@ router.delete("/voices/premium/references/:id",async(req,res)=>{
 });
 
 router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
- try{if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}}
- catch{res.status(503).json({error:"ENTITLEMENTS_UNAVAILABLE",charged:false});return;}
- res.status(503).json({error:elevenLabsVoiceStatus().reason ?? "VOICE_GENERATION_NOT_YET_ENABLED",charged:false});
+ const parsed=key.safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT",charged:false});return;}
+ const availability=elevenLabsVoiceStatus();
+ if(!availability.generationAvailable){res.status(503).json({error:availability.reason,charged:false});return;}
+ try {
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}
+  const {universeId,characterId}=parsed.data;
+  if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND",charged:false});return;}
+  const projectResult=await pool.query("SELECT * FROM echo_voice_projects WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3",[req.userId,universeId,characterId]);
+  const project=projectResult.rows[0];
+  if(!project || project.mode!=="prompt" || project.prompt.trim().length<20 || project.prompt.length>1000){
+   res.status(400).json({error:"VOICE_PROMPT_MUST_BE_20_TO_1000_CHARACTERS",charged:false});return;
+  }
+  // Limit costly previews to one batch per project per month. No automatic retries.
+  const month=new Date().toISOString().slice(0,7);
+  const client=await pool.connect();
+  let reserved=false;
+  try {
+   await client.query("BEGIN");
+   await client.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))",[req.userId,project.id]);
+   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND created_at>=($2 || '-01')::date",[project.id,month]);
+   if(Number(previous.rows[0].count)>0){await client.query("ROLLBACK");res.status(429).json({error:"VOICE_DESIGN_MONTHLY_PREVIEW_LIMIT",charged:false});return;}
+   await client.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,status) VALUES($1,$2,'elevenlabs','pending')",[project.id,req.userId]);
+   await client.query("COMMIT");reserved=true;
+  }catch(e){await client.query("ROLLBACK");throw e;}finally{client.release();}
+  if(!reserved)return;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),45000);
+  let response:Response;
+  try{
+   response=await fetch("https://api.elevenlabs.io/v1/text-to-voice/design",{
+    method:"POST",headers:elevenLabsHeaders(),signal:controller.signal,
+    body:JSON.stringify({model_id:"eleven_multilingual_ttv_v2",voice_description:project.prompt,auto_generate_text:true})
+   });
+  }finally{clearTimeout(timer);}
+  if(!response.ok){res.status(502).json({error:"ELEVENLABS_VOICE_DESIGN_FAILED",providerStatus:response.status,charged:"unknown"});return;}
+  const data=await response.json() as {previews?:{audio_base_64:string;generated_voice_id:string;media_type?:string}[]};
+  const previews=(data.previews??[]).slice(0,project.variant_count);
+  const base=process.env.SUPABASE_URL?.replace(/\/$/,"");
+  const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!secret)throw Error("VOICE_STORAGE_NOT_CONFIGURED");
+  const stored:{id:string}[]=[];
+  for(const preview of previews){
+   if(!preview.generated_voice_id || !preview.audio_base_64)continue;
+   const audio=Buffer.from(preview.audio_base_64,"base64");
+   if(audio.length<100||audio.length>5*1024*1024)continue;
+   const {randomUUID}=await import("node:crypto");
+   const path=`voice-studio/previews/${project.id}/${randomUUID()}.mp3`;
+   const upload=await fetch(`${base}/storage/v1/object/echo-media/${path}`,{
+    method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"audio/mpeg","x-upsert":"false"},body:audio
+   });
+   if(!upload.ok)continue;
+   const inserted=await pool.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,provider_sample_id,audio_object_path,status) VALUES($1,$2,'elevenlabs',$3,$4,'ready') RETURNING id",[project.id,req.userId,preview.generated_voice_id,path]);
+   stored.push({id:inserted.rows[0].id});
+  }
+  if(!stored.length){res.status(502).json({error:"VOICE_PREVIEWS_COULD_NOT_BE_STORED",charged:"unknown"});return;}
+  await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
+  res.json({projectId:project.id,samples:stored,generated:stored.length});
+ }catch{res.status(503).json({error:"VOICE_GENERATION_UNAVAILABLE",charged:"unknown"});}
+});
+router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
+ if(!z.string().uuid().safeParse(req.params.id).success){res.status(400).json({error:"INVALID_SAMPLE"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  const result=await pool.query("SELECT audio_object_path FROM echo_voice_samples WHERE id=$1 AND owner_id=$2 AND status='ready'",[req.params.id,req.userId]);
+  if(!result.rowCount){res.status(404).json({error:"SAMPLE_NOT_FOUND"});return;}
+  const base=process.env.SUPABASE_URL?.replace(/\/$/,""),secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!secret)throw Error("STORAGE_NOT_CONFIGURED");
+  const response=await fetch(`${base}/storage/v1/object/sign/echo-media/${result.rows[0].audio_object_path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:120})});
+  if(!response.ok)throw Error("SIGNED_URL_FAILED");
+  const data=await response.json() as {signedURL?:string};
+  res.json({url:new URL(data.signedURL!,base).toString()});
+ }catch{res.status(503).json({error:"VOICE_SAMPLE_PLAYBACK_UNAVAILABLE"});}
 });
 router.post("/voices/premium/select",requireAuth,async(req,res)=>{
  const parsed=z.object({projectId:z.string().uuid(),sampleId:z.string().uuid()}).strict().safeParse(req.body);
