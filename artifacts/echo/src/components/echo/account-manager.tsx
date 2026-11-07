@@ -55,8 +55,8 @@ export function AccountManager() {
                   if (active || c.archived) return;
                   actions.switchIdentity(c.id);
                   toast({ title: `${translate('Ahora publicas como ')}${c.name}` });
-                  // Open the selected identity's own configuration immediately.
-                  navigate(`/characters/${c.id}/edit`);
+                  // Switching identity opens that character's profile; editing remains a separate action.
+                  navigate(`/profile/${c.id}`, { replace: true });
                 }}
                 className="flex min-w-0 flex-1 items-center gap-3 p-1 text-left"
                 data-testid={`radio-identity-${c.id}`}
