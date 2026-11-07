@@ -520,7 +520,7 @@ export default function CreatorHubPage() {
                   </div>
                   {reactingMessage === message.id && <div className="flex flex-wrap gap-1 rounded-xl bg-background p-1">
                     {['❤️','😂','🥹','😍','👍','🔥','😮','😢'].map(emoji => <button type="button" key={emoji} onClick={() => { setReactingMessage(null); void toggleReaction(message.id, emoji, Boolean(message.reactions?.some(r => r.emoji === emoji && r.ownerId === user?.id))); }} className="rounded-lg p-1 hover:bg-secondary" aria-label={`Reaccionar con ${emoji}`}>{emoji}</button>)}
-                  </div>
+                  </div>}
                 </div>)}
                 {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} {ht("está escribiendo")}</span><span className="animate-pulse">● ● ●</span></div>}
               </div>
