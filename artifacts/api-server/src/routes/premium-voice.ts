@@ -104,6 +104,50 @@ router.post("/voices/premium/reference/verify",async(req,res)=>{
   res.json({verified:true,objectPath:parsed.data.objectPath});
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
+
+router.get("/voices/premium/references",async(req,res)=>{
+ const parsed=key.safeParse(req.query);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!await checkCharacter(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const result=await pool.query("SELECT id,content_type AS \"contentType\",expected_size AS \"size\",created_at AS \"createdAt\" FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND status='ready' ORDER BY created_at DESC LIMIT 20",[req.userId,parsed.data.universeId,parsed.data.characterId]);
+  res.json({references:result.rows});
+ }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
+});
+router.get("/voices/premium/references/:id/play",async(req,res)=>{
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  const owned=await pool.query("SELECT object_path FROM echo_voice_references WHERE id=$1 AND owner_id=$2 AND status='ready'",[req.params.id,req.userId]);
+  if(!owned.rowCount){res.status(404).json({error:"VOICE_REFERENCE_NOT_FOUND"});return;}
+  const base=process.env.SUPABASE_URL?.replace(new RegExp("/$"),"");
+  const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
+  const signed=await fetch(`${base}/storage/v1/object/sign/echo-media/${owned.rows[0].object_path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:60}),signal:AbortSignal.timeout(10000)});
+  if(!signed.ok){res.status(502).json({error:"VOICE_PLAYBACK_UNAVAILABLE"});return;}
+  const data=await signed.json() as {signedURL?:string};
+  const raw=data.signedURL;
+  if(!raw){res.status(502).json({error:"VOICE_PLAYBACK_UNAVAILABLE"});return;}
+  const url=new URL(raw.startsWith("http")?raw:raw.startsWith("/storage/v1/")?`${base}${raw}`:`${base}/storage/v1/${raw.replace(/^[/]/,"")}`);
+  if(url.origin!==new URL(base).origin||!url.pathname.startsWith("/storage/v1/object/sign/echo-media/")){res.status(502).json({error:"VOICE_PLAYBACK_UNAVAILABLE"});return;}
+  res.json({url:url.toString(),expiresIn:60});
+ }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
+});
+router.delete("/voices/premium/references/:id",async(req,res)=>{
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  const owned=await pool.query("SELECT object_path FROM echo_voice_references WHERE id=$1 AND owner_id=$2",[req.params.id,req.userId]);
+  if(!owned.rowCount){res.status(404).json({error:"VOICE_REFERENCE_NOT_FOUND"});return;}
+  const base=process.env.SUPABASE_URL?.replace(new RegExp("/$"),"");
+  const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
+  const removed=await fetch(`${base}/storage/v1/object/echo-media/${owned.rows[0].object_path}`,{method:"DELETE",headers:{Authorization:`Bearer ${secret}`,apikey:secret},signal:AbortSignal.timeout(10000)});
+  if(!removed.ok&&removed.status!==404){res.status(502).json({error:"VOICE_DELETE_FAILED"});return;}
+  await pool.query("DELETE FROM echo_voice_references WHERE id=$1 AND owner_id=$2",[req.params.id,req.userId]);
+  res.json({deleted:true});
+ }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
+});
+
 router.post("/voices/premium/generate",requireAuth,(_req,res)=>{
  res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_NOT_CONFIGURED",charged:false});
 });
