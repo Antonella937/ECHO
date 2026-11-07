@@ -1,3 +1,5 @@
+import { customFetch } from '@workspace/api-client-react';
+import { getActiveUniverseId } from '@/store/persistence';
 import { MusicClipPlayer } from './music-clip-player';
 import { useStoryViewerText } from '@/lib/story-viewer-translations';
 import { VerifiedBadge } from './verified-badge';
@@ -95,6 +97,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const swipeStartY = useRef<number | null>(null);
@@ -169,10 +172,26 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   // Require accepted follows in both directions, not merely a visible profile.
   const mutualFollow = (a: string, b: string) => (state.follows[a] ?? []).includes(b) && (state.follows[b] ?? []).includes(a);
   const shareTargets = state.characters.filter(c => !c.archived && c.id !== me.id && mutualFollow(me.id, c.id) && mutualFollow(liveStory.authorId, c.id) && canViewStory(liveStory, c.id, state) && (c.name + ' ' + c.handle).toLowerCase().includes(shareSearch.toLowerCase()));
-  const shareWith = (targetId: string) => {
-    if (!isStoryActive(liveStory) || !mutualFollow(me.id, targetId) || !mutualFollow(liveStory.authorId, targetId) || !canViewStory(liveStory, targetId, state)) return;
-    try { actions.sendMessage(targetId, '', { storyId: liveStory.id }); setShowShare(false); setShareSearch(''); toast({ title: t('Historia compartida') }); }
-    catch (e) { toast({ title: t('No se pudo compartir'), description: (e as Error).message }); }
+  const shareWith = async (targetId: string) => {
+    if (shareBusy || !isStoryActive(liveStory) || !mutualFollow(me.id, targetId) || !mutualFollow(liveStory.authorId, targetId) || !canViewStory(liveStory, targetId, state)) return;
+    setShareBusy(true);
+    try {
+      // Visibility is stored in the API, not in the local social state.
+      const universeId = encodeURIComponent(getActiveUniverseId());
+      const ids = [...new Set([liveStory.authorId, me.id, targetId])];
+      const profiles = await Promise.all(ids.map(id => customFetch<{ visibility: 'public' | 'private' }>(
+        `/api/character-privacy/${encodeURIComponent(id)}/visibility?universeId=${universeId}`,
+        { method: 'GET', responseType: 'json' }
+      )));
+      if (profiles.some(p => p.visibility !== 'public' && p.visibility !== 'private')) throw new Error('No se pudo comprobar la privacidad de los perfiles.');
+      // Private accounts require accepted mutual follows, already checked above.
+      // Cross-owner block status has no authoritative endpoint yet; never assume
+      // this client-side gate alone provides a complete sharing authorization.
+      actions.sendMessage(targetId, '', { storyId: liveStory.id });
+      setShowShare(false); setShareSearch('');
+      toast({ title: t('Historia compartida') });
+    } catch (e) { toast({ title: t('No se pudo compartir'), description: (e as Error).message }); }
+    finally { setShareBusy(false); }
   };
   const myReaction = liveStory.reactions?.find((r) => r.actorId === me.id)?.value;
   const react = (value: string) => {
@@ -270,7 +289,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           <div className="flex max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-card p-4 text-foreground" data-testid="story-share-picker">
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Compartir historia')}</h2><button type="button" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" onClick={() => setShowShare(false)} aria-label={t('Cerrar')}><X size={20}/></button></div>
             <input value={shareSearch} onChange={e => setShareSearch(e.target.value)} placeholder={t('Buscar personaje')} aria-label={t('Buscar personaje')} className="mb-3 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{shareTargets.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{t('No hay personajes disponibles para compartir esta historia.')}</p> : shareTargets.map(target => <button type="button" key={target.id} onClick={() => shareWith(target.id)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-secondary" data-testid={`share-story-with-${target.id}`}><CharacterAvatar character={target} size={40}/><span className="min-w-0 flex-1 truncate text-sm font-medium">{target.name} <span className="text-muted-foreground">@{target.handle}</span></span><Send size={18} className="text-primary"/></button>)}</div>
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{shareTargets.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">{t('No hay personajes disponibles para compartir esta historia.')}</p> : shareTargets.map(target => <button type="button" key={target.id} onClick={() => void shareWith(target.id)} disabled={shareBusy} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-secondary" data-testid={`share-story-with-${target.id}`}><CharacterAvatar character={target} size={40}/><span className="min-w-0 flex-1 truncate text-sm font-medium">{target.name} <span className="text-muted-foreground">@{target.handle}</span></span><Send size={18} className="text-primary"/></button>)}</div>
             <p className="mt-3 text-xs text-muted-foreground">{t('Solo aparecen personajes que se siguen mutuamente y pueden ver esta historia.')}</p>
           </div>
         </div>}
