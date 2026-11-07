@@ -40,12 +40,16 @@ export default function NotificationsPage() {
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [serverRead, setServerRead] = useState<string[]>([]);
   const [officialSubscribed, setOfficialSubscribed] = useState(true);
+  const [showSubscriptionIntro, setShowSubscriptionIntro] = useState(false);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
     const key = 'echo-official-read:' + user.id;
+    const introKey = 'echo-official-subscription-intro:' + user.id;
+    setShowSubscriptionIntro(localStorage.getItem(introKey) !== '1');
+    if (localStorage.getItem(introKey) !== '1') localStorage.setItem(introKey, '1');
     void customFetch<{ subscribed: boolean }>('/api/creator-hub/social/announcement-subscription', { responseType: 'json' })
       .then(data => { if (active) setOfficialSubscribed(data.subscribed); }).catch(() => {});
     void customFetch<{ ids: string[] }>('/api/creator-hub/social/notification-reads', { responseType: 'json' })
@@ -102,7 +106,7 @@ export default function NotificationsPage() {
           </button>
         }
       />
-      <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+      {showSubscriptionIntro && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
         <div><p className="text-sm font-semibold">📣 ECHO · {officialText.title}</p><p className="text-xs text-muted-foreground">{officialText.detail}</p></div>
         <button type="button" aria-pressed={officialSubscribed} onClick={() => {
           const next = !officialSubscribed;
@@ -110,7 +114,7 @@ export default function NotificationsPage() {
           void customFetch('/api/creator-hub/social/announcement-subscription', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscribed: next }) }).catch(() => setOfficialSubscribed(!next));
           if (!next) setOfficialUpdates([]);
         }} className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold">{officialSubscribed ? officialText.subscribed : officialText.muted}</button>
-      </div>
+      </div>}
       {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {officialText.title}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
