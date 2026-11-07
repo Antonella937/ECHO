@@ -17,27 +17,27 @@ export default function SharedPreviewPage() {
     setJoining(true); setError('');
     try { const result = await customFetch<{ownerId:string;universeId:string}>('/api/universe/shared/' + encodeURIComponent(token) + '/join', { method: 'POST', responseType: 'json' });
       setJoined('/collaboration/' + encodeURIComponent(result.ownerId) + '/' + encodeURIComponent(result.universeId));
-    } catch { setError(t(t("Este enlace no es una invitación de colaboración o ya no está disponible."))); }
+    } catch { setError(t("Este enlace no es una invitación de colaboración o ya no está disponible.")); }
     finally { setJoining(false); }
   };
   const importCopy = async () => {
     setImporting(true); setError('');
     try { const result = await customFetch<{kind:string;universeId:string;importedCount:number}>('/api/universe/shared/' + encodeURIComponent(token) + '/import', { method: 'POST', responseType: 'json' });
-      setImported(result.kind === 'universe' ? t(t("Universo copiado. Encontralo en tus universos.")) : t(t("Personaje copiado a tu universo principal.")));
-    } catch { setError(t(t("No se pudo importar. Revisá los límites de tu plan y que el enlace siga activo."))); }
+      setImported(result.kind === 'universe' ? t("Universo copiado. Encontralo en tus universos.") : t("Personaje copiado a tu universo principal."));
+    } catch { setError(t("No se pudo importar. Revisá los límites de tu plan y que el enlace siga activo.")); }
     finally { setImporting(false); }
   };
   useEffect(() => {
     let active = true;
     void customFetch<Shared>('/api/universe/shared/' + encodeURIComponent(token), { responseType: 'json' })
       .then(result => { if (active) setData(result); })
-      .catch(() => { if (active) setError(t(t("Este enlace no está disponible o fue revocado."))); });
+      .catch(() => { if (active) setError(t("Este enlace no está disponible o fue revocado.")); });
     return () => { active = false; };
-  }, [token]);
+  }, [token, t]);
   return <main className="mx-auto min-h-screen max-w-2xl px-5 py-12 text-foreground">
     <Link href="/" className="text-sm text-primary">ECHO</Link>
     {error ? <p role="alert" className="mt-8">{error}</p> : !data ? <p className="mt-8">{t("Cargando contenido compartido…")}</p> : <>
-      <p className="mt-8 text-xs uppercase tracking-widest text-primary">{data.kind === 'universe' ? t(t("Universo compartido")) : t(t("Personaje compartido"))}</p>
+      <p className="mt-8 text-xs uppercase tracking-widest text-primary">{data.kind === 'universe' ? t("Universo compartido") : t("Personaje compartido")}</p>
       <h1 className="mt-2 font-display text-4xl">{data.universeName}</h1>
       {data.description && <p className="mt-3 text-muted-foreground">{data.description}</p>}
       <div className="mt-8 grid gap-3">{data.characters.map(ch => <article key={ch.id} className="rounded-2xl border border-border bg-card p-5">
