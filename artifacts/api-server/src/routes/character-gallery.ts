@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, echoCharacterGalleryTable, echoUniversesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { visionService } from "../vision/service";
 
 const id = z.string().min(1).max(120);
 const scope = z.object({ universeId: id, characterId: id });
@@ -30,6 +31,24 @@ router.post("/character-gallery", async (req,res):Promise<void> => {
     if(!await belongs(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
     const [photo]=await db.insert(echoCharacterGalleryTable).values({...parsed.data,ownerId:req.userId!}).returning();res.status(201).json({photo});
   }catch{res.status(503).json({error:"GALLERY_UNAVAILABLE"});}
+});
+router.post("/character-gallery/:photoId/analyze", async(req,res):Promise<void> => {
+  const ownerId=req.userId!;
+  try {
+    const [photo]=await db.select().from(echoCharacterGalleryTable).where(and(
+      eq(echoCharacterGalleryTable.id,req.params.photoId as string),
+      eq(echoCharacterGalleryTable.ownerId,ownerId),
+    )).limit(1);
+    if(!photo){res.status(404).json({error:"PHOTO_NOT_FOUND"});return;}
+    if(photo.visionStatus==="complete" && photo.visionAnalysis){res.json({photo});return;}
+    const analysis=await visionService.analyzeGalleryPhoto(ownerId,photo.universeId,photo.id,photo.mediaRef);
+    const [updated]=await db.update(echoCharacterGalleryTable).set({visionAnalysis:analysis,visionStatus:"complete"})
+      .where(and(eq(echoCharacterGalleryTable.id,photo.id),eq(echoCharacterGalleryTable.ownerId,ownerId))).returning();
+    res.json({photo:updated});
+  }catch(error){
+    const code=error instanceof Error && error.name==="VisionError" ? error.message : "GALLERY_VISION_UNAVAILABLE";
+    res.status(503).json({error:code});
+  }
 });
 router.patch("/character-gallery/:photoId", async(req,res):Promise<void> => {
   const parsed=change.safeParse(req.body);
