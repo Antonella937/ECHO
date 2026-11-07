@@ -41,7 +41,8 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { setLink(''); setError(''); }, [universeId, kind, characterId]);
+  const [invite, setInvite] = useState('');
+  useEffect(() => { setLink(''); setInvite(''); setError(''); }, [universeId, kind, characterId]);
   const generate = async () => {
     setBusy(true); setError('');
     try {
@@ -61,6 +62,15 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
     if (navigator.share) { try { await navigator.share({ title: label, url }); } catch { /* cancelled */ } }
     else { try { await navigator.clipboard.writeText(url); } catch { setError('No se pudo compartir automáticamente.'); } }
   };
+  const createInvite = async () => {
+    setBusy(true); setError('');
+    try { const result = await customFetch<{token:string}>('/api/universe/' + encodeURIComponent(universeId) + '/collaboration-invites', {method:'POST',responseType:'json'});
+      const url = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + '/shared/' + result.token;
+      setInvite(url);
+      await navigator.clipboard.writeText(url);
+    } catch { setError('No se pudo crear o copiar la invitación. Activá compartir desde Privacidad.'); }
+    finally { setBusy(false); }
+  };
   const revoke = async () => {
     if (!link) return;
     const token = link.split('/').pop()!;
@@ -76,8 +86,10 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
     <div className="mt-3 flex flex-wrap gap-2">
       <button type="button" disabled={busy} onClick={() => void copy()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{busy ? 'Generando…' : t('Copiar enlace')}</button>
       <button type="button" disabled={busy} onClick={() => void share()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{t('Compartir')}</button>
+      {kind === 'universe' && <button type="button" disabled={busy} onClick={() => void createInvite()} className="min-h-11 rounded-full border border-primary px-3 text-xs text-primary">Invitar a colaborar</button>}
       {link && <button type="button" disabled={busy} onClick={() => void revoke()} className="min-h-11 rounded-full border border-border px-3 text-xs">Revocar enlace</button>}
     </div>
+    {invite && <div className="mt-2 break-all text-xs text-muted-foreground">Invitación de colaboración: {invite}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
   </div>;
 }
