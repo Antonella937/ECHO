@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, echoCharacterBlocksTable, echoUniversesTable } from "@workspace/db";
@@ -28,7 +28,7 @@ export function createCharacterBlocksRouter(): IRouter {
       res.json({ blocks: rows });
     } catch { res.status(503).json({ error: "BLOCKS_UNAVAILABLE" }); }
   });
-  const change = async (req: Parameters<Parameters<typeof router.post>[1]>[0], res: Parameters<Parameters<typeof router.post>[1]>[1], remove: boolean) => {
+  const change = async (req: Request, res: Response, remove: boolean) => {
     const parsed = schema.safeParse(req.body);
     if (!parsed.success || parsed.data.blockerId === parsed.data.blockedId) {
       res.status(400).json({ error: "INVALID_CHARACTER_BLOCK" }); return;
