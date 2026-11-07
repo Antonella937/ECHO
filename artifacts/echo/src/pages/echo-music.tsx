@@ -38,6 +38,7 @@ export default function EchoMusicPage() {
     setLocalAudioError('');
     setElapsed(0);
     setActualDuration(0);
+    setClipStart(0);
     setPlaying(false);
     setPlayerOpen(true);
   }
@@ -117,6 +118,9 @@ export default function EchoMusicPage() {
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [actualDuration, setActualDuration] = useState(0);
+  const [clipStart, setClipStart] = useState(0);
+  const [clipLength, setClipLength] = useState<15 | 30>(15);
+  const clipEnd = Math.min(actualDuration || 0, clipStart + clipLength);
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -180,6 +184,13 @@ export default function EchoMusicPage() {
         {coverUrl ? <img src={coverUrl} alt={`Portada de ${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
       </div>
       <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
+      {audioUrl && actualDuration > 0 && <section className="rounded-xl border border-white/20 bg-white/10 p-4 space-y-3">
+        <p className="text-sm font-semibold">Elegir fragmento para compartir</p>
+        <div className="flex gap-2">{([15, 30] as const).map(seconds => <button key={seconds} type="button" onClick={() => { setClipLength(seconds); setClipStart(start => Math.min(start, Math.max(0, actualDuration - seconds))); }} className={`rounded-full px-4 py-2 text-sm ${clipLength === seconds ? 'bg-white text-black' : 'border border-white/30'}`}>{seconds} s</button>)}</div>
+        <input type="range" aria-label="Inicio del fragmento" min={0} max={Math.max(0, actualDuration - Math.min(clipLength, actualDuration))} step={1} value={clipStart} onChange={event => { const next = Number(event.target.value); setClipStart(next); if (audioRef.current) audioRef.current.currentTime = next; setElapsed(next); }} className="w-full accent-white" />
+        <p className="text-xs text-white/70">Fragmento: {formatTime(clipStart)} – {formatTime(clipEnd)}. La publicación con audio todavía no está habilitada.</p>
+        <button type="button" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = clipStart; audioRef.current.dataset.clipPreview = 'true'; } setElapsed(clipStart); void audioRef.current?.play().catch(() => setPlaying(false)); }} className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold">Escuchar fragmento</button>
+      </section>}
       <div>
         <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label="Progreso de la canción" className="w-full accent-white disabled:opacity-40" />
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
@@ -193,7 +204,7 @@ export default function EchoMusicPage() {
       {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />La canción está preparada, pero la generación de audio todavía no está activada. Cuando ElevenLabs devuelva un archivo, esta pantalla reproducirá el sonido real y la barra avanzará con él.</div>}
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">Ver prompt preparado</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
-    <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => setElapsed(event.currentTarget.currentTime)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+    <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
   </div>;
   return <div><TopBar title="ECHO Music Studio" onBack={back} /><main className="mx-auto max-w-2xl space-y-5 px-4 pb-20 pt-5">
     <div className="rounded-2xl border border-border bg-card/60 p-5">
