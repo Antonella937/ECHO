@@ -1,5 +1,5 @@
 import { HumanVoicePlayback, HumanVoiceRecorder } from '@/components/echo/human-voice-note';
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { compressImage, uploadPrivateImage, uploadPublicationImage, useMediaResolver } from '@/lib/media';
 import { BadgeCheck, Camera, Check, Pencil, X, Compass, Settings2, MessagesSquare, UserRound, ChevronDown } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
@@ -14,6 +14,21 @@ import { useCreatorHubText } from '@/lib/creator-hub-translations';
  * Sharing and access requests intentionally remain disabled until the
  * recipient-scoped authorization API and legal consent are implemented.
  */
+/** Safe, text-only inline formatting. No HTML interpretation or injection. */
+function RichPublicationText({ text }: { text: string }) {
+  const parts: ReactNode[] = [];
+  const pattern = /(\\*\\*([^*\\n]+)\\*\\*|\\*([^*\\n]+)\\*|__([^_\\n]+)__)/g;
+  let last = 0; let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const key = match.index;
+    parts.push(match[2] ? <strong key={key}>{match[2]}</strong> : match[3] ? <em key={key}>{match[3]}</em> : <u key={key}>{match[4]}</u>);
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
 export default function CreatorHubPage() {
   const { user } = useUser();
   const ct = useCreatorTranslation();
@@ -29,6 +44,27 @@ export default function CreatorHubPage() {
   const [publicationKind,setPublicationKind] = useState<Publication['kind']>('post');
   const [publicationTitle,setPublicationTitle] = useState('');
   const [publicationBody,setPublicationBody] = useState('');
+  const publicationTitleRef = useRef<HTMLInputElement>(null);
+  const publicationBodyRef = useRef<HTMLTextAreaElement>(null);
+  const formatPublication = (field: 'title' | 'body', style: 'bold' | 'italic' | 'underline') => {
+    const el = field === 'title' ? publicationTitleRef.current : publicationBodyRef.current;
+    if (!el) return;
+    const value = field === 'title' ? publicationTitle : publicationBody;
+    const start = el.selectionStart ?? value.length;
+    const end = el.selectionEnd ?? start;
+    const marker = style === 'bold' ? '**' : style === 'italic' ? '*' : '__';
+    const selection = value.slice(start, end) || (style === 'bold' ? 'texto' : style === 'italic' ? 'texto' : 'texto');
+    const next = value.slice(0, start) + marker + selection + marker + value.slice(end);
+    if (next.length > (field === 'title' ? 180 : 5000)) return;
+    if (field === 'title') setPublicationTitle(next); else setPublicationBody(next);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(start + marker.length, start + marker.length + selection.length); });
+  };
+  const publicationFormatButtons = (field: 'title' | 'body') => <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label={field === 'title' ? 'Formato del título' : 'Formato del texto'}>
+    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => formatPublication(field, 'bold')} className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold" aria-label="Negrita" title="Negrita">B</button>
+    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => formatPublication(field, 'italic')} className="rounded-lg border border-border px-3 py-1.5 text-sm italic" aria-label="Cursiva" title="Cursiva">I</button>
+    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => formatPublication(field, 'underline')} className="rounded-lg border border-border px-3 py-1.5 text-sm underline" aria-label="Subrayado" title="Subrayado">U</button>
+  </div>;
+
   const [publicationVisibility,setPublicationVisibility] = useState<Publication['visibility']>('public');
   const [publicationPinned,setPublicationPinned] = useState(false);
   const [publicationComposer,setPublicationComposer] = useState(false);
@@ -490,7 +526,7 @@ export default function CreatorHubPage() {
           </div>}
           {profileMessageFeedback && <p role="status" aria-live="polite" className="rounded-xl border border-primary/30 p-3 text-sm text-primary">{profileMessageFeedback}</p>}
           {person.visibility === 'private' && !person.following && <div className="rounded-2xl border border-border px-5 py-8 text-center"><LockKeyhole className="mx-auto mb-3 text-muted-foreground"/><p className="font-semibold">{ht("Perfil privado")}</p><p className="mt-2 text-sm text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p></div>}
-          {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="overflow-hidden rounded-2xl border border-border bg-card">{post.coverPath && <img src={resolvePublicationMedia(post.coverPath)} alt="" className="max-h-80 w-full object-cover" />}<div className="p-5"><h3 className="font-semibold">{post.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{post.body}</p></div></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
+          {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="overflow-hidden rounded-2xl border border-border bg-card">{post.coverPath && <img src={resolvePublicationMedia(post.coverPath)} alt="" className="max-h-80 w-full object-cover" />}<div className="p-5"><h3 className="font-semibold"><RichPublicationText text={post.title}/></h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground"><RichPublicationText text={post.body}/></p></div></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
         </div>}
       </main>
     </div>;
@@ -613,10 +649,14 @@ export default function CreatorHubPage() {
               {publicationComposer && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/30 p-4">
                 <h3 className="font-semibold">{ht("Compartir en ECHO")}</h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{([{id:'character',label:'♙ Personaje'},{id:'world',label:'⬡ Mundo'},{id:'post',label:'▧ Publicación'},...(canPostOfficialUpdates ? [{id:'update' as const,label:'📣 ECHO Update',translationKey:'Actualización de ECHO'}] : [])] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationKind(option.id)} className={`rounded-xl border px-2 py-3 text-xs ${publicationKind===option.id?'border-primary bg-primary/15 text-primary':'border-border'}`}>{`${option.label.split(" ")[0]} ${ht("translationKey" in option ? option.translationKey : option.label.replace(/^[♙⬡▧📣]\s*/, ""))}`}</button>)}</div>
-                <input aria-label={ht("Título de publicación")} maxLength={120} value={publicationTitle} onChange={event=>setPublicationTitle(event.target.value)} placeholder={ht("Título")} className="w-full rounded-xl border border-border bg-background p-3 text-sm"/>
+                <input aria-label={ht("Título de publicación")} maxLength={120} ref={publicationTitleRef} value={publicationTitle} onChange={event=>setPublicationTitle(event.target.value)} placeholder={ht("Título")} className="w-full rounded-xl border border-border bg-background p-3 text-sm"/>
+                {publicationFormatButtons("title")}
+
                 <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-4 text-sm text-primary"><Camera size={18}/> {ht(publicationFile ? 'Cambiar foto o GIF' : 'Agregar foto o GIF')}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={event=>{const file=event.target.files?.[0]??null;if(file&&(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)||file.size>15*1024*1024)){setPublicationError(ht('Elegí JPG, PNG, WebP o GIF de hasta 15 MB.'));return;}setPublicationError('');setPublicationFile(file);}}/></label>
                 {publicationPreview&&<div className="space-y-2"><img src={publicationPreview} alt={ht("Vista previa de la publicación")} className="max-h-80 w-full rounded-xl object-contain"/><button type="button" onClick={()=>setPublicationFile(null)} className="text-xs text-muted-foreground underline">{ht("Quitar imagen")}</button></div>}
-                <textarea aria-label={ht("Descripción de publicación")} maxLength={5000} value={publicationBody} onChange={event=>setPublicationBody(event.target.value)} placeholder={ht("Contá la historia, describí tu personaje o compartí novedades…")} rows={5} className="w-full resize-y rounded-xl border border-border bg-background p-3 text-sm"/>
+                <textarea aria-label={ht("Descripción de publicación")} maxLength={5000} ref={publicationBodyRef} value={publicationBody} onChange={event=>setPublicationBody(event.target.value)} placeholder={ht("Contá la historia, describí tu personaje o compartí novedades…")} rows={5} className="w-full resize-y rounded-xl border border-border bg-background p-3 text-sm"/>
+                {publicationFormatButtons("body")}
+
                 <div className="flex flex-wrap items-center justify-between gap-3"><div className="relative inline-flex max-w-full items-center"><select aria-label={ht("Privacidad de publicación")} value={publicationVisibility} onChange={event=>setPublicationVisibility(event.target.value as Publication['visibility'])} className="max-w-full appearance-none rounded-full border border-border bg-background py-2 pl-3 pr-8 text-sm"><option value="public">🌐 {ht("Público")}</option><option value="followers">{ct("followers")}</option><option value="private">{ct("onlyMe")}</option></select><ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-2.5 text-muted-foreground"/></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={publicationPinned} onChange={event=>setPublicationPinned(event.target.checked)}/> {ct("pinProfile")}</label></div>
                 <div className="flex justify-end gap-2"><button type="button" onClick={()=>setPublicationComposer(false)} className="rounded-full border border-border px-4 py-2 text-sm">{ct("cancel")}</button><button type="button" disabled={publicationBusy||!publicationTitle.trim()} onClick={()=>void publishCreatorContent()} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{ht(publicationBusy?'Publicando…':'Publicar')}</button></div>
               </div>}
@@ -624,7 +664,7 @@ export default function CreatorHubPage() {
               {publicationLoadError && <button type="button" onClick={()=>void refreshPublications()} className="text-xs text-muted-foreground underline underline-offset-4">{ht("No se pudo actualizar el contenido. Reintentar")}</button>}
               {publications.some(item=>item.pinned)&&<div className="space-y-2"><h3 className="font-semibold text-primary">📌 {ht("Destacados")}</h3><div className="grid grid-cols-3 gap-2">{publications.filter(item=>item.pinned).slice(0,3).map(item=><div key={item.id} className="min-w-0 rounded-xl border border-border bg-secondary/40 p-3"><p className="text-xs text-primary">{ht(item.kind==='character'?'Personaje':item.kind==='world'?'Mundo':item.kind==='update'?'Actualización de ECHO':'Publicación')}</p><p className="mt-1 break-words text-sm font-medium">{item.title}</p></div>)}</div></div>}
               <div className="flex flex-wrap gap-2">{([{id:'all',label:'Todo'},{id:'update',label:'Actualizaciones'},{id:'character',label:'Personajes'},{id:'world',label:'Mundos'},{id:'post',label:'Publicaciones'}] as const).map(option=><button key={option.id} type="button" onClick={()=>setPublicationFilter(option.id)} className={`rounded-full px-3 py-2 text-xs ${publicationFilter===option.id?'bg-primary text-primary-foreground':'bg-secondary text-muted-foreground'}`}>{ht(option.label)}</button>)}</div>
-              {publications.filter(item=>publicationFilter==='all'||item.kind===publicationFilter).map(item=><article key={item.id} className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-primary">{ht(item.kind==='character'?'Personaje':item.kind==='world'?'Mundo':item.kind==='update'?'Actualización de ECHO':'Publicación')} {item.pinned?'· 📌':''}</span><span className="text-xs text-muted-foreground">{item.visibility==='public'?ht('Público'):item.visibility==='followers'?ht('Seguidores'):ct('onlyMe')}</span></div><h3 className="text-lg font-semibold">{item.title}</h3>{item.coverPath&&<img src={resolvePublicationMedia(item.coverPath)} alt={`Portada de ${item.title}`} className="max-h-[440px] w-full rounded-xl bg-secondary object-contain" loading="lazy"/>}{item.body&&<p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{item.body}</p>}<p className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(undefined)}</p></article>)}
+              {publications.filter(item=>publicationFilter==='all'||item.kind===publicationFilter).map(item=><article key={item.id} className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-primary">{ht(item.kind==='character'?'Personaje':item.kind==='world'?'Mundo':item.kind==='update'?'Actualización de ECHO':'Publicación')} {item.pinned?'· 📌':''}</span><span className="text-xs text-muted-foreground">{item.visibility==='public'?ht('Público'):item.visibility==='followers'?ht('Seguidores'):ct('onlyMe')}</span></div><h3 className="text-lg font-semibold"><RichPublicationText text={item.title}/></h3>{item.coverPath&&<img src={resolvePublicationMedia(item.coverPath)} alt={`Portada de ${item.title}`} className="max-h-[440px] w-full rounded-xl bg-secondary object-contain" loading="lazy"/>}{item.body&&<p className="whitespace-pre-wrap break-words text-sm text-muted-foreground"><RichPublicationText text={item.body}/></p>}<p className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(undefined)}</p></article>)}
               {publications.length===0&&!publicationLoadError&&<div className="rounded-2xl border border-dashed border-border bg-secondary/20 px-5 py-10 text-center"><p className="font-semibold">{ht("Tu historia empieza acá")}</p><p className="mt-2 text-sm text-muted-foreground">{ht('Publicá un personaje, un mundo o')} {ht(canPostOfficialUpdates?'una actualización de ECHO':'una publicación')}.</p><p className="mx-auto mt-5 max-w-sm border-t border-border/60 pt-4 text-xs leading-relaxed text-muted-foreground"><LockKeyhole size={14} className="mr-1 inline-block align-text-bottom"/> {ht("Vos decidís quién puede ver cada publicación. El contenido para seguidores respeta las solicitudes de acceso.")}</p></div>}
             </section>
             </>}
