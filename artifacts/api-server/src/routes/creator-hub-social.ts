@@ -58,6 +58,26 @@ export function createCreatorHubSocialRouter(): IRouter {
     res.json(result.rows[0] ?? { followers: 0, following: 0 });
   });
 
+  router.get("/creator-hub/social/follow-list/:kind", async (req, res) => {
+    const kind = req.params.kind;
+    if (kind !== "followers" && kind !== "following") { res.status(400).json({ error: "INVALID_LIST" }); return; }
+    const result = await pool.query(
+      `SELECT p.owner_id AS "ownerId", p.display_name AS "displayName", p.username,
+              p.visibility,
+              EXISTS(SELECT 1 FROM echo_creator_follows mine WHERE mine.follower_owner_id=$1 AND mine.followed_owner_id=p.owner_id) AS "following",
+              false AS "requested"
+       FROM echo_creator_follows f
+       JOIN echo_creator_profiles p ON p.owner_id = ${kind === "followers" ? "f.follower_owner_id" : "f.followed_owner_id"}
+       WHERE ${kind === "followers" ? "f.followed_owner_id" : "f.follower_owner_id"}=$1
+         AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b
+           WHERE (b.blocker_owner_id=$1 AND b.blocked_owner_id=p.owner_id)
+              OR (b.blocker_owner_id=p.owner_id AND b.blocked_owner_id=$1))
+       ORDER BY p.display_name ASC LIMIT 500`,
+      [req.userId],
+    );
+    res.json({ profiles: result.rows });
+  });
+
   router.put("/creator-hub/social/me", async (req, res) => {
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_PROFILE" }); return; }
