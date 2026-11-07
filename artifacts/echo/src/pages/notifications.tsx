@@ -1,6 +1,9 @@
 import { useNotificationsText, useLocalizedNotificationExcerpt } from '@/lib/notifications-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useUser } from '@clerk/react';
+import { customFetch } from '@workspace/api-client-react';
+import { useLanguage } from '@/lib/i18n';
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
 import { TopBar } from '@/components/echo/top-bar';
@@ -29,6 +32,25 @@ const VERB: Record<Notification['kind'], string> = {
 
 export default function NotificationsPage() {
   const t = useNotificationsText();
+  const language = useLanguage();
+  const { user } = useUser();
+  const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
+  const [officialRead, setOfficialRead] = useState<string[]>([]);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    const key = 'echo-official-read:' + user.id;
+    try { setOfficialRead(JSON.parse(localStorage.getItem(key) || '[]')); } catch { setOfficialRead([]); }
+    void customFetch<{ updates: typeof officialUpdates }>('/api/creator-hub/social/official-updates', { responseType: 'json' })
+      .then(data => { if (active) setOfficialUpdates(data.updates); }).catch(() => {});
+    return () => { active = false; };
+  }, [user?.id]);
+  const markOfficialRead = (id: string) => {
+    if (!user?.id) return;
+    const next = [...new Set([...officialRead, id])];
+    setOfficialRead(next);
+    localStorage.setItem('echo-official-read:' + user.id, JSON.stringify(next));
+  };
   const resolveMedia = useMediaResolver();
   const { state, me, character, actions } = useSocial();
   const { openStoryList } = useStoryViewer();
@@ -61,6 +83,13 @@ export default function NotificationsPage() {
           </button>
         }
       />
+      {officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}>
+        <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2>
+        <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label="Unread"/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
+          <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
+        </details>)}</div>
+      </section>}
       {list.length === 0 ? (
         <EmptyState title={t("Todo en calma")} body={t("Cuando alguien comente, responda o te escriba, aparecerá aquí.")} />
       ) : (
