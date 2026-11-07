@@ -3,7 +3,7 @@ import { EngineError, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
 import type { VisionContext } from '../vision/contracts';
 import { and, desc, eq } from 'drizzle-orm';
-import { db, echoMemoryArchiveTable } from '@workspace/db';
+import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { clerkClient } from '@clerk/express';
 
 /** Owner must come from verified server authentication, never from request JSON. */
@@ -38,6 +38,27 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     const configured = user.privateMetadata?.echoInterfaceLanguage;
     if (typeof configured === 'string' && ['es','en','pt','fr','de','it','ko','ja','zh'].includes(configured)) language = configured;
   } catch { /* Preserve generation availability if account metadata is temporarily unavailable. */ }
+  // Supply cached visual observations before the character decides what to say.
+  // Never trigger vision billing in the autonomous decision loop.
+  const gallery = input.situation === 'post'
+    ? await db.select().from(echoCharacterGalleryTable).where(and(
+        eq(echoCharacterGalleryTable.ownerId,ownerId),
+        eq(echoCharacterGalleryTable.universeId,input.universeId ?? 'primary'),
+        eq(echoCharacterGalleryTable.characterId,input.characterId),
+        eq(echoCharacterGalleryTable.reserved,false),
+      ))
+    : [];
+  const galleryContext = gallery.filter(photo => (photo.reusable || photo.usedCount === 0) &&
+    (!photo.lastUsedAt || photo.usedCount === 0 || Date.now() - photo.lastUsedAt.getTime() >= 30 * 24 * 60 * 60_000))
+    .slice(0,20).map(photo => {
+      const analysis = photo.visionStatus === 'complete' ? photo.visionAnalysis : null;
+      return {
+        note: photo.description.slice(0,240),
+        scene: typeof analysis?.sceneDescription === 'string' ? analysis.sceneDescription.slice(0,360) : '',
+        setting: typeof analysis?.setting === 'string' ? analysis.setting.slice(0,140) : '',
+        activities: Array.isArray(analysis?.activities) ? analysis.activities.slice(0,6) : [],
+      };
+    });
   return previewDecision(dependencies.provider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext);
 }
