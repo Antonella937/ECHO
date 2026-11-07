@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS echo_collaboration_invites (token_hash text PRIMARY KEY REFERENCES echo_share_links(token_hash) ON DELETE CASCADE, owner_id text NOT NULL, universe_id text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), revoked_at timestamptz);
