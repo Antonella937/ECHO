@@ -5,6 +5,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { SaveUniverseBody } from "@workspace/api-zod";
 import { resolveEchoPlan } from "../lib/entitlements";
+import { elevenLabsVoiceStatus } from "../lib/elevenLabsVoice";
 
 const router: IRouter = Router();
 router.use("/voices/premium", requireAuth, (_req,res,next) => {res.setHeader("Cache-Control","private, no-store");next();});
@@ -30,7 +31,7 @@ router.get("/voices/premium/projects",async(req,res)=>{
   FROM echo_voice_projects WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3`,[req.userId,parsed.data.universeId,parsed.data.characterId]);
   const project=result.rows[0]??null;
   const samples=project?(await pool.query(`SELECT id,status,audio_object_path AS "audioObjectPath" FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 ORDER BY created_at,id`,[project.id,req.userId])).rows:[];
-  res.json({project,samples,generationAvailable:false});
+  res.json({project,samples,generationAvailable:elevenLabsVoiceStatus().generationAvailable,provider:elevenLabsVoiceStatus().provider});
  }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
 });
 router.put("/voices/premium/projects",async(req,res)=>{
@@ -47,7 +48,7 @@ router.put("/voices/premium/projects",async(req,res)=>{
   ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET mode=EXCLUDED.mode,prompt=EXCLUDED.prompt,language=EXCLUDED.language,
   variant_count=EXCLUDED.variant_count,consent_confirmed=EXCLUDED.consent_confirmed,updated_at=now()
   RETURNING id,status`,[req.userId,data.universeId,data.characterId,data.mode,data.prompt,data.language,data.variantCount,data.consentConfirmed]);
-  res.json({project:result.rows[0],generationAvailable:false});
+  res.json({project:result.rows[0],generationAvailable:elevenLabsVoiceStatus().generationAvailable});
  }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
 });
 
@@ -151,7 +152,7 @@ router.delete("/voices/premium/references/:id",async(req,res)=>{
 router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
  try{if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}}
  catch{res.status(503).json({error:"ENTITLEMENTS_UNAVAILABLE",charged:false});return;}
- res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_NOT_CONFIGURED",charged:false});
+ res.status(503).json({error:elevenLabsVoiceStatus().reason ?? "VOICE_GENERATION_NOT_YET_ENABLED",charged:false});
 });
 router.post("/voices/premium/select",requireAuth,async(req,res)=>{
  const parsed=z.object({projectId:z.string().uuid(),sampleId:z.string().uuid()}).strict().safeParse(req.body);
