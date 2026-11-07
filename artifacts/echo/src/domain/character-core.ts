@@ -108,7 +108,16 @@ export function deletionBlockReason(state: SocialState, id: string): string | nu
 export function deleteUnusedAccount(state: SocialState, id: string): SocialState {
   const blocked = deletionBlockReason(state, id);
   if (blocked) throw Error(blocked);
-  const characters = state.characters.filter(c => c.id !== id);
+  const characters = state.characters.filter(c => c.id !== id).map(c => {
+    if (!c.configuration) return c;
+    const config = structuredClone(c.configuration);
+    config.relationships = config.relationships.filter(r => r.targetId !== id);
+    config.currentState.companions = config.currentState.companions.filter(x => x !== id);
+    config.memory.permanent = config.memory.permanent.filter(m => m.targetId !== id);
+    config.memory.relationships = config.memory.relationships.filter(m => m.targetId !== id);
+    config.memory.recent = config.memory.recent.filter(m => m.targetId !== id);
+    return { ...c, configuration: config };
+  });
   const posts = state.posts.filter(p => p.authorId !== id).map(p => ({
     ...p, likes: p.likes.filter(x => x !== id), savedBy: p.savedBy.filter(x => x !== id),
     taggedAccountIds: p.taggedAccountIds?.filter(x => x !== id),
@@ -129,6 +138,7 @@ export function deleteUnusedAccount(state: SocialState, id: string): SocialState
     .filter(([key]) => key !== id).map(([key, ids]) => [key, ids.filter(x => x !== id)])) : undefined;
   return {
     ...state, characters, posts, stories, follows, closeFriends,
+    highlights: state.highlights?.filter(h => h.authorId !== id).map(h => ({ ...h, storyIds: h.storyIds.filter(x => storyIds.has(x)) })).filter(h => h.storyIds.length > 0),
     comments: comments.map(c => ({
       ...c, likes: c.likes.filter(x => x !== id),
       parentId: c.parentId && commentIds.has(c.parentId) ? c.parentId : null,
