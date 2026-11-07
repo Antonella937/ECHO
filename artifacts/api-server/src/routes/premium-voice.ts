@@ -4,7 +4,7 @@ import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { SaveUniverseBody } from "@workspace/api-zod";
-import { getOwnerPlan } from "../lib/entitlements";
+import { resolveEchoPlan } from "../lib/entitlements";
 
 const router: IRouter = Router();
 router.use("/voices/premium", requireAuth, (_req,res,next) => {res.setHeader("Cache-Control","private, no-store");next();});
