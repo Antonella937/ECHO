@@ -42,6 +42,7 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [invite, setInvite] = useState('');
+  const [collaborators, setCollaborators] = useState<Array<{collaborator_id:string;role:string}>>([]);
   useEffect(() => { setLink(''); setInvite(''); setError(''); }, [universeId, kind, characterId]);
   const generate = async () => {
     setBusy(true); setError('');
@@ -71,6 +72,19 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
     } catch { setError('No se pudo crear o copiar la invitación. Activá compartir desde Privacidad.'); }
     finally { setBusy(false); }
   };
+  const loadCollaborators = async () => {
+    try { setCollaborators(await customFetch<Array<{collaborator_id:string;role:string}>>('/api/universe/' + encodeURIComponent(universeId) + '/collaborators', {responseType:'json'})); }
+    catch { setError('No se pudieron cargar las colaboradoras.'); }
+  };
+  const removeCollaborator = async (id:string) => {
+    try { await customFetch('/api/universe/' + encodeURIComponent(universeId) + '/collaborators/' + encodeURIComponent(id), {method:'DELETE'}); await loadCollaborators(); }
+    catch { setError('No se pudo quitar el acceso.'); }
+  };
+  const revokeInvite = async () => {
+    if (!invite) return;
+    try { await customFetch('/api/universe/' + encodeURIComponent(universeId) + '/share-links/' + invite.split('/').pop(), {method:'DELETE'}); setInvite(''); }
+    catch { setError('No se pudo revocar la invitación.'); }
+  };
   const revoke = async () => {
     if (!link) return;
     const token = link.split('/').pop()!;
@@ -89,7 +103,8 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
       {kind === 'universe' && <button type="button" disabled={busy} onClick={() => void createInvite()} className="min-h-11 rounded-full border border-primary px-3 text-xs text-primary">Invitar a colaborar</button>}
       {link && <button type="button" disabled={busy} onClick={() => void revoke()} className="min-h-11 rounded-full border border-border px-3 text-xs">Revocar enlace</button>}
     </div>
-    {invite && <div className="mt-2 break-all text-xs text-muted-foreground">Invitación de colaboración: {invite}</div>}
+    {invite && <div className="mt-2 break-all text-xs text-muted-foreground">Invitación de colaboración: {invite} <button type="button" onClick={() => void revokeInvite()} className="ml-2 underline">Revocar invitación</button></div>}
+    {kind === 'universe' && <div className="mt-3"><button type="button" onClick={() => void loadCollaborators()} className="text-xs text-primary underline">Administrar colaboradoras</button>{collaborators.map(person => <div key={person.collaborator_id} className="mt-2 flex items-center gap-2 text-xs"><span className="min-w-0 flex-1 truncate">{person.collaborator_id}</span><button type="button" onClick={() => void removeCollaborator(person.collaborator_id)} className="underline">Quitar acceso</button></div>)}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
   </div>;
 }
