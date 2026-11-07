@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { customFetch } from '@workspace/api-client-react';
+import { MediaScopeContext } from '@/lib/media';
 import { AudioLines, FileAudio, RefreshCw, Sparkles, Upload } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 
@@ -6,7 +8,9 @@ const copy = {
   es: ['Voice Studio · Premium','Creá una voz exclusiva para tu personaje.','Describir una voz','Usar audio de referencia','Describí el timbre, acento, ritmo y estilo de la voz.','Ej.: voz grave y cálida, con un poco de aspereza, ritmo tranquilo y acento británico.','Idioma de la voz','Cantidad de opciones','Generar muestras','La generación estará disponible cuando conectemos el proveedor. No se realizarán cargos ni se crearán muestras todavía.','Subí un audio WAV, MP3 o M4A (máximo 20 MB).','Elegir archivo','Usá solo tu propia voz o una voz cuyo titular haya autorizado expresamente su uso.','Confirmo que tengo autorización para crear una voz sintética a partir de este audio.','Archivo seleccionado','Quitarlo','Las muestras generadas podrán escucharse, compararse y guardarse cuando activemos el servicio.','La voz de tu personaje no se modificará hasta que elijas y guardes una muestra.'],
   en: ['Voice Studio · Premium','Create a unique voice for your character.','Describe a voice','Use reference audio','Describe the voice’s tone, accent, pace, and style.','E.g. a deep, warm voice with a subtle rasp, calm pacing and a British accent.','Voice language','Number of options','Generate samples','Generation will be available once a provider is connected. No charges or samples will be created yet.','Upload WAV, MP3 or M4A audio (20 MB maximum).','Choose file','Only use your own voice or one whose owner has explicitly authorized synthetic voice creation.','I confirm I have permission to create a synthetic voice from this audio.','Selected file','Remove','Once enabled, generated samples can be played, compared and saved.','Your character’s voice will not change until you select and save a sample.'],
 } as const;
-export function PremiumVoiceStudio() {
+export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
+  const scope = useContext(MediaScopeContext);
+  const universeId = scope?.universeId ?? 'primary';
   const language = useLanguage();
   const labels: readonly string[] = language === 'es' ? copy.es : copy.en;
   const [mode, setMode] = useState<'prompt' | 'reference'>('prompt');
@@ -16,6 +20,25 @@ export function PremiumVoiceStudio() {
   const [file, setFile] = useState<File | null>(null);
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (!characterId) return;
+    let cancelled = false;
+    void customFetch<{project: {mode:'prompt'|'reference';prompt:string;language:string;variantCount:number;consentConfirmed:boolean}|null}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'})
+      .then(data=>{if(cancelled||!data.project)return;const p=data.project;setMode(p.mode);setPrompt(p.prompt);setVoiceLanguage(p.language);setCount(p.variantCount);setConsent(p.consentConfirmed);setSaved(true);})
+      .catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[characterId,universeId]);
+  const saveDraft=async()=>{
+    if(!characterId||saving||mode==='prompt'&&!prompt.trim()||mode==='reference'&&(!consent||!file))return;
+    setSaving(true);setError('');setSaved(false);
+    try {
+      await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode,prompt,language:voiceLanguage,variantCount:count,consentConfirmed:mode==='reference'&&consent})});
+      setSaved(true);
+    } catch {setError(language==='es'?'No se pudo guardar el proyecto. Verificá tu acceso Premium y volvé a intentar.':'Could not save the project. Check Premium access and try again.');}
+    finally {setSaving(false);}
+  };
   const input = useRef<HTMLInputElement>(null);
   const chooseFile = (next: File | undefined) => {
     setError('');
@@ -47,7 +70,11 @@ export function PremiumVoiceStudio() {
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1"/><span>{labels[13]}</span></label>
       <p className="text-xs text-muted-foreground">{labels[12]}</p>
     </>}
+    <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!consent||!file))} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
+    {saved&&<p role="status" className="text-xs text-primary">{language==='es'?'Proyecto guardado. Generación pendiente de activación.':'Project saved. Generation is not yet enabled.'}</p>}
+    {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
     <button type="button" disabled className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground opacity-50"><RefreshCw className="h-4 w-4"/>{labels[8]} ({count})</button>
+    {!characterId&&<p className="text-xs text-muted-foreground">{language==='es'?'Guardá primero el personaje para asociarle un proyecto de voz.':'Save the character before creating a voice project.'}</p>}
     <p className="text-xs text-muted-foreground">{labels[9]}</p>
     <p className="text-xs text-muted-foreground">{labels[16]} {labels[17]}</p>
   </section>;
