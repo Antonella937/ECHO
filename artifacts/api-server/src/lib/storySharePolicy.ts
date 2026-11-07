@@ -14,12 +14,14 @@ export type StorySharePolicyInput = {
   acceptedFollows: ReadonlyArray<{ followerId: string; followedId: string }>;
   /** Directed blocks, including blocks initiated by either participant. */
   blocks: ReadonlyArray<{ blockerId: string; blockedId: string }>;
+  /** Must be true only after loading the complete authoritative block graph. */
+  blocksVerified: boolean;
 };
 
 export function canForwardStory(input: StorySharePolicyInput): boolean {
   const { senderId, authorId, recipientId, storyActive, authorVisibility,
     recipientCanViewStory, acceptedFollows, blocks } = input;
-  if (!senderId || !authorId || !recipientId || senderId === recipientId ||
+  if (!input.blocksVerified || !senderId || !authorId || !recipientId || senderId === recipientId ||
       !storyActive || !recipientCanViewStory) return false;
   if (authorVisibility !== "public" && authorVisibility !== "private") return false;
   const participants = [senderId, authorId, recipientId];
