@@ -495,6 +495,15 @@ export default function CreatorHubPage() {
       setChatMessages(result.messages); setOtherTyping(false);
     } catch { setChatError(ht("No pudimos abrir esta conversación.")); }
   }
+  useEffect(() => {
+    const requested = sessionStorage.getItem('echo:open-creator-chat');
+    if (!requested || !socialReady) return;
+    sessionStorage.removeItem('echo:open-creator-chat');
+    setHubTab('mensajes');
+    const person = conversations.find(item => item.ownerId === requested);
+    void openHumanChat(requested, person?.displayName ?? dmStatus.items.find(item => item.ownerId === requested)?.displayName ?? '');
+  }, [socialReady, conversations.length]);
+
   async function sendHumanMessage() {
     if (!activeChat || !chatDraft.trim() || chatBusy) return;
     setChatBusy(true); setChatError('');
