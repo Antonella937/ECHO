@@ -31,7 +31,10 @@ router.get("/music/status", (_req, res) => {
     addonRequired: true,
     activated: false,
     generationEnabled: false,
-    provider: "not_activated",
+    provider: "elevenlabs_music",
+    model: "music_v2_5",
+    providerConfigured: Boolean(process.env.ELEVENLABS_API_KEY?.trim()),
+    providerRequestsEnabled: false,
     paidCallsMade: 0,
     creditsSharedWithVoices: false,
     commercialMusicPlaybackSeparate: true,
@@ -147,6 +150,47 @@ router.get("/music/clips/search", (_req, res) => {
     provider: "feed_fm_clips",
     charged: false,
     items: [],
+  });
+});
+
+// Official Eleven Music API: POST https://api.elevenlabs.io/v1/music
+// Keep all billable calls disabled until subscription, usage limits, storage,
+// and explicit activation are reviewed. Voice API credentials are server-only.
+const musicGenerationRequest = musicDraft.extend({
+  durationSeconds: z.number().int().min(3).max(300).default(120),
+}).strict();
+function composeElevenMusicRequest(draft: z.infer<typeof musicGenerationRequest>) {
+  const prompt = [
+    draft.description,
+    draft.genre && `Genre: ${draft.genre}`,
+    draft.mood && `Mood: ${draft.mood}`,
+    draft.instruments.length && `Instruments: ${draft.instruments.join(", ")}`,
+    draft.vocalMode === "instrumental"
+      ? "Instrumental only, no singing or spoken words."
+      : `Sung vocals in language ${draft.language}.`,
+    draft.vocalMode === "singing" && draft.lyrics && `Use these original lyrics:\\n${draft.lyrics}`,
+  ].filter(Boolean).join("\\n");
+  return {
+    endpoint: "https://api.elevenlabs.io/v1/music",
+    model_id: "music_v2_5" as const,
+    prompt: prompt.slice(0, 4100),
+    music_length_ms: draft.durationSeconds * 1000,
+    force_instrumental: draft.vocalMode === "instrumental",
+  };
+}
+router.post("/music/generate/preview", (req, res) => {
+  const parsed = musicGenerationRequest.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "INVALID_MUSIC_DRAFT", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  res.json({
+    provider: "elevenlabs_music",
+    status: "dry_run",
+    activated: false,
+    charged: false,
+    request: composeElevenMusicRequest(parsed.data),
+    note: "Request preview only. No ElevenLabs API call was made.",
   });
 });
 
