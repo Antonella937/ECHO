@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS echo_universe_collaborators (owner_id text NOT NULL, universe_id text NOT NULL, collaborator_id text NOT NULL, role text NOT NULL DEFAULT 'editor', joined_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(owner_id, universe_id, collaborator_id), FOREIGN KEY (owner_id, universe_id) REFERENCES echo_universes(owner_id, universe_id) ON DELETE CASCADE);
