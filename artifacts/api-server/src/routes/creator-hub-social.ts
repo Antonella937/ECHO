@@ -467,14 +467,27 @@ export function createCreatorHubSocialRouter(): IRouter {
   router.post("/creator-hub/social/message-requests/:requestId/:action", async (req, res) => {
     const parsed = requestSchema.safeParse(req.params);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_REQUEST" }); return; }
-    const result = await pool.query(
-      `UPDATE echo_creator_message_requests SET status=$3, updated_at=now()
-       WHERE id=$1 AND recipient_owner_id=$2 AND status='pending'
-       RETURNING id`,
-      [parsed.data.requestId, req.userId, parsed.data.action === "accept" ? "accepted" : "rejected"],
-    );
-    if (!result.rowCount) { res.status(404).json({ error: "REQUEST_NOT_FOUND" }); return; }
-    res.json({ status: parsed.data.action === "accept" ? "accepted" : "rejected" });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        `UPDATE echo_creator_message_requests SET status=$3, updated_at=now()
+         WHERE id=$1 AND recipient_owner_id=$2 AND status='pending'
+         RETURNING id, sender_owner_id, recipient_owner_id, preview_body`,
+        [parsed.data.requestId, req.userId, parsed.data.action === "accept" ? "accepted" : "rejected"],
+      );
+      if (!result.rowCount) { await client.query("ROLLBACK"); res.status(404).json({ error: "REQUEST_NOT_FOUND" }); return; }
+      const request = result.rows[0];
+      if (parsed.data.action === "accept" && request.preview_body) {
+        await client.query(
+          "INSERT INTO echo_creator_direct_messages(sender_owner_id,recipient_owner_id,body) VALUES($1,$2,$3)",
+          [request.sender_owner_id, request.recipient_owner_id, request.preview_body],
+        );
+      }
+      await client.query("COMMIT");
+      res.json({ status: parsed.data.action === "accept" ? "accepted" : "rejected" });
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
   });
 
   router.post("/creator-hub/social/blocks", async (req, res) => {
