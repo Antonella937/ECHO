@@ -35,6 +35,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const liked = post.likes.includes(me.id);
   const saved = post.savedBy.includes(me.id);
   const commentCount = state.comments.filter((c) => c.postId === post.id).length;
+  const displayedCommentCount = shownCount(post.displayMetrics?.comments, commentCount);
   const likers = post.likes.map(character).filter(Boolean);
   const tagged = (post.taggedAccountIds ?? []).map(character).filter(Boolean);
   const media = postMedia(post);
@@ -90,7 +91,10 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           <Heart className={cn('h-[25px] w-[25px] transition-transform', liked && 'scale-110 fill-primary text-primary')} strokeWidth={1.6} />
         </IconBtn>
         <IconBtn label={t("Comentar")} onClick={openComments} testId={`button-comment-${post.id}`}>
-          <MessageCircle className="h-[24px] w-[24px] -scale-x-100" strokeWidth={1.6} />
+          <span className="relative inline-flex">
+            <MessageCircle className="h-[24px] w-[24px] -scale-x-100" strokeWidth={1.6} />
+            {displayedCommentCount > 0 && <span className="absolute -right-3 -top-2 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-primary-foreground" data-testid={`badge-comments-${post.id}`}>{formatCount(displayedCommentCount)}</span>}
+          </span>
         </IconBtn>
         <IconBtn label={t("Compartir")} onClick={() => setSheet('share')} testId={`button-share-${post.id}`}>
           <Send className="h-[23px] w-[23px]" strokeWidth={1.6} />
@@ -116,7 +120,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         ) : null}
         <div className="mt-1 flex items-center gap-3 text-[13px] text-muted-foreground">
           <span data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> {t("me gusta")}</span>
-          <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.comments, commentCount))}</span> {t("comentarios")}</span>
+          <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(displayedCommentCount)}</span> {t("comentarios")}</span>
           <span className="flex-1" />
           <PostMetricsEditor post={post} actualComments={commentCount} />
         </div>
@@ -134,9 +138,9 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
             ))}
           </p>
         )}
-        {commentCount > 0 && (
+        {displayedCommentCount > 0 && (
           <button onClick={openComments} className="mt-1.5 text-[14px] text-muted-foreground" data-testid={`button-view-comments-${post.id}`}>
-            {commentCount === 1 ? t('Ver 1 comentario') : `${t('Ver los')} ${commentCount} ${t('comentarios (ver)')}`}
+            {displayedCommentCount === 1 ? t('Ver 1 comentario') : `${t('Ver los')} ${formatCount(displayedCommentCount)} ${t('comentarios (ver)')}`}
           </button>
         )}
         <Link href={`/p/${post.id}`} className="mt-1 block text-[11.5px] uppercase tracking-[0.08em] text-muted-foreground/80" data-testid={`link-post-time-${post.id}`}>
