@@ -26,6 +26,7 @@
 .ep-nav { min-height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--ep-line); }
 .ep-brand { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; letter-spacing: .28em; font-weight: 600; }
 .ep-mark { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid rgba(217,168,189,.55); border-radius: 11px; color: var(--ep-rose); font-family: 'Instrument Serif', serif; font-size: 22px; letter-spacing: 0; }
+.ep-mark > span { position: relative; top: 1px; }
 .ep-navlinks { display: flex; gap: 28px; align-items: center; color: var(--ep-muted); font-size: 13px; }
 .ep-navlinks a:not(.ep-button):hover, .ep-footer a:hover { color: var(--ep-ink); }
 .ep-button { border: 0; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 16px; color: #21191f !important; background: var(--ep-rose); font-size: 13px; font-weight: 700; transition: transform .18s ease, opacity .18s ease, background .18s ease; }
