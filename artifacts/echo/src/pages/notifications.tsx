@@ -36,12 +36,15 @@ export default function NotificationsPage() {
   const { user } = useUser();
   const [creatorPosts, setCreatorPosts] = useState<Array<{ id: string; ownerId: string; displayName: string; title: string; body: string; createdAt: string }>>([]);
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
+  const [serverRead, setServerRead] = useState<string[]>([]);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
     const key = 'echo-official-read:' + user.id;
+    void customFetch<{ ids: string[] }>('/api/creator-hub/social/notification-reads', { responseType: 'json' })
+      .then(data => { if (active) setServerRead(data.ids); }).catch(() => {});
     try { setCreatorRead(JSON.parse(localStorage.getItem('echo-creator-read:' + user.id) || '[]')); } catch { setCreatorRead([]); }
     void customFetch<{ publications: typeof creatorPosts }>('/api/creator-hub/social/following-publications', { responseType: 'json' })
       .then(data => { if (active) setCreatorPosts(data.publications); }).catch(() => {});
@@ -50,7 +53,13 @@ export default function NotificationsPage() {
       .then(data => { if (active) setOfficialUpdates(data.updates); }).catch(() => {});
     return () => { active = false; };
   }, [user?.id]);
+  const saveServerRead = (id: string) => {
+    if (serverRead.includes(id)) return;
+    setServerRead(previous => [...new Set([...previous, id])]);
+    void customFetch('/api/creator-hub/social/notification-reads', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) }).catch(() => {});
+  };
   const markOfficialRead = (id: string) => {
+    saveServerRead(id);
     if (!user?.id) return;
     const next = [...new Set([...officialRead, id])];
     setOfficialRead(next);
@@ -91,14 +100,14 @@ export default function NotificationsPage() {
       {officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {language === 'en' ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label="Unread"/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
+          <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label="Unread"/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
           <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
         </details>)}</div>
       </section>}
       {creatorPosts.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Followed creators' : 'Creadores que seguís'}>
         <h2 className="mb-2 text-sm font-semibold">👥 {language === 'en' ? 'From creators you follow' : 'De creadores que seguís'}</h2>
-        <div className="space-y-2">{creatorPosts.slice(0, 15).map(item => <details key={item.id} onToggle={e => { if (!e.currentTarget.open || !user?.id) return; const next = [...new Set([...creatorRead, item.id])]; setCreatorRead(next); localStorage.setItem('echo-creator-read:' + user.id, JSON.stringify(next)); }} className="rounded-xl border border-border bg-card p-3">
-          <summary className="cursor-pointer text-sm font-semibold">{!creatorRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary"/>}<span className="text-muted-foreground">@{item.displayName} · </span>{item.title}</summary>
+        <div className="space-y-2">{creatorPosts.slice(0, 15).map(item => <details key={item.id} onToggle={e => { if (!e.currentTarget.open || !user?.id) return; saveServerRead(item.id); const next = [...new Set([...creatorRead, item.id])]; setCreatorRead(next); localStorage.setItem('echo-creator-read:' + user.id, JSON.stringify(next)); }} className="rounded-xl border border-border bg-card p-3">
+          <summary className="cursor-pointer text-sm font-semibold">{!creatorRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary"/>}<span className="text-muted-foreground">@{item.displayName} · </span>{item.title}</summary>
           <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
         </details>)}</div>
       </section>}
