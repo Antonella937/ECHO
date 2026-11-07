@@ -28,6 +28,7 @@ export interface CharacterDecision {
      * @maximum 10080
      */
   suggestedDelayMinutes: number;
+  galleryPhotoId?: string | null;
   /**
      * @maxLength 32
      * @nullable
