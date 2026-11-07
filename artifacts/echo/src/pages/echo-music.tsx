@@ -1,10 +1,20 @@
-import { useState } from 'react';
-import { Music2, LockKeyhole, WandSparkles } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
+import { useSocial } from '@/store/social-store';
+import { CharacterAvatar } from '@/components/echo/avatar';
 
 export default function EchoMusicPage() {
   const back = useBack();
+  const { me } = useSocial();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playerOpen, setPlayerOpen] = useState(false);
+  const [audioUrl] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [actualDuration, setActualDuration] = useState(0);
+  const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [genre, setGenre] = useState('');
@@ -42,12 +52,37 @@ export default function EchoMusicPage() {
       });
       if (result.charged || result.status !== 'dry_run') throw new Error('La preparación devolvió un estado inesperado.');
       setPreview(result.request.prompt);
+      setElapsed(0);
+      setPlaying(false);
+      setPlayerOpen(true);
     } catch (err) {
       setPrepareError(err instanceof Error ? err.message : 'No se pudo preparar la canción.');
     } finally {
       setPreparing(false);
     }
   }
+  if (playerOpen) return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#100d12] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+36px)] pt-[calc(env(safe-area-inset-top,0px)+22px)] text-white">
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#5c364b] via-[#231721] to-[#100d12] opacity-80" />
+    <header className="relative z-10 flex items-center justify-between">
+      <button type="button" onClick={() => { audioRef.current?.pause(); setPlaying(false); setPlayerOpen(false); }} aria-label="Volver al estudio" className="grid h-11 w-11 place-items-center"><ChevronDown className="h-7 w-7" /></button>
+      <span className="text-center text-sm font-semibold">ECHO Music · {audioUrl ? 'Reproduciendo' : 'Preparada'}</span>
+      <span className="w-11" />
+    </header>
+    <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-9 py-8">
+      <div className="mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 shadow-2xl">
+        <CharacterAvatar character={me} size={340} className="max-w-full" />
+      </div>
+      <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
+      <div>
+        <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label="Progreso de la canción" className="w-full accent-white disabled:opacity-40" />
+        <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
+        <div className="mt-5 flex justify-center"><button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? 'Pausar' : 'Reproducir'} className="grid h-20 w-20 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-9 w-9 fill-current" /> : <Play className="ml-1 h-9 w-9 fill-current" />}</button></div>
+      </div>
+      {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />La canción está preparada, pero la generación de audio todavía no está activada. Cuando ElevenLabs devuelva un archivo, esta pantalla reproducirá el sonido real y la barra avanzará con él.</div>}
+      <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">Ver prompt preparado</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
+    </div>
+    <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => setElapsed(event.currentTarget.currentTime)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+  </div>;
   return <div><TopBar title="ECHO Music Studio" onBack={back} /><main className="mx-auto max-w-2xl space-y-5 px-4 pb-20 pt-5">
     <div className="rounded-2xl border border-border bg-card/60 p-5">
       <div className="flex items-center gap-2 text-lg font-semibold"><Music2 className="h-5 w-5 text-primary" /> Create your sound</div>
