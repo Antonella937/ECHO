@@ -48,6 +48,16 @@ export function createCreatorHubSocialRouter(): IRouter {
     res.json({ profile: result.rows[0] ?? null });
   });
 
+  router.get("/creator-hub/social/follow-counts", async (req, res) => {
+    const result = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM echo_creator_follows WHERE followed_owner_id=$1) AS followers,
+         (SELECT count(*)::int FROM echo_creator_follows WHERE follower_owner_id=$1) AS following`,
+      [req.userId],
+    );
+    res.json(result.rows[0] ?? { followers: 0, following: 0 });
+  });
+
   router.put("/creator-hub/social/me", async (req, res) => {
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_PROFILE" }); return; }
