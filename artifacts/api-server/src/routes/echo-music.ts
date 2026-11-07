@@ -52,7 +52,7 @@ router.post("/music/library", async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_LIBRARY_ITEM" }); return; }
   const item = parsed.data;
   if (item.audioPath) {
-    if (!/^\\/objects\\/uploads\\/[a-f0-9-]+$/i.test(item.audioPath)) {
+    if (!item.audioPath.startsWith("/objects/uploads/") || !/^\/objects\/uploads\/[a-f0-9-]+$/i.test(item.audioPath)) {
       res.status(400).json({ error: "INVALID_AUDIO_PATH" }); return;
     }
     const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
