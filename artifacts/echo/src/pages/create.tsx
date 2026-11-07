@@ -50,6 +50,7 @@ export default function CreatePage() {
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [musicTitle, setMusicTitle] = useState('');
   const [musicArtist, setMusicArtist] = useState('');
+  const [selectedMusicTrack, setSelectedMusicTrack] = useState<{ id: string; title: string; characterId: string; durationSeconds: number; startSeconds: number; clipSeconds: 15 | 30 } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -423,11 +424,11 @@ export default function CreatePage() {
         {mode === 'story' && (
           <div className="mt-3 grid gap-3">
             <AccountMultiPicker value={mentioned} onChange={setMentioned} label={t("Mencionar cuentas")} excludeId={me.id} max={50} testId="picker-story-mentions" />
-            <MusicSelectorPreview title={musicTitle} artist={musicArtist} onTitleChange={setMusicTitle} onArtistChange={setMusicArtist} story />
+            <MusicSelectorPreview title={musicTitle} artist={musicArtist} onTitleChange={setMusicTitle} onArtistChange={setMusicArtist} story selectedTrack={selectedMusicTrack} onTrackChange={setSelectedMusicTrack} />
           </div>
         )}
 
-        {mode === 'post' && <div className="mt-3"><MusicSelectorPreview title={musicTitle} artist={musicArtist} onTitleChange={setMusicTitle} onArtistChange={setMusicArtist} story={false} /></div>}
+        {mode === 'post' && <div className="mt-3"><MusicSelectorPreview title={musicTitle} artist={musicArtist} onTitleChange={setMusicTitle} onArtistChange={setMusicArtist} story={false} selectedTrack={selectedMusicTrack} onTrackChange={setSelectedMusicTrack} /></div>}
 
         {mode === 'post' && (
           <>
