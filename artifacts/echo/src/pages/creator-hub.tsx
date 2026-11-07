@@ -297,7 +297,7 @@ export default function CreatorHubPage() {
     requestAnimationFrame(() => window.scrollTo({ top: profileReturnScroll.current, behavior: 'instant' }));
   };
   const selectedPerson = peopleResults.find(person => person.ownerId === selectedPersonId);
-  const [viewedProfile, setViewedProfile] = useState<{ displayName: string; username: string; visibility: string; bio: string | null; following: boolean; requested: boolean } | null>(null);
+  const [viewedProfile, setViewedProfile] = useState<{ displayName: string; username: string; visibility: string; bio: string | null; following: boolean; requested: boolean; avatarRef?: string | null; bannerRef?: string | null; avatarPosition?: { x: number; y: number } | null; verificationRole?: 'owner_lifetime' | 'founder_lifetime' | null; roleLabel?: string | null } | null>(null);
   const [viewedPosts, setViewedPosts] = useState<Publication[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
   useEffect(() => {
@@ -464,10 +464,18 @@ export default function CreatorHubPage() {
         {profileLoading && <p className="text-muted-foreground">{ht("Cargando…")}</p>}
         {!profileLoading && !person && <p className="text-muted-foreground">{ht("No encontramos perfiles con ese nombre. La otra persona debe abrir Creator Hub al menos una vez.")}</p>}
         {person && <div className="min-w-0 space-y-7">
-          <div className="h-40 rounded-3xl bg-[linear-gradient(125deg,hsl(263_18%_19%),hsl(336_15%_16%))] sm:h-52"/>
-          <div className="flex items-center gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-background bg-secondary text-2xl font-semibold">{person.displayName.split(/\\s+/).map(n=>n[0]).slice(0,2).join('').toUpperCase()}</div>
-            <div className="min-w-0"><h1 className="text-2xl font-semibold">{person.displayName}</h1><p className="break-all text-muted-foreground">@{person.username}</p></div>
+          <div className="relative h-40 overflow-hidden rounded-3xl bg-[linear-gradient(125deg,hsl(263_18%_19%),hsl(336_15%_16%))] sm:h-52">
+            {'bannerRef' in person && person.bannerRef && <img src={resolveImage(person.bannerRef)} alt="" className="h-full w-full object-cover" />}
+          </div>
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-secondary text-2xl font-semibold">
+              {'avatarRef' in person && person.avatarRef ? <img src={resolveImage(person.avatarRef)} alt="" className="h-full w-full object-cover" style={{ objectPosition: person.avatarPosition ? `${person.avatarPosition.x}% ${person.avatarPosition.y}%` : 'center' }} /> : person.displayName.split(/\\s+/).filter(Boolean).map(n=>n[0]).slice(0,2).join('').toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2"><h1 className="min-w-0 truncate text-2xl font-semibold">{person.displayName}</h1>{'verificationRole' in person && person.verificationRole && <span title={ht("Cuenta verificada de ECHO")} aria-label={ht("Cuenta verificada de ECHO")}><BadgeCheck className="h-6 w-6 shrink-0 fill-primary text-primary-foreground" /></span>}</div>
+              {'roleLabel' in person && person.roleLabel && <p className="text-sm font-semibold text-primary">{person.roleLabel}</p>}
+              <p className="break-all text-muted-foreground">@{person.username}</p>
+            </div>
           </div>
           {'bio' in person && person.bio && <p className="whitespace-pre-wrap text-sm leading-relaxed">{person.bio}</p>}
           <div className="flex min-w-0 flex-wrap gap-3">
@@ -482,7 +490,7 @@ export default function CreatorHubPage() {
           </div>}
           {profileMessageFeedback && <p role="status" aria-live="polite" className="rounded-xl border border-primary/30 p-3 text-sm text-primary">{profileMessageFeedback}</p>}
           {person.visibility === 'private' && !person.following && <div className="rounded-2xl border border-border px-5 py-8 text-center"><LockKeyhole className="mx-auto mb-3 text-muted-foreground"/><p className="font-semibold">{ht("Perfil privado")}</p><p className="mt-2 text-sm text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p></div>}
-          {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="rounded-2xl border border-border p-5"><h3 className="font-semibold">{post.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{post.body}</p></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
+          {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="overflow-hidden rounded-2xl border border-border bg-card">{post.coverPath && <img src={resolvePublicationMedia(post.coverPath)} alt="" className="max-h-80 w-full object-cover" />}<div className="p-5"><h3 className="font-semibold">{post.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{post.body}</p></div></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
         </div>}
       </main>
     </div>;
