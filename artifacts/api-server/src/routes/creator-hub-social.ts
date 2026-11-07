@@ -640,6 +640,23 @@ export function createCreatorHubSocialRouter(): IRouter {
   }).strict();
   // Public official announcements are readable by any signed-in ECHO user.
   // The founder-only publication rule below prevents other creators from impersonating ECHO.
+  // Public creator posts from accounts this member follows; private posts are never exposed.
+  router.get("/creator-hub/social/following-publications", async (req, res) => {
+    const result = await pool.query(
+      `SELECT p.id,p.owner_id AS "ownerId",c.display_name AS "displayName",
+              p.kind,p.title,p.body,p.created_at AS "createdAt"
+       FROM echo_creator_publications p
+       JOIN echo_creator_follows f ON f.followed_owner_id=p.owner_id AND f.follower_owner_id=$1
+       JOIN echo_creator_profiles c ON c.owner_id=p.owner_id
+       WHERE p.visibility='public' AND p.kind<>'update'
+         AND NOT EXISTS (SELECT 1 FROM echo_creator_blocks b
+           WHERE (b.blocker_owner_id=$1 AND b.blocked_owner_id=p.owner_id)
+              OR (b.blocker_owner_id=p.owner_id AND b.blocked_owner_id=$1))
+       ORDER BY p.created_at DESC LIMIT 50`,
+      [req.userId],
+    );
+    res.json({ publications: result.rows });
+  });
   router.get("/creator-hub/social/official-updates", async (req, res) => {
     const result = await pool.query(
       `SELECT id,title,body,created_at AS "createdAt"
