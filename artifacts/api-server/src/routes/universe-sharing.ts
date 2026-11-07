@@ -282,6 +282,17 @@ export function createUniverseSharingRouter(
     res.json(rows.rows[0]);
   });
 
+  router.get("/universe/:universeId/collaborators", async (req,res):Promise<void> => {
+    res.setHeader("Cache-Control","private, no-store");
+    const params=universeParamsSchema.safeParse(req.params);
+    if(!params.success){res.status(400).json({error:"INVALID_UNIVERSE_ID"});return;}
+    const rows=await db.execute(sql`SELECT c.collaborator_id, c.role, c.joined_at FROM echo_universe_collaborators c
+      JOIN echo_universes u ON u.owner_id=c.owner_id AND u.universe_id=c.universe_id
+      WHERE c.owner_id=${req.userId!} AND c.universe_id=${params.data.universeId}
+      AND u.archived_at IS NULL AND u.deleted_at IS NULL`);
+    res.json(rows.rows);
+  });
+
   router.delete("/universe/:universeId/collaborators/:collaboratorId", async (req,res):Promise<void> => {
     res.setHeader("Cache-Control","private, no-store");
     const params=universeParamsSchema.safeParse(req.params);
