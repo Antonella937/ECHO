@@ -166,13 +166,13 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   // Limit costly previews to one batch per project per month. No automatic retries.
   const month=new Date().toISOString().slice(0,7);
   const client=await pool.connect();
-  let reserved=false;
+  let reserved=false; let reservationId:string|null=null;
   try {
    await client.query("BEGIN");
    await client.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))",[req.userId,project.id]);
-   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND created_at>=($2 || '-01')::date",[project.id,month]);
+   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND status IN ('pending','ready') AND created_at>=($2 || '-01')::date",[project.id,month]);
    if(Number(previous.rows[0].count)>0){await client.query("ROLLBACK");res.status(429).json({error:"VOICE_DESIGN_MONTHLY_PREVIEW_LIMIT",charged:false});return;}
-   await client.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,status) VALUES($1,$2,'elevenlabs','pending')",[project.id,req.userId]);
+   const reservation=await client.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,status) VALUES($1,$2,'elevenlabs','pending') RETURNING id",[project.id,req.userId]);reservationId=reservation.rows[0].id;
    await client.query("COMMIT");reserved=true;
   }catch(e){await client.query("ROLLBACK");throw e;}finally{client.release();}
   if(!reserved)return;
@@ -185,7 +185,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
     body:JSON.stringify({model_id:"eleven_multilingual_ttv_v2",voice_description:project.prompt,auto_generate_text:true})
    });
   }finally{clearTimeout(timer);}
-  if(!response.ok){console.error("[voice-design] ElevenLabs request rejected",{providerStatus:response.status,category:response.status===402?"PAYMENT_REQUIRED":response.status===401||response.status===403?"AUTH_OR_PERMISSION":response.status===429?"RATE_OR_CREDIT_LIMIT":"PROVIDER_REJECTED"});res.status(502).json({error:"ELEVENLABS_VOICE_DESIGN_FAILED",providerStatus:response.status,charged:"unknown"});return;}
+  if(!response.ok){await pool.query("UPDATE echo_voice_samples SET status=$2 WHERE id=$1",[reservationId,"failed"]);console.error("[voice-design] ElevenLabs request rejected",{providerStatus:response.status,category:response.status===402?"PAYMENT_REQUIRED":response.status===401||response.status===403?"AUTH_OR_PERMISSION":response.status===429?"RATE_OR_CREDIT_LIMIT":"PROVIDER_REJECTED"});res.status(502).json({error:"ELEVENLABS_VOICE_DESIGN_FAILED",providerStatus:response.status,charged:"unknown"});return;}
   const data=await response.json() as {previews?:{audio_base_64:string;generated_voice_id:string;media_type?:string}[]};
   const previews=(data.previews??[]).slice(0,project.variant_count);
   const base=process.env.SUPABASE_URL?.replace(/\/$/,"");
@@ -205,8 +205,8 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
    const inserted=await pool.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,provider_sample_id,audio_object_path,status) VALUES($1,$2,'elevenlabs',$3,$4,'ready') RETURNING id",[project.id,req.userId,preview.generated_voice_id,path]);
    stored.push({id:inserted.rows[0].id});
   }
-  if(!stored.length){res.status(502).json({error:"VOICE_PREVIEWS_COULD_NOT_BE_STORED",charged:"unknown"});return;}
-  await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
+  if(!stored.length){await pool.query("UPDATE echo_voice_samples SET status=$2 WHERE id=$1",[reservationId,"failed"]);res.status(502).json({error:"VOICE_PREVIEWS_COULD_NOT_BE_STORED",charged:"unknown"});return;}
+  await pool.query("UPDATE echo_voice_samples SET status=$2 WHERE id=$1",[reservationId,'completed']);await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
   res.json({projectId:project.id,samples:stored,generated:stored.length});
  }catch{res.status(503).json({error:"VOICE_GENERATION_UNAVAILABLE",charged:"unknown"});}
 });
