@@ -23,6 +23,7 @@ export type SocialEventPayload =
   | { type: 'post.saved'; postId: string; actorId: CharacterId; saved: boolean }
   | { type: 'story.created'; story: Story }
   | { type: 'story.seen'; storyId: string; actorId: CharacterId }
+  | { type: 'story.liked'; storyId: string; actorId: CharacterId; liked: boolean }
   | { type: 'comment.created'; comment: Comment }
   | { type: 'comment.liked'; commentId: string; actorId: CharacterId; liked: boolean }
   | { type: 'message.sent'; message: Message }
@@ -115,6 +116,19 @@ function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
 
     case 'story.created':
       return { ...state, stories: [ev.story, ...state.stories] };
+
+    case 'story.liked': {
+      const story = state.stories.find(s => s.id === ev.storyId);
+      if (!story || story.authorId === ev.actorId) return state;
+      const stories = state.stories.map(s => s.id === ev.storyId ? { ...s, likes: toggle(s.likes ?? [], ev.actorId, ev.liked) } : s);
+      const notifications = ev.liked
+        ? notify(state.notifications.filter(n => !(n.kind === 'story_like' && n.storyId === ev.storyId && n.actorId === ev.actorId)), {
+            recipientId: story.authorId, actorId: ev.actorId, kind: 'story_like', postId: null,
+            commentId: null, storyId: story.id, excerpt: clip(story.caption, 60), createdAt: ev.at,
+          })
+        : state.notifications.filter(n => !(n.kind === 'story_like' && n.storyId === ev.storyId && n.actorId === ev.actorId));
+      return { ...state, stories, notifications };
+    }
 
     case 'story.seen':
       return {
