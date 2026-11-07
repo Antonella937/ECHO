@@ -34,12 +34,17 @@ export default function NotificationsPage() {
   const t = useNotificationsText();
   const language = useLanguage();
   const { user } = useUser();
+  const [creatorPosts, setCreatorPosts] = useState<Array<{ id: string; ownerId: string; displayName: string; title: string; body: string; createdAt: string }>>([]);
+  const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
     const key = 'echo-official-read:' + user.id;
+    try { setCreatorRead(JSON.parse(localStorage.getItem('echo-creator-read:' + user.id) || '[]')); } catch { setCreatorRead([]); }
+    void customFetch<{ publications: typeof creatorPosts }>('/api/creator-hub/social/following-publications', { responseType: 'json' })
+      .then(data => { if (active) setCreatorPosts(data.publications); }).catch(() => {});
     try { setOfficialRead(JSON.parse(localStorage.getItem(key) || '[]')); } catch { setOfficialRead([]); }
     void customFetch<{ updates: typeof officialUpdates }>('/api/creator-hub/social/official-updates', { responseType: 'json' })
       .then(data => { if (active) setOfficialUpdates(data.updates); }).catch(() => {});
@@ -90,7 +95,14 @@ export default function NotificationsPage() {
           <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
         </details>)}</div>
       </section>}
-      {list.length === 0 ? (
+      {creatorPosts.length > 0 && <section className="px-4 pt-4" aria-label={language === 'en' ? 'Followed creators' : 'Creadores que seguís'}>
+        <h2 className="mb-2 text-sm font-semibold">👥 {language === 'en' ? 'From creators you follow' : 'De creadores que seguís'}</h2>
+        <div className="space-y-2">{creatorPosts.slice(0, 15).map(item => <details key={item.id} onToggle={e => { if (!e.currentTarget.open || !user?.id) return; const next = [...new Set([...creatorRead, item.id])]; setCreatorRead(next); localStorage.setItem('echo-creator-read:' + user.id, JSON.stringify(next)); }} className="rounded-xl border border-border bg-card p-3">
+          <summary className="cursor-pointer text-sm font-semibold">{!creatorRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary"/>}<span className="text-muted-foreground">@{item.displayName} · </span>{item.title}</summary>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
+        </details>)}</div>
+      </section>}
+      {list.length === 0 && officialUpdates.length === 0 && creatorPosts.length === 0 ? (
         <EmptyState title={t("Todo en calma")} body={t("Cuando alguien comente, responda o te escriba, aparecerá aquí.")} />
       ) : (
         <div className="px-1 pt-3">
