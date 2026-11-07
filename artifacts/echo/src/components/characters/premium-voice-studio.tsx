@@ -20,7 +20,7 @@ export function PremiumVoiceStudio() {
   const chooseFile = (next: File | undefined) => {
     setError('');
     if (!next) return;
-    const valid = /\\.(wav|mp3|m4a)$/i.test(next.name) && next.size <= 20 * 1024 * 1024;
+    const valid = /\.(wav|mp3|m4a)$/i.test(next.name) && next.size <= 20 * 1024 * 1024;
     if (!valid) { setFile(null); setError('WAV / MP3 / M4A · max 20 MB'); return; }
     setFile(next); setConsent(false);
   };
