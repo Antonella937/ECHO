@@ -171,25 +171,25 @@ function OfficialUpdateObserver() {
     if (user?.id !== 'user_3LeoBfUicTthDVixNbkPlqXFkdZ') return;
     const preview = () => setVisible({
       id: 'preview-only',
-      title: language === 'en' ? 'Preview: new ECHO announcement' : 'Vista previa: nuevo anuncio de ECHO',
-      body: language === 'en' ? 'This is a local preview. No publication or notification was sent.' : 'Esta es una vista previa local. No se envió ninguna publicación ni notificación.',
+      title: officialText.previewToastTitle,
+      body: officialText.previewToastBody,
       createdAt: new Date().toISOString(),
     });
     window.addEventListener('echo:preview-official-notification', preview);
     return () => window.removeEventListener('echo:preview-official-notification', preview);
-  }, [user?.id, language]);
+  }, [user?.id, officialText.previewToastTitle, officialText.previewToastBody]);
   const english = language === 'en';
   return <>
-    {updates.length > 0 && <button type="button" onClick={() => setExpanded(true)} className="fixed bottom-4 left-4 z-[70] rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-xl" aria-label={english ? 'ECHO official updates' : 'Actualizaciones oficiales de ECHO'}>📣 ECHO {updates.length}</button>}
+    {updates.length > 0 && <button type="button" onClick={() => setExpanded(true)} className="fixed bottom-4 left-4 z-[70] rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-xl" aria-label={officialText.title}>📣 ECHO {updates.length}</button>}
     {visible && <div role="status" className="fixed bottom-16 right-3 z-[80] w-[min(360px,calc(100vw-24px))] rounded-2xl border border-border bg-card p-4 text-foreground shadow-2xl">
-      <div className="flex items-start justify-between gap-2"><strong className="text-sm">📣 {officialText.update}</strong><button type="button" aria-label={english ? 'Dismiss' : 'Cerrar'} onClick={() => setVisible(null)}>×</button></div>
+      <div className="flex items-start justify-between gap-2"><strong className="text-sm">📣 {officialText.update}</strong><button type="button" aria-label={officialText.close} onClick={() => setVisible(null)}>×</button></div>
       <p className="mt-2 text-sm font-semibold">{visible.title}</p>
       <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{visible.body}</p>
       <button type="button" onClick={() => { setVisible(null); setExpanded(true); }} className="mt-3 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">{officialText.read}</button>
     </div>}
     {expanded && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4" onMouseDown={e => { if (e.target === e.currentTarget) setExpanded(false); }}>
       <section role="dialog" aria-modal="true" aria-label={officialText.title} className="max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground">
-        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">📣 {english ? 'Official ECHO updates' : 'Actualizaciones oficiales de ECHO'}</h2><button type="button" onClick={() => setExpanded(false)} aria-label={english ? 'Close' : 'Cerrar'}>×</button></div>
+        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">📣 {officialText.title}</h2><button type="button" onClick={() => setExpanded(false)} aria-label={officialText.close}>×</button></div>
         {updates.map(item => <article key={item.id} className="border-t border-border py-4"><h3 className="font-semibold">{item.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p><p className="mt-2 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</p></article>)}
         <button type="button" onClick={() => { setExpanded(false); navigate('/creator-hub'); }} className="mt-3 text-sm text-primary">{officialText.open}</button>
       </section>
