@@ -197,6 +197,100 @@ export function createUniverseSharingRouter(
     }
   });
 
+
+  // Collaboration is a distinct opt-in: invitation links never silently grant editing rights.
+  router.post("/universe/shared/:token/join", async (req, res): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const token = req.params.token;
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
+    const hash = createHash("sha256").update(token).digest("hex");
+    const rows = await db.execute(sql`SELECT l.owner_id, l.universe_id FROM echo_share_links l
+      JOIN echo_universes u ON u.owner_id=l.owner_id AND u.universe_id=l.universe_id
+      WHERE l.token_hash=${hash} AND l.kind='universe' AND l.revoked_at IS NULL
+      AND u.sharing_enabled=true AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
+    const row = rows.rows[0] as {owner_id:string;universe_id:string}|undefined;
+    if (!row || row.owner_id === req.userId) { res.status(403).json({error:"JOIN_NOT_ALLOWED"}); return; }
+    // Require a separately issued collaborator invitation, not a general share URL.
+    const invites = await db.execute(sql`SELECT 1 FROM echo_collaboration_invites WHERE token_hash=${hash}
+      AND owner_id=${row.owner_id} AND universe_id=${row.universe_id} AND revoked_at IS NULL LIMIT 1`);
+    if (!invites.rows.length) { res.status(403).json({error:"COLLABORATION_INVITE_REQUIRED"}); return; }
+    await db.execute(sql`INSERT INTO echo_universe_collaborators(owner_id,universe_id,collaborator_id)
+      VALUES (${row.owner_id},${row.universe_id},${req.userId!}) ON CONFLICT DO NOTHING`);
+    res.status(201).json({ownerId:row.owner_id,universeId:row.universe_id,role:"editor"});
+  });
+
+  router.post("/universe/:universeId/collaboration-invites", async (req, res): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const params = universeParamsSchema.safeParse(req.params);
+    if (!params.success) { res.status(400).json({error:"INVALID_UNIVERSE_ID"}); return; }
+    const [row] = await db.select().from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,params.data.universeId),
+      isNull(echoUniversesTable.archivedAt),isNull(echoUniversesTable.deletedAt))).limit(1);
+    if (!row || !row.sharingEnabled) { res.status(403).json({error:"SHARING_DISABLED"}); return; }
+    const token = randomBytes(32).toString("base64url");
+    const hash = createHash("sha256").update(token).digest("hex");
+    await db.execute(sql`INSERT INTO echo_share_links(token_hash,owner_id,universe_id,kind)
+      VALUES (${hash},${req.userId!},${params.data.universeId},'universe')`);
+    await db.execute(sql`INSERT INTO echo_collaboration_invites(token_hash,owner_id,universe_id)
+      VALUES (${hash},${req.userId!},${params.data.universeId})`);
+    res.status(201).json({token});
+  });
+
+  router.get("/universe/collaborations/mine", async (req,res):Promise<void> => {
+    res.setHeader("Cache-Control","private, no-store");
+    const rows = await db.execute(sql`SELECT c.owner_id, c.universe_id, c.role,
+      u.state->'creatorSetup'->>'universeName' AS name
+      FROM echo_universe_collaborators c JOIN echo_universes u
+      ON u.owner_id=c.owner_id AND u.universe_id=c.universe_id
+      WHERE c.collaborator_id=${req.userId!} AND u.sharing_enabled=true
+      AND u.archived_at IS NULL AND u.deleted_at IS NULL`);
+    res.json(rows.rows);
+  });
+
+  // Shared editor deliberately exposes ONLY public world metadata.
+  // The owner's full social state, private conversations and memories never cross this boundary.
+  router.get("/universe/collaborations/:ownerId/:universeId", async (req,res):Promise<void> => {
+    res.setHeader("Cache-Control","private, no-store");
+    const {ownerId,universeId}=req.params;
+    const rows=await db.execute(sql`SELECT u.state->'creatorSetup'->>'universeName' AS name,
+      u.state->'creatorSetup'->>'universeDescription' AS description, u.revision
+      FROM echo_universe_collaborators c JOIN echo_universes u
+      ON u.owner_id=c.owner_id AND u.universe_id=c.universe_id
+      WHERE c.owner_id=${ownerId} AND c.universe_id=${universeId}
+      AND c.collaborator_id=${req.userId!} AND u.sharing_enabled=true
+      AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
+    if (!rows.rows.length) {res.status(404).json({error:"COLLABORATION_NOT_FOUND"});return;}
+    res.json(rows.rows[0]);
+  });
+
+  router.patch("/universe/collaborations/:ownerId/:universeId", async (req,res):Promise<void> => {
+    res.setHeader("Cache-Control","private, no-store");
+    const parsed=z.object({name:z.string().trim().min(1).max(60),description:z.string().max(500),
+      expectedRevision:z.number().int().positive()}).strict().safeParse(req.body);
+    if (!parsed.success) {res.status(400).json({error:"INVALID_COLLABORATION_EDIT"});return;}
+    const {ownerId,universeId}=req.params;
+    const rows=await db.execute(sql`UPDATE echo_universes u SET
+      state=jsonb_set(jsonb_set(u.state,'{creatorSetup,universeName}',to_jsonb(${parsed.data.name}::text),true),
+      '{creatorSetup,universeDescription}',to_jsonb(${parsed.data.description}::text),true),
+      revision=u.revision+1, updated_at=now()
+      WHERE u.owner_id=${ownerId} AND u.universe_id=${universeId} AND u.revision=${parsed.data.expectedRevision}
+      AND u.sharing_enabled=true AND u.archived_at IS NULL AND u.deleted_at IS NULL
+      AND EXISTS(SELECT 1 FROM echo_universe_collaborators c WHERE c.owner_id=u.owner_id
+        AND c.universe_id=u.universe_id AND c.collaborator_id=${req.userId!} AND c.role='editor')
+      RETURNING u.revision`);
+    if (!rows.rows.length) {res.status(409).json({error:"COLLABORATION_CONFLICT_OR_REVOKED"});return;}
+    res.json(rows.rows[0]);
+  });
+
+  router.delete("/universe/:universeId/collaborators/:collaboratorId", async (req,res):Promise<void> => {
+    res.setHeader("Cache-Control","private, no-store");
+    const params=universeParamsSchema.safeParse(req.params);
+    if (!params.success) {res.status(400).json({error:"INVALID_UNIVERSE_ID"});return;}
+    await db.execute(sql`DELETE FROM echo_universe_collaborators WHERE owner_id=${req.userId!}
+      AND universe_id=${params.data.universeId} AND collaborator_id=${req.params.collaboratorId}`);
+    res.status(204).end();
+  });
+
   router.delete("/universe/:universeId/share-links/:token", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "private, no-store");
     const params = universeParamsSchema.safeParse(req.params);
