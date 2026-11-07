@@ -1,15 +1,41 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from '@/components/echo/avatar';
 
+type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' };
+const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
+
 export default function EchoMusicPage() {
   const back = useBack();
   const { me } = useSocial();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
+  const [libraryError, setLibraryError] = useState('');
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(libraryKey(me.id)) ?? '[]') as unknown;
+      setLibrary(Array.isArray(stored) ? stored.filter((item): item is MusicDraftRecord => !!item && typeof item === 'object' && typeof item.title === 'string' && item.status === 'draft' && item.characterId === me.id).slice(0, 50) : []);
+    } catch { setLibrary([]); }
+  }, [me.id]);
+  function saveDraft(record: MusicDraftRecord) {
+    try {
+      const next = [record, ...library.filter(item => item.id !== record.id)].slice(0, 50);
+      localStorage.setItem(libraryKey(me.id), JSON.stringify(next));
+      setLibrary(next);
+      setLibraryError('');
+    } catch { setLibraryError('No se pudo guardar el borrador en este dispositivo.'); }
+  }
+  function deleteDraft(id: string) {
+    try {
+      const next = library.filter(item => item.id !== id);
+      localStorage.setItem(libraryKey(me.id), JSON.stringify(next));
+      setLibrary(next);
+    } catch { setLibraryError('No se pudo eliminar el borrador.'); }
+  }
   const [audioUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -52,6 +78,7 @@ export default function EchoMusicPage() {
       });
       if (result.charged || result.status !== 'dry_run') throw new Error('La preparación devolvió un estado inesperado.');
       setPreview(result.request.prompt);
+      saveDraft({ id: crypto.randomUUID(), title: title.trim(), prompt: result.request.prompt, characterId: me.id, createdAt: new Date().toISOString(), durationSeconds, status: 'draft' });
       setElapsed(0);
       setPlaying(false);
       setPlayerOpen(true);
@@ -101,6 +128,10 @@ export default function EchoMusicPage() {
     </form>
     {prepareError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{prepareError}</p>}
     {preview && <section className="rounded-2xl border border-border bg-card/60 p-4" aria-live="polite"><h2 className="text-sm font-semibold">Solicitud preparada · {title} · {durationSeconds}s</h2><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{preview}</pre><p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/> Generación no activada. Sin cargos.</p></section>}
+    <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">Los prompts se guardan solo en este dispositivo. Todavía no son canciones ni se sincronizan con tu cuenta.</p>
+      {libraryError && <p role="alert" className="mt-2 text-xs text-destructive">{libraryError}</p>}
+      {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">Todavía no preparaste canciones.</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">Borrador · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">Eliminar</button></div>)}</div>}
+    </section>
     <div className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Música para historias y publicaciones</h2><p className="mt-2 text-xs text-muted-foreground">Feed.fm Clips: integración preparada, sin activar ni contratar. La reproducción de fragmentos de 15 o 30 segundos se habilitará únicamente después de confirmar el contrato, los derechos para Argentina y el acceso oficial al catálogo. YouTube: búsqueda disponible, sin derechos de reproducción de audio sobre fotos.</p></div>
   </main></div>;
 }
