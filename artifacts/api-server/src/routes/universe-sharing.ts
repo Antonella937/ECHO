@@ -136,6 +136,9 @@ export function createUniverseSharingRouter(
       AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
     const row = rows.rows[0] as { owner_id: string; universe_id: string; kind: string; character_id: string | null; state: Record<string, unknown> } | undefined;
     if (!row) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
+    const invitation = await db.execute(sql`SELECT 1 FROM echo_collaboration_invites
+      WHERE token_hash=${hash} AND revoked_at IS NULL LIMIT 1`);
+    const isCollaborationInvite = invitation.rows.length > 0;
     const state = row.state;
     const characters = Array.isArray(state.characters) ? state.characters as Array<Record<string, unknown>> : [];
     const privateRows = await db.execute(sql`SELECT character_id FROM echo_character_privacy
@@ -149,7 +152,7 @@ export function createUniverseSharingRouter(
     if (!visible.length) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
     const setup = state.creatorSetup as Record<string, unknown> | undefined;
     res.json({ kind: row.kind, universeName: setup?.universeName ?? "Universo ECHO",
-      description: setup?.universeDescription ?? "", characters: visible, importAvailable: false });
+      description: setup?.universeDescription ?? "", characters: visible, importAvailable: !isCollaborationInvite, collaborationInvite: isCollaborationInvite });
   });
 
 
@@ -165,6 +168,9 @@ export function createUniverseSharingRouter(
       AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
     const source = rows.rows[0] as { owner_id:string; universe_id:string; kind:string; character_id:string|null; state:Record<string,unknown> } | undefined;
     if (!source || source.owner_id === req.userId) { res.status(403).json({ error: "IMPORT_NOT_ALLOWED" }); return; }
+    const invitation = await db.execute(sql`SELECT 1 FROM echo_collaboration_invites
+      WHERE token_hash=${hash} LIMIT 1`);
+    if (invitation.rows.length) {res.status(403).json({error:"INVITATION_NOT_IMPORTABLE"});return;}
     const privacyRows = await db.execute(sql`SELECT character_id FROM echo_character_privacy
       WHERE owner_id=${source.owner_id} AND universe_id=${source.universe_id} AND visibility='private'`);
     const hidden = new Set(privacyRows.rows.map(x => String(x.character_id)));
