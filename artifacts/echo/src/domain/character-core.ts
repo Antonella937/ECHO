@@ -101,23 +101,46 @@ export function deriveRoutineContext(config: CharacterConfig, now = new Date()):
 export function deletionBlockReason(state: SocialState, id: string): string | null {
   if (!state.characters.some(c => c.id === id)) return 'Esta cuenta ya no existe.';
   if (state.characters.filter(c => !c.archived && c.id !== id).length === 0) return 'Necesitás conservar al menos una identidad activa en el universo.';
-  const history = state.posts.some(p => p.authorId === id || p.likes.includes(id) || p.savedBy.includes(id)) ||
-    state.stories.some(s => s.authorId === id || s.seenBy.includes(id)) ||
-    state.comments.some(c => c.authorId === id || c.replyToAuthorId === id || c.likes.includes(id)) ||
-    state.messages.some(m => m.senderId === id || m.recipientId === id || m.readBy.includes(id)) ||
-    state.notifications.some(n => n.actorId === id || n.recipientId === id) ||
-    Object.entries(state.follows).some(([key, values]) => (key === id && values.length > 0) || values.includes(id)) ||
-    state.characters.some(c => c.id !== id && c.configuration && (
-      c.configuration.relationships.some(r => r.targetId === id) || c.configuration.currentState.companions.includes(id) ||
-      [...c.configuration.memory.permanent, ...c.configuration.memory.relationships, ...c.configuration.memory.recent].some(m => m.targetId === id)));
-  return history ? 'Esta cuenta tiene historial, interacciones o vínculos. Archivala para conservarlos; podés restaurarla después.' : null;
+  return null;
 }
+
+/** Permanently delete an identity and remove its references throughout the local universe. */
 export function deleteUnusedAccount(state: SocialState, id: string): SocialState {
   const blocked = deletionBlockReason(state, id);
   if (blocked) throw Error(blocked);
-  const follows = { ...state.follows }; delete follows[id];
-  return { ...state, characters: state.characters.filter(c => c.id !== id), follows,
-    currentCharacterId: state.currentCharacterId === id ? state.characters.find(c => c.id !== id && !c.archived)!.id : state.currentCharacterId };
+  const characters = state.characters.filter(c => c.id !== id);
+  const posts = state.posts.filter(p => p.authorId !== id).map(p => ({
+    ...p, likes: p.likes.filter(x => x !== id), savedBy: p.savedBy.filter(x => x !== id),
+    taggedAccountIds: p.taggedAccountIds?.filter(x => x !== id),
+  }));
+  const postIds = new Set(posts.map(p => p.id));
+  const comments = state.comments.filter(c => c.authorId !== id && postIds.has(c.postId));
+  const commentIds = new Set(comments.map(c => c.id));
+  const stories = state.stories.filter(s => s.authorId !== id).map(s => ({
+    ...s, seenBy: s.seenBy.filter(x => x !== id),
+    mentionedAccountIds: s.mentionedAccountIds?.filter(x => x !== id),
+    allowedViewerIds: s.allowedViewerIds?.filter(x => x !== id),
+    likes: s.likes?.filter(x => x !== id),
+    reactions: s.reactions?.filter(r => r.actorId !== id),
+  }));
+  const storyIds = new Set(stories.map(s => s.id));
+  const follows = Object.fromEntries(Object.entries(state.follows)
+    .filter(([key]) => key !== id).map(([key, ids]) => [key, ids.filter(x => x !== id)]));
+  const closeFriends = state.closeFriends ? Object.fromEntries(Object.entries(state.closeFriends)
+    .filter(([key]) => key !== id).map(([key, ids]) => [key, ids.filter(x => x !== id)])) : undefined;
+  return {
+    ...state, characters, posts, stories, follows, closeFriends,
+    comments: comments.map(c => ({
+      ...c, likes: c.likes.filter(x => x !== id),
+      parentId: c.parentId && commentIds.has(c.parentId) ? c.parentId : null,
+      replyToAuthorId: c.replyToAuthorId === id ? null : c.replyToAuthorId,
+    })),
+    messages: state.messages.filter(m => m.senderId !== id && m.recipientId !== id),
+    notifications: state.notifications.filter(n => n.actorId !== id && n.recipientId !== id &&
+      (!n.postId || postIds.has(n.postId)) && (!n.commentId || commentIds.has(n.commentId)) &&
+      (!n.storyId || storyIds.has(n.storyId))),
+    currentCharacterId: state.currentCharacterId === id ? characters.find(c => !c.archived)!.id : state.currentCharacterId,
+  };
 }
 export function duplicateCharacter(state: SocialState, id: string, newId: string): Character {
   const original = state.characters.find(c => c.id === id);
