@@ -168,17 +168,6 @@ function OfficialUpdateObserver() {
     document.addEventListener('visibilitychange', refresh);
     return () => { active = false; clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [user?.id]);
-  useEffect(() => {
-    if (user?.id !== 'user_3LeoBfUicTthDVixNbkPlqXFkdZ') return;
-    const preview = () => setVisible({
-      id: 'preview-only',
-      title: officialText.previewToastTitle,
-      body: officialText.previewToastBody,
-      createdAt: new Date().toISOString(),
-    });
-    window.addEventListener('echo:preview-official-notification', preview);
-    return () => window.removeEventListener('echo:preview-official-notification', preview);
-  }, [user?.id, officialText.previewToastTitle, officialText.previewToastBody]);
   const english = language === 'en';
   return <>
     {updates.length > 0 && <button type="button" onClick={() => setExpanded(true)} className="fixed bottom-4 left-4 z-[70] rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-xl" aria-label={officialText.title}>📣 ECHO {updates.length}</button>}
@@ -205,17 +194,23 @@ function FirstWelcomeDialog() {
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
-    // Avoid claiming twice during route changes and component remounts.
+    let requested = false;
     const localKey = 'echo-welcome-claimed:' + user.id;
-    if (localStorage.getItem(localKey)) return;
-    void customFetch<{ show: boolean }>('/api/creator-hub/social/claim-welcome', {
-      method: 'POST', responseType: 'json',
-    }).then(result => {
-      if (!active) return;
-      localStorage.setItem(localKey, '1');
-      if (result.show) setOpen(true);
-    }).catch(() => { /* retry on next session if unavailable */ });
-    return () => { active = false; };
+    const claim = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId: string }>).detail;
+      if (detail?.userId !== user.id || requested || localStorage.getItem(localKey)) return;
+      requested = true;
+      void customFetch<{ show: boolean }>('/api/creator-hub/social/claim-welcome', {
+        method: 'POST', responseType: 'json',
+      }).then(result => {
+        if (!active) return;
+        localStorage.setItem(localKey, '1');
+        if (result.show) setOpen(true);
+      }).catch(() => { requested = false; });
+    };
+    // The welcome waits until the signed-in account's language has loaded.
+    window.addEventListener('echo:account-language-ready', claim);
+    return () => { active = false; window.removeEventListener('echo:account-language-ready', claim); };
   }, [user?.id]);
   if (!open) return null;
   return <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-5" role="presentation">
@@ -500,6 +495,7 @@ function InterfaceLanguageSync() {
           void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language: lastLanguage.current }) }).catch(console.warn);
         }
         setReadyForUser(user.id);
+        window.dispatchEvent(new CustomEvent('echo:account-language-ready', { detail: { userId: user.id } }));
       })
       .catch(error => { if (!cancelled) console.warn('ECHO language sync unavailable', error); });
     return () => { cancelled = true; };
