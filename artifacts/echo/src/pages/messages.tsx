@@ -2,7 +2,7 @@ import { useMessagesText } from '@/lib/messages-translations';
 import { useLanguage } from '@/lib/i18n';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { PenSquare, Search } from 'lucide-react';
+import { Bookmark, PenSquare, Search, X } from 'lucide-react';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useSocial } from '@/store/social-store';
 import { useThreads } from '@/hooks/use-social-selectors';
@@ -16,7 +16,9 @@ const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 
 export default function MessagesPage() {
   const t = useMessagesText();
-  const { me } = useSocial();
+  const { me, state, character, actions } = useSocial();
+  const [showSaved, setShowSaved] = useState(false);
+  const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
@@ -28,6 +30,8 @@ export default function MessagesPage() {
         onBack={() => navigate("/")}
         sub={`${t("Bandeja de")} ${me.name}`}
         right={
+          <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setShowSaved(v => !v)} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
           <button
             onClick={() => setComposing(true)}
             aria-label={t("Nueva conversación")}
@@ -37,9 +41,21 @@ export default function MessagesPage() {
             <PenSquare className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
             <span className="hidden min-[380px]:inline">{t("Nueva")}</span>
           </button>
+          </div>
         }
       />
-      {threads.length === 0 ? (
+      {showSaved ? (
+        <section className="px-3 pt-4" data-testid="list-saved-messages">
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Mensajes favoritos')}</h2><span className="text-xs text-muted-foreground">{savedMessages.length}</span></div>
+          {savedMessages.length === 0 ? <p className="py-12 text-center text-sm text-muted-foreground">{t('Todavía no guardaste ningún mensaje. Tocá el marcador de un mensaje para encontrarlo aquí.')}</p> : (
+            <ul className="space-y-2">{savedMessages.map(m => { const otherId = m.senderId === me.id ? m.recipientId : m.senderId; const other = character(otherId); return <li key={m.id} className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card p-3">
+              {other && <CharacterAvatar character={other} size={40} />}
+              <Link href={`/messages/${otherId}?saved=${encodeURIComponent(m.id)}`} className="min-w-0 flex-1" data-testid={`link-saved-message-${m.id}`}><p className="text-xs font-semibold">{other?.name ?? t('Conversación')} · {timeAgo(m.createdAt)}</p><p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{m.text || (m.attachments?.length ? t('Archivo adjunto') : t('Mensaje'))}</p></Link>
+              <button type="button" onClick={() => actions.toggleSaveMessage(m.id)} aria-label={t('Quitar de favoritos')} className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid={`button-unsave-message-${m.id}`}><Bookmark className="h-5 w-5 fill-primary text-primary" /></button>
+            </li>; })}</ul>
+          )}
+        </section>
+      ) : threads.length === 0 ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
