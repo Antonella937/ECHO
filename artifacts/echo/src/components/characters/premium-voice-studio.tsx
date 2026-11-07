@@ -23,6 +23,26 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
+  const [references,setReferences]=useState<{id:string;contentType:string;size:number}[]>([]);
+  const [playingUrl,setPlayingUrl]=useState<string | null>(null);
+  const loadReferences=async()=>{
+    if(!characterId)return;
+    const data=await customFetch<{references:{id:string;contentType:string;size:number}[]}>(`/api/voices/premium/references?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
+    setReferences(data.references);
+  };
+  const playReference=async(id:string)=>{
+    try{
+      const data=await customFetch<{url:string}>(`/api/voices/premium/references/${encodeURIComponent(id)}/play`,{responseType:'json'});
+      setPlayingUrl(data.url);
+    }catch{setError(language==='es'?'No se pudo reproducir el audio.':'Could not play the recording.');}
+  };
+  const deleteReference=async(id:string)=>{
+    if(!window.confirm(language==='es'?'¿Eliminar este audio de referencia?':'Delete this reference audio?'))return;
+    try{
+      await customFetch(`/api/voices/premium/references/${encodeURIComponent(id)}`,{method:'DELETE',responseType:'json'});
+      setPlayingUrl(null);await loadReferences();
+    }catch{setError(language==='es'?'No se pudo eliminar el audio.':'Could not delete the recording.');}
+  };
   useEffect(() => {
     if (!characterId) return;
     let cancelled = false;
@@ -31,6 +51,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       .catch(()=>{});
     return ()=>{cancelled=true;};
   },[characterId,universeId]);
+  useEffect(()=>{void loadReferences().catch(()=>{});},[characterId,universeId]);
   const saveDraft=async()=>{
     if(!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent)))return;
     setSaving(true);setError('');setSaved(false);
@@ -43,6 +64,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
         if(!response.ok)throw Error('VOICE_UPLOAD_FAILED');
         await customFetch('/api/voices/premium/reference/verify',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,objectPath:signed.objectPath,contentType,consentConfirmed:true})});
         setUploadedPath(signed.objectPath);
+        await loadReferences();
       }
       await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode,prompt,language:voiceLanguage,variantCount:count,consentConfirmed:mode==='reference'&&consent})});
       setSaved(true);
@@ -79,7 +101,8 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1"/><span>{labels[13]}</span></label>
       <p className="text-xs text-muted-foreground">{labels[12]}</p>
-      <p className="text-xs text-muted-foreground">{uploadedPath?(language==='es'?'Audio enviado a almacenamiento privado. La asociación definitiva al proyecto está pendiente.':'Audio uploaded to private storage. Linking it to the project is still pending.'):(language==='es'?'El audio solo se subirá cuando confirmes el consentimiento y guardes.':'Audio uploads only after you confirm consent and save.')}</p>
+      <p className="text-xs text-muted-foreground">{uploadedPath?(language==='es'?'Audio guardado de forma privada para este personaje.':'Audio saved privately for this character.'):(language==='es'?'El audio solo se subirá cuando confirmes el consentimiento y guardes.':'Audio uploads only after you confirm consent and save.')}</p>
+      {references.length>0&&<div className="space-y-2"><p className="text-xs font-medium">{language==='es'?'Audios de referencia guardados':'Saved reference recordings'}</p>{references.map((reference,i)=><div key={reference.id} className="flex items-center gap-2 text-xs"><span className="flex-1">{language==='es'?'Audio':'Recording'} {i+1} · {(reference.size/1024/1024).toFixed(1)} MB</span><button type="button" className="text-primary underline" onClick={()=>void playReference(reference.id)}>{language==='es'?'Escuchar':'Play'}</button><button type="button" className="text-destructive underline" onClick={()=>void deleteReference(reference.id)}>{language==='es'?'Eliminar':'Delete'}</button></div>)}{playingUrl&&<audio controls src={playingUrl} className="w-full"/>}</div>}
     </>}
     <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent))} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
     {saved&&<p role="status" className="text-xs text-primary">{language==='es'?'Proyecto guardado. Generación pendiente de activación.':'Project saved. Generation is not yet enabled.'}</p>}
