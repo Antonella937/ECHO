@@ -447,41 +447,25 @@ export async function executeAutonomyDecision(input: {
       return { status: "no_action", reasonCode: "MODEL_SELECTED_NONE" };
     }
 
-    // A post is chosen by the existing autonomy model first. Only then consider
-    // an owner-approved, contextually relevant gallery image. No random attachments.
-    if (input.decision.action === "draft" && input.decision.situation === "post" && mutation.targetId) {
-      const caption = input.decision.text?.trim() ?? "";
-      const tokens = (value: string) => new Set((value.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
-        .filter(word => !new Set(["para","with","that","this","from","como","sobre","pero","foto","photo","image","esta","este","just","some","about","have","will","there"]).has(word)));
-      const captionWords = tokens(caption);
-      if (captionWords.size) {
-        const gallery = await tx.select().from(echoCharacterGalleryTable).where(and(
-          eq(echoCharacterGalleryTable.ownerId,input.ownerId),
-          eq(echoCharacterGalleryTable.universeId,universeId),
-          eq(echoCharacterGalleryTable.characterId,input.characterId),
-          eq(echoCharacterGalleryTable.reserved,false),
-        )).for("update");
-        const candidates = gallery.filter(photo => (photo.reusable || photo.usedCount === 0) &&
-          (photo.usedCount === 0 || !photo.lastUsedAt || now.getTime() - photo.lastUsedAt.getTime() >= 30 * DAY_MS))
-          .map(photo => {
-            const vision = photo.visionStatus === "complete" && photo.visionAnalysis ? photo.visionAnalysis : null;
-            const scene = vision && typeof vision.sceneDescription === "string" ? vision.sceneDescription : "";
-            const setting = vision && typeof vision.setting === "string" ? vision.setting : "";
-            const activities = vision && Array.isArray(vision.activities) ? vision.activities.filter((v):v is string => typeof v === "string").join(" ") : "";
-            const details = vision && Array.isArray(vision.notableDetails) ? vision.notableDetails.filter((v):v is string => typeof v === "string").join(" ") : "";
-            const context = [photo.description, scene, setting, activities, details].join(" ");
-            return { photo, score: [...tokens(context)].filter(word => captionWords.has(word)).length };
-          })
-          .filter(item => item.score >= 2).sort((a,b) => b.score - a.score || a.photo.usedCount - b.photo.usedCount);
-        if (candidates.length && candidates[0].score > (candidates[1]?.score ?? 0)) {
-          const selected = candidates[0].photo;
-          const post = mutation.state.posts.find(item => item.id === mutation.targetId);
-          if (post) {
-            post.image = selected.mediaRef;
-            await tx.update(echoCharacterGalleryTable).set({
-              usedCount: sql`${echoCharacterGalleryTable.usedCount} + 1`, lastUsedAt: now,
-            }).where(eq(echoCharacterGalleryTable.id,selected.id));
-          }
+    // Honor only the model's explicit photo choice. Recheck ownership, availability,
+    // reservation and reuse in the same transaction as the post write.
+    if (input.decision.action === "draft" && input.decision.situation === "post" &&
+        input.decision.galleryPhotoId && mutation.targetId) {
+      const [selected] = await tx.select().from(echoCharacterGalleryTable).where(and(
+        eq(echoCharacterGalleryTable.id,input.decision.galleryPhotoId),
+        eq(echoCharacterGalleryTable.ownerId,input.ownerId),
+        eq(echoCharacterGalleryTable.universeId,universeId),
+        eq(echoCharacterGalleryTable.characterId,input.characterId),
+        eq(echoCharacterGalleryTable.reserved,false),
+      )).for("update").limit(1);
+      if (selected && (selected.reusable || selected.usedCount === 0) &&
+          (selected.usedCount === 0 || !selected.lastUsedAt || now.getTime()-selected.lastUsedAt.getTime()>=30*DAY_MS)) {
+        const post = mutation.state.posts.find(item => item.id === mutation.targetId);
+        if (post) {
+          post.image = selected.mediaRef;
+          await tx.update(echoCharacterGalleryTable).set({
+            usedCount: sql`${echoCharacterGalleryTable.usedCount} + 1`, lastUsedAt: now,
+          }).where(eq(echoCharacterGalleryTable.id,selected.id));
         }
       }
     }
