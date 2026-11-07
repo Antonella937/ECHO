@@ -20,3 +20,5 @@ export * from "./echo-subscriptions";
 export * from "./echo-music-library";
 
 export * from "./echo-interface-languages";
+
+export * from './echo-character-gallery';
