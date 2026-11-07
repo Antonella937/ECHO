@@ -1,5 +1,6 @@
 import { SCHEMA_VERSION, type SocialState } from '../domain/types';
 import { upgradeAccounts } from '../domain/accounts';
+import { repairOrphanedCharacterLinks } from '../domain/character-core';
 import { mergeUniverse, same, type MergeConflict, type Resolutions } from './merge';
 import {
   loadUniverse, saveUniverse, RevisionConflict, loadRecovery, saveRecovery,
@@ -72,7 +73,7 @@ export class UniverseSync {
       this.base = recovery && !same(recovery.base, recovery.state) ? recovery.base : remote.state;
       this.view.state = recovery && !same(recovery.base, recovery.state)
         ? recovery.state : remote.state ?? this.seed();
-      this.view.state = upgradeAccounts(this.view.state);
+      this.view.state = repairOrphanedCharacterLinks(upgradeAccounts(this.view.state));
       await this.backup();
     } catch (e) { this.view.error = (e as Error).message; }
     finally { this.view.busy = false; this.emit(); }
@@ -160,7 +161,7 @@ export class UniverseSync {
           await this.backup();
           return;
         }
-        const privateState = await this.io.moveLocalImagesToPrivateStorage(merged.state);
+        const privateState = await this.io.moveLocalImagesToPrivateStorage(repairOrphanedCharacterLinks(merged.state));
         if (this.stopped) return;
         let saved = remote;
         try {
