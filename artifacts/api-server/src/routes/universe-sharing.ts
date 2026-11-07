@@ -105,6 +105,12 @@ export function createUniverseSharingRouter(
     if (body.data.kind === "character" && !characters.some(x => x.id === body.data.characterId && !x.archived)) {
       res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
     }
+    if (body.data.kind === "character") {
+      const privateRows = await db.execute(sql`SELECT 1 FROM echo_character_privacy
+        WHERE owner_id=${req.userId!} AND universe_id=${params.data.universeId}
+        AND character_id=${body.data.characterId!} AND visibility='private' LIMIT 1`);
+      if (privateRows.rows.length) { res.status(403).json({ error: "CHARACTER_PRIVATE" }); return; }
+    }
     const token = randomBytes(32).toString("base64url");
     const hash = createHash("sha256").update(token).digest("hex");
     await db.execute(sql`INSERT INTO echo_share_links (token_hash, owner_id, universe_id, kind, character_id)
