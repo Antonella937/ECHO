@@ -167,6 +167,17 @@ function OfficialUpdateObserver() {
     document.addEventListener('visibilitychange', refresh);
     return () => { active = false; clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [user?.id]);
+  useEffect(() => {
+    if (user?.id !== 'user_3LeoBfUicTthDVixNbkPlqXFkdZ') return;
+    const preview = () => setVisible({
+      id: 'preview-only',
+      title: language === 'en' ? 'Preview: new ECHO announcement' : 'Vista previa: nuevo anuncio de ECHO',
+      body: language === 'en' ? 'This is a local preview. No publication or notification was sent.' : 'Esta es una vista previa local. No se envió ninguna publicación ni notificación.',
+      createdAt: new Date().toISOString(),
+    });
+    window.addEventListener('echo:preview-official-notification', preview);
+    return () => window.removeEventListener('echo:preview-official-notification', preview);
+  }, [user?.id, language]);
   const english = language === 'en';
   return <>
     {updates.length > 0 && <button type="button" onClick={() => setExpanded(true)} className="fixed bottom-4 left-4 z-[70] rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-xl" aria-label={english ? 'ECHO official updates' : 'Actualizaciones oficiales de ECHO'}>📣 ECHO {updates.length}</button>}
