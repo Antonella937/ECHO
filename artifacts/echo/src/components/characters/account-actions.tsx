@@ -31,12 +31,12 @@ export function AccountActions({ account, dirty }: { account: Character; dirty: 
             </div>
           </div>
         ) : (
-          <button onClick={() => setMode('duplicate')} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border text-sm" data-testid="button-duplicate-character"><Copy className="h-4 w-4" /> Duplicar personaje</button>
+          <button onClick={() => setMode('duplicate')} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border text-sm" data-testid="button-duplicate-character"><Copy className="h-4 w-4" /> {t("Duplicar personaje")}</button>
         )}
         {(account.archived ? (
-          <button onClick={() => run(() => { actions.archiveAccount(account.id, false); toast({ title: t("Cuenta restaurada") }); })} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-semibold" data-testid="button-restore-character"><ArchiveRestore className="h-4 w-4" /> Restaurar cuenta</button>
+          <button onClick={() => run(() => { actions.archiveAccount(account.id, false); toast({ title: t("Cuenta restaurada") }); })} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-semibold" data-testid="button-restore-character"><ArchiveRestore className="h-4 w-4" /> {t("Restaurar cuenta")}</button>
         ) : (
-          <button onClick={() => run(() => { actions.archiveAccount(account.id, true); toast({ title: t("Cuenta archivada"), description: t("Su historial se conserva.") }); })} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border text-sm text-muted-foreground" data-testid="button-archive-character"><Archive className="h-4 w-4" /> Archivar (conserva historial)</button>
+          <button onClick={() => run(() => { actions.archiveAccount(account.id, true); toast({ title: t("Cuenta archivada"), description: t("Su historial se conserva.") }); })} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border text-sm text-muted-foreground" data-testid="button-archive-character"><Archive className="h-4 w-4" /> {t("Archivar (conserva historial)")}</button>
         ))}
         {block ? (
           <p className="rounded-2xl bg-secondary/60 p-3 text-[13px] text-muted-foreground" data-testid="text-delete-blocked">{t('No se puede eliminar:')} {block}{!account.archived && ` ${t('Podés archivarla en su lugar.')}`}</p>
@@ -50,7 +50,7 @@ export function AccountActions({ account, dirty }: { account: Character; dirty: 
             </div>
           </div>
         ) : (
-          <button onClick={() => setMode('delete')} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-destructive/40 text-sm text-destructive" data-testid="button-delete-character"><Trash2 className="h-4 w-4" /> Eliminar cuenta sin uso</button>
+          <button onClick={() => setMode('delete')} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-destructive/40 text-sm text-destructive" data-testid="button-delete-character"><Trash2 className="h-4 w-4" /> {t("Eliminar cuenta sin uso")}</button>
         )}
         {error && <p role="alert" className="text-sm text-destructive" data-testid="text-account-action-error">{error}</p>}
       </div>
