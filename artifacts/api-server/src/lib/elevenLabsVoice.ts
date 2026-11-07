@@ -6,8 +6,8 @@
 export function elevenLabsVoiceStatus() {
   const keyPresent = Boolean(process.env.ELEVENLABS_API_KEY?.trim());
   const enabled = process.env.ECHO_ELEVENLABS_VOICE_DESIGN_ENABLED === "true";
-  return { provider:"elevenlabs" as const, configured:keyPresent, generationAvailable:keyPresent && enabled,
-    reason:!keyPresent?"ELEVENLABS_KEY_MISSING":!enabled?"VOICE_DESIGN_DISABLED":null };
+  return { provider:"elevenlabs" as const, configured:keyPresent, generationAvailable:false,
+    reason:!keyPresent?"ELEVENLABS_KEY_MISSING":!enabled?"VOICE_DESIGN_DISABLED":"VOICE_GENERATION_NOT_YET_ENABLED" };
 }
 export function elevenLabsHeaders(): Record<string,string> {
   const key=process.env.ELEVENLABS_API_KEY?.trim();
