@@ -3,18 +3,24 @@ import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload } f
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
+import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import { resolveMedia } from '@/lib/media';
 
-type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' };
+type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string };
 const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
 
 export default function EchoMusicPage() {
   const back = useBack();
   const { me } = useSocial();
+  const resolvePrivateAudio = useMediaResolver();
   const audioRef = useRef<HTMLAudioElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
   const [localAudioError, setLocalAudioError] = useState('');
+  const [savingAudio, setSavingAudio] = useState(false);
+  const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null);
+  const [savedAudioPath, setSavedAudioPath] = useState<string | null>(null);
+  const resolvedSavedAudio = savedAudioPath ? resolvePrivateAudio(savedAudioPath) : '';
   useEffect(() => () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); }, []);
   function importAudio(file: File | undefined) {
     if (!file) return;
@@ -27,6 +33,8 @@ export default function EchoMusicPage() {
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
     setLocalAudioUrl(url);
+    setSelectedAudioFile(file);
+    setSavedAudioPath(null);
     setLocalAudioError('');
     setElapsed(0);
     setActualDuration(0);
@@ -39,7 +47,7 @@ export default function EchoMusicPage() {
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(libraryKey(me.id)) ?? '[]') as unknown;
-      setLibrary(Array.isArray(stored) ? stored.filter((item): item is MusicDraftRecord => !!item && typeof item === 'object' && typeof item.title === 'string' && item.status === 'draft' && item.characterId === me.id).slice(0, 50) : []);
+      setLibrary(Array.isArray(stored) ? stored.filter((item): item is MusicDraftRecord => !!item && typeof item === 'object' && typeof item.title === 'string' && (item.status === 'draft' || (item.status === 'saved_audio' && typeof item.audioPath === 'string')) && item.characterId === me.id).slice(0, 50) : []);
     } catch { setLibrary([]); }
   }, [me.id]);
   function saveDraft(record: MusicDraftRecord) {
@@ -50,6 +58,25 @@ export default function EchoMusicPage() {
       setLibraryError('');
     } catch { setLibraryError('No se pudo guardar el borrador en este dispositivo.'); }
   }
+  async function saveCurrentAudio() {
+    if (!selectedAudioFile || savingAudio) return;
+    setSavingAudio(true);
+    setLocalAudioError('');
+    try {
+      const attachment = await uploadPrivateFile(selectedAudioFile);
+      if (attachment.type !== 'audio') throw new Error('El archivo subido no es audio.');
+      const record: MusicDraftRecord = {
+        id: crypto.randomUUID(), title: title.trim() || selectedAudioFile.name,
+        prompt: preview, characterId: me.id, createdAt: new Date().toISOString(),
+        durationSeconds: Math.round(actualDuration || durationSeconds),
+        status: 'saved_audio', audioPath: attachment.url,
+      };
+      saveDraft(record);
+      setSavedAudioPath(attachment.url);
+    } catch (error) {
+      setLocalAudioError(error instanceof Error ? error.message : 'No se pudo guardar el audio.');
+    } finally { setSavingAudio(false); }
+  }
   function deleteDraft(id: string) {
     try {
       const next = library.filter(item => item.id !== id);
@@ -57,7 +84,7 @@ export default function EchoMusicPage() {
       setLibrary(next);
     } catch { setLibraryError('No se pudo eliminar el borrador.'); }
   }
-  const audioUrl = localAudioUrl;
+  const audioUrl = resolvedSavedAudio || localAudioUrl;
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [actualDuration, setActualDuration] = useState(0);
@@ -129,9 +156,11 @@ export default function EchoMusicPage() {
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
         <div className="mt-5 flex justify-center"><button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? 'Pausar' : 'Reproducir'} className="grid h-20 w-20 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-9 w-9 fill-current" /> : <Play className="ml-1 h-9 w-9 fill-current" />}</button></div>
       </div>
+      {selectedAudioFile && !savedAudioPath && <button type="button" disabled={savingAudio} onClick={() => void saveCurrentAudio()} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{savingAudio ? 'Guardando en almacenamiento privado…' : 'Guardar este audio en ECHO'}</button>}
+      {savedAudioPath && <p className="text-center text-xs text-white/70">Audio guardado en almacenamiento privado. Aparece en tu biblioteca de este dispositivo.</p>}
       <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 p-3 text-sm font-semibold"><Upload className="h-4 w-4" /> Probar con un audio propio<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm" className="sr-only" onChange={event => { importAudio(event.target.files?.[0]); event.target.value = ''; }} /></label>
       {localAudioError && <p role="alert" className="text-sm text-red-200">{localAudioError}</p>}
-      {audioUrl && <p className="text-center text-xs text-white/60">Audio local de prueba: no se guarda ni se publica.</p>}
+      {audioUrl && !savedAudioPath && <p className="text-center text-xs text-white/60">Audio local de prueba: no se guarda hasta que elijas guardarlo.</p>}
       {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />La canción está preparada, pero la generación de audio todavía no está activada. Cuando ElevenLabs devuelva un archivo, esta pantalla reproducirá el sonido real y la barra avanzará con él.</div>}
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">Ver prompt preparado</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
@@ -157,9 +186,9 @@ export default function EchoMusicPage() {
     {localAudioError && <p role="alert" className="text-sm text-destructive">{localAudioError}</p>}
     {prepareError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{prepareError}</p>}
     {preview && <section className="rounded-2xl border border-border bg-card/60 p-4" aria-live="polite"><h2 className="text-sm font-semibold">Solicitud preparada · {title} · {durationSeconds}s</h2><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{preview}</pre><p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/> Generación no activada. Sin cargos.</p></section>}
-    <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">Los prompts se guardan solo en este dispositivo. Todavía no son canciones ni se sincronizan con tu cuenta.</p>
+    <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">El índice de esta biblioteca se guarda en este dispositivo. Los audios que guardes se suben al almacenamiento privado de ECHO; aún no hay sincronización de la biblioteca entre dispositivos.</p>
       {libraryError && <p role="alert" className="mt-2 text-xs text-destructive">{libraryError}</p>}
-      {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">Todavía no preparaste canciones.</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">Borrador · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">Eliminar</button></div>)}</div>}
+      {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">Todavía no preparaste canciones.</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null); setElapsed(0); setActualDuration(0); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio privado guardado' : 'Borrador'} · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">Eliminar</button></div>)}</div>}
     </section>
     <div className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Música para historias y publicaciones</h2><p className="mt-2 text-xs text-muted-foreground">Feed.fm Clips: integración preparada, sin activar ni contratar. La reproducción de fragmentos de 15 o 30 segundos se habilitará únicamente después de confirmar el contrato, los derechos para Argentina y el acceso oficial al catálogo. YouTube: búsqueda disponible, sin derechos de reproducción de audio sobre fotos.</p></div>
   </main></div>;
