@@ -33,6 +33,21 @@ export function mergeUniverse(
   function merge(b: unknown, l: unknown, r: unknown, path: string): unknown {
     // The active character is a local UI choice, never the authenticated owner.
     if (path === 'currentCharacterId') return l;
+    // Older message records omit optional per-user collections. Missing and empty
+    // mean the same thing; never interrupt a bookmark/hide action for this.
+    if (/^messages\.[^.]+\.(savedByIds|hiddenForIds)$/.test(path)) {
+      const left = l === undefined ? [] : l;
+      const right = r === undefined ? [] : r;
+      const previous = b === undefined ? [] : b;
+      if (Array.isArray(left) && Array.isArray(right) && Array.isArray(previous)) {
+        if (same(left, right)) return left;
+        if (same(left, previous)) return right;
+        if (same(right, previous)) return left;
+        const old = new Set(previous);
+        const ls = new Set(left), rs = new Set(right);
+        return [...new Set([...left, ...right])].filter(id => old.has(id) ? ls.has(id) && rs.has(id) : ls.has(id) || rs.has(id));
+      }
+    }
     if (same(l, r)) return l;
     if (base && same(l, b)) return r;
     if (base && same(r, b)) return l;
