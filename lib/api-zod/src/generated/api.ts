@@ -1327,6 +1327,7 @@ export const GetUniverseResponse = zod.object({
 }).optional(),
   "closeFriendsOnly": zod.boolean().optional(),
   "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
+  "likes": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -1849,6 +1850,7 @@ export const SaveUniverseBody = zod.object({
 }).optional(),
   "closeFriendsOnly": zod.boolean().optional(),
   "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
+  "likes": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2359,6 +2361,7 @@ export const SaveUniverseResponse = zod.object({
 }).optional(),
   "closeFriendsOnly": zod.boolean().optional(),
   "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
+  "likes": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -2919,6 +2922,7 @@ export const VerifyUniverseResponse = zod.object({
 }).optional(),
   "closeFriendsOnly": zod.boolean().optional(),
   "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
+  "likes": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -3751,6 +3755,7 @@ export const CreateCreatorUniverseBody = zod.object({
 }).optional(),
   "closeFriendsOnly": zod.boolean().optional(),
   "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
+  "likes": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
@@ -4261,6 +4266,7 @@ export const CreateCreatorUniverseResponse = zod.object({
 }).optional(),
   "closeFriendsOnly": zod.boolean().optional(),
   "allowedViewerIds": zod.array(zod.string()).max(500).optional(),
+  "likes": zod.array(zod.string()).max(500).optional(),
   "mentionedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateStoriesItemMentionedAccountIdsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),
