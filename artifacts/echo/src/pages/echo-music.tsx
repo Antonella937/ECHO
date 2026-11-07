@@ -110,14 +110,17 @@ export default function EchoMusicPage() {
     }
   }
   if (playerOpen) return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#100d12] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+36px)] pt-[calc(env(safe-area-inset-top,0px)+22px)] text-white">
-    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#5c364b] via-[#231721] to-[#100d12] opacity-80" />
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {me.avatar && <div className="absolute -inset-16 bg-cover bg-center opacity-55 blur-[65px] scale-125" style={{ backgroundImage: `url("${resolveMedia(me.avatar)}")` }} />}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#100d12]/55 via-[#100d12]/75 to-[#100d12]/95" />
+    </div>
     <header className="relative z-10 flex items-center justify-between">
       <button type="button" onClick={() => { audioRef.current?.pause(); setPlaying(false); setPlayerOpen(false); }} aria-label="Volver al estudio" className="grid h-11 w-11 place-items-center"><ChevronDown className="h-7 w-7" /></button>
       <span className="text-center text-sm font-semibold">ECHO Music · {audioUrl ? 'Reproduciendo' : 'Preparada'}</span>
       <span className="w-11" />
     </header>
     <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-9 py-8">
-      <div className="mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 shadow-2xl">
+      <div className="mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-[0_25px_80px_rgba(0,0,0,0.55)]">
         {me.avatar ? <img src={resolveMedia(me.avatar)} alt={`Portada de ${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
       </div>
       <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
