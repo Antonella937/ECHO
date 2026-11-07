@@ -7,6 +7,15 @@ export default function SharedPreviewPage() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<Shared | null>(null);
   const [error, setError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState('');
+  const importCopy = async () => {
+    setImporting(true); setError('');
+    try { const result = await customFetch<{kind:string;universeId:string;importedCount:number}>('/api/universe/shared/' + encodeURIComponent(token) + '/import', { method: 'POST', responseType: 'json' });
+      setImported(result.kind === 'universe' ? 'Universo copiado. Encontralo en tus universos.' : 'Personaje copiado a tu universo principal.');
+    } catch { setError('No se pudo importar. Revisá los límites de tu plan y que el enlace siga activo.'); }
+    finally { setImporting(false); }
+  };
   useEffect(() => {
     let active = true;
     void customFetch<Shared>('/api/universe/shared/' + encodeURIComponent(token), { responseType: 'json' })
@@ -26,7 +35,8 @@ export default function SharedPreviewPage() {
         {ch.occupation && <p className="mt-2 text-sm">{ch.occupation}</p>}
         {ch.bio && <p className="mt-2 text-sm text-muted-foreground">{ch.bio}</p>}
       </article>)}</div>
-      <p className="mt-6 text-xs text-muted-foreground">Vista previa de solo lectura. No incluye mensajes, recuerdos, configuraciones privadas ni acceso al universo original. La importación estará disponible en una próxima versión.</p>
+      <p className="mt-6 text-xs text-muted-foreground">La copia incluye los datos públicos básicos de los personajes, sin mensajes, recuerdos, imágenes privadas ni acceso al universo original.</p>
+      {imported ? <p role="status" className="mt-4 text-primary">{imported}</p> : <button type="button" disabled={importing} onClick={() => void importCopy()} className="mt-4 rounded-full bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{importing ? "Importando…" : "Importar una copia a mi cuenta"}</button>}
     </>}
   </main>;
 }
