@@ -41,6 +41,7 @@ import SavedPage from '@/pages/saved';
 import SettingsPage from '@/pages/settings';
 import EchoMusicPage from '@/pages/echo-music';
 import SharedPreviewPage from '@/pages/shared-preview';
+import CollaborationPage from '@/pages/collaboration';
 import SubscriptionsPage from '@/pages/subscriptions';
 import HelpCenterPage from '@/pages/help-center';
 import SupportAdminPage from '@/pages/support-admin';
@@ -146,6 +147,7 @@ function ProtectedRouter() {
           <Route path="/tags/:tag" component={HashtagPage} />
           <Route path="/creator-hub" component={CreatorHubPage} />
           <Route path="/shared/:token" component={SharedPreviewPage} />
+          <Route path="/collaboration/:ownerId/:universeId" component={CollaborationPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/music" component={EchoMusicPage} />
           <Route path="/settings/subscriptions" component={SubscriptionsPage} />
