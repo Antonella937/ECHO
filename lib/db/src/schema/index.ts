@@ -15,3 +15,5 @@ export * from "./echo-relationship-ledger";
 export * from "./echo-voice-budget";
 
 export * from "./echo-subscriptions";
+
+export * from "./echo-music-library";
