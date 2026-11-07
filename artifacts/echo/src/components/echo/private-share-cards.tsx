@@ -100,7 +100,7 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
     <div className="mt-3 flex flex-wrap gap-2">
       <button type="button" disabled={busy} onClick={() => void copy()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{busy ? t('Generando…') : t('Copiar enlace')}</button>
       <button type="button" disabled={busy} onClick={() => void share()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{t('Compartir')}</button>
-      {kind === 'universe' && <button type="button" disabled={busy} onClick={() => void createInvite()} className="min-h-11 rounded-full border border-primary px-3 text-xs text-primary">{t("Invitar a colaborar")}</button>}
+      {kind === 'universe' && <button type="button" disabled={busy} onClick={() => void createInvite()} className="tap inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-full border border-primary px-3 py-2 text-center text-[11px] font-semibold leading-tight text-primary whitespace-normal">{t("Invitar a colaborar")}</button>}
       {link && <button type="button" disabled={busy} onClick={() => void revoke()} className="min-h-11 rounded-full border border-border px-3 text-xs">{t("Revocar enlace")}</button>}
     </div>
     {invite && <div className="mt-2 break-all text-xs text-muted-foreground">{t("Invitación de colaboración: ")}{invite} <button type="button" onClick={() => void revokeInvite()} className="ml-2 underline">{t("Revocar invitación")}</button></div>}
