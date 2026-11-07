@@ -476,6 +476,38 @@ function InterfaceLanguageSync() {
     lastLanguage.current = language;
     void customFetch('/api/account/interface-language', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language }) }).catch(error => console.warn('ECHO language preference save failed', error));
   }, [language, readyForUser, user?.id]);
+  // Keep the same account language across already-open devices, not only at login.
+  useEffect(() => {
+    if (!user?.id || readyForUser !== user.id) return;
+    let active = true;
+    let busy = false;
+    const refresh = async () => {
+      if (busy || document.visibilityState === 'hidden') return;
+      busy = true;
+      try {
+        const result = await customFetch<{ language: Language | null }>('/api/account/interface-language', { responseType: 'json' });
+        if (!active || !result.language) return;
+        // Never overwrite a local selection while its save is in flight.
+        if (lastLanguage.current !== getLanguage()) return;
+        if (result.language !== getLanguage()) {
+          lastLanguage.current = result.language;
+          setLanguage(result.language);
+        }
+      } catch (error) { console.warn('ECHO language refresh unavailable', error); }
+      finally { busy = false; }
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
+    const onFocus = () => { void refresh(); };
+    const timer = window.setInterval(() => { void refresh(); }, 20000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user?.id, readyForUser]);
   return null;
 }
 
