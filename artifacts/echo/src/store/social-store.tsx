@@ -259,7 +259,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       toggleStoryLike(id) {
         const story = cur().stories.find(s => s.id === id);
         if (!story || !canViewStory(story, myId(), cur()) || !isStoryActive(story) || story.authorId === myId()) return;
-        coordinator.current?.edit(s => ({ ...s, stories: s.stories.map(st => st.id === id ? { ...st, likes: (st.likes ?? []).includes(myId()) ? (st.likes ?? []).filter(actor => actor !== myId()) : [...(st.likes ?? []), myId()] } : st) }));
+        dispatch({ type: 'story.liked', storyId: id, actorId: myId(), liked: !(story.likes ?? []).includes(myId()) });
       },
       reactStory(id, value) {
         const story = cur().stories.find(s => s.id === id);
