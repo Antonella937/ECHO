@@ -408,11 +408,15 @@ export function createCreatorHubSocialRouter(): IRouter {
         "SELECT 1 FROM echo_creator_message_requests WHERE sender_owner_id=$1 AND recipient_owner_id=$2 AND status='accepted'",
         [req.userId, parsed.data.targetOwnerId],
       );
-      if (accepted.rowCount) { await client.query("COMMIT"); res.json({ status: "accepted" }); return; }
+      if (accepted.rowCount) {
+        await client.query("INSERT INTO echo_creator_direct_messages(sender_owner_id,recipient_owner_id,body) VALUES($1,$2,$3)", [req.userId, parsed.data.targetOwnerId, parsed.data.body]);
+        await client.query("COMMIT"); res.json({ status: "accepted" }); return;
+      }
       if (target.rows[0].message_privacy === "nobody") {
         await client.query("ROLLBACK"); res.status(403).json({ error: "MESSAGES_DISABLED" }); return;
       }
       if (target.rows[0].message_privacy === "everyone") {
+        await client.query("INSERT INTO echo_creator_direct_messages(sender_owner_id,recipient_owner_id,body) VALUES($1,$2,$3)", [req.userId, parsed.data.targetOwnerId, parsed.data.body]);
         await client.query("COMMIT"); res.json({ status: "allowed" }); return;
       }
       // A rejected request cannot be re-sent automatically. This prevents
