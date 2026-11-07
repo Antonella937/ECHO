@@ -461,9 +461,15 @@ export default function CreatorHubPage() {
   useEffect(() => {
     if (!activeChat) return;
     const ownerId = activeChat.ownerId;
-    const interval = setInterval(() => { if (document.visibilityState === 'visible') void refreshHumanChat(ownerId).catch(() => {}); }, 3000);
+    const poll = () => { if (document.visibilityState === 'visible') void refreshHumanChat(ownerId).catch(() => {}); };
+    poll();
+    const interval = setInterval(poll, 2000);
+    document.addEventListener('visibilitychange', poll);
+    window.addEventListener('focus', poll);
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', poll);
+      window.removeEventListener('focus', poll);
       if (typingTimeout.current) clearTimeout(typingTimeout.current);
       void customFetch('/api/creator-hub/social/typing', { method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetOwnerId: ownerId, typing: false }) }).catch(() => {});
     };
