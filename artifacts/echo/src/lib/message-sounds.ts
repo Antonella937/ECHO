@@ -17,13 +17,15 @@ export function unlockMessageAudio() {
     if (context.state === 'suspended') void context.resume().catch(() => undefined);
   } catch { /* browser does not support Web Audio */ }
 }
-export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification') {
-  if (!getSoundPreferences()[kind]) return;
+export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' | 'creatorHub') {
+  if (!getSoundPreferences()[kind === 'creatorHub' ? 'notification' : kind]) return;
   try {
     unlockMessageAudio();
     if (!context || context.state !== 'running') return;
     const now = context.currentTime;
-    const notes = kind === 'incoming'
+    const notes = kind === 'creatorHub'
+      ? [{ f: 659.25, t: 0, d: 0.14 }, { f: 987.77, t: 0.12, d: 0.16 }, { f: 1318.51, t: 0.24, d: 0.28 }]
+      : kind === 'incoming'
       ? [{ f: 880, t: 0, d: 0.16 }, { f: 1318.5, t: 0.11, d: 0.27 }]
       : kind === 'notification'
         ? [{ f: 1174.66, t: 0, d: 0.14 }, { f: 1567.98, t: 0.13, d: 0.22 }]
