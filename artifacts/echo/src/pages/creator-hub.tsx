@@ -286,6 +286,21 @@ export default function CreatorHubPage() {
     document.addEventListener('visibilitychange', refresh);
     return () => { active = false; clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [user?.id]);
+  const [followListKind, setFollowListKind] = useState<'followers' | 'following' | null>(null);
+  const [followListRows, setFollowListRows] = useState<Array<{ ownerId: string; displayName: string; username: string; visibility: string; following: boolean; requested: boolean }>>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
+  const [followListError, setFollowListError] = useState('');
+  useEffect(() => {
+    if (!followListKind) return;
+    let active = true;
+    setFollowListLoading(true);
+    setFollowListError('');
+    void customFetch<{ profiles: typeof followListRows }>('/api/creator-hub/social/follow-list/' + followListKind, { responseType: 'json' })
+      .then(data => { if (active) setFollowListRows(data.profiles); })
+      .catch(() => { if (active) setFollowListError(ht("No se pudo cargar la lista.")); })
+      .finally(() => { if (active) setFollowListLoading(false); });
+    return () => { active = false; };
+  }, [followListKind]);
   const [socialSaving, setSocialSaving] = useState(false);
   const [socialReady, setSocialReady] = useState(false);
   useEffect(() => {
@@ -618,9 +633,17 @@ export default function CreatorHubPage() {
                <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-secondary/70 px-3 py-1 text-xs font-semibold text-foreground sm:inline-flex">{socialProfile?.visibility === "private" && <LockKeyhole size={13} />}{ht(socialProfile?.visibility === "public" ? "Perfil público" : "Perfil privado")}</span>
             </div>
             <div className="flex items-center gap-6 px-1 text-sm" aria-label={ht("Estadísticas de seguimiento")}>
-              <span className="flex items-baseline gap-1.5"><strong className="font-semibold tabular-nums text-foreground">{followCounts?.followers ?? '—'}</strong><span className="text-muted-foreground">{ct("followers")}</span></span>
-              <span className="flex items-baseline gap-1.5"><strong className="font-semibold tabular-nums text-foreground">{followCounts?.following ?? '—'}</strong><span className="text-muted-foreground">{ht("Seguidos")}</span></span>
+              <button type="button" onClick={() => setFollowListKind('followers')} className="flex items-baseline gap-1.5 rounded-md hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><strong className="font-semibold tabular-nums text-foreground">{followCounts?.followers ?? '—'}</strong><span className="text-muted-foreground">{ct("followers")}</span></button>
+              <button type="button" onClick={() => setFollowListKind('following')} className="flex items-baseline gap-1.5 rounded-md hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><strong className="font-semibold tabular-nums text-foreground">{followCounts?.following ?? '—'}</strong><span className="text-muted-foreground">{ht("Seguidos")}</span></button>
             </div>
+            {followListKind && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setFollowListKind(null); }}>
+              <div role="dialog" aria-modal="true" aria-label={followListKind === 'followers' ? ct("followers") : ht("Seguidos")} className="w-full max-w-md rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl">
+                <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">{followListKind === 'followers' ? ct("followers") : ht("Seguidos")}</h2><button type="button" aria-label={ct("close")} onClick={() => setFollowListKind(null)} className="rounded-full p-2 hover:bg-secondary"><X size={20}/></button></div>
+                <div className="max-h-[60dvh] space-y-2 overflow-y-auto">
+                  {followListLoading ? <p className="py-6 text-center text-sm text-muted-foreground">{ht("Cargando…")}</p> : followListError ? <p role="alert" className="py-5 text-sm text-destructive">{followListError}</p> : followListRows.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">{ht("Todavía no hay perfiles.")}</p> : followListRows.map(person => <button type="button" key={person.ownerId} onClick={() => { setPeopleResults(previous => [...previous.filter(item => item.ownerId !== person.ownerId), person]); setFollowListKind(null); setSelectedPersonId(person.ownerId); }} className="flex w-full items-center gap-3 rounded-xl border border-border/60 p-3 text-left hover:bg-secondary"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary font-semibold">{person.displayName.slice(0,1).toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{person.displayName}</span><span className="block truncate text-xs text-muted-foreground">@{person.username}</span></span></button>)}
+                </div>
+              </div>
+            </div>}
             {profileError && <p role="alert" className="text-xs text-destructive">{profileError}</p>}
             {editingBio ? <div className="space-y-2"><div className="flex items-center gap-2" role="toolbar" aria-label={ht("Formato de biografía")}><button type="button" onClick={() => formatBio('**', '**')} aria-label={ht("Negrita")} title={ht("Negrita")} className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold">B</button><button type="button" onClick={() => formatBio('*', '*')} aria-label={ht("Cursiva")} title={ht("Cursiva")} className="rounded-lg border border-border px-3 py-1.5 text-sm italic">I</button><button type="button" onClick={() => formatBio('__', '__')} aria-label={ht("Subrayado")} title={ht("Subrayado")} className="rounded-lg border border-border px-3 py-1.5 text-sm underline">U</button></div><textarea ref={bioInputRef} aria-label={ht("Biografía de Creator Hub")} value={bioDraft} maxLength={500} rows={3} onChange={e => setBioDraft(e.target.value)} placeholder={ht("Contá algo sobre vos…")} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground" /><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{bioDraft.length}/500 {ht("caracteres")}</span><div className="flex gap-2"><button type="button" onClick={() => setEditingBio(false)} className="rounded-full border border-border px-3 py-2 text-xs">{ct("cancel")}</button><button type="button" disabled={savingBio} onClick={() => void saveBio()} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{ht(savingBio ? 'Guardando…' : 'Guardar biografía')}</button></div></div></div> : <div className="flex items-start gap-2"><p className="min-w-0 max-w-fit whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{renderBio(bio)}</p><button type="button" aria-label={ht("Editar biografía")} title={ht("Editar biografía")} onClick={() => { setBioDraft(savedBio); setProfileError(''); setEditingBio(true); }} className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"><Pencil size={15}/></button></div>}
             <div className="space-y-2">
