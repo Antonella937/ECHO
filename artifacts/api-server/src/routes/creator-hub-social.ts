@@ -408,6 +408,12 @@ export function createCreatorHubSocialRouter(): IRouter {
     }));
     res.json({ enabled, items });
   });
+  router.put("/creator-hub/social/dm-notifications/push-preference", async (req, res) => {
+    const parsed = z.object({ enabled: z.boolean() }).strict().safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_PREFERENCES" }); return; }
+    await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoCreatorHubPushEnabled: parsed.data.enabled } });
+    res.json({ enabled: parsed.data.enabled });
+  });
   router.put("/creator-hub/social/dm-notifications/preferences", async (req, res) => {
     const parsed = z.object({ enabled: z.boolean() }).strict().safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "INVALID_PREFERENCES" }); return; }
