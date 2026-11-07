@@ -71,7 +71,7 @@ router.post("/voices/premium/reference/request-url",async(req,res)=>{
   if(!response.ok){res.status(502).json({error:"VOICE_UPLOAD_SIGN_FAILED"});return;}
   const payload=await response.json() as {url?:string;signedURL?:string;token?:string};
   const relative=payload.url??payload.signedURL;
-  const uploadURL=relative?new URL(relative.startsWith("http")?relative.startsWith("/storage/v1/")?`${base}${relative}`:`${base}/storage/v1/${relative.replace(/^\\//,"")}`).toString()
+  const uploadURL=relative?new URL(relative.startsWith("http")?relative:relative.startsWith("/storage/v1/")?`${base}${relative}`:`${base}/storage/v1/${relative.replace(/^[/]/,"")}`).toString()
    :payload.token?`${base}/storage/v1/object/upload/sign/echo-media/${path}?token=${encodeURIComponent(payload.token)}`:null;
   if(!uploadURL||!uploadURL.startsWith(`${base}/storage/v1/object/upload/sign/echo-media/`)){res.status(502).json({error:"VOICE_UPLOAD_SIGN_INVALID"});return;}
   res.json({uploadURL,objectPath:path});
