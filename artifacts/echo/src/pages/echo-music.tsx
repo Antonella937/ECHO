@@ -234,7 +234,7 @@ export default function EchoMusicPage() {
         <p className="text-sm font-semibold">Elegir fragmento para compartir</p>
         <div className="flex gap-2">{([15, 30] as const).map(seconds => <button key={seconds} type="button" onClick={() => { setClipLength(seconds); setClipStart(start => Math.min(start, Math.max(0, actualDuration - seconds))); }} className={`rounded-full px-4 py-2 text-sm ${clipLength === seconds ? 'bg-white text-black' : 'border border-white/30'}`}>{seconds} s</button>)}</div>
         <input type="range" aria-label="Inicio del fragmento" min={0} max={Math.max(0, actualDuration - Math.min(clipLength, actualDuration))} step={1} value={clipStart} onChange={event => { const next = Number(event.target.value); setClipStart(next); if (audioRef.current) audioRef.current.currentTime = next; setElapsed(next); }} className="w-full accent-white" />
-        <p className="text-xs text-white/70">Fragmento: {formatTime(clipStart)} – {formatTime(clipEnd)}. La publicación con audio todavía no está habilitada.</p>
+        <p className="text-xs text-white/70">Fragmento: {formatTime(clipStart)} – {formatTime(clipEnd)}. Los fragmentos de canciones publicadas se pueden adjuntar desde Crear publicación o historia.</p>
         <button type="button" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = clipStart; audioRef.current.dataset.clipPreview = 'true'; } setElapsed(clipStart); void audioRef.current?.play().catch(() => setPlaying(false)); }} className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold">Escuchar fragmento</button>
       </section>}
       <div>
