@@ -5,6 +5,8 @@ import { z } from "zod";
 import { randomBytes, createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { createAdditionalUniverse, writeUniverse, StructuralLimitError } from "../lib/universeRepository";
+import { SaveUniverseBody } from "@workspace/api-zod";
 
 const universeParamsSchema = z.object({
   universeId: z.string().trim().min(1).max(120),
@@ -125,6 +127,74 @@ export function createUniverseSharingRouter(
     const setup = state.creatorSetup as Record<string, unknown> | undefined;
     res.json({ kind: row.kind, universeName: setup?.universeName ?? "Universo ECHO",
       description: setup?.universeDescription ?? "", characters: visible, importAvailable: false });
+  });
+
+
+  // Copy only public character identity, never conversation history, memory, credentials or media.
+  router.post("/universe/shared/:token/import", async (req, res): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const token = req.params.token;
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) { res.status(404).json({ error: "SHARE_NOT_FOUND" }); return; }
+    const hash = createHash("sha256").update(token).digest("hex");
+    const rows = await db.execute(sql`SELECT l.owner_id, l.universe_id, l.kind, l.character_id, u.state
+      FROM echo_share_links l JOIN echo_universes u ON u.owner_id = l.owner_id AND u.universe_id = l.universe_id
+      WHERE l.token_hash = ${hash} AND l.revoked_at IS NULL AND u.sharing_enabled = true
+      AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
+    const source = rows.rows[0] as { owner_id:string; kind:string; character_id:string|null; state:Record<string,unknown> } | undefined;
+    if (!source || source.owner_id === req.userId) { res.status(403).json({ error: "IMPORT_NOT_ALLOWED" }); return; }
+    const state = source.state;
+    const originals = Array.isArray(state.characters) ? state.characters as Array<Record<string,unknown>> : [];
+    const chosen = originals.filter(ch => !ch.archived && ch.id !== "nela" &&
+      (source.kind === "universe" || ch.id === source.character_id));
+    if (!chosen.length) { res.status(422).json({ error: "NO_IMPORTABLE_CHARACTERS" }); return; }
+    // Reuse the recipient's own identity as the primary account; never copy the sender's owner identity.
+    const [recipient] = await db.select().from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, "primary"),
+      isNull(echoUniversesTable.archivedAt), isNull(echoUniversesTable.deletedAt))).limit(1);
+    if (!recipient) { res.status(409).json({ error: "RECIPIENT_ONBOARDING_REQUIRED" }); return; }
+    const own = SaveUniverseBody.shape.state.safeParse(recipient.state);
+    if (!own.success) { res.status(409).json({ error: "RECIPIENT_STATE_INVALID" }); return; }
+    const ids = new Set(own.data.characters.map(ch => ch.id));
+    const handles = new Set(own.data.characters.map(ch => ch.handle.toLowerCase()));
+    const imported = chosen.map(original => {
+      const id = crypto.randomUUID();
+      let handle = String(original.handle ?? "imported").replace(/[^a-zA-Z0-9_.]/g, "").slice(0,20) || "imported";
+      const base = handle;
+      let n = 1;
+      while (handles.has(handle.toLowerCase())) handle = (base.slice(0, 14) + "_" + n++).slice(0, 24);
+      handles.add(handle.toLowerCase()); ids.add(id);
+      return {
+        id, handle, name: String(original.name ?? "Personaje").slice(0, 80),
+        occupation: String(original.occupation ?? "").slice(0, 160),
+        bio: String(original.bio ?? "").slice(0, 500),
+        location: "", avatar: "asset:account-default",
+        providerRef: { provider: "mock", externalId: null, status: "not_connected", lastSyncAt: null },
+        identity: { provider: "mock", referenceImages: [], seed: 0, appearance: "", styleNotes: "", updatedAt: new Date().toISOString() },
+        accountType: "personal", verified: false, archived: false,
+      };
+    });
+    try {
+      if (source.kind === "character") {
+        const next = { ...own.data, characters: [...own.data.characters, ...imported],
+          follows: { ...own.data.follows, ...Object.fromEntries(imported.map(ch => [ch.id, []])) } };
+        const parsed = SaveUniverseBody.shape.state.safeParse(next);
+        if (!parsed.success) { res.status(422).json({ error: "IMPORT_VALIDATION_FAILED" }); return; }
+        const saved = await writeUniverse(req.userId!, parsed.data as Record<string,unknown>, recipient.revision, "primary");
+        if (!saved) { res.status(409).json({ error: "REVISION_CONFLICT" }); return; }
+        res.status(201).json({ kind: "character", universeId: "primary", importedCount: imported.length }); return;
+      }
+      const name = String((state.creatorSetup as Record<string,unknown> | undefined)?.universeName ?? "Universo importado").slice(0,60);
+      const next = { ...own.data, characters: [own.data.characters.find(ch => ch.id === "nela")!, ...imported],
+        currentCharacterId: "nela", follows: { nela: [], ...Object.fromEntries(imported.map(ch => [ch.id, []])) },
+        posts: [], comments: [], stories: [], messages: [], notifications: [], highlights: [] };
+      const parsed = SaveUniverseBody.shape.state.safeParse(next);
+      if (!parsed.success) { res.status(422).json({ error: "IMPORT_VALIDATION_FAILED" }); return; }
+      const created = await createAdditionalUniverse(req.userId!, name, parsed.data as Record<string,unknown>);
+      res.status(201).json({ kind: "universe", universeId: created.universeId, importedCount: imported.length });
+    } catch (error) {
+      if (error instanceof StructuralLimitError) { res.status(409).json({ error: error.code }); return; }
+      throw error;
+    }
   });
 
   router.delete("/universe/:universeId/share-links/:token", async (req, res): Promise<void> => {
