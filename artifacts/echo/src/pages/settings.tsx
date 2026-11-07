@@ -1,6 +1,6 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
@@ -50,6 +50,11 @@ export default function SettingsPage() {
           </div>
         <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">{st("Tu perfil de creador ›")}</span></Link>
 
+          <Link href="/music" className="mt-3 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-echo-music-studio">
+            <span className="flex items-center gap-3"><Music2 className="h-5 w-5 text-primary" /> ECHO Music Studio</span>
+            <span className="text-xs text-muted-foreground">{st("Crear canciones ›")}</span>
+          </Link>
+
           <UniverseSelector />
           <Link href="/search" className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-sm font-semibold">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> {st("Buscar en este universo")}
@@ -97,8 +102,6 @@ export default function SettingsPage() {
         <MessageSoundSettings />
 
         <MusicConnectionsSection />
-
-        <Link href="/music" className="mt-3 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold">ECHO Music Studio <span className="text-xs text-muted-foreground">Preparar canciones ›</span></Link>
 
         <PushNotificationSettings />
 
