@@ -644,6 +644,25 @@ export function createCreatorHubSocialRouter(): IRouter {
     );
     res.json({publications:result.rows});
   });
+  router.patch("/creator-hub/social/publications/:id", async (req, res) => {
+    if (!z.string().uuid().safeParse(req.params.id).success) { res.status(400).json({error:"INVALID_ID"}); return; }
+    const parsed = publicationSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({error:"INVALID_PUBLICATION"}); return; }
+    if (parsed.data.kind === "update" && req.userId !== founderOwnerId) { res.status(403).json({error:"OFFICIAL_UPDATES_RESTRICTED"}); return; }
+    const {kind,title,body,visibility,pinned,coverPath} = parsed.data;
+    if (coverPath) {
+      const owned = await pool.query("SELECT 1 FROM echo_media WHERE owner_id=$1 AND object_path=$2", [req.userId,coverPath]);
+      if (!owned.rowCount) { res.status(400).json({error:"MEDIA_NOT_OWNED"}); return; }
+    }
+    const result = await pool.query(
+      `UPDATE echo_creator_publications SET kind=$3,title=$4,body=$5,visibility=$6,pinned=$7,cover_path=$8
+       WHERE id=$1 AND owner_id=$2
+       RETURNING id,kind,title,body,visibility,pinned,cover_path AS "coverPath",created_at AS "createdAt"`,
+      [req.params.id,req.userId,kind,title,body,visibility,pinned,coverPath],
+    );
+    if (!result.rowCount) { res.status(404).json({error:"PUBLICATION_NOT_FOUND"}); return; }
+    res.json({publication:result.rows[0]});
+  });
   router.delete("/creator-hub/social/publications/:id", async (req, res) => {
     if (!z.string().uuid().safeParse(req.params.id).success) { res.status(400).json({error:"INVALID_ID"}); return; }
     const result = await pool.query(
