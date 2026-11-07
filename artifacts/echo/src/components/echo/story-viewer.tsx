@@ -4,7 +4,7 @@ import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AtSign, ChevronLeft, ChevronRight, Eye, Heart, Music2, Send, Trash2, X } from 'lucide-react';
+import { AtSign, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Music2, Send, Trash2, X } from 'lucide-react';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
 import { storyViewCount, storyViewerIds, formatCount } from '@/domain/accounts';
 import { StoryMetricsEditor } from './story-metrics-editor';
@@ -95,6 +95,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const swipeStartY = useRef<number | null>(null);
 
   const group = groups[Math.min(gi, groups.length - 1)];
   const story = group.stories[Math.min(si, group.stories.length - 1)];
@@ -157,6 +158,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   };
 
   const viewers = storyViewerIds(liveStory).map(character).filter(Boolean);
+  const likedViewerIds = new Set(liveStory.likes ?? []);
+  const viewerRows = [...new Set([...storyViewerIds(liveStory), ...(liveStory.likes ?? [])])].map(character).filter((v): v is NonNullable<typeof v> => !!v);
   const totalViews = storyViewCount(liveStory);
   const active = isStoryActive(liveStory);
   const mentioned = (liveStory.mentionedAccountIds ?? []).map(character).filter((c): c is NonNullable<typeof c> => !!c);
@@ -171,6 +174,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
   return (
     <motion.div
+      onTouchStart={(e) => { if (isMine && !showViewers) swipeStartY.current = e.touches[0]?.clientY ?? null; }}
+      onTouchEnd={(e) => { if (isMine && swipeStartY.current !== null && swipeStartY.current - (e.changedTouches[0]?.clientY ?? swipeStartY.current) > 65) setShowViewers(true); swipeStartY.current = null; }}
       className="echo-dark-surface fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(240_8%_3%)] text-foreground"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -319,16 +324,25 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 {totalViews === 0 ? t('Nadie la ha visto todavía') : `${t('Vista por')} ${formatCount(totalViews)}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} ${t("reacción(es)")}` : ''}{liveStory.likes?.length ? ` · ${liveStory.likes.length} ${t("Me gusta")}` : ''}
               </button>
               <StoryMetricsEditor key={story.id} story={liveStory} onOpenChange={open => setEditingMetricsId(open ? story.id : null)} />
-              {showViewers && viewers.length > 0 && (
-                <div className="mt-1 flex flex-col gap-2 rounded-3xl bg-card/95 p-3 backdrop-blur">
-                  {viewers.map((v) =>
-                    v ? (
-                      <div key={v.id} className="flex items-center gap-2.5 text-sm">
-                        <CharacterAvatar character={v} size={28} /> <span className="flex-1">{v.name}</span>
-                        {liveStory.reactions?.find((r) => r.actorId === v.id) && <span className="text-base">{liveStory.reactions.find((r) => r.actorId === v.id)!.value}</span>}
+              {showViewers && (
+                <div className="absolute bottom-0 left-0 right-0 z-30 max-h-[65dvh] overflow-hidden rounded-t-3xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl" data-testid="story-viewers-sheet">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <div className="flex items-center gap-3 text-sm font-semibold">
+                      <span className="flex items-center gap-1"><Eye className="h-4 w-4" />{formatCount(totalViews)}</span>
+                      <span className="flex items-center gap-1"><Heart className="h-4 w-4 text-red-500" fill="currentColor" />{liveStory.likes?.length ?? 0}</span>
+                    </div>
+                    <button type="button" onClick={() => setShowViewers(false)} className="grid h-9 w-9 place-items-center rounded-full bg-secondary" aria-label={t("Cerrar")} data-testid="button-story-viewers-close"><ChevronDown className="h-5 w-5" /></button>
+                  </div>
+                  <div className="max-h-[calc(65dvh-64px)] overflow-y-auto overscroll-contain p-3">
+                    {viewerRows.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">{t('Nadie la ha visto todavía')}</p> : viewerRows.map(v => (
+                      <div key={v.id} className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm" data-testid={`story-viewer-row-${v.id}`}>
+                        <CharacterAvatar character={v} size={38} />
+                        <span className="min-w-0 flex-1 truncate font-medium">{v.handle}</span>
+                        {liveStory.reactions?.find(r => r.actorId === v.id) && <span className="text-lg">{liveStory.reactions.find(r => r.actorId === v.id)!.value}</span>}
+                        {likedViewerIds.has(v.id) && <Heart className="h-5 w-5 shrink-0 text-red-500" fill="currentColor" aria-label={t('Me gusta')} data-testid={`story-liked-by-${v.id}`} />}
                       </div>
-                    ) : null,
-                  )}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
