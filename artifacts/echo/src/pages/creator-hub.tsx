@@ -501,6 +501,36 @@ export default function CreatorHubPage() {
   const initials = nameParts.length > 1
     ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
     : (nameParts[0]?.slice(0, 2).toUpperCase() || 'EC');
+  if (activeChat) {
+    return <div className="flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-background text-foreground" data-testid="creator-hub-fullscreen-chat">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border/60 bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)]">
+        <button type="button" onClick={() => { setActiveChat(null); setChatMessages([]); setChatDraft(''); setReactingMessage(null); void refreshConversations(); }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" aria-label={ct("back")} data-testid="button-creator-chat-back"><ArrowLeft size={23}/></button>
+        <div className="min-w-0 flex-1"><h2 className="truncate text-base font-semibold">{activeChat.name}</h2><p className="text-xs text-muted-foreground">Creator Hub</p></div>
+        <button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="rounded-full px-3 py-2 text-xs text-primary">{ct("refresh")}</button>
+      </header>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-4 sm:px-6">
+              <div className="flex items-center justify-between"><h3 className="font-semibold">{ht("Chat con")} {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">{ct("refresh")}</button></div>
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-secondary/30 p-4" data-testid="creator-hub-chat-messages">
+                {chatError ? <p role="alert" className="text-xs text-destructive">{chatError}</p> : chatMessages.length === 0 && <p className="text-xs text-muted-foreground">{ct("noMessages")}</p>}
+                {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.kind === "voice" && message.objectPath ? <HumanVoicePlayback objectPath={message.objectPath} durationSeconds={message.durationSeconds ?? 0} /> : message.body}</div>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {message.reactions?.map((reaction, index) => <span key={index} className="text-xs">{reaction.emoji}</span>)}
+                    <button type="button" onClick={() => setReactingMessage(reactingMessage === message.id ? null : message.id)} aria-label={ct("send")} className="rounded-full px-2 text-xs text-muted-foreground hover:bg-secondary">☺ +</button>
+                  </div>
+                  {reactingMessage === message.id && <div className="flex flex-wrap gap-1 rounded-xl bg-background p-1">
+                    {['❤️','😂','🥹','😍','👍','🔥','😮','😢'].map(emoji => <button type="button" key={emoji} onClick={() => { setReactingMessage(null); void toggleReaction(message.id, emoji, Boolean(message.reactions?.some(r => r.emoji === emoji && r.ownerId === user?.id))); }} className="rounded-lg p-1 hover:bg-secondary" aria-label={`Reaccionar con ${emoji}`}>{emoji}</button>)}
+                  </div>
+                </div>)}
+                {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} {ht("está escribiendo")}</span><span className="animate-pulse">● ● ●</span></div>}
+              </div>
+              {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
+              <div className="shrink-0"><HumanVoiceRecorder key={activeChat.ownerId} targetOwnerId={activeChat.ownerId} onSent={() => refreshHumanChat(activeChat.ownerId)} /></div>
+              <div className="flex shrink-0 gap-2 pb-[env(safe-area-inset-bottom,0px)]"><input aria-label={ht("Escribí un mensaje…")} value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder={ht("Escribí un mensaje…")} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{ct("send")}</button></div>
+            </div>}
+
+    </div>;
+  }
   if (selectedPersonId) {
     const person = viewedProfile ?? selectedPerson;
     return <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-background text-foreground" style={{ WebkitTextSizeAdjust: '100%', touchAction: 'pan-y' }}>
@@ -618,26 +648,6 @@ export default function CreatorHubPage() {
               {conversations.length === 0 && <p className="text-sm text-muted-foreground">{ht("Todavía no tenés conversaciones. Buscá una persona en Explorar para empezar.")}</p>}
               {conversations.map(person => <button key={person.ownerId} type="button" onClick={() => void openHumanChat(person.ownerId,person.displayName)} className="flex w-full items-center justify-between rounded-xl bg-secondary/50 px-4 py-3 text-left text-sm hover:bg-secondary"><span>{person.displayName} <span className="text-muted-foreground">@{person.username}</span></span><MessageCircle size={17} className="text-primary"/></button>)}
             </div>
-            {activeChat && <div className="rounded-2xl border border-border p-4 space-y-3">
-              <div className="flex items-center justify-between"><h3 className="font-semibold">{ht("Chat con")} {activeChat.name}</h3><button type="button" onClick={() => void openHumanChat(activeChat.ownerId, activeChat.name)} className="text-xs text-primary">{ct("refresh")}</button></div>
-              <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
-                {chatError ? <p role="alert" className="text-xs text-destructive">{chatError}</p> : chatMessages.length === 0 && <p className="text-xs text-muted-foreground">{ct("noMessages")}</p>}
-                {chatMessages.map(message => <div key={message.id} className={`flex flex-col ${message.senderOwnerId === user?.id ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${message.senderOwnerId === user?.id ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>{message.kind === "voice" && message.objectPath ? <HumanVoicePlayback objectPath={message.objectPath} durationSeconds={message.durationSeconds ?? 0} /> : message.body}</div>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {message.reactions?.map((reaction, index) => <span key={index} className="text-xs">{reaction.emoji}</span>)}
-                    <button type="button" onClick={() => setReactingMessage(reactingMessage === message.id ? null : message.id)} aria-label={ct("send")} className="rounded-full px-2 text-xs text-muted-foreground hover:bg-secondary">☺ +</button>
-                  </div>
-                  {reactingMessage === message.id && <div className="flex flex-wrap gap-1 rounded-xl bg-background p-1">
-                    {['❤️','😂','🥹','😍','👍','🔥','😮','😢'].map(emoji => <button type="button" key={emoji} onClick={() => { setReactingMessage(null); void toggleReaction(message.id, emoji, Boolean(message.reactions?.some(r => r.emoji === emoji && r.ownerId === user?.id))); }} className="rounded-lg p-1 hover:bg-secondary" aria-label={`Reaccionar con ${emoji}`}>{emoji}</button>)}
-                  </div>}
-                </div>)}
-                {otherTyping && <div aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground"><span>{activeChat.name} {ht("está escribiendo")}</span><span className="animate-pulse">● ● ●</span></div>}
-              </div>
-              {chatError && <p role="alert" className="text-xs text-destructive">{chatError}</p>}
-              <HumanVoiceRecorder key={activeChat.ownerId} targetOwnerId={activeChat.ownerId} onSent={() => refreshHumanChat(activeChat.ownerId)} />
-              <div className="flex gap-2"><input aria-label={ht("Escribí un mensaje…")} value={chatDraft} maxLength={2000} onChange={e => updateChatDraft(e.target.value)} placeholder={ht("Escribí un mensaje…")} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm"/><button type="button" disabled={chatBusy || !chatDraft.trim()} onClick={() => void sendHumanMessage()} className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{ct("send")}</button></div>
-            </div>}
             <div className="rounded-2xl border border-border p-4 space-y-4">
               <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{ht("Bandeja de solicitudes")}</h3><button type="button" onClick={() => void refreshInbox()} className="text-xs text-primary">{ct("refresh")}</button></div>
               {inboxError && <p role="alert" className="text-xs text-destructive">{inboxError}</p>}
