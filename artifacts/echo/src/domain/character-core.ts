@@ -104,6 +104,33 @@ export function deletionBlockReason(state: SocialState, id: string): string | nu
   return null;
 }
 
+/** Repair dangling character references after an older deletion, without resetting user content. */
+export function repairOrphanedCharacterLinks(state: SocialState): SocialState {
+  const ids = new Set(state.characters.map(c => c.id));
+  let changed = false;
+  const characters = state.characters.map(c => {
+    if (!c.configuration) return c;
+    const config = structuredClone(c.configuration);
+    const valid = (target: string) => target === 'owner' || (ids.has(target) && target !== c.id);
+    const relationships = config.relationships.filter(r => valid(r.targetId));
+    const companions = config.currentState.companions.filter(valid);
+    const permanent = config.memory.permanent.filter(m => !m.targetId || valid(m.targetId));
+    const relationshipMemories = config.memory.relationships.filter(m => !!m.targetId && valid(m.targetId));
+    const recent = config.memory.recent.filter(m => !m.targetId || valid(m.targetId));
+    if (relationships.length === config.relationships.length && companions.length === config.currentState.companions.length &&
+      permanent.length === config.memory.permanent.length && relationshipMemories.length === config.memory.relationships.length &&
+      recent.length === config.memory.recent.length) return c;
+    changed = true;
+    config.relationships = relationships;
+    config.currentState.companions = companions;
+    config.memory.permanent = permanent;
+    config.memory.relationships = relationshipMemories;
+    config.memory.recent = recent;
+    return { ...c, configuration: config };
+  });
+  return changed ? { ...state, characters } : state;
+}
+
 /** Permanently delete an identity and remove its references throughout the local universe. */
 export function deleteUnusedAccount(state: SocialState, id: string): SocialState {
   const blocked = deletionBlockReason(state, id);
