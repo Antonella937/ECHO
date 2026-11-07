@@ -40,8 +40,8 @@ export interface SocialActions {
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
-  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; commentsEnabled?: boolean }): string;
-  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean }): string;
+  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
+  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
   deletePost(postId: string): void;
   deleteStory(storyId: string): void;
   toggleCloseFriend(characterId: string): void;
@@ -294,7 +294,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (!['dark', 'light', 'system'].includes(appearance.theme) || !/^#[a-f0-9]{6}$/i.test(appearance.accent)) throw new Error('Apariencia inválida.');
         coordinator.current?.edit(s => ({ ...s, appearance }));
       },
-      createPost({ image, media, caption, location, taggedAccountIds, commentsEnabled }) {
+      createPost({ image, media, caption, location, taggedAccountIds, commentsEnabled, musicClip }) {
         if (media) validatePostMedia(media);
         const id = uid('p');
         dispatch({
@@ -313,12 +313,13 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
             illustrative: false,
             ...(taggedAccountIds ? { taggedAccountIds } : {}),
             ...(commentsEnabled !== undefined ? { commentsEnabled } : {}),
+            ...(musicClip ? { musicClip } : {}),
           },
         });
         coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { postId: id }, taggedAccountIds));
         return id;
       },
-      createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly }) {
+      createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly, musicClip }) {
         const allowedViewerIds = closeFriendsOnly ? (cur().closeFriends?.[myId()] ?? []) : [];
         if (closeFriendsOnly && !allowedViewerIds.length) throw new Error('Agregá al menos un mejor amigo antes de publicar.');
         const id = uid('s');
@@ -326,7 +327,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           type: 'story.created',
           story: { id, authorId: myId(), image, caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
             ...(mentionedAccountIds ? { mentionedAccountIds: mentionedAccountIds.filter(id => !closeFriendsOnly || allowedViewerIds.includes(id)) } : {}),
-            ...(closeFriendsOnly ? { closeFriendsOnly: true, allowedViewerIds } : {}), ...(music ? { music } : {}) },
+            ...(closeFriendsOnly ? { closeFriendsOnly: true, allowedViewerIds } : {}), ...(music ? { music } : {}), ...(musicClip ? { musicClip } : {}) },
         });
         coordinator.current?.edit(s => {
           const next = mentionNotifications(s, caption, myId(), { storyId: id }, mentionedAccountIds);
