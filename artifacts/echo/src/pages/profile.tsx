@@ -98,7 +98,7 @@ export default function ProfilePage() {
               <Archive className="h-3.5 w-3.5" /> {t("Cuenta archivada · historial conservado")}
             </p>
           )}
-          <p className="mt-2 max-w-[440px] text-[14.5px] leading-relaxed text-foreground/90" data-testid="text-profile-bio">{person.bio}</p>
+          <p className="mt-2 max-w-[440px] whitespace-pre-wrap break-words text-[14.5px] leading-relaxed text-foreground/90" data-testid="text-profile-bio">{person.bio}</p>
           {person.location && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" strokeWidth={1.6} /> {person.location}
           </p>}
