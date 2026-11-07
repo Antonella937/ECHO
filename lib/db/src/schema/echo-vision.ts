@@ -35,7 +35,7 @@ export const echoVisionAnalysesTable = pgTable("echo_vision_analyses", {
 export const echoVisionMediaRefsTable = pgTable("echo_vision_media_refs", {
   ownerId: text("owner_id").notNull(),
   universeId: text("universe_id").notNull().default("primary"),
-  entityType: text("entity_type").$type<"post" | "story">().notNull(),
+  entityType: text("entity_type").$type<"post" | "story" | "gallery">().notNull(),
   entityId: text("entity_id").notNull(),
   mediaId: text("media_id").notNull(),
   position: integer("position").notNull(),
