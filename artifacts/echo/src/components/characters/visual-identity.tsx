@@ -5,6 +5,15 @@ import type { IdentityReference } from '@/domain/types';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
 import { Area } from './ui';
 
+function ReferencePhoto({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  return <div className="relative h-full w-full overflow-hidden rounded-xl bg-secondary">
+    {status === 'loading' && <div role="status" aria-label="Loading image" className="absolute inset-0 grid place-items-center"><span className="h-7 w-7 animate-spin rounded-full border-2 border-primary/20 border-t-primary" /></div>}
+    {status === 'error' && <div role="status" aria-label="Image unavailable" className="absolute inset-0 grid place-items-center text-muted-foreground"><ImagePlus className="h-7 w-7 opacity-60" /></div>}
+    <img key={src} src={src} alt={alt} loading="lazy" onLoad={() => setStatus('loaded')} onError={() => setStatus('error')} className={className + (status === 'loaded' ? '' : ' opacity-0')} />
+  </div>;
+}
+
 export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
   avatar: string;
   identity: IdentityReference | undefined;
@@ -49,7 +58,7 @@ export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
     <h3 className="font-display text-lg">{t("Identidad visual")}</h3>
     <p className="mt-1 mb-4 text-xs text-muted-foreground">{t("Estas referencias ayudan a mantener la apariencia del personaje en futuras imágenes IA. La foto de perfil es la referencia facial principal.")}</p>
     <div className="mb-4 flex items-center gap-3">
-      {avatar && <img src={resolve(avatar)} alt={t("Referencia facial principal")} className="h-20 w-20 rounded-xl object-cover bg-secondary" />}
+      {avatar && <div className="h-20 w-20 shrink-0"><ReferencePhoto src={resolve(avatar)} alt={t("Referencia facial principal")} className="h-20 w-20 object-cover" /></div>}
       <div className="text-xs text-muted-foreground">{t("Foto de perfil · referencia principal del rostro. Se actualiza desde el selector de avatar de arriba.")}</div>
     </div>
     <Area id="character-facial-description" label={t("Descripción facial")} value={identity?.facialDescription ?? ''} onChange={facialDescription => patch({ facialDescription })} max={4000} rows={3} />
@@ -58,7 +67,7 @@ export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
     <p className="mb-2 text-sm font-medium">{t('Fotos adicionales')} ({images.length}/5)</p>
     <div className="grid grid-cols-3 gap-2">
       {images.map((ref, index) => <div key={ref + index} className="relative overflow-hidden rounded-xl bg-secondary">
-        <img src={resolve(ref)} alt={`${t('Referencia')} ${index + 1}`} className="aspect-[3/4] w-full object-cover" />
+        <ReferencePhoto key={resolve(ref)} src={resolve(ref)} alt={`${t('Referencia')} ${index + 1}`} className="aspect-[3/4] w-full object-cover" />
         <button type="button" aria-label={`${t('Eliminar referencia')} ${index + 1}`} onClick={() => patch({ referenceImages: images.filter((_, i) => i !== index) })} className="absolute right-1 top-1 rounded-full bg-black/70 p-2 text-white"><X className="h-4 w-4" /></button>
       </div>)}
       {images.length < 5 && <button type="button" disabled={uploading} onClick={() => picker.current?.click()} className="flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-xs text-muted-foreground disabled:opacity-50"><ImagePlus className="h-6 w-6" />{t(uploading ? 'Subiendo…' : 'Agregar foto')}</button>}
