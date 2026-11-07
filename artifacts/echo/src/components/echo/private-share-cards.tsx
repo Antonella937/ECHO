@@ -97,7 +97,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
         <h2 id={`${noteId}-h`} className="m-0 text-[22px] font-normal" style={{ fontFamily: SERIF }}>{t("Tarjetas para compartir")}</h2>
         <p id={noteId} className="mt-1 mb-0 flex gap-2 text-[11px] leading-relaxed text-[#a59ba4]" data-testid="text-share-dependency">
           <span aria-hidden="true" className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#d9a8bd]" />
-          {t("Esta vista es privada y solo visible para ti. Compartir requiere un enlace autorizado que aún no está disponible.")}
+          Los enlaces muestran una vista limitada y se pueden revocar. No incluyen conversaciones ni recuerdos privados.
         </p>
       </div>
 
