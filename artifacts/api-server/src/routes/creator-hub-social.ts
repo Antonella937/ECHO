@@ -638,6 +638,21 @@ export function createCreatorHubSocialRouter(): IRouter {
     pinned: z.boolean().default(false),
     coverPath: z.string().regex(new RegExp("^/objects/uploads/[0-9a-f-]{36}$", "i")).nullable().default(null),
   }).strict();
+  const readStateSchema = z.object({ ids: z.array(z.string().uuid()).max(300) }).strict();
+  router.get("/creator-hub/social/notification-reads", async (req, res) => {
+    const user = await clerkClient.users.getUser(req.userId!);
+    const ids = user.privateMetadata?.echoCreatorNotificationReads;
+    res.json({ ids: Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string').slice(-300) : [] });
+  });
+  router.put("/creator-hub/social/notification-reads", async (req, res) => {
+    const parsed = readStateSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_NOTIFICATION_READS" }); return; }
+    const user = await clerkClient.users.getUser(req.userId!);
+    const previous = user.privateMetadata?.echoCreatorNotificationReads;
+    const ids = [...new Set([...(Array.isArray(previous) ? previous.filter((id): id is string => typeof id === 'string') : []), ...parsed.data.ids])].slice(-300);
+    await clerkClient.users.updateUserMetadata(req.userId!, { privateMetadata: { echoCreatorNotificationReads: ids } });
+    res.json({ ids });
+  });
   // Public official announcements are readable by any signed-in ECHO user.
   // The founder-only publication rule below prevents other creators from impersonating ECHO.
   // Public creator posts from accounts this member follows; private posts are never exposed.
@@ -671,6 +686,7 @@ export function createCreatorHubSocialRouter(): IRouter {
     const parsed = publicationSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({error:"INVALID_PUBLICATION"}); return; }
     if (parsed.data.kind === "update" && req.userId !== founderOwnerId) { res.status(403).json({error:"OFFICIAL_UPDATES_RESTRICTED"}); return; }
+    if (parsed.data.kind === "update" && parsed.data.visibility !== "public") { res.status(400).json({error:"OFFICIAL_UPDATES_MUST_BE_PUBLIC"}); return; }
     const profile = await pool.query("SELECT 1 FROM echo_creator_profiles WHERE owner_id=$1", [req.userId]);
     if (!profile.rowCount) { res.status(409).json({error:"CREATOR_PROFILE_REQUIRED"}); return; }
     const {kind,title,body,visibility,pinned,coverPath} = parsed.data;
