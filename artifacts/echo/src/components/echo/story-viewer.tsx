@@ -93,6 +93,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [replyFocused, setReplyFocused] = useState(false);
   const [reply, setReply] = useState('');
   const [showViewers, setShowViewers] = useState(false);
+  const [viewerFilter, setViewerFilter] = useState<'views' | 'likes'>('views');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
@@ -162,7 +163,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
   const viewers = storyViewerIds(liveStory).map(character).filter(Boolean);
   const likedViewerIds = new Set(liveStory.likes ?? []);
-  const viewerRows = [...new Set([...storyViewerIds(liveStory), ...(liveStory.likes ?? [])])].map(character).filter((v): v is NonNullable<typeof v> => !!v);
+  const viewerRows = (viewerFilter === 'likes' ? [...likedViewerIds] : storyViewerIds(liveStory).filter(id => !likedViewerIds.has(id))).map(character).filter((v): v is NonNullable<typeof v> => !!v);
   const totalViews = storyViewCount(liveStory);
   const active = isStoryActive(liveStory);
   const mentioned = (liveStory.mentionedAccountIds ?? []).map(character).filter((c): c is NonNullable<typeof c> => !!c);
@@ -348,7 +349,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           {isMine ? (
             <div className="relative">
               <button
-                onClick={() => setShowViewers((v) => !v)}
+                onClick={() => { setViewerFilter('views'); setShowViewers((v) => !v); }}
                 className="flex h-11 items-center gap-2 rounded-full px-3 text-sm text-foreground/85"
                 data-testid="button-story-viewers"
               >
@@ -366,7 +367,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                     <button type="button" onClick={() => setShowViewers(false)} className="grid h-9 w-9 place-items-center rounded-full bg-secondary" aria-label={t("Cerrar")} data-testid="button-story-viewers-close"><ChevronDown className="h-5 w-5" /></button>
                   </div>
                   <div className="max-h-[calc(65dvh-64px)] overflow-y-auto overscroll-contain p-3">
-                    {viewerRows.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">{t('Nadie la ha visto todavía')}</p> : viewerRows.map(v => (
+                    {viewerRows.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">{viewerFilter === 'likes' ? t('Me gusta') + ': 0' : t('Nadie la ha visto todavía')}</p> : viewerRows.map(v => (
                       <div key={v.id} className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm" data-testid={`story-viewer-row-${v.id}`}>
                         <CharacterAvatar character={v} size={38} />
                         <span className="min-w-0 flex-1 truncate font-medium">{v.handle}</span>
