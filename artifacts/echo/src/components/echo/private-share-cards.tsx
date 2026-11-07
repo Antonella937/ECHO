@@ -53,15 +53,15 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
       const url = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + '/shared/' + result.token;
       setLink(url);
       return url;
-    } catch { setError('No se pudo generar el enlace. Activá compartir universo desde Privacidad.'); return ''; }
+    } catch { setError(t('No se pudo generar el enlace. Activá compartir universo desde Privacidad.')); return ''; }
     finally { setBusy(false); }
   };
-  const copy = async () => { const url = link || await generate(); if (url) { try { await navigator.clipboard.writeText(url); } catch { setError('No se pudo copiar automáticamente.'); } } };
+  const copy = async () => { const url = link || await generate(); if (url) { try { await navigator.clipboard.writeText(url); } catch { setError(t('No se pudo copiar automáticamente.')); } } };
   const share = async () => {
     const url = link || await generate();
     if (!url) return;
     if (navigator.share) { try { await navigator.share({ title: label, url }); } catch { /* cancelled */ } }
-    else { try { await navigator.clipboard.writeText(url); } catch { setError('No se pudo compartir automáticamente.'); } }
+    else { try { await navigator.clipboard.writeText(url); } catch { setError(t('No se pudo compartir automáticamente.')); } }
   };
   const createInvite = async () => {
     setBusy(true); setError('');
@@ -69,21 +69,21 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
       const url = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + '/shared/' + result.token;
       setInvite(url);
       await navigator.clipboard.writeText(url);
-    } catch { setError('No se pudo crear o copiar la invitación. Activá compartir desde Privacidad.'); }
+    } catch { setError(t('No se pudo crear o copiar la invitación. Activá compartir desde Privacidad.')); }
     finally { setBusy(false); }
   };
   const loadCollaborators = async () => {
     try { setCollaborators(await customFetch<Array<{collaborator_id:string;role:string}>>('/api/universe/' + encodeURIComponent(universeId) + '/collaborators', {responseType:'json'})); }
-    catch { setError('No se pudieron cargar las colaboradoras.'); }
+    catch { setError(t('No se pudieron cargar las colaboradoras.')); }
   };
   const removeCollaborator = async (id:string) => {
     try { await customFetch('/api/universe/' + encodeURIComponent(universeId) + '/collaborators/' + encodeURIComponent(id), {method:'DELETE'}); await loadCollaborators(); }
-    catch { setError('No se pudo quitar el acceso.'); }
+    catch { setError(t('No se pudo quitar el acceso.')); }
   };
   const revokeInvite = async () => {
     if (!invite) return;
     try { await customFetch('/api/universe/' + encodeURIComponent(universeId) + '/share-links/' + invite.split('/').pop(), {method:'DELETE'}); setInvite(''); }
-    catch { setError('No se pudo revocar la invitación.'); }
+    catch { setError(t('No se pudo revocar la invitación.')); }
   };
   const revoke = async () => {
     if (!link) return;
@@ -92,19 +92,19 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
     try {
       await customFetch('/api/universe/' + encodeURIComponent(universeId) + '/share-links/' + token, { method: 'DELETE' });
       setLink('');
-    } catch { setError('No se pudo revocar el enlace.'); }
+    } catch { setError(t('No se pudo revocar el enlace.')); }
     finally { setBusy(false); }
   };
   return <div className="mt-3">
     <LinkRow label={label} link={link} />
     <div className="mt-3 flex flex-wrap gap-2">
-      <button type="button" disabled={busy} onClick={() => void copy()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{busy ? 'Generando…' : t('Copiar enlace')}</button>
+      <button type="button" disabled={busy} onClick={() => void copy()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{busy ? '{t("Generando…")}' : t('Copiar enlace')}</button>
       <button type="button" disabled={busy} onClick={() => void share()} className={disabledBtn.replace('opacity-55 cursor-not-allowed', '')}>{t('Compartir')}</button>
-      {kind === 'universe' && <button type="button" disabled={busy} onClick={() => void createInvite()} className="min-h-11 rounded-full border border-primary px-3 text-xs text-primary">Invitar a colaborar</button>}
-      {link && <button type="button" disabled={busy} onClick={() => void revoke()} className="min-h-11 rounded-full border border-border px-3 text-xs">Revocar enlace</button>}
+      {kind === 'universe' && <button type="button" disabled={busy} onClick={() => void createInvite()} className="min-h-11 rounded-full border border-primary px-3 text-xs text-primary">{t("Invitar a colaborar")}</button>}
+      {link && <button type="button" disabled={busy} onClick={() => void revoke()} className="min-h-11 rounded-full border border-border px-3 text-xs">{t("Revocar enlace")}</button>}
     </div>
-    {invite && <div className="mt-2 break-all text-xs text-muted-foreground">Invitación de colaboración: {invite} <button type="button" onClick={() => void revokeInvite()} className="ml-2 underline">Revocar invitación</button></div>}
-    {kind === 'universe' && <div className="mt-3"><button type="button" onClick={() => void loadCollaborators()} className="text-xs text-primary underline">Administrar colaboradoras</button>{collaborators.map(person => <div key={person.collaborator_id} className="mt-2 flex items-center gap-2 text-xs"><span className="min-w-0 flex-1 truncate">{person.collaborator_id}</span><button type="button" onClick={() => void removeCollaborator(person.collaborator_id)} className="underline">Quitar acceso</button></div>)}</div>}
+    {invite && <div className="mt-2 break-all text-xs text-muted-foreground">{t("Invitación de colaboración: ")}{invite} <button type="button" onClick={() => void revokeInvite()} className="ml-2 underline">{t("Revocar invitación")}</button></div>}
+    {kind === 'universe' && <div className="mt-3"><button type="button" onClick={() => void loadCollaborators()} className="text-xs text-primary underline">{t("Administrar colaboradoras")}</button>{collaborators.map(person => <div key={person.collaborator_id} className="mt-2 flex items-center gap-2 text-xs"><span className="min-w-0 flex-1 truncate">{person.collaborator_id}</span><button type="button" onClick={() => void removeCollaborator(person.collaborator_id)} className="underline">{t("Quitar acceso")}</button></div>)}</div>}
     {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
   </div>;
 }
@@ -124,7 +124,7 @@ export function PrivateShareCards({ universeName, description, creatorName, char
         <h2 id={`${noteId}-h`} className="m-0 text-[22px] font-normal" style={{ fontFamily: SERIF }}>{t("Tarjetas para compartir")}</h2>
         <p id={noteId} className="mt-1 mb-0 flex gap-2 text-[11px] leading-relaxed text-[#a59ba4]" data-testid="text-share-dependency">
           <span aria-hidden="true" className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#d9a8bd]" />
-          Los enlaces muestran una vista limitada y se pueden revocar. No incluyen conversaciones ni recuerdos privados.
+          {t("Los enlaces muestran una vista limitada y se pueden revocar. No incluyen conversaciones ni recuerdos privados.")}
         </p>
       </div>
 
