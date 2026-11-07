@@ -59,9 +59,9 @@ router.post("/voices/premium/reference/request-url",async(req,res)=>{
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
   if(!await checkCharacter(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
-  const base=process.env.SUPABASE_URL?.replace(/\\/$/,"");
+  const base=process.env.SUPABASE_URL?.replace(new RegExp("/$"),"");
   const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!base||!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(base)||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
+  if(!base||!base.startsWith("https://")||!base.endsWith(".supabase.co")||!secret){res.status(503).json({error:"SUPABASE_NOT_CONFIGURED"});return;}
   const {randomUUID}=await import("node:crypto");
   const path=`voice-studio/${randomUUID()}/${randomUUID()}`;
   const response=await fetch(`${base}/storage/v1/object/upload/sign/echo-media/${path}`,{
@@ -71,7 +71,7 @@ router.post("/voices/premium/reference/request-url",async(req,res)=>{
   if(!response.ok){res.status(502).json({error:"VOICE_UPLOAD_SIGN_FAILED"});return;}
   const payload=await response.json() as {url?:string;signedURL?:string;token?:string};
   const relative=payload.url??payload.signedURL;
-  const uploadURL=relative?new URL(relative.startsWith("http")?relative:`${base}/storage/v1/${relative.replace(/^\\/?(?:storage\\/v1\\/)?/,"")}`).toString()
+  const uploadURL=relative?new URL(relative.startsWith("http")?relative.startsWith("/storage/v1/")?`${base}${relative}`:`${base}/storage/v1/${relative.replace(/^\\//,"")}`).toString()
    :payload.token?`${base}/storage/v1/object/upload/sign/echo-media/${path}?token=${encodeURIComponent(payload.token)}`:null;
   if(!uploadURL||!uploadURL.startsWith(`${base}/storage/v1/object/upload/sign/echo-media/`)){res.status(502).json({error:"VOICE_UPLOAD_SIGN_INVALID"});return;}
   res.json({uploadURL,objectPath:path});
