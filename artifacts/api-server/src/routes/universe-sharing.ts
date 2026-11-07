@@ -97,6 +97,10 @@ export function createUniverseSharingRouter(
       isNull(echoUniversesTable.archivedAt), isNull(echoUniversesTable.deletedAt),
     )).limit(1);
     if (!universe || !universe.sharingEnabled) { res.status(403).json({ error: "SHARING_DISABLED" }); return; }
+    const inherited = await db.execute(sql`SELECT recipient_character_id FROM echo_import_provenance
+      WHERE recipient_owner_id=${req.userId!} AND recipient_universe_id=${params.data.universeId}
+      AND (recipient_character_id='' OR recipient_character_id=${body.data.characterId ?? ''}) LIMIT 1`);
+    if (inherited.rows.length) { res.status(403).json({error:"ORIGINAL_CREATOR_ONLY"}); return; }
     const characters = Array.isArray(universe.state.characters) ? universe.state.characters as Array<{id?:string;archived?:boolean}> : [];
     if (body.data.kind === "character" && !characters.some(x => x.id === body.data.characterId && !x.archived)) {
       res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
@@ -140,7 +144,7 @@ export function createUniverseSharingRouter(
       FROM echo_share_links l JOIN echo_universes u ON u.owner_id = l.owner_id AND u.universe_id = l.universe_id
       WHERE l.token_hash = ${hash} AND l.revoked_at IS NULL AND u.sharing_enabled = true
       AND u.archived_at IS NULL AND u.deleted_at IS NULL LIMIT 1`);
-    const source = rows.rows[0] as { owner_id:string; kind:string; character_id:string|null; state:Record<string,unknown> } | undefined;
+    const source = rows.rows[0] as { owner_id:string; universe_id:string; kind:string; character_id:string|null; state:Record<string,unknown> } | undefined;
     if (!source || source.owner_id === req.userId) { res.status(403).json({ error: "IMPORT_NOT_ALLOWED" }); return; }
     const state = source.state;
     const originals = Array.isArray(state.characters) ? state.characters as Array<Record<string,unknown>> : [];
@@ -181,6 +185,11 @@ export function createUniverseSharingRouter(
         if (!parsed.success) { res.status(422).json({ error: "IMPORT_VALIDATION_FAILED" }); return; }
         const saved = await writeUniverse(req.userId!, parsed.data as Record<string,unknown>, recipient.revision, "primary");
         if (!saved) { res.status(409).json({ error: "REVISION_CONFLICT" }); return; }
+        for (let i=0;i<imported.length;i++) {
+          await db.execute(sql`INSERT INTO echo_import_provenance(recipient_owner_id,recipient_universe_id,recipient_character_id,
+            original_owner_id,original_universe_id,original_character_id)
+            VALUES(${req.userId!},'primary',${imported[i].id},${source.owner_id},${(rows.rows[0] as {universe_id:string}).universe_id ?? 'primary'},${chosen[i].id as string})`);
+        }
         res.status(201).json({ kind: "character", universeId: "primary", importedCount: imported.length }); return;
       }
       const name = String((state.creatorSetup as Record<string,unknown> | undefined)?.universeName ?? "Universo importado").slice(0,60);
@@ -190,6 +199,9 @@ export function createUniverseSharingRouter(
       const parsed = SaveUniverseBody.shape.state.safeParse(next);
       if (!parsed.success) { res.status(422).json({ error: "IMPORT_VALIDATION_FAILED" }); return; }
       const created = await createAdditionalUniverse(req.userId!, name, parsed.data as Record<string,unknown>);
+      await db.execute(sql`INSERT INTO echo_import_provenance(recipient_owner_id,recipient_universe_id,recipient_character_id,
+        original_owner_id,original_universe_id)
+        VALUES(${req.userId!},${created.universeId},'',${source.owner_id},${(rows.rows[0] as {universe_id:string}).universe_id ?? 'primary'})`);
       res.status(201).json({ kind: "universe", universeId: created.universeId, importedCount: imported.length });
     } catch (error) {
       if (error instanceof StructuralLimitError) { res.status(409).json({ error: error.code }); return; }
@@ -223,6 +235,9 @@ export function createUniverseSharingRouter(
     res.setHeader("Cache-Control", "private, no-store");
     const params = universeParamsSchema.safeParse(req.params);
     if (!params.success) { res.status(400).json({error:"INVALID_UNIVERSE_ID"}); return; }
+    const inherited = await db.execute(sql`SELECT 1 FROM echo_import_provenance WHERE recipient_owner_id=${req.userId!}
+      AND recipient_universe_id=${params.data.universeId} AND recipient_character_id='' LIMIT 1`);
+    if (inherited.rows.length) {res.status(403).json({error:"ORIGINAL_CREATOR_ONLY"});return;}
     const [row] = await db.select().from(echoUniversesTable).where(and(
       eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,params.data.universeId),
       isNull(echoUniversesTable.archivedAt),isNull(echoUniversesTable.deletedAt))).limit(1);
