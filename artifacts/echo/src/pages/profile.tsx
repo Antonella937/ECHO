@@ -132,6 +132,8 @@ export default function ProfilePage() {
               disabled={person.archived}
               onClick={() => {
                 actions.switchIdentity(person.id);
+                // Keep the URL and browser history aligned with the newly active identity.
+                navigate(`/profile/${person.id}`, { replace: true });
                 toast({ title: `${t("Ahora publicas como")} ${person.name}` });
               }}
               className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50"
