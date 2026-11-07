@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload } from 'lucide-react';
+import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3 } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
@@ -44,6 +44,8 @@ export default function EchoMusicPage() {
   }
   const [playerOpen, setPlayerOpen] = useState(false);
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
+  const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
+  const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
   const [libraryError, setLibraryError] = useState('');
   const [cloudLibraryAvailable, setCloudLibraryAvailable] = useState(false);
   useEffect(() => {
@@ -115,6 +117,12 @@ export default function EchoMusicPage() {
     } catch { setLibraryError('No se pudo eliminar el borrador.'); }
   }
   const audioUrl = resolvedSavedAudio || localAudioUrl;
+  const filteredLibrary = library.filter(item => item.status === libraryFilter).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  function openLibraryItem(item: MusicDraftRecord) {
+    audioRef.current?.pause(); setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds);
+    setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null);
+    setElapsed(0); setActualDuration(0); setClipStart(0); setPlayerOpen(true);
+  }
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [actualDuration, setActualDuration] = useState(0);
@@ -207,6 +215,29 @@ export default function EchoMusicPage() {
     <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
   </div>;
   return <div><TopBar title="ECHO Music Studio" onBack={back} /><main className="mx-auto max-w-2xl space-y-5 px-4 pb-20 pt-5">
+    <nav aria-label="Secciones de ECHO Music" className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary/60 p-1">
+      <button type="button" onClick={() => setStudioTab('create')} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${studioTab === 'create' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}><WandSparkles className="h-4 w-4" /> Crear música</button>
+      <button type="button" onClick={() => setStudioTab('library')} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${studioTab === 'library' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}><Library className="h-4 w-4" /> Mi biblioteca</button>
+    </nav>
+    {studioTab === 'library' ? <section className="space-y-5">
+      <div className="rounded-2xl border border-border bg-card/60 p-5">
+        <div className="flex items-center gap-3"><Disc3 className="h-7 w-7 text-primary" /><div><h1 className="text-xl font-bold">Mi biblioteca</h1><p className="text-xs text-muted-foreground">{library.filter(item => item.status === 'saved_audio').length} canciones guardadas · {library.filter(item => item.status === 'draft').length} borradores</p></div></div>
+        <p className="mt-3 text-xs text-muted-foreground">{cloudLibraryAvailable ? 'Biblioteca conectada a tu cuenta de ECHO.' : 'Sincronización pendiente: también se muestran los registros locales.'}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setLibraryFilter('saved_audio')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'saved_audio' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>Canciones guardadas</button>
+        <button type="button" onClick={() => setLibraryFilter('draft')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'draft' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>Borradores</button>
+      </div>
+      {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
+      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? 'Todavía no guardaste canciones' : 'Todavía no tenés borradores'}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? 'Probá con un audio propio y guardalo en ECHO.' : 'Prepará una canción con un prompt para verla acá.'}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">Ir al estudio</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-3">
+        <button type="button" onClick={() => openLibraryItem(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
+          <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio guardado' : 'Prompt preparado'} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? 'Escuchar canción' : 'Ver borrador'}</p></div>
+        </button>
+        <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>
+      </article>)}</div>}
+      <p className="text-xs text-muted-foreground">Eliminar un registro no borra todavía el archivo privado del almacenamiento.</p>
+    </section> : <>
     <div className="rounded-2xl border border-border bg-card/60 p-5">
       <div className="flex items-center gap-2 text-lg font-semibold"><Music2 className="h-5 w-5 text-primary" /> Create your sound</div>
       <p className="mt-2 text-xs text-muted-foreground">Configurá una canción original para Eleven Music. La vista previa se prepara en ECHO sin enviar datos a ElevenLabs ni consumir créditos.</p>
@@ -226,10 +257,11 @@ export default function EchoMusicPage() {
     {localAudioError && <p role="alert" className="text-sm text-destructive">{localAudioError}</p>}
     {prepareError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{prepareError}</p>}
     {preview && <section className="rounded-2xl border border-border bg-card/60 p-4" aria-live="polite"><h2 className="text-sm font-semibold">Solicitud preparada · {title} · {durationSeconds}s</h2><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{preview}</pre><p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/> Generación no activada. Sin cargos.</p></section>}
-    <section className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">Los audios se guardan en almacenamiento privado. {cloudLibraryAvailable ? 'Biblioteca conectada a tu cuenta.' : 'Biblioteca local; sincronización en la nube pendiente.'}</p>
+    <section className="hidden rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Mi biblioteca · borradores</h2><p className="mt-1 text-xs text-muted-foreground">Los audios se guardan en almacenamiento privado. {cloudLibraryAvailable ? 'Biblioteca conectada a tu cuenta.' : 'Biblioteca local; sincronización en la nube pendiente.'}</p>
       {libraryError && <p role="alert" className="mt-2 text-xs text-destructive">{libraryError}</p>}
       {library.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">Todavía no preparaste canciones.</p> : <div className="mt-3 space-y-2">{library.map(item => <div key={item.id} className="flex items-center gap-2 rounded-xl border border-border p-3"><Music2 className="h-4 w-4 shrink-0 text-primary"/><button type="button" onClick={() => { setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds); setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null); setElapsed(0); setActualDuration(0); setPlayerOpen(true); }} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="text-xs text-muted-foreground">{item.status === 'saved_audio' ? 'Audio privado guardado' : 'Borrador'} · {item.durationSeconds}s</span></button><button type="button" onClick={() => deleteDraft(item.id)} className="text-xs text-muted-foreground underline">Eliminar</button></div>)}</div>}
     </section>
     <div className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">Música para historias y publicaciones</h2><p className="mt-2 text-xs text-muted-foreground">Feed.fm Clips: integración preparada, sin activar ni contratar. La reproducción de fragmentos de 15 o 30 segundos se habilitará únicamente después de confirmar el contrato, los derechos para Argentina y el acceso oficial al catálogo. YouTube: búsqueda disponible, sin derechos de reproducción de audio sobre fotos.</p></div>
+    </>}
   </main></div>;
 }
