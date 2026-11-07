@@ -1,5 +1,7 @@
 import { useSharedShellText } from '@/lib/shared-shell-translations';
-import { type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useUser } from '@clerk/react';
+import { customFetch } from '@workspace/api-client-react';
 import { Link, useLocation } from 'wouter';
 import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
@@ -8,12 +10,41 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
 import { useUnreadCounts } from '@/hooks/use-social-selectors';
 
+function useCreatorNotificationCount() {
+  const { user } = useUser();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!user?.id) { setCount(0); return; }
+    let active = true;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const [official, creators, reads] = await Promise.all([
+          customFetch<{ updates: Array<{ id: string }> }>('/api/creator-hub/social/official-updates', { responseType: 'json' }),
+          customFetch<{ publications: Array<{ id: string }> }>('/api/creator-hub/social/following-publications', { responseType: 'json' }),
+          customFetch<{ ids: string[] }>('/api/creator-hub/social/notification-reads', { responseType: 'json' }),
+        ]);
+        if (!active) return;
+        const readIds = new Set(reads.ids);
+        setCount([...official.updates, ...creators.publications].filter(item => !readIds.has(item.id)).length);
+      } catch { if (active) setCount(0); }
+    };
+    void refresh();
+    const interval = setInterval(() => { void refresh(); }, 30000);
+    const onFocus = () => { void refresh(); };
+    window.addEventListener('focus', onFocus);
+    return () => { active = false; clearInterval(interval); window.removeEventListener('focus', onFocus); };
+  }, [user?.id]);
+  return count;
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const t = useTranslation();
   const shared = useSharedShellText();
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
+  const creatorUnread = useCreatorNotificationCount();
   const inConversation = /^\/messages\/.+/.test(location);
   // Creator Hub is a full-screen destination, not a feed panel.
   if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
@@ -22,7 +53,7 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: '/', label: t('home'), icon: Home, match: (l: string) => l === '/' },
     { href: '/messages', label: t('messages'), icon: Send, badge: messages, match: (l: string) => l.startsWith('/messages') },
     { href: '/create', label: t('create'), icon: PlusSquare, match: (l: string) => l.startsWith('/create') },
-    { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications, match: (l: string) => l.startsWith('/notifications') },
+    { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications + creatorUnread, match: (l: string) => l.startsWith('/notifications') },
   ];
   const profileActive = location === `/profile/${me.id}`;
   const friends = (state.follows[me.id] ?? []).map(character).filter(Boolean);
