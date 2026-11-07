@@ -1,3 +1,4 @@
+import { useWelcomeText } from '@/lib/welcome-translations';
 import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
@@ -197,6 +198,37 @@ function OfficialUpdateObserver() {
   </>;
 }
 
+function FirstWelcomeDialog() {
+  const { user } = useUser();
+  const copy = useWelcomeText();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    // Avoid claiming twice during route changes and component remounts.
+    const localKey = 'echo-welcome-claimed:' + user.id;
+    if (localStorage.getItem(localKey)) return;
+    void customFetch<{ show: boolean }>('/api/creator-hub/social/claim-welcome', {
+      method: 'POST', responseType: 'json',
+    }).then(result => {
+      if (!active) return;
+      localStorage.setItem(localKey, '1');
+      if (result.show) setOpen(true);
+    }).catch(() => { /* retry on next session if unavailable */ });
+    return () => { active = false; };
+  }, [user?.id]);
+  if (!open) return null;
+  return <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-5" role="presentation">
+    <section role="dialog" aria-modal="true" aria-labelledby="echo-welcome-heading" className="w-full max-w-md rounded-3xl border border-primary/30 bg-card p-7 text-center text-foreground shadow-2xl">
+      <div className="mb-4 text-4xl">🖤</div>
+      <h2 id="echo-welcome-heading" className="text-2xl font-bold">{copy.heading}</h2>
+      <p className="mt-4 text-sm leading-7 text-muted-foreground">{copy.message}</p>
+      <p className="mt-5 text-sm font-semibold text-primary">{copy.signature}</p>
+      <button type="button" autoFocus onClick={() => setOpen(false)} className="mt-7 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">{copy.button}</button>
+    </section>
+  </div>;
+}
+
 function ProtectedRouter() {
   const [location] = useLocation();
   useEffect(() => {
@@ -206,6 +238,7 @@ function ProtectedRouter() {
     <Shell>
       <MessageSoundObserver />
       <OfficialUpdateObserver />
+      <FirstWelcomeDialog />
       <FounderSurprise />
       <RoutedErrorBoundary>
         <Switch>
