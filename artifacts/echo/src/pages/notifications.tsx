@@ -56,11 +56,9 @@ export default function NotificationsPage() {
       <TopBar
         title={t("Avisos")}
         right={
-          unread.length > 0 && (
-            <button onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary" data-testid="button-mark-all-read">
+          <button disabled={unread.length === 0} onClick={actions.markAllNotificationsRead} className="h-10 rounded-full px-3 text-xs font-semibold text-primary disabled:cursor-default disabled:opacity-45" data-testid="button-mark-all-read">
               {t("Marcar todo como leído")}
-            </button>
-          )
+          </button>
         }
       />
       {list.length === 0 ? (
