@@ -286,6 +286,8 @@ export default function CreatorHubPage() {
   const openPersonProfile = (ownerId: string) => {
     profileReturnScroll.current = window.scrollY;
     setProfileMessageFeedback('');
+    setRequestComposerOpen(false);
+    setRequestDraft('');
     setSelectedPersonId(ownerId);
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -332,6 +334,8 @@ export default function CreatorHubPage() {
   const [peopleBusy, setPeopleBusy] = useState(false);
   const [peopleFeedback, setPeopleFeedback] = useState('');
   const [profileMessageFeedback, setProfileMessageFeedback] = useState('');
+  const [requestComposerOpen, setRequestComposerOpen] = useState(false);
+  const [requestDraft, setRequestDraft] = useState('');
   async function searchPeople() {
     if (peopleQuery.trim().length < 2) return;
     setPeopleBusy(true); setPeopleFeedback(''); setPeopleResults([]); setSelectedPersonId(null);
@@ -344,13 +348,14 @@ export default function CreatorHubPage() {
     finally { setPeopleBusy(false); }
   }
   async function requestMessage(ownerId: string) {
+    if (!requestDraft.trim()) return;
     setPeopleBusy(true); setPeopleFeedback(''); setProfileMessageFeedback(ht('Enviando solicitud…'));
     try {
       const result = await customFetch<{ status: 'requested' | 'allowed' | 'accepted' }>('/api/creator-hub/social/message-requests', {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetOwnerId: ownerId }),
+        body: JSON.stringify({ targetOwnerId: ownerId, body: requestDraft.trim() }),
       });
-      if (result.status === 'requested') { const notice = ht("Solicitud enviada. Aparecerá en la bandeja de esa persona."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); }
+      if (result.status === 'requested') { const notice = ht("Solicitud enviada. Aparecerá en la bandeja de esa persona."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); setRequestComposerOpen(false); setRequestDraft(''); }
       else { setSelectedPersonId(null); setHubTab('mensajes'); setPeopleFeedback(ht("Podés escribirle.")); const person = peopleResults.find(item => item.ownerId === ownerId); await openHumanChat(ownerId, person?.displayName ?? ht("esta persona")); }
     } catch { const notice = ht("No se pudo enviar la solicitud. Puede que la persona no acepte mensajes."); setPeopleFeedback(notice); setProfileMessageFeedback(notice); }
     finally { setPeopleBusy(false); }
@@ -416,7 +421,7 @@ export default function CreatorHubPage() {
     finally { setChatBusy(false); }
   }
   const [followInbox, setFollowInbox] = useState<Array<{ id: string; displayName: string; username: string }>>([]);
-  const [messageInbox, setMessageInbox] = useState<Array<{ id: string; senderOwnerId: string; displayName: string; username: string }>>([]);
+  const [messageInbox, setMessageInbox] = useState<Array<{ id: string; senderOwnerId: string; displayName: string; username: string; previewBody?: string }>>([]);
   const [inboxBusy, setInboxBusy] = useState(false);
   const [inboxError, setInboxError] = useState('');
   async function refreshInbox() {
@@ -467,8 +472,14 @@ export default function CreatorHubPage() {
           {'bio' in person && person.bio && <p className="whitespace-pre-wrap text-sm leading-relaxed">{person.bio}</p>}
           <div className="flex min-w-0 flex-wrap gap-3">
             <button type="button" disabled={peopleBusy || person.following || person.requested} onClick={() => void followPerson(selectedPersonId)} className="rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-60">{ht(person.following ? 'Siguiendo' : person.requested ? 'Solicitado' : person.visibility === 'private' ? 'Solicitar seguir' : 'Seguir')}</button>
-            <button type="button" disabled={peopleBusy} onClick={() => void requestMessage(selectedPersonId)} className="flex min-h-11 items-center gap-2 rounded-full border border-primary/40 px-5 py-3 text-primary active:opacity-70"><MessageCircle size={18}/>{ht("Mensaje privado")}</button>
+            <button type="button" disabled={peopleBusy} onClick={() => { setRequestComposerOpen(true); setProfileMessageFeedback(''); }} className="flex min-h-11 items-center gap-2 rounded-full border border-primary/40 px-5 py-3 text-primary active:opacity-70"><MessageCircle size={18}/>{ht("Mensaje privado")}</button>
           </div>
+          {requestComposerOpen && <div className="space-y-3 rounded-2xl border border-primary/30 bg-card p-4">
+            <h2 className="font-semibold">{ht("Mensaje privado")} · {person.displayName}</h2>
+            <p className="text-sm text-muted-foreground">{ht("Escribí tu primer mensaje. La otra persona podrá aceptarlo o rechazarlo antes de abrir el chat.")}</p>
+            <textarea autoFocus rows={4} maxLength={2000} value={requestDraft} onChange={event => setRequestDraft(event.target.value)} placeholder={ht("Escribí un mensaje…")} aria-label={ht("Escribí un mensaje…")} className="w-full resize-none rounded-xl border border-border bg-background p-3 text-base text-foreground"/>
+            <div className="flex flex-wrap gap-3"><button type="button" disabled={peopleBusy || !requestDraft.trim()} onClick={() => void requestMessage(selectedPersonId)} className="rounded-full bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-50">{ht(peopleBusy ? "Enviando…" : "Enviar solicitud")}</button><button type="button" disabled={peopleBusy} onClick={() => setRequestComposerOpen(false)} className="rounded-full border border-border px-5 py-3">{ct("cancel")}</button></div>
+          </div>}
           {profileMessageFeedback && <p role="status" aria-live="polite" className="rounded-xl border border-primary/30 p-3 text-sm text-primary">{profileMessageFeedback}</p>}
           {person.visibility === 'private' && !person.following && <div className="rounded-2xl border border-border px-5 py-8 text-center"><LockKeyhole className="mx-auto mb-3 text-muted-foreground"/><p className="font-semibold">{ht("Perfil privado")}</p><p className="mt-2 text-sm text-muted-foreground">{ht("Este perfil es privado. El contenido requiere autorización de su creador.")}</p></div>}
           {(person.visibility === 'public' || person.following) && <section className="space-y-3"><h2 className="text-lg font-semibold">{ht("Publicaciones")}</h2>{viewedPosts.map(post=><article key={post.id} className="rounded-2xl border border-border p-5"><h3 className="font-semibold">{post.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{post.body}</p></article>)}{viewedPosts.length===0 && <p className="text-sm text-muted-foreground">{ht("Todavía no hay publicaciones.")}</p>}</section>}
@@ -579,7 +590,7 @@ export default function CreatorHubPage() {
                   <h4 className="text-sm font-medium">{ht(label)} · {requests.length}</h4>
                   {requests.length === 0 ? <p className="text-xs text-muted-foreground">{ct("noRequests")}</p> : requests.map(request => (
                     <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/50 px-3 py-3">
-                      <div className="min-w-0"><p className="truncate text-sm font-medium">{request.displayName}</p><p className="truncate text-xs text-muted-foreground">@{request.username}</p></div>
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{request.displayName}</p><p className="truncate text-xs text-muted-foreground">@{request.username}</p>{kind === "message-requests" && "previewBody" in request && request.previewBody && <p className="mt-2 whitespace-pre-wrap break-words text-sm">{request.previewBody}</p>}</div>
                       <div className="flex gap-2"><button type="button" disabled={inboxBusy} onClick={() => void decideInbox(kind, request.id, 'reject')} className="rounded-full border border-border px-3 py-2 text-xs disabled:opacity-50">{ct("decline")}</button><button type="button" disabled={inboxBusy} onClick={() => void decideInbox(kind, request.id, 'accept')} className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{ct("accept")}</button></div>
                     </div>
                   ))}
