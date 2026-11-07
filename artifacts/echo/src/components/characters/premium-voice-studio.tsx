@@ -41,6 +41,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
         const signed=await customFetch<{uploadURL:string;objectPath:string}>('/api/voices/premium/reference/request-url',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,contentType,size:file.size,consentConfirmed:true})});
         const response=await fetch(signed.uploadURL,{method:'PUT',headers:{'Content-Type':contentType},body:file});
         if(!response.ok)throw Error('VOICE_UPLOAD_FAILED');
+        await customFetch('/api/voices/premium/reference/verify',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,objectPath:signed.objectPath,contentType,consentConfirmed:true})});
         setUploadedPath(signed.objectPath);
       }
       await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode,prompt,language:voiceLanguage,variantCount:count,consentConfirmed:mode==='reference'&&consent})});
