@@ -1,3 +1,4 @@
+import { useCreatorHubDmStatus } from '@/lib/creator-hub-notifications';
 import { useSharedShellText } from '@/lib/shared-shell-translations';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/react';
@@ -45,6 +46,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const { me, state, character } = useSocial();
   const { notifications, messages } = useUnreadCounts();
   const creatorUnread = useCreatorNotificationCount();
+  const creatorDmStatus = useCreatorHubDmStatus();
+  const creatorDmUnread = creatorDmStatus.enabled ? creatorDmStatus.items.filter(item => item.unread).length : 0;
   const inConversation = /^\/messages\/.+/.test(location);
   // Creator Hub is a full-screen destination, not a feed panel.
   if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
@@ -53,7 +56,7 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: '/', label: t('home'), icon: Home, match: (l: string) => l === '/' },
     { href: '/messages', label: t('messages'), icon: Send, badge: messages, match: (l: string) => l.startsWith('/messages') },
     { href: '/create', label: t('create'), icon: PlusSquare, match: (l: string) => l.startsWith('/create') },
-    { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications + creatorUnread, match: (l: string) => l.startsWith('/notifications') },
+    { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications + creatorUnread + creatorDmUnread, match: (l: string) => l.startsWith('/notifications') },
   ];
   const profileActive = location === `/profile/${me.id}`;
   const friends = (state.follows[me.id] ?? []).map(character).filter(Boolean);
