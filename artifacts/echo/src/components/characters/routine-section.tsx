@@ -51,11 +51,13 @@ export function RoutineSection({ config, set }: SectionProps) {
               </div>
             </fieldset>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
             {(['start', 'end'] as const).map((k) => (
-              <Field key={k} id={`rt-${k}-${e.id}`} label={k === 'start' ? t('Desde') : t('Hasta')}>
-                <input id={`rt-${k}-${e.id}`} type="time" value={e[k]} onChange={(ev) => ev.target.value && up(e.id, { [k]: ev.target.value })} className={inputCls} data-testid={`input-routine-${k}-${e.id}`} />
-              </Field>
+              <div key={k} className="min-w-0">
+                <Field id={`rt-${k}-${e.id}`} label={k === 'start' ? t('Desde') : t('Hasta')}>
+                  <input id={`rt-${k}-${e.id}`} type="time" value={e[k]} onChange={(ev) => ev.target.value && up(e.id, { [k]: ev.target.value })} className={cn(inputCls, 'block w-full min-w-0 max-w-full')} data-testid={`input-routine-${k}-${e.id}`} />
+                </Field>
+              </div>
             ))}
           </div>
           {e.end <= e.start && <p className="mt-1.5 px-1 text-xs text-primary">{t("Termina al día siguiente (horario nocturno).")}</p>}
