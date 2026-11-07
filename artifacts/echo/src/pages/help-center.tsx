@@ -61,7 +61,7 @@ export default function HelpCenterPage() {
   };
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 text-foreground">
-      <Link href="/settings" className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Volver a Configuración</Link>
+      <Link href="/settings" className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {t("Volver a Configuración")}</Link>
       <div className="mb-7">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">{t("ECHO · Asistencia")}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{t("Centro de ayuda")}</h1>
@@ -78,7 +78,7 @@ export default function HelpCenterPage() {
         <textarea id="echo-report-description" required maxLength={4000} value={description} onChange={e => setDescription(e.target.value)} rows={6} placeholder={t("¿Qué estabas haciendo? ¿Qué esperabas que pasara? ¿Qué pasó realmente?")} className="mt-2 w-full resize-y rounded-xl border border-border bg-background p-3 text-sm" />
         <label className="mt-5 flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
           <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-primary" />
-          Autorizo enviar esta descripción al equipo de soporte. No se adjuntan automáticamente conversaciones, imágenes ni datos de sesión.
+          {t("Autorizo enviar esta descripción al equipo de soporte. No se adjuntan automáticamente conversaciones, imágenes ni datos de sesión.")}
         </label>
         <button type="button" onClick={() => void send()} disabled={!description.trim() || !consent || sending} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40">{sending ? t('Enviando…') : t('Enviar reporte')}</button>
         {feedback && <p role="status" className="mt-3 break-words text-xs text-muted-foreground">{feedback}</p>}
