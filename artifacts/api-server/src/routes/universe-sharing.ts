@@ -215,13 +215,14 @@ export function createUniverseSharingRouter(
           follows: { ...own.data.follows, ...Object.fromEntries(imported.map(ch => [ch.id, []])) } };
         const parsed = SaveUniverseBody.shape.state.safeParse(next);
         if (!parsed.success) { res.status(422).json({ error: "IMPORT_VALIDATION_FAILED" }); return; }
-        const saved = await writeUniverse(req.userId!, parsed.data as Record<string,unknown>, recipient.revision, "primary");
+        const saved = await writeUniverse(req.userId!, parsed.data as Record<string,unknown>, recipient.revision, "primary", async tx => {
+          for (let i=0;i<imported.length;i++) {
+            await tx.execute(sql`INSERT INTO echo_import_provenance(recipient_owner_id,recipient_universe_id,recipient_character_id,
+              original_owner_id,original_universe_id,original_character_id)
+              VALUES(${req.userId!},'primary',${imported[i].id},${source.owner_id},${source.universe_id},${String(chosen[i].id)})`);
+          }
+        });
         if (!saved) { res.status(409).json({ error: "REVISION_CONFLICT" }); return; }
-        for (let i=0;i<imported.length;i++) {
-          await db.execute(sql`INSERT INTO echo_import_provenance(recipient_owner_id,recipient_universe_id,recipient_character_id,
-            original_owner_id,original_universe_id,original_character_id)
-            VALUES(${req.userId!},'primary',${imported[i].id},${source.owner_id},${(rows.rows[0] as {universe_id:string}).universe_id ?? 'primary'},${chosen[i].id as string})`);
-        }
         res.status(201).json({ kind: "character", universeId: "primary", importedCount: imported.length }); return;
       }
       const name = String((state.creatorSetup as Record<string,unknown> | undefined)?.universeName ?? "Universo importado").slice(0,60);
@@ -230,10 +231,11 @@ export function createUniverseSharingRouter(
         posts: [], comments: [], stories: [], messages: [], notifications: [], highlights: [] };
       const parsed = SaveUniverseBody.shape.state.safeParse(next);
       if (!parsed.success) { res.status(422).json({ error: "IMPORT_VALIDATION_FAILED" }); return; }
-      const created = await createAdditionalUniverse(req.userId!, name, parsed.data as Record<string,unknown>);
-      await db.execute(sql`INSERT INTO echo_import_provenance(recipient_owner_id,recipient_universe_id,recipient_character_id,
-        original_owner_id,original_universe_id)
-        VALUES(${req.userId!},${created.universeId},'',${source.owner_id},${(rows.rows[0] as {universe_id:string}).universe_id ?? 'primary'})`);
+      const created = await createAdditionalUniverse(req.userId!, name, parsed.data as Record<string,unknown>, async (tx, newUniverseId) => {
+        await tx.execute(sql`INSERT INTO echo_import_provenance(recipient_owner_id,recipient_universe_id,recipient_character_id,
+          original_owner_id,original_universe_id)
+          VALUES(${req.userId!},${newUniverseId},'',${source.owner_id},${source.universe_id})`);
+      });
       res.status(201).json({ kind: "universe", universeId: created.universeId, importedCount: imported.length });
     } catch (error) {
       if (error instanceof StructuralLimitError) { res.status(409).json({ error: error.code }); return; }
