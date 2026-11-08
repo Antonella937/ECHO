@@ -30,7 +30,9 @@ export function visibleSceneEvents(scene: SceneContext, viewerId: string): Scene
     .filter(event => event.sceneId === scene.sceneId)
     .filter(event => {
       if (event.visibility === 'public') return true;
-      if (event.visibility === 'participants') return (event.audienceIds?.length ?? 0) > 0\n        ? event.audienceIds!.includes(viewerId) || event.actorId === viewerId\n        : scene.participantIds.includes(viewerId);
+      if (event.visibility === 'participants') return (event.audienceIds?.length ?? 0) > 0
+        ? event.audienceIds!.includes(viewerId) || event.actorId === viewerId
+        : scene.participantIds.includes(viewerId);
       return event.actorId === viewerId || (event.audienceIds ?? []).includes(viewerId);
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
