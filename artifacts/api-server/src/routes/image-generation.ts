@@ -205,7 +205,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
       await refundCredits(req.userId!, creditOperation);
       throw generationError;
     }
-    res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId, chargedPhotoCredits: cost });
+    res.json({ status: 'generated', objectPath: result.objectPath, estimatedCostUsd: result.billedUsd, costReconciled: false, jobId: result.jobId, chargedPhotoCredits: cost });
   } catch (error) {
     req.log.error({ err: error }, 'Image generation failed');
     res.status(503).json({ error: 'IMAGE_GENERATION_UNAVAILABLE' });
