@@ -13,8 +13,20 @@ type Entitlements = {
     remainingCharacters: number; maxDailyMessages: number; usedMessagesToday: number; remainingMessagesToday: number };
 };
 
+type CreditWallet = {
+  balances: { photo: { monthly: number; reward: number; purchased: number }; voice: { monthly: number; reward: number; purchased: number } };
+  dailyReward: { available: boolean; claimedToday: boolean; streak: number; photoCredits: number; voiceCredits: number; nextResetAt: string };
+};
+
 export function PlanAndQuotaSettings() {
   const t = usePlanQuotaText();
+  const [wallet, setWallet] = useState<CreditWallet | null>(null);
+  const [walletError, setWalletError] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimMessage, setClaimMessage] = useState("");
+  const loadWallet = () => { void customFetch<CreditWallet>("/api/creator/credits/wallet", { responseType: "json" }).then(value => { setWallet(value); setWalletError(false); }).catch(() => setWalletError(true)); };
+  useEffect(() => { loadWallet(); }, []);
+  const claimReward = async () => { setClaiming(true); setClaimMessage(""); try { const result = await customFetch<CreditWallet>("/api/creator/credits/daily-reward", { method: "POST", responseType: "json" }); setWallet(result); setClaimMessage(t("¡Recompensa diaria reclamada!")); } catch { setClaimMessage(t("No se pudo reclamar la recompensa. Actualizá para comprobar el estado.")); loadWallet(); } finally { setClaiming(false); } };
   const [data, setData] = useState<Entitlements | null>(null);
   const capacity = useGetCreatorAccount();
   const [details, setDetails] = useState<'plans' | 'character' | 'world' | 'music' | 'video' | 'billing' | null>(null);
@@ -53,6 +65,21 @@ export function PlanAndQuotaSettings() {
       </> : null}
       <button type="button" onClick={() => setDetails(details === 'plans' ? null : 'plans')} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">{t("Ver planes Free, Plus y Premium")} <ChevronRight className="h-4 w-4" /></button>
       <button type="button" onClick={load} disabled={loading} className="mt-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" /> {t("Actualizar estado")}</button>
+    </div>
+    <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4" data-testid="echo-credit-wallet">
+      <h3 className="text-sm font-bold">{t("Mi monedero ECHO")}</h3>
+      {wallet ? <>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {(["photo","voice"] as const).map(kind => <div key={kind} className="rounded-xl bg-secondary/50 p-3"><div className="text-xs text-muted-foreground">{kind === "photo" ? "Photo Credits" : "Voice Credits"}</div><div className="mt-1 text-2xl font-bold">{Object.values(wallet.balances[kind]).reduce((a,b)=>a+b,0)}</div><div className="mt-1 text-[10px] text-muted-foreground">{t("Mensuales")}: {wallet.balances[kind].monthly} · {t("Regalos")}: {wallet.balances[kind].reward} · {t("Comprados")}: {wallet.balances[kind].purchased}</div></div>)}
+        </div>
+        <div className="mt-3 rounded-xl border border-border p-3">
+          <div className="text-sm font-semibold">{t("Regalo diario")} 🎁</div>
+          <p className="mt-1 text-xs text-muted-foreground">{wallet.dailyReward.claimedToday ? t("Ya reclamaste tu recompensa de hoy.") : t("Tu recompensa de hoy está lista.")}</p>
+          {wallet.dailyReward.claimedToday && <p className="mt-1 text-xs text-muted-foreground">{t("Racha")}: {wallet.dailyReward.streak}/7 · +{wallet.dailyReward.photoCredits} Photo Credits · +{wallet.dailyReward.voiceCredits} Voice Credits</p>}
+          <button type="button" onClick={claimReward} disabled={!wallet.dailyReward.available || claiming} className="mt-3 min-h-11 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{claiming ? t("Reclamando…") : wallet.dailyReward.claimedToday ? t("Recompensa reclamada") : t("Abrir regalo diario")}</button>
+          {claimMessage && <p role="status" className="mt-2 text-xs">{claimMessage}</p>}
+        </div>
+      </> : <p className="mt-2 text-xs text-muted-foreground">{walletError ? t("El monedero no está disponible por ahora.") : t("Cargando créditos…")}</p>}
     </div>
     <div className="mt-3 grid grid-cols-2 gap-3">
       <Link href="/characters/new" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card/60 p-3 text-center text-xs font-semibold"><Plus className="h-4 w-4" /> {t("Crear personaje")}</Link>
