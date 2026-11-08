@@ -18,6 +18,7 @@ export type EventSource = 'user' | 'provider' | 'system';
 
 export type SocialEventPayload =
   | { type: 'post.created'; post: Post }
+  | { type: 'post.collaboration.responded'; postId: string; actorId: CharacterId; accept: boolean }
   | { type: 'post.deleted'; postId: string; actorId: CharacterId }
   | { type: 'post.liked'; postId: string; actorId: CharacterId; liked: boolean }
   | { type: 'post.saved'; postId: string; actorId: CharacterId; saved: boolean }
@@ -72,6 +73,14 @@ function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
     case 'post.created':
       return { ...state, posts: [ev.post, ...state.posts] };
 
+    case 'post.collaboration.responded': {
+      const post = state.posts.find(p => p.id === ev.postId);
+      if (!post || !(post.collaborationInvites ?? []).includes(ev.actorId)) return state;
+      return { ...state, posts: state.posts.map(p => p.id !== ev.postId ? p : ({
+        ...p, collaborationInvites: (p.collaborationInvites ?? []).filter(id => id !== ev.actorId),
+        collaboratorIds: ev.accept ? [...new Set([...(p.collaboratorIds ?? []), ev.actorId])] : (p.collaboratorIds ?? []),
+      })) };
+    }
     case 'post.deleted': {
       const post = state.posts.find((p) => p.id === ev.postId);
       if (!post || post.authorId !== ev.actorId) return state;
