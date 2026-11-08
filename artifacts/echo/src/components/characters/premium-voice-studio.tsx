@@ -37,11 +37,13 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [samples,setSamples]=useState<{id:string;status:string}[]>([]);
   const [sampleUrl,setSampleUrl]=useState<string|null>(null);
   const [projectId,setProjectId]=useState<string|null>(null);
+  const [selectedSampleId,setSelectedSampleId]=useState<string|null>(null);
+  const [selecting,setSelecting]=useState<string|null>(null);
   const [generating,setGenerating]=useState(false);
   const loadProject=async()=>{
     if(!characterId)return;
-    const data=await customFetch<{project:{id:string}|null;samples:{id:string;status:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
-    setGenerationAvailable(data.generationAvailable);setSamples(data.samples);setProjectId(data.project?.id??null);
+    const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
+    setGenerationAvailable(data.generationAvailable);setSamples(data.samples);setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
   };
   const generate=async()=>{
     if(!characterId||generating)return;
@@ -52,6 +54,16 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       await loadProject();
     }catch{setError(language==='es'?'No se pudieron generar las muestras. Revisá los límites o la configuración de ElevenLabs.':'Could not generate previews. Check limits or ElevenLabs configuration.');}
     finally{setGenerating(false);}
+  };
+  const selectSample=async(id:string)=>{
+    if(!projectId||selecting)return;
+    setSelecting(id);setError('');
+    try{
+      await customFetch('/api/voices/premium/select',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({projectId,sampleId:id})});
+      setSelectedSampleId(id);
+      await loadProject();
+    }catch{setError(language==='es'?'No se pudo seleccionar esta voz. Intentá de nuevo.':'Could not select this voice. Please try again.');}
+    finally{setSelecting(null);}
   };
   const playSample=async(id:string)=>{
     try{const data=await customFetch<{url:string}>(`/api/voices/premium/samples/${id}/play`,{responseType:'json'});setSampleUrl(data.url);}
@@ -143,7 +155,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     {saved&&<p role="status" className="text-xs text-primary">{language==='es'?'Proyecto guardado. Generación pendiente de activación.':'Project saved. Generation is not yet enabled.'}</p>}
     {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
     <button type="button" disabled={!generationAvailable||!characterId||generating||mode!=='prompt'||prompt.trim().length<20||prompt.length>1000} onClick={()=>void generate()} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"><RefreshCw className="h-4 w-4"/>{generating?'…':labels[8]} ({count})</button>
-    {samples.filter(x=>x.status==='ready').length>0&&<div className="space-y-2 text-sm"><p>{language==='es'?'Muestras generadas':'Generated previews'}</p>{samples.filter(x=>x.status==='ready').map((sample,i)=><button type="button" key={sample.id} onClick={()=>void playSample(sample.id)} className="mr-2 rounded-lg border px-3 py-2">{language==='es'?'Escuchar muestra':'Play preview'} {i+1}</button>)}{sampleUrl&&<audio controls src={sampleUrl} className="w-full"/>}<p className="text-xs text-muted-foreground">{language==='es'?'La selección definitiva se habilitará después de conectar la activación individual.':'Final selection will be available after per-character activation is connected.'}</p></div>}
+    {samples.filter(x=>x.status==='ready').length>0&&<div className="space-y-2 text-sm"><p>{language==='es'?'Muestras generadas':'Generated previews'}</p>{samples.filter(x=>x.status==='ready').map((sample,i)=><div key={sample.id} className="flex items-center gap-2 py-1"><button type="button" onClick={()=>void playSample(sample.id)} className="flex-1 rounded-lg border px-3 py-2">{language==='es'?'Escuchar muestra':'Play preview'} {i+1}</button><button type="button" disabled={!projectId||!!selecting} onClick={()=>void selectSample(sample.id)} className="rounded-lg border border-primary/40 px-3 py-2 text-primary disabled:opacity-50" aria-pressed={selectedSampleId===sample.id}>{selectedSampleId===sample.id?(language==='es'?'✓ Seleccionada':'✓ Selected'):selecting===sample.id?'…':(language==='es'?'Elegir voz':'Choose voice')}</button></div>)}{sampleUrl&&<audio controls src={sampleUrl} className="w-full"/>}<p className="text-xs text-muted-foreground">{language==='es'?'La voz seleccionada se guarda para este personaje. La síntesis real se habilitará al conectar el proveedor.':'The selected voice is saved for this character. Live synthesis requires the provider to be enabled.'}</p></div>}
     {!characterId&&<p className="text-xs text-muted-foreground">{language==='es'?'Guardá primero el personaje para asociarle un proyecto de voz.':'Save the character before creating a voice project.'}</p>}
     {!generationAvailable&&<p className="text-xs text-muted-foreground">{labels[9]}</p>}
     <p className="text-xs text-muted-foreground">{labels[16]} {labels[17]}</p>
