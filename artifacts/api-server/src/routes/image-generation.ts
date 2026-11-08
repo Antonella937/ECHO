@@ -1,5 +1,7 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
+import { spendCredits, refundCredits } from '../lib/creditWallet';
 import { requireAuth } from '../middlewares/requireAuth';
 import { readUniverse } from '../lib/universeRepository';
 import { db, echoMediaTable } from '@workspace/db';
@@ -159,12 +161,25 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const scene = prepareImageScene(input.data.prompt, character, characters, selected);
     const referencePaths = scene.referencePaths;
     const preparedPrompt = scene.preparedPrompt;
-    const result = await generateCharacterImage({
+    const creditOperation = randomUUID();
+    const cost = scene.people.length > 1 ? 2 : 1;
+    const charge = await spendCredits(req.userId!, 'photo', cost, creditOperation);
+    if (!charge.charged) {
+      res.status(402).json({ error: 'INSUFFICIENT_PHOTO_CREDITS', requiredCredits: cost });
+      return;
+    }
+    let result: Awaited<ReturnType<typeof generateCharacterImage>>;
+    try {
+      result = await generateCharacterImage({
       ownerId: req.userId!, universeId: input.data.universeId,
       characterId: character.id, preparedPrompt, style: selected, referencePaths,
       ...(input.data.sourceObjectPath ? { edit: { sourcePath: input.data.sourceObjectPath, instruction: input.data.prompt } } : {}),
     });
-    res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId });
+    } catch (generationError) {
+      await refundCredits(req.userId!, creditOperation);
+      throw generationError;
+    }
+    res.json({ status: 'generated', objectPath: result.objectPath, billedUsd: result.billedUsd, jobId: result.jobId, chargedPhotoCredits: cost });
   } catch (error) {
     req.log.error({ err: error }, 'Image generation failed');
     res.status(503).json({ error: 'IMAGE_GENERATION_UNAVAILABLE' });
