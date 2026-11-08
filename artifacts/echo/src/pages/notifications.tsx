@@ -30,6 +30,8 @@ const VERB: Record<Notification['kind'], string> = {
   story_reply: 'ha respondido a tu historia',
   story_like: 'le ha gustado tu historia',
   follow: 'ahora te sigue',
+  collaboration_invite: 'te invitó a colaborar en una publicación',
+  collaboration_accepted: 'aceptó tu invitación a colaborar',
 };
 
 export default function NotificationsPage() {
