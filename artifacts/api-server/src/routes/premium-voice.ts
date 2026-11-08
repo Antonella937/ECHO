@@ -390,7 +390,16 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
   const response=await fetch(`${base}/storage/v1/object/sign/echo-media/${result.rows[0].audio_object_path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:120})});
   if(!response.ok)throw Error("SIGNED_URL_FAILED");
   const data=await response.json() as {signedURL?:string};
-  res.json({url:new URL(data.signedURL!,base).toString()});
+  const raw=data.signedURL;
+  if(!raw){res.status(502).json({error:"VOICE_SAMPLE_SIGNED_URL_MISSING"});return;}
+  // Supabase commonly returns /object/sign/... relative to /storage/v1/.
+  // Resolving that against the origin directly strips /storage/v1 and breaks playback.
+  const url=new URL(raw.startsWith("http")?raw:raw.startsWith("/storage/v1/")?
+   `${base}${raw}`:`${base}/storage/v1/${raw.replace(/^[/]/,"")}`);
+  if(url.origin!==new URL(base).origin || !url.pathname.startsWith("/storage/v1/object/sign/echo-media/")){
+   res.status(502).json({error:"VOICE_SAMPLE_SIGNED_URL_INVALID"});return;
+  }
+  res.json({url:url.toString(),expiresIn:120});
  }catch{res.status(503).json({error:"VOICE_SAMPLE_PLAYBACK_UNAVAILABLE"});}
 });
 /**
