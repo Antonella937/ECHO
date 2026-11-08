@@ -68,7 +68,8 @@ function ShareActions({ label, universeId, kind, characterId }: { label: string;
     try { const result = await customFetch<{token:string}>('/api/universe/' + encodeURIComponent(universeId) + '/collaboration-invites', {method:'POST',responseType:'json'});
       const url = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + '/shared/' + result.token;
       setInvite(url);
-      await navigator.clipboard.writeText(url);
+      try { await navigator.clipboard.writeText(url); }
+      catch { /* Keep the generated invitation visible for manual copying on mobile. */ }
     } catch { setError(t('No se pudo crear o copiar la invitación. Activá compartir desde Privacidad.')); }
     finally { setBusy(false); }
   };
