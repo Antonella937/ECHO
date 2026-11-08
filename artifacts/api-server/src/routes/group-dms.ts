@@ -10,7 +10,8 @@ router.use("/group-dms", requireAuth);
 const id = z.string().min(1).max(120);
 const scope = z.object({ universeId: id.default("primary"), actorId: id });
 const createBody = scope.extend({ name: z.string().trim().min(1).max(80), participantIds: z.array(id).min(2).max(31) });
-const sendBody = scope.extend({ text: z.string().trim().min(1).max(10000) });
+const attachmentSchema = z.object({ id: z.string().min(1).max(200), type: z.enum(['image', 'video', 'audio']), url: z.string().min(1).max(2048), durationSeconds: z.number().nonnegative().optional() }).passthrough();
+const sendBody = scope.extend({ text: z.string().trim().max(10000).default(''), attachments: z.array(attachmentSchema).max(5).default([]) }).refine(v => !!v.text || v.attachments.length > 0);
 const asObject = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const asArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
@@ -73,20 +74,20 @@ router.get("/group-dms/:groupId/messages", async (req, res) => {
 router.post("/group-dms/:groupId/messages", async (req, res) => {
   const parsed = sendBody.safeParse(req.body);
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_MESSAGE" }); return; }
-  const { universeId, actorId, text } = parsed.data;
+  const { universeId, actorId, text, attachments } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
   const groupId = String(req.params.groupId);
   const messageId = randomUUID();
   const inserted = await db.execute(sql`INSERT INTO echo_group_messages
-    (owner_id, universe_id, id, group_id, sender_id, body, read_by)
-    SELECT ${req.userId!}, ${universeId}, ${messageId}, id, ${actorId}, ${text}, ${JSON.stringify([actorId])}::jsonb
+    (owner_id, universe_id, id, group_id, sender_id, body, attachments, read_by)
+    SELECT ${req.userId!}, ${universeId}, ${messageId}, id, ${actorId}, ${text}, ${JSON.stringify(attachments)}::jsonb, ${JSON.stringify([actorId])}::jsonb
     FROM echo_group_conversations
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}
     AND participant_ids ? ${actorId} RETURNING id, created_at`);
   if (!inserted.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   await db.execute(sql`UPDATE echo_group_conversations SET updated_at = now()
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
-  res.status(201).json({ id: messageId, groupId, senderId: actorId, text, createdAt: inserted.rows[0].created_at });
+  res.status(201).json({ id: messageId, groupId, senderId: actorId, text, attachments, createdAt: inserted.rows[0].created_at });
 });
 const editBody = scope.extend({ name: z.string().trim().min(1).max(80) });
 router.patch("/group-dms/:groupId", async (req, res) => {
