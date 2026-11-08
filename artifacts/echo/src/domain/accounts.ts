@@ -80,7 +80,7 @@ export function editStoryMetrics(state: SocialState, id: string, actor: string, 
     ? { ...s, displayMetrics: { ...s.displayMetrics, views } } : s) };
 }
 export function formatCount(value: number) {
-  return new Intl.NumberFormat('es', { notation: value >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value);
+  return new Intl.NumberFormat('es-AR', { notation: value >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1, useGrouping: true }).format(value);
 }
 export function accountFormValues(c: AccountInput): AccountInput {
   return { name: c.name, handle: c.handle, bio: c.bio, avatar: c.avatar,
