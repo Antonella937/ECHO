@@ -31,6 +31,27 @@ const router: IRouter = Router();
 
 router.use("/universe", requireAuth);
 
+// Lightweight owner-scoped revision probe. Never returns the universe JSON payload.
+router.get("/universe/revision", async (req, res): Promise<void> => {
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  if (!universeId || universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_UNIVERSE_ID" }); return;
+  }
+  const [row] = await db.select({
+    revision: echoUniversesTable.revision,
+    archivedAt: echoUniversesTable.archivedAt,
+    deletedAt: echoUniversesTable.deletedAt,
+  }).from(echoUniversesTable).where(and(
+    eq(echoUniversesTable.ownerId, req.userId!),
+    eq(echoUniversesTable.universeId, universeId),
+  )).limit(1);
+  if (row?.archivedAt || row?.deletedAt) {
+    res.status(409).json({ error: "UNIVERSE_UNAVAILABLE" }); return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ revision: row?.revision ?? 0 });
+});
+
 router.get("/universe", async (req, res): Promise<void> => {
   const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
   const [meta] = await db.select().from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId)));
