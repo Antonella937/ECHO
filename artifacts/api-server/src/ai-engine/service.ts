@@ -2,7 +2,8 @@ import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionI
 import { EngineError, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
 import type { VisionContext } from '../vision/contracts';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
+import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { clerkClient } from '@clerk/express';
 
@@ -60,6 +61,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         activities: Array.isArray(analysis?.activities) ? analysis.activities.slice(0,6) : [],
       };
     });
+  let dmPreferences: DmConversationPreferences | undefined;
+  if (input.situation === 'dm') {
+    try {
+      const stored = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences
+        WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'} AND character_id = ${input.characterId} LIMIT 1`);
+      if (stored.rows[0]?.preferences) dmPreferences = parseDmConversationPreferences(stored.rows[0].preferences);
+    } catch (error) {
+      console.warn('DM preference lookup skipped', { reason: error instanceof Error ? error.name : 'UNKNOWN' });
+    }
+  }
   return previewDecision(dependencies.provider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences);
 }
