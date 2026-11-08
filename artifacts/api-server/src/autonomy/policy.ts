@@ -8,6 +8,7 @@ import type {
   Story,
   SocialState,
 } from "@workspace/api-zod";
+import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
 
 export type AutonomySituation = CharacterDecisionInput["situation"];
 export type ExecutedAutonomyAction = {
