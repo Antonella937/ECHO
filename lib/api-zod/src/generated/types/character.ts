@@ -14,6 +14,11 @@ import type { CharacterProviderRef } from './characterProviderRef';
 export interface Character {
   configuration?: CharacterConfiguration;
   accountType?: CharacterAccountType;
+  privateAccount?: boolean;
+  professionalCategory?: string;
+  contactEmail?: string;
+  website?: string;
+  accountIdentity?: {description?:string;voice?:string;facts?:string};
   verified?: boolean;
   archived?: boolean;
   displayMetrics?: CharacterDisplayMetrics;
