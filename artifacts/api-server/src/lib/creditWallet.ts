@@ -23,7 +23,7 @@ export async function creditWallet(ownerId: string, claim = false) {
       if (!amount) continue;
       await client.query(`INSERT INTO echo_credit_ledger(owner_id,kind,bucket,amount,event_key,expires_at)
         VALUES($1,$2,'monthly',$3,$4,$5) ON CONFLICT DO NOTHING`,
-        [ownerId,kind,amount,`monthly:${month}:${plan}`,monthEnd(now)]);
+        [ownerId,kind,amount,`monthly:${month}`,monthEnd(now)]);
     }
     const today = utcDay(now);
     let claimed = false;
