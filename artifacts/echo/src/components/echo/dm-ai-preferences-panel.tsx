@@ -13,7 +13,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId }:
   open: boolean; onClose: () => void; characterId: string; universeId: string;
 }) {
   const { user } = useUser();
-  const { language } = useLanguage();
+  const language = useLanguage();
   const es = language === 'es';
   const [prefs, setPrefs] = useState<Preferences>(defaults);
   const [status, setStatus] = useState('');
