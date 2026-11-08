@@ -194,9 +194,10 @@ export function applyAutonomyDecision(
 
   if (decision.action === "react" && decision.situation === "story_reaction") {
     const target = opportunity.storyId ? state.stories.find((item) => item.id === opportunity.storyId) : undefined;
-    if (!target || !target.caption.trim() || !recentWithin(target.createdAt, now, DAY_MS) ||
-      !target.seenBy.includes(characterId) ||
-      !relevantAuthor(state, characterId, target.authorId, !!target.mentionedAccountIds?.includes(characterId)) ||
+    if (!target || !recentWithin(target.createdAt, now, DAY_MS) ||
+      !state.follows[characterId]?.includes(target.authorId) ||
+      (target.closeFriendsOnly && (!(state.closeFriends?.[target.authorId] ?? []).includes(characterId) ||
+        !(target.allowedViewerIds ?? state.closeFriends?.[target.authorId] ?? []).includes(characterId))) ||
       target.reactions?.some((item) => item.actorId === characterId)) {
       throw new SocialExecutionError("STORY_REACTION_TARGET_UNAVAILABLE");
     }
