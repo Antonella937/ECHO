@@ -204,4 +204,37 @@ router.get("/group-dms/:groupId/search", async (req, res) => {
     ORDER BY m.created_at DESC LIMIT 50`);
   res.json({ messages: result.rows });
 });
+const preferencesBody = scope.extend({ muted: z.boolean().optional(), archived: z.boolean().optional() }).refine(v => v.muted !== undefined || v.archived !== undefined);
+router.get("/group-dms/:groupId/preferences", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`SELECT p.muted, p.archived FROM echo_group_conversations g
+    LEFT JOIN echo_group_member_preferences p ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
+    WHERE g.owner_id = ${req.userId!} AND g.universe_id = ${universeId} AND g.id = ${String(req.params.groupId)}
+      AND g.participant_ids ? ${actorId} LIMIT 1`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ muted: result.rows[0].muted === true, archived: result.rows[0].archived === true });
+});
+router.patch("/group-dms/:groupId/preferences", async (req, res) => {
+  const parsed = preferencesBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_PREFERENCES" }); return; }
+  const { universeId, actorId, muted, archived } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const groupId = String(req.params.groupId);
+  const membership = await db.execute(sql`SELECT id FROM echo_group_conversations
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}
+      AND participant_ids ? ${actorId} LIMIT 1`);
+  if (!membership.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  const result = await db.execute(sql`INSERT INTO echo_group_member_preferences
+    (owner_id, universe_id, group_id, actor_id, muted, archived)
+    VALUES (${req.userId!}, ${universeId}, ${groupId}, ${actorId}, ${muted ?? false}, ${archived ?? false})
+    ON CONFLICT (owner_id, universe_id, group_id, actor_id)
+    DO UPDATE SET muted = COALESCE(${muted ?? null}::boolean, echo_group_member_preferences.muted),
+      archived = COALESCE(${archived ?? null}::boolean, echo_group_member_preferences.archived),
+      updated_at = now()
+    RETURNING muted, archived`);
+  res.json(result.rows[0]);
+});
 export default router;
