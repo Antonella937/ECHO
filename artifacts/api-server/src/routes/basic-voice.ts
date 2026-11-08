@@ -175,7 +175,7 @@ router.post("/voices/basic/attach-to-dm", requireAuth, async (req, res) => {
         m.text.trim() && m.text.length <= 500 && !m.hiddenForIds?.includes(characterId));
       if (!message) return "CHARACTER_MESSAGE_NOT_FOUND";
       if (message.attachments?.some(a => a.type === "audio")) return "ALREADY_HAS_AUDIO";
-      const attachment = { id: `voice-${messageId}`, type: "audio" as const, url: objectPath, mimeType: audio.mimeType };
+      const attachment = { id: `voice-${messageId}`, type: "audio" as const, url: objectPath, mimeType: "audio/wav" };
       const state = { ...parsed.data, messages: parsed.data.messages.map(m => m.id === messageId
         ? { ...m, attachments: [...(m.attachments ?? []), attachment] } : m) };
       const updated = await tx.update(echoUniversesTable).set({
