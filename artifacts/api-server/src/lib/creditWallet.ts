@@ -85,7 +85,7 @@ export async function spendCredits(ownerId: string, kind: Kind, amount: number, 
   try {
     await client.query("BEGIN");
     await client.query("SELECT owner_id FROM echo_credit_wallets WHERE owner_id=$1 FOR UPDATE", [ownerId]);
-    const prior = await client.query("SELECT 1 FROM echo_credit_ledger WHERE owner_id=$1 AND event_key LIKE $2 LIMIT 1", [ownerId,`debit:%:${operationKey}`]);
+    const prior = await client.query("SELECT 1 FROM echo_credit_ledger WHERE owner_id=$1 AND split_part(event_key,':',3)=$2 AND event_key LIKE 'debit:%' LIMIT 1", [ownerId,operationKey]);
     if (prior.rowCount) { await client.query("ROLLBACK"); return { charged: false, duplicate: true }; }
     const grants = await client.query<{id:string;bucket:Bucket;remaining:string;expires_at:Date|null}>(`
       SELECT g.id::text,g.bucket,g.expires_at,
@@ -120,7 +120,7 @@ export async function refundCredits(ownerId:string, operationKey:string) {
     await client.query("SELECT owner_id FROM echo_credit_wallets WHERE owner_id=$1 FOR UPDATE",[ownerId]);
     const charges=await client.query<{kind:Kind;bucket:Bucket;amount:number;event_key:string;expires_at:Date|null}>(`
       SELECT kind,bucket,amount,event_key,expires_at FROM echo_credit_ledger
-      WHERE owner_id=$1 AND event_key LIKE $2 AND amount<0`,[ownerId,`debit:%:${operationKey}`]);
+      WHERE owner_id=$1 AND split_part(event_key,':',3)=$2 AND event_key LIKE 'debit:%' AND amount<0`,[ownerId,operationKey]);
     for(const item of charges.rows) {
       await client.query(`INSERT INTO echo_credit_ledger(owner_id,kind,bucket,amount,event_key,expires_at)
         VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
