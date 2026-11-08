@@ -5,7 +5,7 @@ import { AudioLines, FileAudio, RefreshCw, Sparkles, Upload } from 'lucide-react
 import { useLanguage } from '@/lib/i18n';
 
 const copy = {
-  es: ['Voice Studio · Premium','Creá una voz exclusiva para tu personaje.','Describir una voz','Usar audio de referencia','Describí el timbre, acento, ritmo y estilo de la voz.','Ej.: voz grave y cálida, con un poco de aspereza, ritmo tranquilo y acento británico.','Idioma de la voz','Cantidad de opciones','Generar muestras','La generación estará disponible cuando conectemos el proveedor. No se realizarán cargos ni se crearán muestras todavía.','Subí un audio WAV, MP3 o M4A (máximo 20 MB).','Elegir archivo','Usá solo tu propia voz o una voz cuyo titular haya autorizado expresamente su uso.','Confirmo que tengo autorización para crear una voz sintética a partir de este audio.','Archivo seleccionado','Quitarlo','Las muestras generadas podrán escucharse, compararse y guardarse cuando activemos el servicio.','La voz de tu personaje no se modificará hasta que elijas y guardes una muestra.'],
+  es: ['Voice Studio · Premium','Creá una voz exclusiva para tu personaje.','Describir una voz','Usar audio de referencia','Describí el timbre, acento, ritmo y estilo de la voz.','Ej.: voz grave y cálida, con un poco de aspereza, ritmo tranquilo y acento británico.','Idioma de la voz','Cantidad de opciones','Generar muestras','La generación estará disponible cuando conectemos el proveedor. No se realizarán cargos ni se crearán muestras todavía.','Subí un audio WAV, MP3 o M4A (máximo 20 MB). Para mejores resultados, 1–2 minutos de una sola voz clara, sin música ni ruido.','Elegir archivo','Usá solo tu propia voz o una voz cuyo titular haya autorizado expresamente su uso.','Confirmo que tengo autorización para crear una voz sintética a partir de este audio.','Archivo seleccionado','Quitarlo','Las muestras generadas podrán escucharse, compararse y guardarse cuando activemos el servicio.','La voz de tu personaje no se modificará hasta que elijas y guardes una muestra.'],
   en: ['Voice Studio · Premium','Create a unique voice for your character.','Describe a voice','Use reference audio','Describe the voice’s tone, accent, pace, and style.','E.g. a deep, warm voice with a subtle rasp, calm pacing and a British accent.','Voice language','Number of options','Generate samples','Generation will be available once a provider is connected. No charges or samples will be created yet.','Upload WAV, MP3 or M4A audio (20 MB maximum).','Choose file','Only use your own voice or one whose owner has explicitly authorized synthetic voice creation.','I confirm I have permission to create a synthetic voice from this audio.','Selected file','Remove','Once enabled, generated samples can be played, compared and saved.','Your character’s voice will not change until you select and save a sample.'],
 } as const;
 export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
@@ -31,7 +31,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
-  const [references,setReferences]=useState<{id:string;contentType:string;size:number}[]>([]);
+  const [references,setReferences]=useState<{id:string;objectPath:string;contentType:string;size:number}[]>([]);
   const [playingUrl,setPlayingUrl]=useState<string | null>(null);
   const [generationAvailable,setGenerationAvailable]=useState(false);
   const [samples,setSamples]=useState<{id:string;status:string}[]>([]);
@@ -43,13 +43,14 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [cloning,setCloning]=useState(false);
   const [catalogue,setCatalogue]=useState<{voiceId:string;name:string;previewUrl:string;accent:string;language:string;description:string}[]>([]);
   const [catalogueSelected,setCatalogueSelected]=useState<string|null>(null);
+  const [selectedCustomVoice,setSelectedCustomVoice]=useState(false);
   const [catalogueSaving,setCatalogueSaving]=useState<string|null>(null);
   const [catalogueAudio,setCatalogueAudio]=useState<string|null>(null);
   const [voiceTestBusy,setVoiceTestBusy]=useState(false);
   const [voiceTestUrl,setVoiceTestUrl]=useState<string|null>(null);
   useEffect(()=>()=>{if(voiceTestUrl)URL.revokeObjectURL(voiceTestUrl);},[voiceTestUrl]);
   const testSelectedVoice=async()=>{
-    if(!characterId||!catalogueSelected||voiceTestBusy||!generationAvailable)return;
+    if(!characterId||(!catalogueSelected&&!selectedCustomVoice)||voiceTestBusy||!generationAvailable)return;
     setVoiceTestBusy(true);setError('');
     try{
       const audio=await customFetch<Blob>('/api/voices/premium/synthesize',{method:'POST',responseType:'blob',
@@ -68,6 +69,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     setGenerationAvailable(data.generationAvailable);setSamples(data.samples.filter(s=>s.provider!=='elevenlabs_catalog'));setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
     const selected=data.samples.find(s=>s.id===data.project?.selectedSampleId) as {provider?:string;providerVoiceId?:string}|undefined;
     setCatalogueSelected(selected?.provider==='elevenlabs_catalog'?selected.providerVoiceId??null:null);
+    setSelectedCustomVoice(Boolean(selected && ['elevenlabs','elevenlabs_clone'].includes(selected.provider??'') && selected.providerVoiceId));
   };
   useEffect(()=>{
     if(access!=='allowed')return;
@@ -125,7 +127,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
 
   const loadReferences=async()=>{
     if(!characterId)return;
-    const data=await customFetch<{references:{id:string;contentType:string;size:number}[]}>(`/api/voices/premium/references?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
+    const data=await customFetch<{references:{id:string;objectPath:string;contentType:string;size:number}[]}>(`/api/voices/premium/references?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
     setReferences(data.references);
   };
   const playReference=async(id:string)=>{
@@ -197,7 +199,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
         </div>)}
       </div>
     </section>}
-    {catalogueSelected&&<div className="space-y-2 rounded-xl border border-primary/30 p-3">
+    {(catalogueSelected||selectedCustomVoice)&&<div className="space-y-2 rounded-xl border border-primary/30 p-3">
       <p className="text-sm font-medium">{language==='es'?'Probar la voz elegida':'Test the selected voice'}</p>
       <p className="text-xs text-muted-foreground">{language==='es'?'Genera una frase corta real. Consume 2 créditos de ECHO y créditos de ElevenLabs; máximo una prueba cada 24 horas.':'Generates one real short phrase. Uses 2 ECHO credits and ElevenLabs credits; limited to once every 24 hours.'}</p>
       <button type="button" disabled={!generationAvailable||voiceTestBusy} onClick={()=>void testSelectedVoice()} className="min-h-11 w-full rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{voiceTestBusy?'…':language==='es'?'Probar voz · 2 créditos':'Test voice · 2 credits'}</button>
@@ -225,7 +227,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       <p className="text-xs text-muted-foreground">{labels[12]}</p>
       <p className="text-xs text-muted-foreground">{uploadedPath?(language==='es'?'Audio guardado de forma privada para este personaje.':'Audio saved privately for this character.'):(language==='es'?'El audio solo se subirá cuando confirmes el consentimiento y guardes.':'Audio uploads only after you confirm consent and save.')}</p>
       {uploadedPath&&consent&&<button type="button" disabled={!generationAvailable||cloning} onClick={()=>void cloneReference()} className="flex min-h-11 w-full items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{cloning?(language==='es'?'Creando voz…':'Creating voice…'):(language==='es'?'Crear voz personalizada':'Create custom voice')}</button>}
-      {references.length>0&&<div className="space-y-2"><p className="text-xs font-medium">{language==='es'?'Audios de referencia guardados':'Saved reference recordings'}</p>{references.map((reference,i)=><div key={reference.id} className="flex items-center gap-2 text-xs"><span className="flex-1">{language==='es'?'Audio':'Recording'} {i+1} · {(reference.size/1024/1024).toFixed(1)} MB</span><button type="button" className="text-primary underline" onClick={()=>void playReference(reference.id)}>{language==='es'?'Escuchar':'Play'}</button><button type="button" className="text-destructive underline" onClick={()=>void deleteReference(reference.id)}>{language==='es'?'Eliminar':'Delete'}</button></div>)}{playingUrl&&<audio controls src={playingUrl} className="w-full"/>}</div>}
+      {references.length>0&&<div className="space-y-2"><p className="text-xs font-medium">{language==='es'?'Audios de referencia guardados':'Saved reference recordings'}</p>{references.map((reference,i)=><div key={reference.id} className="flex flex-wrap items-center gap-2 text-xs"><span className="flex-1">{language==='es'?'Audio':'Recording'} {i+1} · {(reference.size/1024/1024).toFixed(1)} MB</span><button type="button" disabled={cloning} className="text-primary underline" onClick={()=>{setUploadedPath(reference.objectPath);setConsent(false);setMode('reference');}}>{uploadedPath===reference.objectPath?(language==='es'?'✓ Elegido':'✓ Chosen'):(language==='es'?'Usar este':'Use this')}</button><button type="button" className="text-primary underline" onClick={()=>void playReference(reference.id)}>{language==='es'?'Escuchar':'Play'}</button><button type="button" className="text-destructive underline" onClick={()=>void deleteReference(reference.id)}>{language==='es'?'Eliminar':'Delete'}</button></div>)}{playingUrl&&<audio controls src={playingUrl} className="w-full"/>}</div>}
     </>}
     <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent))} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
     {saved&&<p role="status" className="text-xs text-primary">{language==='es'?'Proyecto guardado. Generación pendiente de activación.':'Project saved. Generation is not yet enabled.'}</p>}
