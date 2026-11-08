@@ -41,7 +41,7 @@ export function AutonomySettingsSection() {
   const [dmDrafts, setDmDrafts] = useState<Record<string, { dmFrequency: "rarely" | "sometimes" | "frequently"; dmMediaPreference: "text" | "mixed" | "voice"; dmInstructions: string }>>({});
   useEffect(() => {
     if (!query.data) return;
-    setDmDrafts(Object.fromEntries(query.data.characters.map((character) => [character.characterId, { dmFrequency: character.dmFrequency, dmMediaPreference: character.dmMediaPreference === "voice" ? "text" : character.dmMediaPreference, dmInstructions: character.dmInstructions }])));
+    setDmDrafts(Object.fromEntries(query.data.characters.map((character) => [character.characterId, { dmFrequency: character.dmFrequency, dmMediaPreference: character.dmMediaPreference, dmInstructions: character.dmInstructions }])));
   }, [query.data]);
   const updateCache = (next: NonNullable<typeof settings>) => {
     client.setQueryData(getGetAutonomySettingsQueryKey({ universeId: next.universeId }), next);
@@ -196,10 +196,11 @@ export function AutonomySettingsSection() {
                   {t("Tipo de mensajes preferido")}
                   <select
                     className="mt-1 block w-full rounded-lg border border-border bg-background p-2 text-sm"
-                    value={dmDrafts[character.characterId].dmMediaPreference === "voice" ? "text" : dmDrafts[character.characterId].dmMediaPreference}
+                    value={dmDrafts[character.characterId].dmMediaPreference}
                     onChange={(event) => setDmDrafts((old) => ({ ...old, [character.characterId]: { ...old[character.characterId], dmMediaPreference: event.target.value as "text" | "mixed" | "voice" } }))}
                   >
                     <option value="text">{t("Solo texto")}</option>
+                    <option value="voice">{t("Texto y notas de voz (solo con presupuesto de audio habilitado)")}</option>
                     <option value="mixed">{t("Texto y ocasionalmente fotos (cuando estén habilitadas y dentro de tu plan)")}</option>
                   </select>
                 </label>
