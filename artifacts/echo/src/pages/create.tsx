@@ -144,7 +144,7 @@ export default function CreatePage() {
 
   const checkAiStatus = async () => {
     try {
-      const status = await customFetch<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } }>('/api/ai-engine/images/status', { responseType: 'json' });
+      const status = await customFetch<{ enabled: boolean; reason: string; prerequisites?: { falKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } }>('/api/ai-engine/images/status', { responseType: 'json' });
       setAiStatus(status);
     } catch {
       setAiStatus(null);
@@ -154,7 +154,7 @@ export default function CreatePage() {
   useEffect(() => {
     if (mediaSource !== 'ai') return;
     let active = true;
-    void customFetch<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } }>('/api/ai-engine/images/status', { responseType: 'json' })
+    void customFetch<{ enabled: boolean; reason: string; prerequisites?: { falKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } }>('/api/ai-engine/images/status', { responseType: 'json' })
       .then((status) => { if (active) setAiStatus(status); })
       .catch(() => { if (active) setAiStatus(null); });
     return () => { active = false; };
@@ -316,7 +316,7 @@ export default function CreatePage() {
             <div className="font-semibold">{t(aiStatus.enabled ? 'Generador disponible' : 'Generador pendiente de activación')}</div>
             {!aiStatus.enabled && <p className="mt-1 text-muted-foreground">{t("La vista previa es gratuita. Todavía no se envían solicitudes pagas.")}</p>}
             {aiStatus.prerequisites && <p className="mt-1 text-muted-foreground">
-              {t('Clave API:')} {aiStatus.prerequisites.openRouterKeyConfigured ? t('configurada') : t('pendiente')} · {t('Almacenamiento:')} {aiStatus.prerequisites.privateStorageConfigured ? t('configurado') : t('pendiente')} · {t('Proveedor:')} {aiStatus.prerequisites.providerValidated ? t('validado') : t('pendiente')} · {t('Presupuesto:')} {aiStatus.prerequisites.budgetActivated ? t('habilitado') : t('bloqueado')}
+              {t('Clave API:')} {aiStatus.prerequisites.falKeyConfigured ? t('configurada') : t('pendiente')} · {t('Almacenamiento:')} {aiStatus.prerequisites.privateStorageConfigured ? t('configurado') : t('pendiente')} · {t('Proveedor:')} {aiStatus.prerequisites.providerValidated ? t('validado') : t('pendiente')} · {t('Presupuesto:')} {aiStatus.prerequisites.budgetActivated ? t('habilitado') : t('bloqueado')}
             </p>}
           </div>}
           <button type="button" disabled={!aiPrompt.trim() || aiPreparing} onClick={() => void prepareAi()}
