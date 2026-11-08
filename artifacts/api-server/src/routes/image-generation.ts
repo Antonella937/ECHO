@@ -14,6 +14,7 @@ import { imageGenerationAccessStatus } from '../lib/imageGenerationAccess';
 import { paidImageGenerationActivated } from '../lib/imageGenerationActivation';
 import { generateCharacterImage } from '../lib/imageGenerationService';
 import { readImageBudgetReadiness } from '../lib/imageBudgetReadiness';
+import { probeFalImagePricing } from '../lib/falProviderPreflight';
 
 /**
  * Image generation preparation. Strictly NO provider calls, no paid operations.
@@ -108,6 +109,30 @@ router.post('/ai-engine/images/prepare-edit', requireAuth, async (req, res) => {
   } catch (error) {
     req.log.error({ err: error }, 'Image edit preview failed');
     res.status(503).json({ error: 'IMAGE_EDIT_PREPARATION_UNAVAILABLE' });
+  }
+});
+
+/**
+ * Non-billable private beta provider check. No prompt, reference media,
+ * or charge is sent to fal.ai. This does not activate paid generation.
+ */
+router.get('/ai-engine/images/provider-check', requireAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!imageGenerationAccessStatus(req.userId).allowed) {
+    res.status(403).json({ error: 'IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED' });
+    return;
+  }
+  const key = process.env.FAL_KEY;
+  if (!key) {
+    res.status(503).json({ verified: false, error: 'FAL_KEY_MISSING' });
+    return;
+  }
+  try {
+    const pricing = await probeFalImagePricing(key);
+    res.json({ verified: true, paidRequestMade: false, pricing });
+  } catch (error) {
+    req.log.warn({ err: error }, 'fal.ai non-billable provider preflight failed');
+    res.status(503).json({ verified: false, paidRequestMade: false, error: 'FAL_PROVIDER_PREFLIGHT_FAILED' });
   }
 });
 
