@@ -31,7 +31,7 @@ let catalogueCache: {expires:number;voices:ListedVoice[]} | null = null;
 async function curatedElevenLabsVoices():Promise<ListedVoice[]> {
  if (catalogueCache && catalogueCache.expires>Date.now()) return catalogueCache.voices;
  const response=await fetch("https://api.elevenlabs.io/v2/voices?page_size=100",{
-  method:"GET",headers:elevenLabsHeaders(),signal:AbortSignal.timeout(15000)
+  method:"GET",headers:{"xi-api-key":process.env.ELEVENLABS_API_KEY!.trim()},signal:AbortSignal.timeout(15000)
  });
  if(!response.ok)throw Error(`ELEVENLABS_CATALOGUE_HTTP_${response.status}`);
  const payload=await response.json() as {voices?:Array<{voice_id?:string;name?:string;category?:string;preview_url?:string;description?:string;labels?:Record<string,string>;is_legacy?:boolean;sharing?:{rate?:number;custom_rate?:number}}>;has_more?:boolean};
@@ -56,7 +56,7 @@ async function curatedElevenLabsVoices():Promise<ListedVoice[]> {
 router.get("/voices/premium/catalogue",requireAuth,async(req,res)=>{
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
-  if(!elevenLabsVoiceStatus().generationAvailable){res.json({voices:[],available:false});return;}
+  if(!elevenLabsVoiceStatus().configured){res.json({voices:[],available:false});return;}
   const voices=await curatedElevenLabsVoices();
   res.json({voices,available:true});
  }catch(error){req.log.warn({reason:error instanceof Error?error.message:"UNKNOWN"},"ElevenLabs catalogue unavailable");res.status(503).json({error:"VOICE_CATALOGUE_UNAVAILABLE"});}
@@ -66,7 +66,7 @@ router.post("/voices/premium/catalogue/select",requireAuth,async(req,res)=>{
  if(!parsed.success){res.status(400).json({error:"INVALID_CATALOGUE_SELECTION"});return;}
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
-  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"VOICE_CATALOGUE_DISABLED"});return;}
+  if(!elevenLabsVoiceStatus().configured){res.status(503).json({error:"VOICE_CATALOGUE_DISABLED"});return;}
   const {universeId,characterId,voiceId}=parsed.data;
   if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
   const available=(await curatedElevenLabsVoices()).find(voice=>voice.voiceId===voiceId);
