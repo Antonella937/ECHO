@@ -89,6 +89,31 @@ router.post("/voices/premium/catalogue/select",requireAuth,async(req,res)=>{
  }catch(error){req.log.warn({reason:error instanceof Error?error.message:"UNKNOWN"},"ElevenLabs catalogue selection failed");res.status(503).json({error:"VOICE_CATALOGUE_SELECTION_UNAVAILABLE"});}
 });
 
+/** Owner-controlled autonomous voice budgets. Disabled until explicitly opted in. */
+router.get("/voices/premium/autonomy-controls",async(req,res)=>{
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  const result=await pool.query("SELECT enabled,monthly_character_limit AS \"monthlyCharacterLimit\",max_daily_messages AS \"maxDailyMessages\",preference FROM echo_voice_budgets WHERE owner_id=$1",[req.userId]);
+  res.json({controls:result.rows[0]??{enabled:false,monthlyCharacterLimit:800,maxDailyMessages:2,preference:"off"}});
+ }catch{res.status(503).json({error:"VOICE_BUDGET_UNAVAILABLE"});}
+});
+router.put("/voices/premium/autonomy-controls",async(req,res)=>{
+ const parsed=z.object({enabled:z.boolean(),preference:z.enum(["off","occasional","frequent"]),monthlyCharacterLimit:z.number().int().min(100).max(3000),maxDailyMessages:z.number().int().min(1).max(5)}).strict().safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_BUDGET"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  const data=parsed.data;
+  const enabled=data.enabled && data.preference!=="off";
+  const result=await pool.query(`INSERT INTO echo_voice_budgets(owner_id,enabled,monthly_character_limit,max_daily_messages,preference)
+    VALUES($1,$2,$3,$4,$5)
+    ON CONFLICT(owner_id) DO UPDATE SET enabled=EXCLUDED.enabled,monthly_character_limit=EXCLUDED.monthly_character_limit,
+    max_daily_messages=EXCLUDED.max_daily_messages,preference=EXCLUDED.preference,updated_at=now()
+    RETURNING enabled,monthly_character_limit AS "monthlyCharacterLimit",max_daily_messages AS "maxDailyMessages",preference`,
+    [req.userId,enabled,data.monthlyCharacterLimit,data.maxDailyMessages,data.preference]);
+  res.json({controls:result.rows[0]});
+ }catch{res.status(503).json({error:"VOICE_BUDGET_UNAVAILABLE"});}
+});
+
 router.get("/voices/premium/projects",async(req,res)=>{
  const parsed=key.safeParse(req.query);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT"});return;}
