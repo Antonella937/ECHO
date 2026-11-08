@@ -74,6 +74,26 @@ export default function ScenesPage() {
     }catch{setError(es?'No se pudo generar la respuesta. Revisá el turno y los créditos de IA.':'Could not generate a reply. Check turn settings and AI credits.')}
     finally{setBusy(false)}
   };
+  const continueScene = async () => {
+    if(!active || active.status!=='active' || busy)return;
+    const ai = active.participantIds.filter(id=>id!==me.id);
+    if(!ai.length)return;
+    const turn=active.turnSettings;
+    let target=turn?.nextCharacterId && ai.includes(turn.nextCharacterId)?turn.nextCharacterId:null;
+    if(!target && turn?.mode==='manual'){
+      setError(es?'Elegí primero el próximo personaje.':'Choose the next character first.');
+      return;
+    }
+    if(!target && turn?.mode==='ordered'){
+      const order=(turn.order??[]).filter(id=>ai.includes(id));
+      target=order.length?order[(turn.cursor??0)%order.length]:null;
+    }
+    if(!target){
+      const last=events.filter(e=>ai.includes(e.actorId)).at(-1)?.actorId;
+      target=ai.find(id=>id!==last)??ai[0];
+    }
+    if(target)await generateReply(target);
+  };
   const updateStatus = async (status:'active'|'paused'|'finished')=>{
     if(!active)return;setBusy(true);setError('');
     try{await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/status`,{
@@ -111,6 +131,7 @@ export default function ScenesPage() {
           </div>
         </div>
       </details><div className="flex flex-wrap gap-2">
+        {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {es?'Continuar escena':'Continue scene'}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
           className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           ✦ {state.characters.find(c=>c.id===id)?.name??id}
