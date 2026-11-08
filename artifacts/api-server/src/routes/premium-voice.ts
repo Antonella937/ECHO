@@ -231,7 +231,7 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
  * Voice design previews remain a separate provider-cost flow.
  */
 router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
- const parsed=key.extend({text:z.string().trim().min(1).max(500)}).strict().safeParse(req.body);
+ const parsed=key.extend({text:z.string().trim().min(1).max(180)}).strict().safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_REQUEST"});return;}
  const {universeId,characterId,text}=parsed.data;
  let operation:string|null=null;
@@ -258,8 +258,8 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
   if(!response.ok){await refundFailedCharacterAudio(req.userId!,operation);operation=null;res.status(502).json({error:"CUSTOM_VOICE_GENERATION_FAILED"});return;}
   const audio=Buffer.from(await response.arrayBuffer());
   if(audio.length<100 || audio.length>10*1024*1024){await refundFailedCharacterAudio(req.userId!,operation);operation=null;res.status(502).json({error:"CUSTOM_VOICE_INVALID_AUDIO"});return;}
-  // Provider audio duration is not trusted from text length; the 30-second
-  // entitlement is enforced by a conservative request character limit.
+  // Short text reduces the risk of exceeding the 30-second allowance; actual
+  // duration still needs validation before this route is enabled publicly.
   res.setHeader("Content-Type","audio/mpeg");
   res.setHeader("Cache-Control","private, no-store");
   res.send(audio);
