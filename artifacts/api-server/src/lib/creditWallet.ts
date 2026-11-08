@@ -18,6 +18,8 @@ export async function creditWallet(ownerId: string, claim = false) {
     await client.query("SELECT owner_id FROM echo_credit_wallets WHERE owner_id=$1 FOR UPDATE", [ownerId]);
     const now = new Date();
     const month = utcMonth(now);
+    // Monthly grants use a single event key per month; a plan upgrade must
+    // not mint a second full allocation during the same calendar month.
     const grants = ECHO_CREDIT_POLICY.monthlyPlans[plan];
     for (const [kind, amount] of [["photo", grants.photoCredits], ["voice", grants.voiceCredits]] as const) {
       if (!amount) continue;
