@@ -22,6 +22,7 @@ export async function saveGeneratedImage(ownerId: string, bytes: Buffer, mimeTyp
   try {
     await db.insert(echoMediaTable).values({ ownerId, objectPath });
   } catch (error) {
+    // Supabase Storage removes an object through the authenticated object path.
     await fetch(url, { method: 'DELETE', headers, signal: AbortSignal.timeout(10000) }).catch(() => {});
     throw error;
   }
