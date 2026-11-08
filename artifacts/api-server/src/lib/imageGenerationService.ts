@@ -4,6 +4,7 @@ import { paidImageGenerationActivated } from './imageGenerationActivation';
 import { loadImageReferences } from './imageReferences';
 import { reserveImageBudget, settleImageBudget } from './imageBudget';
 import { requestFalImage } from './falImageTransport';
+import { falProEditEstimatedCostUsd } from './falImagePricing';
 import { saveGeneratedImage } from './generatedImageStorage';
 import { orchestrateImageGeneration } from './imageGenerationOrchestrator';
 import { prepareImageEdit, validateImageEditReferences } from './imageEditPreparation';
@@ -30,6 +31,9 @@ export async function generateCharacterImage(input: {
   const editPlan = input.edit ? prepareImageEdit({ instruction: input.edit.instruction, sourcePath: input.edit.sourcePath, identityPaths: input.referencePaths }) : null;
   const references = await loadImageReferences(input.ownerId, editPlan?.referencePaths ?? input.referencePaths);
   if (editPlan) validateImageEditReferences(input.edit!.sourcePath, references);
+  // Validate actual image dimensions and model rate card before reserving funds.
+  const estimatedCostUsd = falProEditEstimatedCostUsd(references);
+  if (estimatedCostUsd > MAX_IMAGE_COST_USD) throw Error('FAL_IMAGE_ESTIMATE_EXCEEDS_PER_IMAGE_LIMIT');
   return orchestrateImageGeneration({
     reserve: reserveImageBudget,
     settle: settleImageBudget,
