@@ -46,6 +46,9 @@ export default function GroupConversationPage() {
   const [autonomyEnabled, setAutonomyEnabled] = useState(false);
   const [autonomyInterval, setAutonomyInterval] = useState(60);
   const [autonomyLoaded, setAutonomyLoaded] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [archived, setArchived] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, [messages.length]);
   const scope = new URLSearchParams({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id });
@@ -69,11 +72,27 @@ export default function GroupConversationPage() {
     if (!settingsOpen || !id || !user?.id) return;
     let active = true;
     setAutonomyLoaded(false);
+    setPreferencesLoaded(false);
+    void customFetch<{ muted: boolean; archived: boolean }>(`/api/group-dms/${encodeURIComponent(id)}/preferences?${scope}`, { method: 'GET', responseType: 'json' })
+      .then(value => { if (active) { setMuted(value.muted); setArchived(value.archived); setPreferencesLoaded(true); } })
+      .catch(() => { if (active) setError('No se pudieron cargar las preferencias del grupo.'); });
     void customFetch<{ enabled: boolean; intervalMinutes: number }>(`/api/group-dms/${encodeURIComponent(id)}/autonomy?${scope}`, { method: 'GET', responseType: 'json' })
       .then(result => { if (active) { setAutonomyEnabled(result.enabled); setAutonomyInterval(result.intervalMinutes); setAutonomyLoaded(true); } })
       .catch(() => { if (active) { setAutonomyLoaded(false); setError('No se pudo cargar la configuración de autonomía.'); } });
     return () => { active = false; };
   }, [settingsOpen, id, user?.id, me.id]);
+  const savePreferences = async (patch: { muted?: boolean; archived?: boolean }) => {
+    if (!id || !preferencesLoaded || savingSettings) return;
+    setSavingSettings(true);
+    try {
+      const value = await customFetch<{ muted: boolean; archived: boolean }>(`/api/group-dms/${encodeURIComponent(id)}/preferences`, {
+        method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, ...patch }),
+      });
+      setMuted(value.muted); setArchived(value.archived); setError('');
+    } catch { setError('No se pudieron guardar las preferencias del grupo.'); }
+    finally { setSavingSettings(false); }
+  };
   const saveAutonomy = async (enabled: boolean, intervalMinutes: number) => {
     if (!group || savingSettings || !autonomyLoaded) return;
     setSavingSettings(true);
@@ -223,6 +242,12 @@ export default function GroupConversationPage() {
         <select value={autonomyInterval} disabled={!autonomyLoaded || savingSettings} onChange={e => void saveAutonomy(autonomyEnabled, Number(e.target.value))} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
           <option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>1 hora</option><option value={180}>3 horas</option><option value={360}>6 horas</option>
         </select>
+      </div>
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="font-semibold">Preferencias de conversación</p>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={muted} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ muted: e.target.checked })} /> Silenciar este grupo</label>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={archived} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ archived: e.target.checked })} /> Archivar este grupo</label>
+        <p className="mt-2 text-xs text-muted-foreground">Estas preferencias son individuales. Archivar no elimina los mensajes.</p>
       </div>
       <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>
     </div>}
