@@ -25,6 +25,22 @@ export default function MessagesPage() {
   const [groupComposer, setGroupComposer] = useState(false);
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
+  const [acceptedRequests, setAcceptedRequests] = useState<string[]>([]);
+  const [rejectedRequests, setRejectedRequests] = useState<string[]>([]);
+  const requestStorageKey = `echo-dm-requests:${user?.id ?? 'anonymous'}:${me.id}`;
+  useEffect(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(requestStorageKey) ?? '{}') as { accepted?: string[]; rejected?: string[] };
+      setAcceptedRequests(Array.isArray(value.accepted) ? value.accepted : []);
+      setRejectedRequests(Array.isArray(value.rejected) ? value.rejected : []);
+    } catch { setAcceptedRequests([]); setRejectedRequests([]); }
+  }, [requestStorageKey]);
+  const updateRequest = (id: string, accept: boolean) => {
+    const accepted = accept ? [...new Set([...acceptedRequests, id])] : acceptedRequests.filter(x => x !== id);
+    const rejected = accept ? rejectedRequests.filter(x => x !== id) : [...new Set([...rejectedRequests, id])];
+    setAcceptedRequests(accepted); setRejectedRequests(rejected);
+    localStorage.setItem(requestStorageKey, JSON.stringify({ accepted, rejected }));
+  };
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
@@ -38,11 +54,12 @@ export default function MessagesPage() {
   const followed = new Set(state.follows[me.id] ?? []);
   const requests = threads.filter(({ other }) =>
     !followed.has(other.id) &&
+    !acceptedRequests.includes(other.id) && !rejectedRequests.includes(other.id) &&
     !state.messages.some(m => m.senderId === me.id && m.recipientId === other.id)
   );
   const visibleThreads = threads.filter(({ other }) => showRequests
     ? requests.some(r => r.other.id === other.id)
-    : !requests.some(r => r.other.id === other.id));
+    : !requests.some(r => r.other.id === other.id) && !rejectedRequests.includes(other.id));
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
   const backToInbox = () => { if (showSaved) { setShowSaved(false); window.history.replaceState(null, "", "/messages"); } else navigate("/"); };
@@ -125,6 +142,7 @@ export default function MessagesPage() {
                   </span>
                 )}
               </Link>
+              {showRequests && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => updateRequest(other.id, true)} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => updateRequest(other.id, false)} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button></div>}
             </li>
           ))}
         </ul>
