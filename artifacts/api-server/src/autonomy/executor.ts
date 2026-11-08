@@ -498,7 +498,7 @@ export async function executeAutonomyDecision(input: {
     }
 
     // Honor only the model's explicit photo choice. Recheck ownership, availability,
-    // reservation and reuse in the same transaction as the post write.
+    // reservation and reuse in the same transaction as the feed post or story write.
     if (input.decision.action === "draft" && input.decision.situation === "post" &&
         input.decision.galleryPhotoId && mutation.targetId) {
       const [selected] = await tx.select().from(echoCharacterGalleryTable).where(and(
@@ -511,8 +511,10 @@ export async function executeAutonomyDecision(input: {
       if (selected && (selected.reusable || selected.usedCount === 0) &&
           (selected.usedCount === 0 || !selected.lastUsedAt || now.getTime()-selected.lastUsedAt.getTime()>=30*DAY_MS)) {
         const post = mutation.state.posts.find(item => item.id === mutation.targetId);
-        if (post) {
-          post.image = selected.mediaRef;
+        const story = mutation.state.stories.find(item => item.id === mutation.targetId);
+        if (post || story) {
+          if (post) post.image = selected.mediaRef;
+          if (story) story.image = selected.mediaRef;
           await tx.update(echoCharacterGalleryTable).set({
             usedCount: sql`${echoCharacterGalleryTable.usedCount} + 1`, lastUsedAt: now,
           }).where(eq(echoCharacterGalleryTable.id,selected.id));
