@@ -344,6 +344,22 @@ export async function runAutonomyLiveCycle(
       return { status, reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };
     }
 
+    // Scene presence affects unsolicited social outreach only. Incoming DM replies
+    // remain governed by existing DM permissions; scenes never override blocks.
+    if (dependencies.lane === "dm" && opportunity.situation === "dm" &&
+        opportunity.reason !== "A recent incoming direct message is awaiting a reply.") {
+      const activeScenes = await db.execute(sql`SELECT scene_id FROM echo_scenes
+        WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+          AND status = 'active' AND participant_ids @> ${JSON.stringify([character.id])}::jsonb LIMIT 1`);
+      if (activeScenes.rows.length) {
+        await dependencies.repository.complete(ownerId, runId, {
+          status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null,
+        }, universeId);
+        return { status: "no_action", reasonCode: "CHARACTER_PRESENT_IN_ACTIVE_SCENE",
+          characterId: character.id, runId, model: null };
+      }
+    }
+
     // Fail closed: BOTH AI identities must explicitly allow the other in this universe.
     if (opportunity.situation === "dm" && opportunity.recipientId &&
         state.characters.some(peer => peer.id === opportunity.recipientId && !peer.archived)) {
