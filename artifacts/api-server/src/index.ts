@@ -35,7 +35,7 @@ process.on("SIGTERM", () => autonomyWorker.stop());
 process.on("SIGINT", () => autonomyWorker.stop());
 
 // Independent of the AI autonomy switch: scheduled posts are explicit owner instructions.
-const scheduledInterval = setInterval(() => { void publishDueScheduledPosts(); }, 30000);
+const scheduledInterval = setInterval(() => { void publishDueScheduledPosts(); }, 300000);
 void publishDueScheduledPosts();
 process.on("SIGTERM", () => clearInterval(scheduledInterval));
 process.on("SIGINT", () => clearInterval(scheduledInterval));
