@@ -25,7 +25,7 @@ async function getUniverse(ownerId: string, universeId: string, actorId: string)
   return characters;
 }
 const serializeGroup = (row: Record<string, unknown>) => ({
-  id: row.id, name: row.name, avatar: row.avatar, createdBy: row.created_by,
+  id: row.id, name: row.name, avatar: row.avatar, createdBy: row.created_by, muted: row.muted === true, archived: row.archived === true,
   participantIds: row.participant_ids, createdAt: row.created_at, updatedAt: row.updated_at,
 });
 router.get("/group-dms", async (req, res) => {
@@ -33,9 +33,12 @@ router.get("/group-dms", async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
   const { universeId, actorId } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
-  const result = await db.execute(sql`SELECT id, name, avatar, created_by, participant_ids, created_at, updated_at
-    FROM echo_group_conversations WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
-    AND participant_ids ? ${actorId} ORDER BY updated_at DESC LIMIT 100`);
+  const result = await db.execute(sql`SELECT g.id, g.name, g.avatar, g.created_by, g.participant_ids, g.created_at, g.updated_at,
+    COALESCE(p.muted, false) AS muted, COALESCE(p.archived, false) AS archived
+    FROM echo_group_conversations g LEFT JOIN echo_group_member_preferences p
+      ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
+    WHERE g.owner_id = ${req.userId!} AND g.universe_id = ${universeId}
+    AND g.participant_ids ? ${actorId} ORDER BY g.updated_at DESC LIMIT 100`);
   res.json({ groups: result.rows.map(row => serializeGroup(row as Record<string, unknown>)) });
 });
 router.post("/group-dms", async (req, res) => {
