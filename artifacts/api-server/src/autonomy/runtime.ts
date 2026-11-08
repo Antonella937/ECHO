@@ -16,6 +16,7 @@ import { logger } from "../lib/logger";
 import { runAutonomyWorkerTick, startAutonomyWorker } from "./worker";
 import { readUniverse } from "../lib/universeRepository";
 import { runGroupAutonomyOnce } from "./group-executor";
+import { runCollaborationAutonomyOnce } from "./collaboration-executor";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { dispatchAutonomousVoice, getVoiceOwnerControls } from "./voice-adapter";
@@ -33,6 +34,7 @@ const repository: LiveAutonomyRepository = {
 export function startAutonomyBackgroundWorker() {
   let lastSocialSlotAttempted = -1;
   let lastGroupSlotAttempted = -1;
+  let lastCollaborationSlotAttempted = -1;
   return startAutonomyWorker({
     enabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
     tick: async () => {
@@ -85,6 +87,24 @@ export function startAutonomyBackgroundWorker() {
           }
         } catch (error) {
           logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" }, "Group autonomy tick failed");
+        }
+      }
+      if (result.status === "completed" && socialSlot !== lastCollaborationSlotAttempted) {
+        lastCollaborationSlotAttempted = socialSlot;
+        try {
+          const targets = await listLiveOptInTargets();
+          const unique = [...new Map(targets.filter(t => t.socialEnabled)
+            .map(t => [`${t.ownerId}:${t.universeId}`, t])).values()];
+          // Limit AI usage: at most one collaboration decision per global tick.
+          for (const target of unique) {
+            const outcome = await runCollaborationAutonomyOnce(target.ownerId, target.universeId);
+            if (outcome.status === "executed") {
+              logger.info({ accepted: outcome.accepted }, "Collaboration autonomy decision completed");
+              break;
+            }
+          }
+        } catch (error) {
+          logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" }, "Collaboration autonomy tick failed");
         }
       }
       if (result.status === "completed") {
