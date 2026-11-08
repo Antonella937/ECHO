@@ -128,7 +128,6 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <button type="button" disabled={person.archived} onClick={() => actions.toggleFollow(person.id)} className="tap col-span-2 flex h-11 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50" data-testid="button-profile-follow">{isFollowing ? t("Siguiendo") : isRequested ? t("Solicitado") : person.privateAccount ? t("Solicitar seguir") : t("Seguir")}</button>
             <button
               onClick={() => navigate(`/messages/${person.id}`)}
               className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
@@ -136,19 +135,7 @@ export default function ProfilePage() {
             >
               <MessageCircle className="h-4 w-4 shrink-0" strokeWidth={2} /> {t("Mensaje")}
             </button>
-            <button
-              disabled={person.archived}
-              onClick={() => {
-                actions.switchIdentity(person.id);
-                // Keep the URL and browser history aligned with the newly active identity.
-                navigate(`/profile/${person.id}`, { replace: true });
-                toast({ title: `${t("Ahora publicas como")} ${person.name}` });
-              }}
-              className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50"
-              data-testid="button-profile-become"
-            >
-              <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t(person.archived ? 'Restaura para usar' : 'Usar este perfil')}
-            </button>
+            <button type="button" disabled={person.archived} onClick={() => actions.toggleFollow(person.id)} className="tap flex h-11 items-center justify-center rounded-xl bg-secondary text-sm font-semibold disabled:opacity-50" data-testid="button-profile-follow">{isFollowing ? t("Siguiendo") : isRequested ? t("Solicitado") : person.privateAccount ? t("Solicitar seguir") : t("Seguir")}</button>
             <button onClick={() => setEditing(true)} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="button-profile-edit">
               <Pencil className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Editar perfil")}
             </button>
