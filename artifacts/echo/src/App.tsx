@@ -41,6 +41,7 @@ import PostPage from '@/pages/post';
 import CreatePage from '@/pages/create';
 import NotificationsPage from '@/pages/notifications';
 import MessagesPage from '@/pages/messages';
+import ScenesPage from '@/pages/scenes';
 import ConversationPage from '@/pages/conversation';
 import GroupConversationPage from '@/pages/group-conversation';
 import SavedPage from '@/pages/saved';
@@ -311,6 +312,7 @@ function ProtectedRouter() {
           <Route path="/create" component={CreatePage} />
           <Route path="/notifications" component={NotificationsPage} />
           <Route path="/messages" component={MessagesPage} />
+          <Route path="/scenes" component={ScenesPage} />
           <Route path="/messages/group/:id" component={GroupConversationPage} />
           <Route path="/messages/:id" component={ConversationPage} />
           <Route path="/saved" component={SavedPage} />
