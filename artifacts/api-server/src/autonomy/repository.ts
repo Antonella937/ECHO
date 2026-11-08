@@ -215,7 +215,7 @@ export async function reserveDryRun(
         ne(echoAutonomyRunsTable.situation, "dm"),
       ));
       if ((perCharacterHour?.value ?? 0) >= 3 || (perCharacterDay?.value ?? 0) >= 10 ||
-        (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
+        (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12) {
         return { kind: "rate_limited" };
       }
   
