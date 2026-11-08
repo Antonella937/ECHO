@@ -15,7 +15,7 @@ export function useUnreadCounts() {
   return useMemo(
     () => ({
       notifications: state.notifications.filter((n) => n.recipientId === me.id && !n.read && n.kind !== 'message' && n.kind !== 'story_reply').length,
-      messages: state.messages.filter((m) => hasMessageContent(m) && !hiddenFor(m, me.id) && m.recipientId === me.id && !m.readBy.includes(me.id)).length,
+      messages: selectInbox(state, me.id).reduce((total, thread) => total + thread.unread, 0),
     }),
     [state.notifications, state.messages, me.id],
   );
