@@ -1,3 +1,4 @@
+import { synthesizeBasicVoice } from "../lib/basicVoiceProvider";
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, echoMediaTable, echoVoiceBudgetsTable, echoVoiceUsageTable, echoUniversesTable } from "@workspace/db";
@@ -73,11 +74,7 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
   });
   if (!reserved) return;
   try {
-    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json",
-      ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
-      body: JSON.stringify({ model: "kokoro", input: input.text, voice, response_format: "wav" }), signal: AbortSignal.timeout(45000) });
-    if (!response.ok) throw Error("VOICE_PROVIDER_FAILED");
-    const bytes = Buffer.from(await response.arrayBuffer());
+    const bytes = await synthesizeBasicVoice({ text: input.text, voice, requestId: input.messageId });
     if (bytes.length < 44 || bytes.length > 15 * 1024 * 1024 || bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WAVE") throw Error("INVALID_WAV");
     const objectPath = `/objects/uploads/${randomUUID()}`;
     const uploaded = await fetch(`${base}/storage/v1/object/echo-media/${objectPath.slice("/objects/".length)}`, {
