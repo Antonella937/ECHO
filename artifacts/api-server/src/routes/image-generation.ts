@@ -207,10 +207,10 @@ router.post('/ai-engine/images/storage-self-test', requireAuth, async (req, res)
   try {
     objectPath = await saveGeneratedImage(req.userId!, png, 'image/png');
     uploaded = true;
-    const base = process.env.SUPABASE_URL?.replace(/\\/$/, '');
+    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!base || !key) throw Error('STORAGE_NOT_CONFIGURED');
-    const remotePath = objectPath.replace(/^\\/objects\\//, '');
+    const remotePath = objectPath.replace(/^\/objects\//, '');
     const url = `${base}/storage/v1/object/echo-media/${remotePath}`;
     const headers = { Authorization: `Bearer ${key}`, apikey: key };
     const response = await fetch(url, { headers, redirect: 'error', signal: AbortSignal.timeout(10000) });
@@ -225,10 +225,10 @@ router.post('/ai-engine/images/storage-self-test', requireAuth, async (req, res)
   } finally {
     if (objectPath) {
       try {
-        const base = process.env.SUPABASE_URL?.replace(/\\/$/, '');
+        const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
         const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (!base || !key) throw Error('STORAGE_NOT_CONFIGURED');
-        const remotePath = objectPath.replace(/^\\/objects\\//, '');
+        const remotePath = objectPath.replace(/^\/objects\//, '');
         const response = await fetch(`${base}/storage/v1/object/echo-media/${remotePath}`, {
           method: 'DELETE', headers: { Authorization: `Bearer ${key}`, apikey: key },
           signal: AbortSignal.timeout(10000),
