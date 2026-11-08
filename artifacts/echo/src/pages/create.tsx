@@ -357,20 +357,6 @@ export default function CreatePage() {
           </button>
         ))}
 
-        {mediaSource === 'upload' && (mode === 'post' || mode === 'story') && items.length === 0 && !busy && (
-          <button
-            type="button"
-            onClick={() => {
-              setItems([{ id: 'echo-beta-sample', type: 'image', url: 'asset:account-default' }]);
-              setError(null);
-            }}
-            className="mt-3 w-full rounded-2xl border border-border bg-secondary px-4 py-3 text-sm font-medium"
-            data-testid="button-use-sample-image"
-          >
-            Usar imagen de prueba · sin subir archivos
-          </button>
-        )}
-
         {mediaSource === 'upload' && items.length > 0 && (mode === 'post' || items.length > 1) && (
           <div className="mt-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
