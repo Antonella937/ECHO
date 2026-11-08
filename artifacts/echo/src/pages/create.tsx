@@ -53,7 +53,7 @@ export default function CreatePage() {
   const [aiTransferAcknowledged, setAiTransferAcknowledged] = useState(false);
   const [aiGeneratedPath, setAiGeneratedPath] = useState<string | null>(null);
   const [aiEditSource, setAiEditSource] = useState<string | null>(null);
-  const [aiStatus, setAiStatus] = useState<{ enabled: boolean; reason: string; prerequisites?: { openRouterKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } } | null>(null);
+  const [aiStatus, setAiStatus] = useState<{ enabled: boolean; reason: string; prerequisites?: { falKeyConfigured: boolean; privateStorageConfigured: boolean; providerValidated: boolean; budgetActivated: boolean } } | null>(null);
   const [items, setItems] = useState<PostMedia[]>([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -324,7 +324,7 @@ export default function CreatePage() {
             data-testid="button-ai-image-preview">{t(aiPreparing ? 'Preparando…' : 'Preparar vista previa · gratis')}</button>
           <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-xs leading-relaxed" data-testid="label-ai-transfer-acknowledgement">
             <input type="checkbox" className="mt-0.5" checked={aiTransferAcknowledged} onChange={e => setAiTransferAcknowledged(e.target.checked)} data-testid="checkbox-ai-transfer-acknowledgement" />
-            <span>{t("Entiendo que, si activo una generación real, ECHO enviará mi descripción de la escena y hasta cuatro imágenes privadas de referencia del personaje a OpenRouter y al proveedor del modelo para crear la imagen. No debo incluir fotografías ajenas sin autorización ni datos sensibles. Esta confirmación es específica de la prueba de imágenes, no reemplaza los documentos legales definitivos ni habilita por sí sola el servicio.")}</span>
+            <span>{t("Entiendo que, si activo una generación real, ECHO enviará mi descripción de la escena y hasta cuatro imágenes privadas de referencia del personaje a fal.ai para crear la imagen. No debo incluir fotografías ajenas sin autorización ni datos sensibles. Esta confirmación es específica de la prueba de imágenes, no reemplaza los documentos legales definitivos ni habilita por sí sola el servicio.")}</span>
           </label>
           {aiPreview && aiPrepared && <div className="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3" data-testid="ai-image-preview">
             <div className="text-sm font-semibold">{t("Vista previa de la solicitud")}</div>
