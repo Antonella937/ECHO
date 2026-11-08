@@ -23,6 +23,7 @@ import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled, isAutonomyOw
 import type { Opportunity } from "./policy";
 import { recordAutonomyEvent } from "./event-memory";
 import { displacedMemories } from "../lib/memoryArchive";
+import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ALLOWED_REACTIONS = new Set(["❤", "😂", "😮", "😢", "🔥", "👏"]);
@@ -83,7 +84,7 @@ export function applyAutonomyDecision(
     const story = state.stories.find(item => item.id === opportunity.storyId);
     if (!story || !recentWithin(story.createdAt, now, DAY_MS) ||
       story.authorId === characterId || !state.follows[characterId]?.includes(story.authorId) ||
-      story.seenBy.includes(characterId)) {
+      !canCharacterViewCloseFriendsStory(state, story, characterId) || story.seenBy.includes(characterId)) {
       return { state, changed: false, targetId: null };
     }
     return {
@@ -209,6 +210,7 @@ export function applyAutonomyDecision(
     const target = opportunity.storyId ? state.stories.find((item) => item.id === opportunity.storyId) : undefined;
     if (!target || !recentWithin(target.createdAt, now, DAY_MS) ||
       !state.follows[characterId]?.includes(target.authorId) ||
+      !canCharacterViewCloseFriendsStory(state, target, characterId) ||
       target.reactions?.some((item) => item.actorId === characterId)) {
       throw new SocialExecutionError("STORY_REACTION_TARGET_UNAVAILABLE");
     }
