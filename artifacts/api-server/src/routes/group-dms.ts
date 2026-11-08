@@ -148,4 +148,28 @@ router.patch("/group-dms/:groupId/avatar", async (req, res) => {
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ avatar: result.rows[0].avatar });
 });
+router.get("/group-dms/:groupId/autonomy", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`SELECT autonomy_enabled, autonomy_interval_minutes FROM echo_group_conversations
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
+    AND participant_ids ? ${actorId} LIMIT 1`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ enabled: result.rows[0].autonomy_enabled, intervalMinutes: result.rows[0].autonomy_interval_minutes });
+});
+const groupAutonomyBody = scope.extend({ enabled: z.boolean(), intervalMinutes: z.number().int().min(15).max(1440).default(60) });
+router.patch("/group-dms/:groupId/autonomy", async (req, res) => {
+  const parsed = groupAutonomyBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_AUTONOMY_SETTINGS" }); return; }
+  const { universeId, actorId, enabled, intervalMinutes } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`UPDATE echo_group_conversations
+    SET autonomy_enabled = ${enabled}, autonomy_interval_minutes = ${intervalMinutes}, updated_at = now()
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
+    AND participant_ids ? ${actorId} RETURNING autonomy_enabled, autonomy_interval_minutes`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ enabled: result.rows[0].autonomy_enabled, intervalMinutes: result.rows[0].autonomy_interval_minutes });
+});
 export default router;
