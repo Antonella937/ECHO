@@ -181,40 +181,44 @@ export async function reserveDryRun(
       return { kind: "duplicate", runId: String(existing.id), status: existing.status, characterId: existing.characterId };
     }
 
-    const now = new Date();
-    const hourAgo = new Date(now.getTime() - 60 * 60_000);
-    const dayAgo = new Date(now.getTime() - 24 * 60 * 60_000);
-    const [perCharacterHour] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
-      eq(echoAutonomyRunsTable.ownerId, ownerId),
-      eq(echoAutonomyRunsTable.universeId, universeId),
-      eq(echoAutonomyRunsTable.characterId, characterId),
-      gte(echoAutonomyRunsTable.createdAt, hourAgo),
-      eq(echoAutonomyRunsTable.status, "executed"),
-      ne(echoAutonomyRunsTable.situation, "dm"),
-    ));
-    const [ownerHour] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
-      eq(echoAutonomyRunsTable.ownerId, ownerId),
-      gte(echoAutonomyRunsTable.createdAt, hourAgo),
-      eq(echoAutonomyRunsTable.status, "executed"),
-      ne(echoAutonomyRunsTable.situation, "dm"),
-    ));
-    const [perCharacterDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
-      eq(echoAutonomyRunsTable.ownerId, ownerId),
-      eq(echoAutonomyRunsTable.universeId, universeId),
-      eq(echoAutonomyRunsTable.characterId, characterId),
-      gte(echoAutonomyRunsTable.createdAt, dayAgo),
-      eq(echoAutonomyRunsTable.status, "executed"),
-      ne(echoAutonomyRunsTable.situation, "dm"),
-    ));
-    const [ownerDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
-      eq(echoAutonomyRunsTable.ownerId, ownerId),
-      gte(echoAutonomyRunsTable.createdAt, dayAgo),
-      eq(echoAutonomyRunsTable.status, "executed"),
-      ne(echoAutonomyRunsTable.situation, "dm"),
-    ));
-    if (lane === "social" && ((perCharacterHour?.value ?? 0) >= 3 || (perCharacterDay?.value ?? 0) >= 10 ||
-      (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
-      return { kind: "rate_limited" };
+    // DM reservations do not use social activity caps: skip four unnecessary COUNT queries.
+    if (lane === "social") {
+      const now = new Date();
+      const hourAgo = new Date(now.getTime() - 60 * 60_000);
+      const dayAgo = new Date(now.getTime() - 24 * 60 * 60_000);
+      const [perCharacterHour] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
+        eq(echoAutonomyRunsTable.ownerId, ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.characterId, characterId),
+        gte(echoAutonomyRunsTable.createdAt, hourAgo),
+        eq(echoAutonomyRunsTable.status, "executed"),
+        ne(echoAutonomyRunsTable.situation, "dm"),
+      ));
+      const [ownerHour] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
+        eq(echoAutonomyRunsTable.ownerId, ownerId),
+        gte(echoAutonomyRunsTable.createdAt, hourAgo),
+        eq(echoAutonomyRunsTable.status, "executed"),
+        ne(echoAutonomyRunsTable.situation, "dm"),
+      ));
+      const [perCharacterDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
+        eq(echoAutonomyRunsTable.ownerId, ownerId),
+        eq(echoAutonomyRunsTable.universeId, universeId),
+        eq(echoAutonomyRunsTable.characterId, characterId),
+        gte(echoAutonomyRunsTable.createdAt, dayAgo),
+        eq(echoAutonomyRunsTable.status, "executed"),
+        ne(echoAutonomyRunsTable.situation, "dm"),
+      ));
+      const [ownerDay] = await tx.select({ value: count() }).from(echoAutonomyRunsTable).where(and(
+        eq(echoAutonomyRunsTable.ownerId, ownerId),
+        gte(echoAutonomyRunsTable.createdAt, dayAgo),
+        eq(echoAutonomyRunsTable.status, "executed"),
+        ne(echoAutonomyRunsTable.situation, "dm"),
+      ));
+      if ((perCharacterHour?.value ?? 0) >= 3 || (perCharacterDay?.value ?? 0) >= 10 ||
+        (ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
+        return { kind: "rate_limited" };
+      }
+  
     }
 
     const [created] = await tx.insert(echoAutonomyRunsTable).values({
