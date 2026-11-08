@@ -60,6 +60,7 @@ export type PostMedia = import('@workspace/api-client-react').PostMedia;
 export interface MusicClip { trackId: string; title: string; startSeconds: number; clipSeconds: 15 | 30; }
 
 export interface Post {
+  poll?: { question: string; options: Array<{ id: string; text: string }>; votes: Record<string, string>; closesAt?: ISODate };
   /** Collaboration invitations are not co-authorship until accepted. */
   collaborationInvites?: string[];
   collaboratorIds?: string[];
