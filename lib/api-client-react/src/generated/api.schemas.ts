@@ -709,6 +709,8 @@ export type CharacterAccountType = typeof CharacterAccountType[keyof typeof Char
 
 export const CharacterAccountType = {
   personal: 'personal',
+  artist: 'artist',
+  business: 'business',
   band: 'band',
   venue: 'venue',
   organization: 'organization',
@@ -750,6 +752,11 @@ export type CharacterIdentity = {
 export interface Character {
   configuration?: CharacterConfiguration;
   accountType?: CharacterAccountType;
+  privateAccount?: boolean;
+  professionalCategory?: string;
+  contactEmail?: string;
+  website?: string;
+  accountIdentity?: {description?:string;voice?:string;facts?:string};
   verified?: boolean;
   archived?: boolean;
   displayMetrics?: CharacterDisplayMetrics;
