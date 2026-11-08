@@ -18,6 +18,7 @@ const storageReady = () => {
   const raw = process.env.SUPABASE_URL;
   if (!raw || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false;
   try { const url = new URL(raw); return url.protocol === "https:" && url.hostname.endsWith(".supabase.co") && !url.username && !url.password; } catch { return false; }
+};
 
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
 export async function resolveAutonomousVoiceId(ownerId: string, universeId: string, characterId: string, basicVoiceId?: string | null): Promise<string | null> {
