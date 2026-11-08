@@ -15,11 +15,13 @@ import { cn } from '@/lib/utils';
 /** Identity switcher + account management (active / archived). */
 export function AccountManager() {
   const translate = useAccountManagementText();
-  const galleryLabel = galleryLabels[useLanguage()].title;
+  const language = useLanguage();
+  const galleryLabel = galleryLabels[language].title;
   const { state, me, actions } = useSocial();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
+  const [professionalCreation, setProfessionalCreation] = useState(false);
   const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
   const archivedCount = state.characters.filter((c) => c.archived).length;
 
@@ -36,9 +38,14 @@ export function AccountManager() {
           ))}
         </div>
       </div>
-      <Link href="/characters/new" className="mt-3 flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground" data-testid="button-create-character">
-        <Plus className="h-4 w-4" /> {translate('Crear personaje')}
-      </Link>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href="/characters/new" className="flex min-h-12 items-center justify-center gap-1 rounded-2xl bg-primary px-2 py-3 text-center text-xs font-semibold text-primary-foreground sm:text-sm" data-testid="button-create-character">
+          <Plus className="h-4 w-4 shrink-0" /> {translate('Crear personaje')}
+        </Link>
+        <button type="button" onClick={() => { setProfessionalCreation(true); setEditing(null); }} className="flex min-h-12 items-center justify-center gap-1 rounded-2xl bg-primary px-2 py-3 text-center text-xs font-semibold text-primary-foreground sm:text-sm" data-testid="button-create-professional-account">
+          <Plus className="h-4 w-4 shrink-0" /> {language === 'es' ? 'Cuenta profesional' : 'Professional account'}
+        </button>
+      </div>
 
       <div className="mt-3 flex flex-col gap-2" role={tab === 'active' ? 'radiogroup' : undefined} aria-label={translate("Identidad activa")}>
         {list.length === 0 && (
@@ -87,7 +94,7 @@ export function AccountManager() {
         })}
       </div>
 
-      <AccountEditor open={editing !== undefined} accountId={editing} onClose={() => setEditing(undefined)} />
+      <AccountEditor open={editing !== undefined || professionalCreation} accountId={professionalCreation ? null : editing} initialType={professionalCreation ? "band" : "personal"} onClose={() => { setEditing(undefined); setProfessionalCreation(false); }} />
     </div>
   );
 }
