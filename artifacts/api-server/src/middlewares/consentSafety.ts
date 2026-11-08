@@ -3,6 +3,7 @@ import type { Request, RequestHandler } from "express";
 import { db, echoMediaTable, echoCharacterFollowRequestsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getOwnerConsent } from "../lib/ownerConsent";
+import { canGenerateImages, imageGenerationAccessMode } from "../lib/imageGenerationAccess";
 import { AUTONOMY_PRIVATE_BETA_ENABLED, isAutonomyOwnerAuthorized } from "../autonomy/constants";
 
 /**
@@ -46,13 +47,14 @@ export function createConsentSafetyGate(
       const safeStorageDiagnostic = req.method === "POST" && path === "/ai-engine/images/storage-self-test" &&
         process.env.ECHO_IMAGE_STORAGE_SELF_TEST_ENABLED === "true" &&
         (process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS ?? "").split(",").map(id => id.trim()).includes(ownerId);
-      // Private image generation is permitted only with a server-side owner allowlist,
-      // active provider controls, and the exact per-request transfer acknowledgement.
-      // Public AI endpoints remain blocked while legal documents are unavailable.
+      // Image generation remains fail-closed: beta allowlist by default, or
+      // separately approved authenticated-user mode after public legal review.
+      // Every request still requires explicit media-transfer acknowledgement.
       const privateImageGeneration = req.method === "POST" && path === "/ai-engine/images/generate" &&
         process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED === "true" &&
         process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED === "true" &&
-        (process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS ?? "").split(",").map(id => id.trim()).includes(ownerId) &&
+        canGenerateImages(ownerId) &&
+        (imageGenerationAccessMode() !== "authenticated_users" || process.env.ECHO_PUBLIC_IMAGE_GENERATION_APPROVED === "true") &&
         req.body?.imageTransferAcknowledgement === "image-transfer-preview-v1";
       const authorizedPrivateAutonomy = AUTONOMY_PRIVATE_BETA_ENABLED &&
         path.startsWith("/autonomy/") && isAutonomyOwnerAuthorized(ownerId);
