@@ -65,7 +65,7 @@ router.get("/group-dms/:groupId/messages", async (req, res) => {
     AND participant_ids ? ${actorId} LIMIT 1`);
   if (!group.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   const messages = await db.execute(sql`SELECT id, group_id AS "groupId", sender_id AS "senderId",
-    body AS text, attachments, read_by AS "readBy", quote_message_id AS "quoteMessageId",
+    body AS text, attachments, read_by AS "readBy", quote_message_id AS "quoteMessageId", pinned_at AS "pinnedAt", pinned_by AS "pinnedBy",
     created_at AS "createdAt" FROM echo_group_messages
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND group_id = ${groupId}
     ORDER BY created_at DESC LIMIT 100`);
@@ -171,5 +171,37 @@ router.patch("/group-dms/:groupId/autonomy", async (req, res) => {
     AND participant_ids ? ${actorId} RETURNING autonomy_enabled, autonomy_interval_minutes`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ enabled: result.rows[0].autonomy_enabled, intervalMinutes: result.rows[0].autonomy_interval_minutes });
+});
+const pinBody = scope.extend({ pinned: z.boolean() });
+router.patch("/group-dms/:groupId/messages/:messageId/pin", async (req, res) => {
+  const parsed = pinBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success || !id.safeParse(req.params.messageId).success) {
+    res.status(400).json({ error: "INVALID_PIN_REQUEST" }); return;
+  }
+  const { universeId, actorId, pinned } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`UPDATE echo_group_messages SET pinned_at = CASE WHEN ${pinned} THEN now() ELSE NULL END,
+    pinned_by = CASE WHEN ${pinned} THEN ${actorId} ELSE NULL END
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+    AND group_id = ${String(req.params.groupId)} AND id = ${String(req.params.messageId)}
+    AND EXISTS (SELECT 1 FROM echo_group_conversations g WHERE g.owner_id = ${req.userId!}
+      AND g.universe_id = ${universeId} AND g.id = ${String(req.params.groupId)} AND g.participant_ids ? ${actorId})
+    RETURNING id, pinned_at AS "pinnedAt", pinned_by AS "pinnedBy"`);
+  if (!result.rows.length) { res.status(404).json({ error: "MESSAGE_NOT_FOUND" }); return; }
+  res.json({ message: result.rows[0] });
+});
+router.get("/group-dms/:groupId/search", async (req, res) => {
+  const parsed = scope.extend({ q: z.string().trim().min(1).max(120) }).safeParse(req.query);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_SEARCH" }); return; }
+  const { universeId, actorId, q } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`SELECT m.id, m.sender_id AS "senderId", m.body AS text, m.created_at AS "createdAt"
+    FROM echo_group_messages m JOIN echo_group_conversations g ON
+      g.owner_id = m.owner_id AND g.universe_id = m.universe_id AND g.id = m.group_id
+    WHERE m.owner_id = ${req.userId!} AND m.universe_id = ${universeId}
+      AND m.group_id = ${String(req.params.groupId)} AND g.participant_ids ? ${actorId}
+      AND m.body ILIKE ('%' || ${q} || '%')
+    ORDER BY m.created_at DESC LIMIT 50`);
+  res.json({ messages: result.rows });
 });
 export default router;
