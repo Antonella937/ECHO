@@ -180,7 +180,7 @@ router.get("/voices/premium/references",async(req,res)=>{
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
   if(!await checkCharacter(req.userId!,parsed.data.universeId,parsed.data.characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
-  const result=await pool.query("SELECT id,content_type AS \"contentType\",expected_size AS \"size\",created_at AS \"createdAt\" FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND status='ready' ORDER BY created_at DESC LIMIT 20",[req.userId,parsed.data.universeId,parsed.data.characterId]);
+  const result=await pool.query("SELECT id,object_path AS \"objectPath\",content_type AS \"contentType\",expected_size AS \"size\",created_at AS \"createdAt\" FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND status='ready' ORDER BY created_at DESC LIMIT 20",[req.userId,parsed.data.universeId,parsed.data.characterId]);
   res.json({references:result.rows});
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
@@ -233,6 +233,22 @@ router.post("/voices/premium/clone",requireAuth,async(req,res)=>{
   if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
   const reference=await pool.query("SELECT content_type FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND object_path=$4 AND status='ready'",[req.userId,universeId,characterId,objectPath]);
   if(!reference.rowCount){res.status(404).json({error:"VERIFIED_REFERENCE_NOT_FOUND"});return;}
+  // Reserve a clone before contacting the paid provider, so duplicate taps
+  // cannot create multiple costly voices for the same character.
+  let cloneReservationId:string|null=null;
+  res.once("finish",()=>{if(cloneReservationId)void pool.query("UPDATE echo_voice_samples SET status='failed' WHERE id=$1 AND owner_id=$2 AND status='pending'",[cloneReservationId,req.userId]).catch(()=>{});});
+  const reservationClient=await pool.connect();
+  try{
+   await reservationClient.query("BEGIN");
+   await reservationClient.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))",[req.userId,universeId+":"+characterId+":clone"]);
+   const projectForClone=await reservationClient.query("INSERT INTO echo_voice_projects(owner_id,universe_id,character_id,mode,consent_confirmed,status) VALUES($1,$2,$3,'reference',true,'draft') ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET consent_confirmed=true,updated_at=now() RETURNING id",[req.userId,universeId,characterId]);
+   const existing=await reservationClient.query("SELECT 1 FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 AND provider='elevenlabs_clone' AND (created_at>now()-interval '24 hours' OR (status='ready' AND created_at>=date_trunc('month',now()))) LIMIT 1",[projectForClone.rows[0].id,req.userId]);
+   if(existing.rowCount){await reservationClient.query("ROLLBACK");res.status(429).json({error:"VOICE_CLONE_RATE_LIMIT"});return;}
+   const reserved=await reservationClient.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,status) VALUES($1,$2,'elevenlabs_clone','pending') RETURNING id",[projectForClone.rows[0].id,req.userId]);
+   cloneReservationId=reserved.rows[0].id;
+   await reservationClient.query("COMMIT");
+  }catch(error){await reservationClient.query("ROLLBACK").catch(()=>{});throw error;}
+  finally{reservationClient.release();}
   const base=process.env.SUPABASE_URL?.replace(/\/$/,""),secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!base||!secret)throw Error("VOICE_STORAGE_NOT_CONFIGURED");
   const audioResponse=await fetch(`${base}/storage/v1/object/echo-media/${objectPath}`,{headers:{Authorization:`Bearer ${secret}`,apikey:secret},signal:AbortSignal.timeout(20000)});
@@ -252,20 +268,21 @@ router.post("/voices/premium/clone",requireAuth,async(req,res)=>{
    req.log.warn({providerStatus:createdResponse.status},"ElevenLabs voice cloning request rejected");
    res.status(502).json({error:"ELEVENLABS_VOICE_CLONE_FAILED",providerStatus:createdResponse.status});return;
   }
-  const created=await createdResponse.json() as {voice_id?:string};
+  const created=await createdResponse.json() as {voice_id?:string;requires_verification?:boolean};
+  if(created.requires_verification){res.status(409).json({error:"VOICE_PROVIDER_VERIFICATION_REQUIRED"});return;}
   if(!created.voice_id||!/^[a-zA-Z0-9_-]{10,128}$/.test(created.voice_id)){res.status(502).json({error:"ELEVENLABS_VOICE_ID_INVALID"});return;}
   const projectResult=await pool.query(`INSERT INTO echo_voice_projects(owner_id,universe_id,character_id,mode,consent_confirmed,status)
    VALUES($1,$2,$3,'reference',true,'ready')
    ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET mode='reference',consent_confirmed=true,status='ready',updated_at=now()
    RETURNING id`,[req.userId,universeId,characterId]);
   const projectId=projectResult.rows[0].id;
-  const sample=await pool.query(`INSERT INTO echo_voice_samples(project_id,owner_id,provider,provider_sample_id,status)
-   VALUES($1,$2,'elevenlabs',$3,'ready') RETURNING id`,[projectId,req.userId,created.voice_id]);
+  const sample=await pool.query("UPDATE echo_voice_samples SET provider_sample_id=$2,status='ready' WHERE id=$1 AND owner_id=$3 RETURNING id",[cloneReservationId,created.voice_id,req.userId]);
   await pool.query("UPDATE echo_voice_projects SET selected_sample_id=$2,updated_at=now() WHERE id=$1 AND owner_id=$3",[projectId,sample.rows[0].id,req.userId]);
+  cloneReservationId=null;
   res.json({cloned:true,projectId,sampleId:sample.rows[0].id});
  }catch(error){
   req.log.error({err:error},"Premium voice cloning failed");
-  res.status(503).json({error:"VOICE_CLONING_UNAVAILABLE"});
+  if(!res.headersSent)res.status(503).json({error:"VOICE_CLONING_UNAVAILABLE"});
  }
 });
 
