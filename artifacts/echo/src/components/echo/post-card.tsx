@@ -27,6 +27,7 @@ interface Props {
 export function PostCard({ post, onCommentClick, eager }: Props) {
   const t = useFeedText();
   const language = useLanguage();
+  const collaborationLabels = ({"es":["Invitación a colaborar en esta publicación","Aceptar","Rechazar"],"en":["Invitation to collaborate on this post","Accept","Decline"],"pt":["Convite para colaborar nesta publicação","Aceitar","Recusar"],"fr":["Invitation à collaborer à cette publication","Accepter","Refuser"],"de":["Einladung zur Zusammenarbeit an diesem Beitrag","Annehmen","Ablehnen"],"it":["Invito a collaborare a questo post","Accetta","Rifiuta"],"ko":["이 게시물의 공동 작업 초대","수락","거절"],"ja":["この投稿へのコラボレーション招待","承認","辞退"],"zh":["邀请你共同发布此帖子","接受","拒绝"]} as Record<string, [string, string, string]>)[language] ?? ["Invitation to collaborate on this post","Accept","Decline"];
   const pollLabels = ({ es: ['votos', 'Finalizada'], en: ['votes', 'Closed'], pt: ['votos', 'Encerrada'], fr: ['votes', 'Terminée'], de: ['Stimmen', 'Beendet'], it: ['voti', 'Terminata'], ko: ['표', '종료됨'], ja: ['票', '終了'], zh: ['票', '已结束'] } as Record<string, [string, string]>)[language] ?? ['votes', 'Closed'];
   const { me, character, actions, state } = useSocial();
   const author = character(post.authorId);
@@ -101,8 +102,8 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
       )}
 
       {invitedMe && <div className="mx-4 my-3 rounded-xl border border-border bg-secondary/50 p-3 text-sm">
-        <p className="mb-2 font-medium">{t("Invitación a colaborar en esta publicación")}</p>
-        <div className="flex gap-2"><button type="button" onClick={() => actions.respondCollaboration(post.id, true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{t("Aceptar")}</button><button type="button" onClick={() => actions.respondCollaboration(post.id, false)} className="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold">{t("Rechazar")}</button></div>
+        <p className="mb-2 font-medium">{collaborationLabels[0]}</p>
+        <div className="flex gap-2"><button type="button" onClick={() => actions.respondCollaboration(post.id, true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{collaborationLabels[1]}</button><button type="button" onClick={() => actions.respondCollaboration(post.id, false)} className="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold">{collaborationLabels[2]}</button></div>
       </div>}
       {poll && <section className="mx-4 my-3 rounded-2xl border border-border bg-card p-4" data-testid={`post-poll-${post.id}`}>
         <h3 className="mb-3 text-sm font-semibold">{poll.question}</h3>
