@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS echo_group_member_preferences (owner_id text NOT NULL, universe_id text NOT NULL, group_id text NOT NULL, actor_id text NOT NULL, muted boolean NOT NULL DEFAULT false, archived boolean NOT NULL DEFAULT false, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(owner_id, universe_id, group_id, actor_id));
