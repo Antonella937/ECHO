@@ -65,3 +65,62 @@ export function canAccessGroup(group: GroupConversation, characterId: string): b
 export function canSendGroupMessage(group: GroupConversation, senderId: string): boolean {
   return canAccessGroup(group, senderId);
 }
+
+/** Immutable group operations; membership changes never rewrite historical messages. */
+export function renameGroup(group: GroupConversation, actorId: string, name: string, now: string): GroupConversation {
+  if (!canAccessGroup(group, actorId)) throw new Error('GROUP_ACCESS_DENIED');
+  const nextName = name.trim();
+  if (!nextName || nextName.length > 80) throw new Error('INVALID_GROUP_NAME');
+  return { ...group, name: nextName, updatedAt: now };
+}
+
+export function updateGroupAvatar(group: GroupConversation, actorId: string, avatar: string | null, now: string): GroupConversation {
+  if (!canAccessGroup(group, actorId)) throw new Error('GROUP_ACCESS_DENIED');
+  return { ...group, avatar, updatedAt: now };
+}
+
+export function addGroupParticipants(group: GroupConversation, actorId: string, selectedIds: string[], now: string): GroupConversation {
+  if (!canAccessGroup(group, actorId)) throw new Error('GROUP_ACCESS_DENIED');
+  const participantIds = [...new Set([...group.participantIds, ...selectedIds.filter(Boolean)])];
+  if (participantIds.length > 32) throw new Error('GROUP_PARTICIPANT_LIMIT');
+  return { ...group, participantIds, updatedAt: now };
+}
+
+export function leaveGroup(group: GroupConversation, actorId: string, now: string): GroupConversation {
+  if (!canAccessGroup(group, actorId)) throw new Error('GROUP_ACCESS_DENIED');
+  return { ...group, participantIds: group.participantIds.filter(id => id !== actorId), updatedAt: now };
+}
+
+export function makeGroupMessage(input: {
+  id: string;
+  group: GroupConversation;
+  senderId: string;
+  text: string;
+  now: string;
+  attachments?: GroupMessage['attachments'];
+  quoteMessageId?: string;
+}): GroupMessage {
+  if (!canSendGroupMessage(input.group, input.senderId)) throw new Error('GROUP_ACCESS_DENIED');
+  const text = input.text.trim();
+  if (!text && !input.attachments?.length) throw new Error('EMPTY_GROUP_MESSAGE');
+  if (text.length > 10000) throw new Error('GROUP_MESSAGE_TOO_LONG');
+  return {
+    id: input.id, groupId: input.group.id, senderId: input.senderId, text,
+    createdAt: input.now, readBy: [input.senderId],
+    ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+    ...(input.quoteMessageId ? { quoteMessageId: input.quoteMessageId } : {}),
+  };
+}
+
+export function markGroupMessagesRead(messages: GroupMessage[], group: GroupConversation, actorId: string): GroupMessage[] {
+  if (!canAccessGroup(group, actorId)) throw new Error('GROUP_ACCESS_DENIED');
+  return messages.map(message => message.groupId === group.id && !message.readBy.includes(actorId)
+    ? { ...message, readBy: [...message.readBy, actorId] }
+    : message);
+}
+
+export function groupUnreadCount(messages: GroupMessage[], group: GroupConversation, actorId: string): number {
+  if (!canAccessGroup(group, actorId)) return 0;
+  return messages.filter(message => message.groupId === group.id &&
+    message.senderId !== actorId && !message.readBy.includes(actorId)).length;
+}
