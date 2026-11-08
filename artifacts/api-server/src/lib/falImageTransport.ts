@@ -39,7 +39,18 @@ export async function requestFalImage(input: {
     }),
     signal: AbortSignal.timeout(120_000),
   });
-  if (!response.ok) throw Error(`FAL_IMAGE_HTTP_${response.status}`);
+  if (!response.ok) {
+    // Log only validation field locations and types; never log private images, prompts or provider text.
+    if (response.status === 422) {
+      const detail = await response.json().catch(() => null) as any;
+      const fields = Array.isArray(detail?.detail) ? detail.detail.slice(0, 8).map((e: any) => ({
+        field: Array.isArray(e?.loc) ? e.loc.filter((x: unknown) => typeof x === 'string' || typeof x === 'number').slice(0, 5).join('.') : 'unknown',
+        type: typeof e?.type === 'string' ? e.type.slice(0, 64) : 'unknown',
+      })) : [];
+      console.error('FAL_IMAGE_VALIDATION_FIELDS', JSON.stringify(fields));
+    }
+    throw Error(`FAL_IMAGE_HTTP_${response.status}`);
+  }
   if (Number(response.headers.get('content-length') || 0) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   const raw = await response.text();
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
