@@ -46,6 +46,7 @@ export interface Character {
   accountType?: 'personal' | 'band' | 'venue' | 'organization';
   verified?: boolean;
   archived?: boolean;
+  privateAccount?: boolean;
   /** Fictional base audience; actual relationships remain in follows. */
   displayMetrics?: { followers?: number | null; following?: number | null };
 }
@@ -170,6 +171,7 @@ export interface SocialState {
   characters: Character[];
   /** follower -> followed ids */
   follows: Record<CharacterId, CharacterId[]>;
+  followRequests?: Record<CharacterId, CharacterId[]>;
   posts: Post[];
   comments: Comment[];
   stories: Story[];
