@@ -33,7 +33,7 @@ export default function ProfilePage() {
   const [showMutualFollowers, setShowMutualFollowers] = useState(false);
   const [tab, setTab] = useState<'posts' | 'tagged'>('posts');
   const posts = useMemo(() => {
-    const own = state.posts.filter((p) => p.authorId === id).sort(byDateDesc);
+    const own = state.posts.filter((p) => p.authorId === id || p.collaboratorIds?.includes(id!)).sort(byDateDesc);
     const pinned = getOrderedPinnedPosts(state, id!).slice(0, 3);
     const pinnedIds = new Set(pinned.map(p => p.id));
     return [...pinned, ...own.filter(p => !pinnedIds.has(p.id))];
