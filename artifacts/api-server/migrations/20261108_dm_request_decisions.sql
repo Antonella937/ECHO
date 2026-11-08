@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS echo_dm_request_decisions (owner_id text NOT NULL, universe_id text NOT NULL, actor_id text NOT NULL, sender_id text NOT NULL, status text NOT NULL CHECK (status IN ('accepted','rejected','blocked')), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (owner_id, universe_id, actor_id, sender_id));
