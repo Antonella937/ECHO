@@ -108,42 +108,37 @@ function recentActorActivity(state: SocialState, characterId: string, now: Date)
   ].filter((time): time is number => time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS);
 }
 
+// Autonomous social outreach is limited to followed accounts. An existing DM
+// thread is an additional valid DM connection, even without a follow.
+function hasDmThread(state: SocialState, a: string, b: string) {
+  return state.messages.some(message =>
+    !message.hiddenForIds?.includes(a) &&
+    ((message.senderId === a && message.recipientId === b) ||
+      (message.senderId === b && message.recipientId === a)));
+}
+
 function availableTargets(state: SocialState, character: Character) {
-  const targets = new Set<string>();
-  for (const relationship of character.configuration?.relationships ?? []) {
-    if (relationship.targetId !== "owner" && relationship.targetId !== character.id) targets.add(relationship.targetId);
-  }
-  for (const message of state.messages) {
-    if (message.hiddenForIds?.includes(character.id)) continue;
-    if (message.senderId === character.id) targets.add(message.recipientId);
-    if (message.recipientId === character.id) targets.add(message.senderId);
-  }
-  return state.characters.filter((candidate) =>
-    candidate.id !== character.id && !candidate.archived && targets.has(candidate.id),
-  );
+  const following = new Set(state.follows[character.id] ?? []);
+  return state.characters.filter(candidate =>
+    candidate.id !== character.id && !candidate.archived &&
+    (following.has(candidate.id) || hasDmThread(state, character.id, candidate.id)));
 }
 
 function commentTarget(state: SocialState, character: Character, now: Date) {
-  const relationshipIds = new Set((character.configuration?.relationships ?? [])
-    .filter((item) => item.targetId !== "owner")
-    .map((item) => item.targetId));
+  const following = new Set(state.follows[character.id] ?? []);
   const posts = [...state.posts]
-    .filter((post) => post.commentsEnabled !== false &&
+    .filter(post => post.authorId !== character.id &&
+      following.has(post.authorId) && post.commentsEnabled !== false &&
       (asTime(post.createdAt) ?? 0) <= now.getTime() &&
       now.getTime() - (asTime(post.createdAt) ?? 0) < 30 * DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
   for (const post of posts) {
-    const relevant = post.authorId !== character.id && (
-      relationshipIds.has(post.authorId) ||
-      !!post.taggedAccountIds?.includes(character.id) ||
-      !!state.follows[character.id]?.includes(post.authorId));
-    if (!relevant) continue;
     const reply = [...state.comments]
-      .filter((item) => item.postId === post.id && item.authorId !== character.id && item.parentId === null &&
-        !state.comments.some((child) => child.parentId === item.id && child.authorId === character.id))
+      .filter(item => item.postId === post.id && item.authorId !== character.id && item.parentId === null &&
+        !state.comments.some(child => child.parentId === item.id && child.authorId === character.id))
       .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))[0];
     if (reply) return { post, comment: reply };
-    if (!state.comments.some((item) => item.postId === post.id && item.authorId === character.id)) {
+    if (!state.comments.some(item => item.postId === post.id && item.authorId === character.id)) {
       return { post, comment: undefined };
     }
   }
@@ -251,9 +246,8 @@ export function chooseAutonomyOpportunity(input: {
 
   const comment = commentTarget(state, character, now);
   const recipients = availableTargets(state, character);
-  const relationIds = new Set((config?.relationships ?? []).filter(item => item.targetId !== "owner").map(item => item.targetId));
-  const relevantAuthor = (authorId: string, tagged = false) =>
-    authorId !== character.id && (relationIds.has(authorId) || !!state.follows[character.id]?.includes(authorId) || tagged);
+  const following = new Set(state.follows[character.id] ?? []);
+  const relevantAuthor = (authorId: string) => authorId !== character.id && following.has(authorId);
   const recentTargetUsed = (situation: AutonomySituation, targetId: string) =>
     history.some(event => event.situation === situation && event.targetId === targetId);
   const recent30d = (value: Date | string) => {
@@ -261,19 +255,19 @@ export function chooseAutonomyOpportunity(input: {
     return time !== null && time <= now.getTime() && now.getTime() - time < 30 * DAY_MS;
   };
   const targetPost = [...state.posts].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
-    .find(post => recent30d(post.createdAt) && relevantAuthor(post.authorId, !!post.taggedAccountIds?.includes(character.id)) &&
+    .find(post => recent30d(post.createdAt) && relevantAuthor(post.authorId) &&
       !!post.caption?.trim() && !post.likes.includes(character.id) && !recentTargetUsed("like_post", post.id));
   const targetComment = [...state.comments].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => {
       const parent = state.posts.find(post => post.id === item.postId);
       return !!parent && item.authorId !== character.id && !!item.text?.trim() && recent30d(item.createdAt) &&
-        (relevantAuthor(parent.authorId, !!parent.taggedAccountIds?.includes(character.id)) || relationIds.has(item.authorId)) &&
+        relevantAuthor(parent.authorId) &&
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
   const targetStory = [...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => recent24h(item.createdAt) && item.authorId !== character.id && !!item.caption?.trim() &&
       item.seenBy.includes(character.id) &&
-      (relationIds.has(item.authorId) || !!state.follows[character.id]?.includes(item.authorId) || !!item.mentionedAccountIds?.includes(character.id)) &&
+      following.has(item.authorId) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
   const targetMessage = [...state.messages].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => item.recipientId === character.id && item.senderId !== character.id &&
@@ -333,7 +327,7 @@ export function chooseAutonomyOpportunity(input: {
       const relation = (id: string) => config?.relationships.find((item) => item.targetId === id)?.closeness ?? 0;
       return relation(b.id) - relation(a.id);
     })[0];
-    return { situation: "dm", recipientId: recipient.id, reasonCode: "OPPORTUNITY_SELECTED", reason: "A configured relationship or real conversation provides a valid recipient.", localHour: local.hour, timezone };
+    return { situation: "dm", recipientId: recipient.id, reasonCode: "OPPORTUNITY_SELECTED", reason: "A followed account or existing direct conversation provides a valid recipient.", localHour: local.hour, timezone };
   }
   if (selected.situation === "like_post" && targetPost) {
     return { situation: "like_post", postId: targetPost.id, reasonCode: "OPPORTUNITY_SELECTED",
