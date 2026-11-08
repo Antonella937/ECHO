@@ -23,6 +23,7 @@ export default function ScenesPage() {
   const [participants,setParticipants] = useState<string[]>([]);
   const [message,setMessage] = useState('');
   const [nextSpeaker,setNextSpeaker] = useState('');
+  const [autoReply,setAutoReply] = useState(false);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const characters = state.characters.filter(c => !c.archived && c.id !== me.id);
@@ -43,6 +44,22 @@ export default function ScenesPage() {
   const send = async (e:FormEvent) => {e.preventDefault();if(!selected||!message.trim())return;setBusy(true);setError('');
     try {await customFetch('/api/scenes/events',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,sceneId:selected,actorId:me.id,text:message.trim(),visibility:'participants',audienceIds:[]})});setMessage('');
       const r=await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(selected)}/events?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'});setEvents(r.events);
+      if(autoReply && active?.status==='active' && active.turnSettings?.mode!=='manual'){
+        const ai=active.participantIds.filter(id=>id!==me.id);
+        const turn=active.turnSettings;
+        const chosen=turn?.nextCharacterId && ai.includes(turn.nextCharacterId)?turn.nextCharacterId:
+          turn?.mode==='ordered' ? (turn.order??[]).filter(id=>ai.includes(id))[(turn.cursor??0)%Math.max(1,(turn.order??[]).filter(id=>ai.includes(id)).length)]:
+          ai.find(id=>id!==r.events.filter(ev=>ai.includes(ev.actorId)).at(-1)?.actorId)??ai[0];
+        if(chosen){
+          await customFetch(`/api/scenes/${encodeURIComponent(selected)}/reply`,{
+            method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({universeId,characterId:chosen})
+          });
+          const after=await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(selected)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,{method:'GET',responseType:'json'});
+          setEvents(after.events);
+          await refresh();
+        }
+      }
     }catch{setError(es?'No se pudo enviar.':'Could not send.')}finally{setBusy(false)}
   };
   const active=scenes.find(s=>s.sceneId===selected);
@@ -130,7 +147,7 @@ export default function ScenesPage() {
             {active.status!=='finished'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('finished')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Finalizar':'Finish'}</button>}
           </div>
         </div>
-      </details><div className="flex flex-wrap gap-2">
+      </details><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={autoReply} onChange={e=>setAutoReply(e.target.checked)}/>{es?'Respuesta automática después de mi mensaje (una por turno)':'Automatic reply after my message (one per turn)'}</label><div className="flex flex-wrap gap-2">
         {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {es?'Continuar escena':'Continue scene'}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
           className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
