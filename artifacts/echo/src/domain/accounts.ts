@@ -2,7 +2,7 @@ import type { Character, Post, Story, SocialState } from './types';
 import { characterConfig, sameCharacterValue, validateCharacterConfig } from './character-core';
 
 export type AccountInput = Pick<Character, 'name' | 'handle' | 'bio' | 'avatar'> &
-  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity' | 'privateAccount' | 'professionalCategory' | 'contactEmail' | 'website'>>;
+  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity' | 'privateAccount' | 'professionalCategory' | 'contactEmail' | 'website' | 'accountIdentity'>>;
 export const accountTypes = { personal: 'Personal / Personaje IA', artist: 'Artista / Creador', band: 'Banda / Proyecto musical', business: 'Negocio / Marca', venue: 'Lugar / Establecimiento', organization: 'Organización' } as const;
 const catalog = [
   ['pretty-violence', 'Pretty Violence', 'prettyviolence', 'band'],
@@ -43,6 +43,7 @@ export function validateAccount(input: AccountInput, state: SocialState, id?: st
   if (input.accountType && !Object.hasOwn(accountTypes, input.accountType)) throw Error('Tipo de cuenta inválido.');
   if ((input.professionalCategory ?? '').length > 80) throw Error('La categoría admite hasta 80 caracteres.');
   if ((input.contactEmail ?? '').length > 254 || (input.website ?? '').length > 500) throw Error('Los datos de contacto son demasiado largos.');
+  if (input.accountIdentity && Object.values(input.accountIdentity).some(v => v.length > 2500)) throw Error('La ficha de identidad admite hasta 2500 caracteres por campo.');
   validateMetrics(input.displayMetrics);
   if (input.identity) {
     const identity = input.identity;
@@ -85,6 +86,7 @@ export function accountFormValues(c: AccountInput): AccountInput {
   return { name: c.name, handle: c.handle, bio: c.bio, avatar: c.avatar,
     occupation: c.occupation ?? '', location: c.location ?? '', configuration: c.configuration, identity: c.identity,
     accountType: c.accountType ?? 'personal', verified: c.verified ?? false, privateAccount: c.privateAccount ?? false,
+    accountIdentity: c.accountIdentity ?? { description: '', voice: '', facts: '' },
     professionalCategory: c.professionalCategory ?? '', contactEmail: c.contactEmail ?? '', website: c.website ?? '',
     displayMetrics: { followers: c.displayMetrics?.followers ?? null, following: c.displayMetrics?.following ?? null } };
 }
@@ -119,6 +121,7 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       accountType: formField(now.accountType, wanted.accountType, before.accountType),
       verified: formField(now.verified, wanted.verified, before.verified),
       privateAccount: formField(now.privateAccount, wanted.privateAccount, before.privateAccount),
+      accountIdentity: configField(now.accountIdentity, wanted.accountIdentity, before.accountIdentity) as Character['accountIdentity'],
       professionalCategory: formField(now.professionalCategory, wanted.professionalCategory, before.professionalCategory),
       contactEmail: formField(now.contactEmail, wanted.contactEmail, before.contactEmail),
       website: formField(now.website, wanted.website, before.website),
