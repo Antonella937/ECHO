@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { BASIC_VOICES, basicVoicePreviewPath, type BasicVoiceId } from '@/lib/basic-voices';
 
-/** Free, pre-generated sample catalogue. This does not enable live speech synthesis. */
+/** Preview catalogue for the selectable Kokoro voices. */
 export function BasicVoiceCatalogue({ selectedVoiceId, onSelect }: { selectedVoiceId?: string; onSelect(id: BasicVoiceId | undefined): void }) {
   const t = useCharacterDetailsText();
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -22,7 +22,7 @@ export function BasicVoiceCatalogue({ selectedVoiceId, onSelect }: { selectedVoi
   };
   return <section className="mt-6 rounded-2xl border border-border bg-card/60 p-4" data-testid="basic-voice-catalogue">
     <h3 className="text-sm font-semibold">{t("Catálogo de voces · muestras gratuitas")}</h3>
-    <p className="mt-1 text-xs text-muted-foreground">{t("Escuchá las diez voces en inglés. Son muestras grabadas; los mensajes hablados todavía no están habilitados.")}</p>
+    <p className="mt-1 text-xs text-muted-foreground">{t("Escuchá las diez voces disponibles y elegí la que querés usar. Las muestras no consumen créditos.")}</p>
     <p className="mt-3 text-xs font-medium" data-testid="selected-basic-voice">{selectedVoiceId ? `${t('Voz elegida:')} ${BASIC_VOICES.find(v => v.id === selectedVoiceId)?.label ?? t('Desconocida')}` : t('Todavía no elegiste una voz.')}</p>
     <div className="mt-3 grid grid-cols-2 gap-2">
       {BASIC_VOICES.map(voice => <div key={voice.id} className={`flex min-w-0 flex-col items-start justify-between gap-3 rounded-2xl border p-3 ${selectedVoiceId === voice.id ? "border-primary bg-primary/10" : "border-border bg-secondary/40"}`}>
