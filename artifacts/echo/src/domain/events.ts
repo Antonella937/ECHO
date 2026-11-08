@@ -71,8 +71,18 @@ export function applyEvent(state: SocialState, ev: SocialEvent): SocialState {
 }
 function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
   switch (ev.type) {
-    case 'post.created':
-      return { ...state, posts: [ev.post, ...state.posts] };
+    case 'post.created': {
+      let notifications = state.notifications;
+      for (const recipientId of new Set(ev.post.collaborationInvites ?? [])) {
+        if (recipientId === ev.post.authorId || !state.characters.some(c => c.id === recipientId && !c.archived)) continue;
+        notifications = notify(notifications, {
+          recipientId, actorId: ev.post.authorId, kind: 'collaboration_invite',
+          postId: ev.post.id, commentId: null, storyId: null,
+          excerpt: clip(ev.post.caption || 'Invitación a colaborar', 90), createdAt: ev.at,
+        });
+      }
+      return { ...state, posts: [ev.post, ...state.posts], notifications };
+    }
 
     case 'post.poll.voted': {
       const post = state.posts.find(p => p.id === ev.postId);
@@ -84,7 +94,11 @@ function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
     case 'post.collaboration.responded': {
       const post = state.posts.find(p => p.id === ev.postId);
       if (!post || !(post.collaborationInvites ?? []).includes(ev.actorId)) return state;
-      return { ...state, posts: state.posts.map(p => p.id !== ev.postId ? p : ({
+      const notifications = ev.accept ? notify(state.notifications, {
+        recipientId: post.authorId, actorId: ev.actorId, kind: 'collaboration_accepted',
+        postId: post.id, commentId: null, storyId: null, excerpt: clip(post.caption || 'Colaboración aceptada', 90), createdAt: ev.at,
+      }) : state.notifications;
+      return { ...state, notifications, posts: state.posts.map(p => p.id !== ev.postId ? p : ({
         ...p, collaborationInvites: (p.collaborationInvites ?? []).filter(id => id !== ev.actorId),
         collaboratorIds: ev.accept ? [...new Set([...(p.collaboratorIds ?? []), ev.actorId])] : (p.collaboratorIds ?? []),
       })) };
