@@ -1,3 +1,4 @@
+import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
 import type { CharacterDecisionInput, SocialState } from '@workspace/api-zod';
 import { createHash } from 'node:crypto';
 import { EngineError, sections } from './contracts';
@@ -37,8 +38,8 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       }
       break;
     case 'dm':
-      rejectUnexpected('recipientId');
-      if (!recipient || recipient.id === actor.id) throw new EngineError('INVALID_DM_TARGET');
+      rejectUnexpected('recipientId', 'storyId');
+      if (!recipient || recipient.id === actor.id || (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
       break;
     case 'like_post':
       rejectUnexpected('postId');
