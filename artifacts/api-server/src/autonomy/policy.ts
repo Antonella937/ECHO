@@ -215,6 +215,24 @@ export function chooseAutonomyOpportunity(input: {
       localHour: local.hour, timezone };
   }
 
+  // A story reply is a private DM, not a public story reaction. Keep it in the
+  // existing DM lane so bilateral permissions and delivery limits still apply.
+  if (input.lane === "dm" && !unanswered && random() < 0.18) {
+    const following = new Set(state.follows[character.id] ?? []);
+    const candidate = [...state.stories].reverse().find(story =>
+      story.authorId !== character.id && following.has(story.authorId) &&
+      canCharacterViewCloseFriendsStory(state, story, character.id) &&
+      (asTime(story.createdAt) ?? 0) > now.getTime() - DAY_MS &&
+      (asTime(story.createdAt) ?? 0) <= now.getTime() &&
+      !state.messages.some(message => message.senderId === character.id && message.storyId === story.id) &&
+      !history.some(item => item.situation === "dm" && item.targetId === story.authorId));
+    if (candidate) {
+      return { situation: "dm", recipientId: candidate.authorId, storyId: candidate.id,
+        reasonCode: "OPPORTUNITY_SELECTED",
+        reason: "A visible story from a followed account invites an occasional private reply.",
+        localHour: local.hour, timezone };
+    }
+  }
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
   if (latestActivity > 0 && now.getTime() - latestActivity < cooldownMs) {
     return { situation: null, reasonCode: "COOLDOWN", reason: "Minimum cooldown has not elapsed.", localHour: local.hour, timezone };
