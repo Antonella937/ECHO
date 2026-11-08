@@ -37,6 +37,9 @@ export interface SocialActions {
   deleteAccount(id: string): void;
   updatePostMetrics(id: string, metrics: PostMetrics, expected?: PostMetrics): void;
   updateStoryMetrics(id: string, metrics: StoryMetrics, expected?: StoryMetrics): void;
+  toggleFollow(targetId: string): void;
+  respondFollowRequest(requesterId: string, accept: boolean): void;
+  setPrivateAccount(accountId: string, value: boolean): void;
   toggleLike(postId: string): void;
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
@@ -195,6 +198,30 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       updateStoryMetrics(id, metrics, expected) {
         coordinator.current?.edit(s => editStoryMetrics(s, id, myId(), metrics, expected));
+      },
+      toggleFollow(targetId) {
+        coordinator.current?.edit(s => {
+          const actor = s.currentCharacterId;
+          const target = s.characters.find(c => c.id === targetId && !c.archived);
+          if (!target || actor === targetId) return s;
+          const followed = s.follows[actor] ?? [];
+          const pending = s.followRequests?.[targetId] ?? [];
+          if (followed.includes(targetId)) return { ...s, follows: { ...s.follows, [actor]: followed.filter(id => id !== targetId) } };
+          if (pending.includes(actor)) return { ...s, followRequests: { ...s.followRequests, [targetId]: pending.filter(id => id !== actor) } };
+          if (target.privateAccount) return { ...s, followRequests: { ...s.followRequests, [targetId]: [...pending, actor] }, notifications: [{ id: uid('n'), recipientId: targetId, actorId: actor, kind: 'follow', postId: null, commentId: null, storyId: null, excerpt: 'follow_request', createdAt: new Date().toISOString(), read: false }, ...s.notifications] };
+          return { ...s, follows: { ...s.follows, [actor]: [...followed, targetId] }, notifications: [{ id: uid('n'), recipientId: targetId, actorId: actor, kind: 'follow', postId: null, commentId: null, storyId: null, excerpt: '', createdAt: new Date().toISOString(), read: false }, ...s.notifications] };
+        });
+      },
+      respondFollowRequest(requesterId, accept) {
+        coordinator.current?.edit(s => {
+          const target = s.currentCharacterId;
+          const pending = s.followRequests?.[target] ?? [];
+          if (!pending.includes(requesterId)) return s;
+          return { ...s, followRequests: { ...s.followRequests, [target]: pending.filter(id => id !== requesterId) }, ...(accept ? { follows: { ...s.follows, [requesterId]: Array.from(new Set([...(s.follows[requesterId] ?? []), target])) } } : {}) };
+        });
+      },
+      setPrivateAccount(accountId, value) {
+        coordinator.current?.edit(s => ({ ...s, characters: s.characters.map(c => c.id === accountId ? { ...c, privateAccount: value } : c) }));
       },
       toggleLike(postId) {
         const p = cur().posts.find((x) => x.id === postId);
