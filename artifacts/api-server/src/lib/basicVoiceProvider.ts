@@ -4,6 +4,10 @@
  * The Kokoro-compatible transport preserves the existing production contract.
  * Future async providers must implement this boundary with separate adapters.
  */
+import { synthesizeDeapiMp3 } from "./deapiSpeech";
+import { mp3DurationSeconds } from "./mp3Duration";
+
+export type BasicVoiceAudio = { bytes: Buffer; mimeType: "audio/wav" | "audio/mpeg"; seconds: number };
 export type BasicVoiceRequest = {
   text: string;
   voice: string;
@@ -30,8 +34,28 @@ function providerEndpoint(): URL {
 }
 
 export function basicVoiceProviderReady(): boolean {
+  const provider = process.env.ECHO_BASIC_TTS_PROVIDER || "kokoro";
+  if (provider === "deapi") return !!process.env.ECHO_DEAPI_TTS_KEY;
+  if (provider !== "kokoro") return false;
   try { providerEndpoint(); return true; }
   catch { return false; }
+}
+
+/** Explicit opt-in adapter. Legacy synthesizeBasicVoice keeps its WAV-only contract. */
+export async function synthesizeBasicVoiceAudio(request: BasicVoiceRequest): Promise<BasicVoiceAudio> {
+  const provider = process.env.ECHO_BASIC_TTS_PROVIDER || "kokoro";
+  if (provider === "deapi") {
+    const bytes = await synthesizeDeapiMp3(request);
+    const seconds = mp3DurationSeconds(bytes);
+    if (seconds === null || seconds <= 0 || seconds > 30) {
+      throw new BasicVoiceProviderError("VOICE_ENGINE_INVALID_AUDIO");
+    }
+    return { bytes, mimeType: "audio/mpeg", seconds };
+  }
+  if (provider !== "kokoro") throw new BasicVoiceProviderError("VOICE_PROVIDER_NOT_IMPLEMENTED");
+  const bytes = await synthesizeBasicVoice(request);
+  // The existing route validates WAV duration; leave the legacy contract unchanged.
+  return { bytes, mimeType: "audio/wav", seconds: 0 };
 }
 
 /**
