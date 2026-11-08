@@ -1,4 +1,5 @@
 import { MusicClipPlayer } from './music-clip-player';
+import { useLanguage } from '@/lib/i18n';
 import { useFeedText } from '@/lib/feed-translations';
 import { useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
@@ -25,6 +26,8 @@ interface Props {
 
 export function PostCard({ post, onCommentClick, eager }: Props) {
   const t = useFeedText();
+  const language = useLanguage();
+  const pollLabels = ({ es: ['votos', 'Finalizada'], en: ['votes', 'Closed'], pt: ['votos', 'Encerrada'], fr: ['votes', 'Terminée'], de: ['Stimmen', 'Beendet'], it: ['voti', 'Terminata'], ko: ['표', '종료됨'], ja: ['票', '終了'], zh: ['票', '已结束'] } as Record<string, [string, string]>)[language] ?? ['votes', 'Closed'];
   const { me, character, actions, state } = useSocial();
   const author = character(post.authorId);
   const [sheet, setSheet] = useState<null | 'comments' | 'likers' | 'share' | 'options'>(null);
@@ -113,7 +116,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
             <span className="relative flex justify-between gap-2 px-3 py-3"><span className={myVote === option.id ? 'font-semibold' : ''}>{option.text}</span>{myVote && <span className="font-semibold">{percent}%</span>}</span>
           </button>;
         })}</div>
-        <p className="mt-2 text-xs text-muted-foreground">{voteCount} {t("votos")}{pollClosed ? ` · ${t("Finalizada")}` : ''}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{voteCount} {pollLabels[0]}{pollClosed ? ` · ${pollLabels[1]}` : ''}</p>
       </section>}
       {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact /></div>}
       <div className="flex items-center px-2.5 pt-2">
