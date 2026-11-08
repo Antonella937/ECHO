@@ -98,7 +98,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   },[characterId,universeId]);
   useEffect(()=>{void loadReferences().catch(()=>{});void loadProject().catch(()=>{});},[characterId,universeId]);
   const saveDraft=async()=>{
-    if(!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent)))return;
+    if(!characterId||saving||(mode==='prompt'&&(prompt.trim().length<20||prompt.length>1000))||(mode==='reference'&&(!file||!consent)))return;
     setSaving(true);setError('');setSaved(false);
     try {
       if(mode==='reference' && file){
@@ -135,7 +135,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     </div>
     {mode === 'prompt' ? <>
       <label htmlFor="echo-voice-prompt" className="block text-sm font-medium">{labels[4]}</label>
-      <textarea id="echo-voice-prompt" rows={4} maxLength={1500} value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={labels[5]} className="w-full resize-y rounded-xl border border-border bg-background p-3 text-base"/>
+      <textarea id="echo-voice-prompt" rows={4} maxLength={1000} value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={labels[5]} className="w-full resize-y rounded-xl border border-border bg-background p-3 text-base"/>
       <div className="grid grid-cols-2 gap-3">
         <label className="space-y-1 text-xs">{labels[6]}<select value={voiceLanguage} onChange={e => setVoiceLanguage(e.target.value)} className="min-h-11 w-full rounded-xl border border-border bg-background px-2 text-base"><option value="en">English</option><option value="es">Español</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="zh">中文</option></select></label>
         <label className="space-y-1 text-xs">{labels[7]}<select value={count} onChange={e => setCount(Number(e.target.value))} className="min-h-11 w-full rounded-xl border border-border bg-background px-2 text-base"><option value={2}>2</option><option value={3}>3</option></select></label>
