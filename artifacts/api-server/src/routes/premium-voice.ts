@@ -315,7 +315,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
  if(!elevenLabsCreationAllowed(req.userId!)){res.status(503).json({error:"VOICE_CREATION_NOT_ENABLED"});return;}
  const parsed=key.safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT",charged:false});return;}
- const availability=elevenLabsVoiceStatus();
+ const availability=elevenLabsVoiceStatus(req.userId!);
  if(!availability.generationAvailable){res.status(503).json({error:availability.reason,charged:false});return;}
  try {
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}
