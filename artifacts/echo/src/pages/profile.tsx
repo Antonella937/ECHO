@@ -53,6 +53,7 @@ export default function ProfilePage() {
   const isRequested = (state.followRequests?.[person.id] ?? []).includes(me.id);
   const canSeeContent = isMe || !person.privateAccount || isFollowing;
   const pendingRequests = state.followRequests?.[me.id] ?? [];
+  const pendingCollaborations = state.posts.filter(p => p.collaborationInvites?.includes(me.id));
   const stories = state.stories.filter((s) => s.authorId === person.id && isStoryActive(s) && canViewStory(s, me.id, state));
   const unseen = !isMe && stories.some((s) => !s.seenBy.includes(me.id));
   const myFollowing = new Set(state.follows[me.id] ?? []);
@@ -117,6 +118,14 @@ export default function ProfilePage() {
           </p>}
         </div>
 
+        {isMe && pendingCollaborations.length > 0 && <section className="mt-4 space-y-2" data-testid="pending-collaborations">
+          <h3 className="text-sm font-semibold">{t('Invitaciones a colaborar')} ({pendingCollaborations.length})</h3>
+          {pendingCollaborations.map(post => <div key={post.id} className="flex items-center gap-2 rounded-xl border border-border p-3 text-sm">
+            <Link href={`/p/${post.id}`} className="min-w-0 flex-1 truncate">@{character(post.authorId)?.handle ?? post.authorId} · {post.caption || t('Publicación')}</Link>
+            <button type="button" onClick={() => actions.respondCollaboration(post.id, true)} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">{t('Aceptar')}</button>
+            <button type="button" onClick={() => actions.respondCollaboration(post.id, false)} className="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold">{t('Rechazar')}</button>
+          </div>)}
+        </section>}
         {isMe && pendingRequests.length > 0 && <div className="mt-4 space-y-2">{pendingRequests.map(requesterId => { const requester = character(requesterId); return requester && <div key={requesterId} className="flex items-center gap-2 rounded-xl border border-border p-2 text-sm"><CharacterAvatar character={requester} size={32} /><span className="min-w-0 flex-1 truncate">@{requester.handle}</span><button className="rounded-lg bg-primary px-2 py-2 text-primary-foreground" onClick={() => actions.respondFollowRequest(requesterId, true)}>{t('Aceptar')}</button><button className="rounded-lg bg-secondary px-2 py-2" onClick={() => actions.respondFollowRequest(requesterId, false)}>{t('Rechazar')}</button></div>; })}</div>}
         {isMe ? (
           <div className="mt-5 grid grid-cols-2 gap-2">
