@@ -14,6 +14,7 @@ type Entitlements = {
 };
 
 type CreditWallet = {
+  history: {kind:"photo"|"voice";bucket:"monthly"|"reward"|"purchased";amount:number;event_key:string;created_at:string}[];
   balances: { photo: { monthly: number; reward: number; purchased: number }; voice: { monthly: number; reward: number; purchased: number } };
   dailyReward: { available: boolean; claimedToday: boolean; streak: number; photoCredits: number; voiceCredits: number; nextResetAt: string };
 };
@@ -79,6 +80,11 @@ export function PlanAndQuotaSettings() {
           <button type="button" onClick={claimReward} disabled={!wallet.dailyReward.available || claiming} className="mt-3 min-h-11 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{claiming ? t("Reclamando…") : wallet.dailyReward.claimedToday ? t("Recompensa reclamada") : t("Abrir regalo diario")}</button>
           {claimMessage && <p role="status" className="mt-2 text-xs">{claimMessage}</p>}
         </div>
+        <details className="mt-3 rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-xs font-semibold">{t("Historial de créditos")}</summary>
+          {wallet.history.length === 0 ? <p className="mt-2 text-xs text-muted-foreground">{t("Todavía no hay movimientos.")}</p> :
+            <ul className="mt-2 space-y-2">{wallet.history.slice(0,20).map((item,i) => <li key={item.event_key + i} className="flex justify-between gap-2 border-b border-border/50 py-1 text-xs"><span>{item.kind === "photo" ? "Photo" : "Voice"} · {item.bucket === "reward" ? t("Regalo") : item.bucket === "monthly" ? t("Mensual") : t("Compra")}</span><span className={item.amount > 0 ? "font-semibold text-primary" : "font-semibold"}>{item.amount > 0 ? "+" : ""}{item.amount}</span></li>)}</ul>}
+        </details>
       </> : <p className="mt-2 text-xs text-muted-foreground">{walletError ? t("El monedero no está disponible por ahora.") : t("Cargando créditos…")}</p>}
     </div>
     <div className="mt-3 grid grid-cols-2 gap-3">
