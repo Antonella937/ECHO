@@ -49,7 +49,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const loadProject=async()=>{
     if(!characterId)return;
     const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string;provider?:string;providerVoiceId?:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
-    setGenerationAvailable(data.generationAvailable);setSamples(data.samples);setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
+    setGenerationAvailable(data.generationAvailable);setSamples(data.samples.filter(s=>s.provider!=='elevenlabs_catalog'));setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
     const selected=data.samples.find(s=>s.id===data.project?.selectedSampleId) as {provider?:string;providerVoiceId?:string}|undefined;
     setCatalogueSelected(selected?.provider==='elevenlabs_catalog'?selected.providerVoiceId??null:null);
   };
