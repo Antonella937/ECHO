@@ -112,4 +112,39 @@ router.post("/group-dms/:groupId/leave", async (req, res) => {
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ left: true });
 });
+const addMembersBody = scope.extend({ participantIds: z.array(id).min(1).max(31) });
+router.post("/group-dms/:groupId/participants", async (req, res) => {
+  const parsed = addMembersBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_PARTICIPANTS" }); return; }
+  const { universeId, actorId, participantIds } = parsed.data;
+  const characters = await getUniverse(req.userId!, universeId, actorId);
+  if (!characters) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  if (participantIds.some(member => !characters.some(c => c.id === member && c.archived !== true))) {
+    res.status(422).json({ error: "UNKNOWN_PARTICIPANT" }); return;
+  }
+  const groupId = String(req.params.groupId);
+  const current = await db.execute(sql`SELECT participant_ids FROM echo_group_conversations
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}
+    AND participant_ids ? ${actorId} LIMIT 1`);
+  if (!current.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  const merged = [...new Set([...asArray(current.rows[0].participant_ids), ...participantIds])];
+  if (merged.length > 32) { res.status(422).json({ error: "GROUP_PARTICIPANT_LIMIT" }); return; }
+  const result = await db.execute(sql`UPDATE echo_group_conversations SET participant_ids = ${JSON.stringify(merged)}::jsonb, updated_at = now()
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}
+    AND participant_ids ? ${actorId} RETURNING participant_ids`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ participantIds: result.rows[0].participant_ids });
+});
+const avatarBody = scope.extend({ avatar: z.string().url().max(2048).nullable() });
+router.patch("/group-dms/:groupId/avatar", async (req, res) => {
+  const parsed = avatarBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_AVATAR" }); return; }
+  const { universeId, actorId, avatar } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`UPDATE echo_group_conversations SET avatar = ${avatar}, updated_at = now()
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
+    AND participant_ids ? ${actorId} RETURNING avatar`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ avatar: result.rows[0].avatar });
+});
 export default router;
