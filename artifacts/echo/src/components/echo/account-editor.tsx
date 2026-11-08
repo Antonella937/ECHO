@@ -35,6 +35,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
   const [avatar, setAvatar] = useState('asset:account-default');
   const [type, setType] = useState<AccountType>('personal');
   const [verified, setVerified] = useState(false);
+  const [privateAccount, setPrivateAccount] = useState(false);
   const [followers, setFollowers] = useState('');
   const [following, setFollowing] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -55,6 +56,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setAvatar(account?.avatar ?? 'asset:account-default');
     setType(account?.accountType ?? 'personal');
     setVerified(account?.verified ?? false);
+    setPrivateAccount(account?.privateAccount ?? false);
     setFollowers(account?.displayMetrics?.followers?.toString() ?? '');
     setFollowing(account?.displayMetrics?.following?.toString() ?? '');
     setError(null);
@@ -74,7 +76,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setError(null);
     try {
       const input: AccountInput = {
-        name, handle: handle.toLowerCase(), bio, avatar, accountType: type, verified,
+        name, handle: handle.toLowerCase(), bio, avatar, accountType: type, verified, privateAccount,
         displayMetrics: { followers: parseBase(followers), following: parseBase(following) },
       };
       if (isNew) {
@@ -159,6 +161,10 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
           <input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} className="h-5 w-5 accent-[hsl(var(--primary))]" data-testid="checkbox-account-verified" />
         </label>
 
+        <label className="mt-4 flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border px-4">
+          <span className="text-sm">{t("Cuenta privada")}</span>
+          <input type="checkbox" checked={privateAccount} onChange={(e) => setPrivateAccount(e.target.checked)} className="h-5 w-5 accent-[hsl(var(--primary))]" data-testid="checkbox-account-private" />
+        </label>
         <div className="mt-6 rounded-2xl bg-accent/30 p-3 text-[13px] leading-relaxed text-muted-foreground">
           <b className="text-foreground">{t("Base visual")}</b>: cifra ficticia que se suma a los seguimientos reales del universo. Nunca crea seguidores. Déjala vacía para usar solo la actividad real.
         </div>
