@@ -136,7 +136,7 @@ router.post("/group-dms/:groupId/participants", async (req, res) => {
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ participantIds: result.rows[0].participant_ids });
 });
-const avatarBody = scope.extend({ avatar: z.string().url().max(2048).nullable() });
+const avatarBody = scope.extend({ avatar: z.string().min(1).max(2048).refine(v => v.startsWith('https://') || !v.includes('://'), 'INVALID_AVATAR_PATH').nullable() });
 router.patch("/group-dms/:groupId/avatar", async (req, res) => {
   const parsed = avatarBody.safeParse(req.body);
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_AVATAR" }); return; }
