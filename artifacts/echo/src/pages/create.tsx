@@ -47,6 +47,9 @@ export default function CreatePage() {
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [tagged, setTagged] = useState<string[]>([]);
   const [collaborators, setCollaborators] = useState<string[]>([]);
+  const [pollEnabled, setPollEnabled] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
   const [mentioned, setMentioned] = useState<string[]>([]);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [musicTitle, setMusicTitle] = useState('');
@@ -218,7 +221,11 @@ export default function CreatePage() {
         return;
       }
       validatePostMedia(items);
-      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), ...(collaborators.length ? { collaborationInvites: collaborators } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
+      if (pollEnabled && (!pollQuestion.trim() || pollOptions.filter(v => v.trim()).length < 2 || pollOptions.some(v => !v.trim()))) {
+        setError(t('Completá la pregunta y al menos dos opciones.')); return;
+      }
+      const poll = pollEnabled ? { question: pollQuestion.trim().slice(0, 200), options: pollOptions.map((text, i) => ({ id: `option_${i}`, text: text.trim().slice(0, 100) })), votes: {} as Record<string, string> } : undefined;
+      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), ...(collaborators.length ? { collaborationInvites: collaborators } : {}), ...(poll ? { poll } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
       const cover = items.find((m) => m.type === 'image');
       if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
       toast({ title: t('Publicado'), description: `${t('Como')} ${me.name}` });
@@ -435,6 +442,14 @@ export default function CreatePage() {
             <div className="mt-3"><AccountMultiPicker value={collaborators} onChange={setCollaborators} label={t("Invitar colaboradores")} excludeId={me.id} max={10} testId="picker-post-collaborators" />
               <p className="mt-1 text-xs text-muted-foreground">{t("La publicación aparecerá en sus perfiles cuando acepten.")}</p>
             </div>
+            <section className="mt-3 rounded-2xl border border-border p-3">
+              <label className="flex items-center justify-between gap-3 text-sm font-medium">{t("Agregar encuesta")}<Switch checked={pollEnabled} onCheckedChange={setPollEnabled} /></label>
+              {pollEnabled && <div className="mt-3 grid gap-2">
+                <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value.slice(0, 200))} maxLength={200} placeholder={t("Pregunta")} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />
+                {pollOptions.map((option, i) => <input key={i} value={option} onChange={e => setPollOptions(old => old.map((v, j) => i === j ? e.target.value.slice(0, 100) : v))} maxLength={100} placeholder={`${t("Opción")} ${i + 1}`} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />)}
+                <div className="flex gap-2">{pollOptions.length < 4 && <button type="button" onClick={() => setPollOptions(old => [...old, ''])} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t("Agregar opción")}</button>}{pollOptions.length > 2 && <button type="button" onClick={() => setPollOptions(old => old.slice(0, -1))} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t("Quitar opción")}</button>}</div>
+              </div>}
+            </section>
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
               <span className="block text-sm font-medium">{t("Permitir comentarios")}</span>
               <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} data-testid="switch-comments-enabled" />
