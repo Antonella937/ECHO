@@ -9,7 +9,7 @@ import { FAL_TEXT_IMAGE_MODEL } from './falTextImageTransport';
 export async function probeFalImagePricing(apiKey: string, fetchImpl: typeof fetch = fetch) {
   if (!apiKey.trim()) throw Error('FAL_KEY_MISSING');
   const url = new URL('https://api.fal.ai/v1/models/pricing');
-  url.searchParams.set('endpoint_id', [FAL_IMAGE_MODEL, FAL_TEXT_IMAGE_MODEL].join(','));
+  // Query the pricing catalog and validate each model independently.
   const response = await fetchImpl(url.toString(), {
     method: 'GET',
     headers: { Authorization: `Key ${apiKey}`, Accept: 'application/json' },
