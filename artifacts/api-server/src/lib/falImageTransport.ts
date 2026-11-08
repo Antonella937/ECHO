@@ -42,7 +42,8 @@ export async function requestFalImage(input: {
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   let payload: any;
   try { payload = JSON.parse(raw); } catch { throw Error('FAL_IMAGE_INVALID_JSON'); }
-  return parseFalImagePayload(payload);
+  parseFalImagePayload(payload);
+  throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
 
 }
 
