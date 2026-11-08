@@ -8,7 +8,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { SaveUniverseBody } from "@workspace/api-zod";
 import { resolveEchoPlan } from "../lib/entitlements";
-import { elevenLabsVoiceStatus, elevenLabsHeaders } from "../lib/elevenLabsVoice";
+import { elevenLabsVoiceStatus, elevenLabsHeaders, elevenLabsCreationAllowed } from "../lib/elevenLabsVoice";
 
 const router: IRouter = Router();
 router.use("/voices/premium", requireAuth, (_req,res,next) => {res.setHeader("Cache-Control","private, no-store");next();});
@@ -99,7 +99,7 @@ router.get("/voices/premium/projects",async(req,res)=>{
   FROM echo_voice_projects WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3`,[req.userId,parsed.data.universeId,parsed.data.characterId]);
   const project=result.rows[0]??null;
   const samples=project?(await pool.query(`SELECT id,status,provider,provider_sample_id AS "providerVoiceId",audio_object_path AS "audioObjectPath" FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 ORDER BY created_at,id`,[project.id,req.userId])).rows:[];
-  res.json({project,samples,generationAvailable:elevenLabsVoiceStatus().generationAvailable,provider:elevenLabsVoiceStatus().provider});
+  res.json({project,samples,generationAvailable:elevenLabsVoiceStatus(req.userId!).generationAvailable,provider:elevenLabsVoiceStatus().provider});
  }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
 });
 router.put("/voices/premium/projects",async(req,res)=>{
@@ -116,7 +116,7 @@ router.put("/voices/premium/projects",async(req,res)=>{
   ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET mode=EXCLUDED.mode,prompt=EXCLUDED.prompt,language=EXCLUDED.language,
   variant_count=EXCLUDED.variant_count,consent_confirmed=EXCLUDED.consent_confirmed,updated_at=now()
   RETURNING id,status`,[req.userId,data.universeId,data.characterId,data.mode,data.prompt,data.language,data.variantCount,data.consentConfirmed]);
-  res.json({project:result.rows[0],generationAvailable:elevenLabsVoiceStatus().generationAvailable});
+  res.json({project:result.rows[0],generationAvailable:elevenLabsVoiceStatus(req.userId!).generationAvailable});
  }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
 });
 
@@ -223,11 +223,12 @@ router.delete("/voices/premium/references/:id",async(req,res)=>{
  * reference recording. The browser never receives the provider API key.
  */
 router.post("/voices/premium/clone",requireAuth,async(req,res)=>{
+ if(!elevenLabsCreationAllowed(req.userId!)){res.status(503).json({error:"VOICE_CREATION_NOT_ENABLED"});return;}
  const parsed=key.extend({objectPath:z.string().regex(/^voice-studio\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i),consentConfirmed:z.literal(true)}).strict().safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_CLONE_REQUEST"});return;}
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
-  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  if(!elevenLabsVoiceStatus(req.userId!).generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
   const {universeId,characterId,objectPath}=parsed.data;
   if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
   const reference=await pool.query("SELECT content_type FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND object_path=$4 AND status='ready'",[req.userId,universeId,characterId,objectPath]);
@@ -269,6 +270,7 @@ router.post("/voices/premium/clone",requireAuth,async(req,res)=>{
 });
 
 router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
+ if(!elevenLabsCreationAllowed(req.userId!)){res.status(503).json({error:"VOICE_CREATION_NOT_ENABLED"});return;}
  const parsed=key.safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT",charged:false});return;}
  const availability=elevenLabsVoiceStatus();
@@ -351,7 +353,8 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
  * Voice design previews remain a separate provider-cost flow.
  */
 router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
- const parsed=key.extend({text:z.string().trim().min(1).max(180)}).strict().safeParse(req.body);
+ if(!elevenLabsVoiceStatus(req.userId!).generationAvailable){res.status(503).json({error:"VOICE_TEST_NOT_ENABLED"});return;}
+ const parsed=key.extend({text:z.string().trim().min(1).max(100)}).strict().safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_REQUEST"});return;}
  const {universeId,characterId,text}=parsed.data;
  let operation:string|null=null;
@@ -366,7 +369,23 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
    [req.userId,universeId,characterId]);
   const voiceId=selected.rows[0]?.provider_sample_id;
   if(!voiceId || !/^[a-zA-Z0-9_-]{10,128}$/.test(voiceId)){res.status(409).json({error:"CUSTOM_VOICE_NOT_SELECTED"});return;}
-  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  if(!elevenLabsVoiceStatus(req.userId!).generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  // A bounded one-off production test, not an unmetered synthesis endpoint.
+  const gate=await pool.connect();
+  let testId:string;
+  try{
+    await gate.query("BEGIN");
+    await gate.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext('elevenlabs-one-off-test'))",[req.userId]);
+    const previous=await gate.query(`SELECT count(*)::int AS count FROM echo_voice_usage
+      WHERE owner_id=$1 AND message_id LIKE 'eleven-test-%' AND created_at>=now()-interval '24 hours'`,[req.userId]);
+    if(Number(previous.rows[0].count)>=1){
+      await gate.query("ROLLBACK");res.status(429).json({error:"VOICE_TEST_DAILY_LIMIT"});return;
+    }
+    testId='eleven-test-'+randomUUID();
+    await gate.query("INSERT INTO echo_voice_usage(owner_id,message_id,month_key,character_id,characters,status) VALUES($1,$2,to_char(now() at time zone 'UTC','YYYY-MM'),$3,$4,'reserved')",
+      [req.userId,testId,characterId,text.length]);
+    await gate.query("COMMIT");
+  }catch(error){await gate.query("ROLLBACK").catch(()=>{});throw error;}finally{gate.release();}
   operation=randomUUID();
   const charge=await reserveCharacterAudioCredit({ownerId:req.userId!,characterId,requestKey:operation,engine:"custom",requestedSeconds:30});
   if(!charge.allowed){res.status(402).json({error:charge.reason,remainingCredits:charge.remaining});return;}
@@ -394,11 +413,12 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
 });
 
 router.post("/voices/premium/select",requireAuth,async(req,res)=>{
+ if(!elevenLabsCreationAllowed(req.userId!)){res.status(503).json({error:"VOICE_CREATION_NOT_ENABLED"});return;}
  const parsed=z.object({projectId:z.string().uuid(),sampleId:z.string().uuid()}).strict().safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_SELECTION"});return;}
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
-  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  if(!elevenLabsVoiceStatus(req.userId!).generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
   const projectResult=await pool.query(`SELECT p.id,p.owner_id,p.universe_id,p.character_id,p.prompt,p.selected_sample_id,
     s.id AS sample_id,s.provider_sample_id,s.status AS sample_status
     FROM echo_voice_projects p JOIN echo_voice_samples s ON s.project_id=p.id

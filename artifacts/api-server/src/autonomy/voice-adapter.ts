@@ -22,7 +22,7 @@ const storageReady = () => {
 
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
 export async function resolveAutonomousVoiceId({ ownerId, universeId, characterId, basicVoiceId }: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string | null }): Promise<string | null> {
-  if (await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus().generationAvailable) {
+  if (await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus(ownerId).generationAvailable) {
     const selected = await pool.query(`SELECT s.provider_sample_id
       FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
       WHERE p.owner_id=$1 AND p.universe_id=$2 AND p.character_id=$3
@@ -37,7 +37,7 @@ export async function resolveAutonomousVoiceId({ ownerId, universeId, characterI
 export async function getVoiceOwnerControls(ownerId: string) {
   if (!await canUseBasicVoices(ownerId)) return null;
   const [row] = await db.select().from(echoVoiceBudgetsTable).where(eq(echoVoiceBudgetsTable.ownerId, ownerId)).limit(1);
-  const customReady = await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus().generationAvailable;
+  const customReady = await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus(ownerId).generationAvailable;
   const engineReady = storageReady() && (basicVoiceProviderReady() || customReady);
   const enabled = row?.enabled === true && engineReady;
   if (!enabled || !row) return null;
@@ -97,7 +97,7 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
   if (!reserved) return;
   try {
     if (custom) {
-      if (await resolveEchoPlan(input.ownerId) !== "premium" || !elevenLabsVoiceStatus().generationAvailable) throw Error("CUSTOM_VOICE_NOT_AVAILABLE");
+      if (await resolveEchoPlan(input.ownerId) !== "premium" || !elevenLabsVoiceStatus(input.ownerId).generationAvailable) throw Error("CUSTOM_VOICE_NOT_AVAILABLE");
       const voiceId = input.voiceId.slice("elevenlabs:".length);
       if (!/^[a-zA-Z0-9_-]{10,128}$/.test(voiceId)) throw Error("CUSTOM_VOICE_ID_INVALID");
       creditRequest = randomUUID();
