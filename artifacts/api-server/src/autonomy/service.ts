@@ -342,6 +342,16 @@ export async function runAutonomyLiveCycle(
       return { status, reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };
     }
 
+    // Private AI-to-AI conversations require an explicit bilateral opt-in.
+    // Until the per-peer allowlist is wired to persistent controls, deny by default.
+    if (opportunity.situation === "dm" && opportunity.recipientId &&
+        state.characters.some(peer => peer.id === opportunity.recipientId && !peer.archived)) {
+      await dependencies.repository.complete(ownerId, runId, {
+        status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null,
+      }, universeId);
+      return { status: "no_action", reasonCode: "CHARACTER_DM_REQUIRES_MUTUAL_PERMISSION", characterId: character.id, runId, model: null };
+    }
+
     const decisionInput = {
       characterId: character.id,
       situation: opportunity.situation,
