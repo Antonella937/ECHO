@@ -6,9 +6,7 @@ type ImageMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
 /** Private generated image storage. Called only after an authenticated, budgeted generation. */
 export async function saveGeneratedImage(ownerId: string, bytes: Buffer, mimeType: ImageMime): Promise<string> {
-  if (!bytes.length || bytes.length > 15 * 1024 * 1024 || !validMediaHeader(bytes, mimeType)) {
-    throw Error('INVALID_GENERATED_IMAGE');
-  }
+  validateGeneratedImage(bytes, mimeType);
   const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !key || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base)) throw Error('STORAGE_NOT_CONFIGURED');
@@ -28,4 +26,11 @@ export async function saveGeneratedImage(ownerId: string, bytes: Buffer, mimeTyp
     throw error;
   }
   return objectPath;
+}
+
+/** Offline validation before any Supabase write or database mutation. */
+export function validateGeneratedImage(bytes: Buffer, mimeType: ImageMime): void {
+  if (!bytes.length || bytes.length > 15 * 1024 * 1024 || !validMediaHeader(bytes, mimeType)) {
+    throw Error('INVALID_GENERATED_IMAGE');
+  }
 }
