@@ -5,6 +5,8 @@ export interface CharacterCommunicationPermissions {
   characterToCharacterDm: boolean;
   /** A blocked pair overrides the general character-to-character permission. */
   blockedPeerIds: string[];
+  /** Explicit allowlist: no character-to-character DM without a per-peer Yes. */
+  allowedPeerIds?: string[];
 }
 export type CommunicationKind = 'social' | 'dm_to_user' | 'character_dm';
 export interface CommunicationRequest {
@@ -19,6 +21,8 @@ export function mayCommunicate(input: CommunicationRequest): boolean {
   if (input.kind === 'dm_to_user') return input.senderPermissions.autonomousDmToUser;
   if (!input.senderPermissions.characterToCharacterDm || !input.recipientPermissions?.characterToCharacterDm) return false;
   if (!input.recipientId || input.senderId === input.recipientId) return false;
+  if (!input.senderPermissions.allowedPeerIds?.includes(input.recipientId)) return false;
+  if (!input.recipientPermissions.allowedPeerIds?.includes(input.senderId)) return false;
   if (input.senderPermissions.blockedPeerIds.includes(input.recipientId)) return false;
   if (input.recipientPermissions.blockedPeerIds.includes(input.senderId)) return false;
   return true;
