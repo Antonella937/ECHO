@@ -83,8 +83,9 @@ scenesRouter.post("/scenes/events", async (req, res) => {
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId} LIMIT 1`);
     const scene = rows.rows[0];
     const participants = Array.isArray(scene?.participant_ids) ? scene.participant_ids : [];
-    const activeState = await availableCharacters(req.userId!, universeId);
-    const identity = activeState && (actorId === (await db.select({state:echoUniversesTable.state}).from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1))[0]?.state as { me?: { id?: string } } | undefined)?.me?.id;
+    const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId))).limit(1);
+    const identity = actorId === (universe?.state as { currentCharacterId?: string } | null)?.currentCharacterId;
     if (!identity || scene?.status !== "active" || !participants.includes(actorId) ||
         audienceIds.some(a => !participants.includes(a))) {
       res.status(403).json({ error: "SCENE_EVENT_NOT_ALLOWED" }); return;
