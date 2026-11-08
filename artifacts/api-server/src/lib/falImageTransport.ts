@@ -18,7 +18,10 @@ export async function requestFalImage(input: {
 }): Promise<ImageGenerationResult> {
   if (!input.apiKey.trim()) throw Error('IMAGE_PROVIDER_KEY_MISSING');
   if (!input.references.length || input.references.length > 4) throw Error('FAL_EDIT_REQUIRES_1_TO_4_REFERENCES');
-  // IMPORTANT: do not send a billable request until a reliable, bounded\n  // per-request price calculation and reconciliation path is implemented.\n  // A previous version would call fal.ai and only then reject its response,\n  // potentially charging credits without delivering an image.\n  throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');\n  const fetchImpl = input.fetchImpl ?? fetch;
+  // No billable call until the model pricing and reconciliation contract is verified.
+  // This fails before transmitting any references or consuming fal.ai credits.
+  throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
+  const fetchImpl = input.fetchImpl ?? fetch;
   const image_urls = input.references.map(ref => {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(ref.mimeType) ||
         !ref.bytes.length || ref.bytes.length > 15_000_000) throw Error('INVALID_IMAGE_REFERENCE');
