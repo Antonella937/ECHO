@@ -1,3 +1,4 @@
+import { mp3DurationSeconds } from "./mp3Duration";
 /**
  * deAPI Kokoro job transport. Server-only and deliberately not activated by default.
  * Returns MP3; consumers must validate duration and store with audio/mpeg.
@@ -66,6 +67,10 @@ export async function synthesizeDeapiMp3(input: { text: string; voice: string; r
           !(bytes.toString("ascii", 0, 3) === "ID3" ||
             (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0))) {
         throw new DeapiSpeechError("DEAPI_INVALID_MP3");
+      }
+      const seconds = mp3DurationSeconds(bytes);
+      if (seconds === null || seconds <= 0 || seconds > 30) {
+        throw new DeapiSpeechError("DEAPI_INVALID_DURATION");
       }
       return bytes;
     }
