@@ -1,4 +1,5 @@
 import { useMessagesText } from '@/lib/messages-translations';
+import { recentlyActive } from '@/domain/activity';
 import { useLanguage } from '@/lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
@@ -134,7 +135,7 @@ export default function MessagesPage() {
           {visibleThreads.map(({ other, last, unread }) => (
             <li key={other.id}>
               <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
-                <CharacterAvatar character={other} size={52} />
+                <span className="relative shrink-0"><CharacterAvatar character={other} size={52} />{recentlyActive(state, other.id) && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-[3px] border-background bg-emerald-500" aria-label="Recently active" data-testid={`activity-thread-${other.id}`} />}</span>
                 <div className="min-w-0 flex-1">
                   <div className={cn('flex min-w-0 items-center gap-1 text-[15px]', unread ? 'font-semibold' : 'font-medium')}>
                     <span className="truncate">{other.name}</span>
