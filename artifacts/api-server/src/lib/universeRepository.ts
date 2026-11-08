@@ -47,9 +47,14 @@ export async function readUniverse(ownerId: string, universeId = "primary") {
 export async function writeUniverse(ownerId: string, state: Record<string, unknown>, expectedRevision: number, universeId = "primary", afterSave?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<void>) {
   const membershipPlan = await resolveEchoPlan(ownerId);
   return db.transaction(async (tx) => {
-    const initialRows = await tx.select().from(echoUniversesTable)
-      .where(eq(echoUniversesTable.ownerId, ownerId));
-    const initialCurrent = initialRows.find(row => row.universeId === universeId);
+    // Only the target universe's creator plan is needed before taking the lock.
+    // Avoid downloading every universe's full JSON state twice per save.
+    const [initialCurrent] = await tx.select({ state: echoUniversesTable.state })
+      .from(echoUniversesTable)
+      .where(and(
+        eq(echoUniversesTable.ownerId, ownerId),
+        eq(echoUniversesTable.universeId, universeId),
+      )).limit(1);
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
     const existingPlan = initialCurrent?.state?.creatorSetup as { plan?: unknown } | undefined;
     const entitlements = await lockEntitlement(
