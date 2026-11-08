@@ -8,6 +8,7 @@ import type {
   Story,
   SocialState,
 } from "@workspace/api-zod";
+import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
 
 export type AutonomySituation = CharacterDecisionInput["situation"];
 export type ExecutedAutonomyAction = {
@@ -267,8 +268,7 @@ export function chooseAutonomyOpportunity(input: {
   const targetStory = [...state.stories].sort((a, b) => Number(a.seenBy.includes(character.id)) - Number(b.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
-      (!item.closeFriendsOnly || ((state.closeFriends?.[item.authorId] ?? []).includes(character.id) &&
-        (item.allowedViewerIds ?? state.closeFriends?.[item.authorId] ?? []).includes(character.id))) &&
+      canCharacterViewCloseFriendsStory(state, item, character.id) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
   const targetMessage = [...state.messages].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => item.recipientId === character.id && item.senderId !== character.id &&

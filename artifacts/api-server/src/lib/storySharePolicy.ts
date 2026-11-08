@@ -34,3 +34,16 @@ export function canForwardStory(input: StorySharePolicyInput): boolean {
   return follows(senderId, recipientId) && follows(recipientId, senderId) &&
     follows(authorId, recipientId) && follows(recipientId, authorId);
 }
+
+/** Fail-closed legacy close-friends visibility check for autonomy decisions. */
+export function canCharacterViewCloseFriendsStory(stateValue: unknown, storyValue: unknown, viewerId: string): boolean {
+  if (!stateValue || typeof stateValue !== "object" || !storyValue || typeof storyValue !== "object") return false;
+  const state = stateValue as Record<string, unknown>;
+  const story = storyValue as Record<string, unknown>;
+  if (story.closeFriendsOnly !== true) return true;
+  const closeFriends = state.closeFriends && typeof state.closeFriends === "object"
+    ? state.closeFriends as Record<string, unknown> : {};
+  const list = Array.isArray(closeFriends[String(story.authorId)]) ? closeFriends[String(story.authorId)] as unknown[] : [];
+  const allowed = Array.isArray(story.allowedViewerIds) ? story.allowedViewerIds : list;
+  return list.includes(viewerId) && allowed.includes(viewerId);
+}
