@@ -156,7 +156,7 @@ export function applyAutonomyDecision(
 
   if (decision.action === "like" && decision.situation === "like_post") {
     const target = opportunity.postId ? state.posts.find((item) => item.id === opportunity.postId) : undefined;
-    if (!target || !recentWithin(target.createdAt, now, 30 * DAY_MS) || !target.caption.trim() ||
+    if (!target || !recentWithin(target.createdAt, now, 30 * DAY_MS) ||
       !relevantAuthor(state, characterId, target.authorId, !!target.taggedAccountIds?.includes(characterId)) ||
       target.likes.includes(characterId)) throw new SocialExecutionError("POST_LIKE_TARGET_UNAVAILABLE");
     const updated = { ...target, likes: [...target.likes, characterId] };
