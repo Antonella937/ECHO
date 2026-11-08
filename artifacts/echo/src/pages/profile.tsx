@@ -1,4 +1,5 @@
 import { useLanguage } from '@/lib/i18n';
+import { recentlyActive } from '@/domain/activity';
 import { useDiscoveryText } from '@/lib/discovery-translations';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
@@ -106,6 +107,7 @@ export default function ProfilePage() {
           <p className="text-sm text-muted-foreground">@{person.handle} · {person.occupation || accountTypes[person.accountType ?? 'personal']}</p>
           {person.accountType && person.accountType !== 'personal' && <p className="mt-1 text-xs text-muted-foreground">{person.professionalCategory || t(accountTypes[person.accountType])}</p>}
           {person.accountType && person.accountType !== 'personal' && (person.contactEmail || person.website) && <div className="mt-2 flex flex-wrap gap-3 text-xs">{person.contactEmail && <a href={`mailto:${person.contactEmail}`} className="text-primary">{t('Contacto')}</a>}{person.website && /^https?:\/\//i.test(person.website) && <a href={person.website} target="_blank" rel="noopener noreferrer" className="text-primary">{t('Sitio web')}</a>}</div>}
+          {recentlyActive(state, person.id) && <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="status-recent-activity"><span className="h-2 w-2 rounded-full bg-emerald-500" />{({ es: 'Actividad reciente', en: 'Recently active', pt: 'Atividade recente', fr: 'Activité récente', de: 'Kürzlich aktiv', it: 'Attività recente', ko: '최근 활동', ja: '最近のアクティビティ', zh: '最近活跃' } as Record<string,string>)[language] ?? 'Recently active'}</p>}
           {person.privateAccount && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="h-3.5 w-3.5" /> {t('Cuenta privada')}</p>}
           {person.archived && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground" data-testid="status-profile-archived">
