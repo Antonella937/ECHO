@@ -56,7 +56,7 @@ export function startAutonomyBackgroundWorker() {
           now,
           lane: input.lane,
           voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
-            ...controls, dispatch: dispatchAutonomousVoice, resolveVoiceId: ({ ownerId, universeId, characterId, basicVoiceId }) => resolveAutonomousVoiceId(ownerId, universeId, characterId, basicVoiceId),
+            ...controls, dispatch: dispatchAutonomousVoice, resolveVoiceId: resolveAutonomousVoiceId,
           } : undefined).catch(() => undefined),
             });
             if (outcome.status === "no_action" || outcome.status === "rate_limited" || outcome.status === "disabled") {
