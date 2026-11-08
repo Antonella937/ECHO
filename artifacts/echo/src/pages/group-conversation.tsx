@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useParams } from 'wouter';
-import { ChevronLeft, Send, Users, MoreHorizontal, Paperclip, X } from 'lucide-react';
+import { ChevronLeft, Send, Users, MoreHorizontal, Paperclip, X, Mic, Square } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useSocial } from '@/store/social-store';
 import { useUser } from '@clerk/react';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { AttachmentView } from '@/components/echo/dm-attachment-view';
-import { uploadAttachment, validateAttachments } from '@/lib/dm-attachments';
+import { uploadAttachment, validateAttachments, formatDuration } from '@/lib/dm-attachments';
+import { useVoiceRecorder } from '@/lib/use-voice-recorder';
+import { uploadPrivateFile } from '@/lib/media';
 import type { MessageAttachment } from '@/domain/types';
 
 type Group = { id: string; name: string; avatar?: string | null; participantIds: string[] };
@@ -26,6 +28,12 @@ export default function GroupConversationPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  const recorder = useVoiceRecorder((blob, seconds) => {
+    const file = new File([blob], `nota-de-voz-${Date.now()}.${blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`, { type: blob.type });
+    try { validateAttachments([file], pendingFiles.length); setPendingFiles(old => [...old, file]); setError(''); }
+    catch (err) { setError((err as Error).message); }
+  }, setError);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -60,6 +68,22 @@ export default function GroupConversationPage() {
       });
       setGroup({ ...group, avatar }); setAvatarUrl(avatar ?? ''); setError('');
     } catch { setError('No se pudo actualizar la foto. Usá un enlace HTTPS válido.'); }
+    finally { setSavingSettings(false); }
+  };
+  const uploadGroupAvatar = async (file: File) => {
+    if (!group || savingSettings) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+      setError('Elegí una imagen JPG, PNG o WebP de hasta 10 MB.'); return;
+    }
+    setSavingSettings(true);
+    try {
+      const uploaded = await uploadPrivateFile(file);
+      await customFetch(`/api/group-dms/${encodeURIComponent(group.id)}/avatar`, {
+        method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, avatar: uploaded.url }),
+      });
+      setGroup({ ...group, avatar: uploaded.url }); setAvatarUrl(uploaded.url); setError('');
+    } catch { setError('No se pudo subir la foto del grupo.'); }
     finally { setSavingSettings(false); }
   };
   const addMembers = async () => {
@@ -127,7 +151,10 @@ export default function GroupConversationPage() {
       <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Información del grupo</h2><button onClick={() => setSettingsOpen(false)} className="text-sm text-muted-foreground">Cerrar</button></div>
       <label className="mb-1 block text-xs text-muted-foreground">Nombre</label>
       <div className="flex gap-2"><input value={groupName} maxLength={80} onChange={e => setGroupName(e.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3" /><button onClick={() => void editGroup()} disabled={savingSettings || !groupName.trim()} className="rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">Guardar</button></div>
-      <label className="mb-1 mt-4 block text-xs text-muted-foreground">Foto del grupo (enlace HTTPS)</label>
+      <label className="mb-1 mt-4 block text-xs text-muted-foreground">Foto del grupo</label>
+      <input ref={avatarFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void uploadGroupAvatar(file); e.target.value = ''; }} />
+      <button type="button" onClick={() => avatarFileRef.current?.click()} disabled={savingSettings} className="mb-2 rounded-xl bg-secondary px-3 py-2 text-sm disabled:opacity-50">Elegir foto de la galería</button>
+      <label className="mb-1 block text-xs text-muted-foreground">O usar un enlace HTTPS</label>
       <div className="flex gap-2"><input type="url" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3" /><button onClick={() => void saveAvatar(avatarUrl.trim() || null)} disabled={savingSettings || (!!avatarUrl.trim() && !avatarUrl.trim().startsWith('https://'))} className="rounded-xl bg-secondary px-3 text-sm disabled:opacity-50">Aplicar</button></div>
       {group?.avatar && <button onClick={() => void saveAvatar(null)} className="mt-1 text-xs text-muted-foreground">Quitar foto</button>}
       <p className="mt-4 text-xs font-medium">{group?.participantIds.length ?? 0} participantes</p>
@@ -151,9 +178,11 @@ export default function GroupConversationPage() {
     </main>
     {error && <p role="alert" className="px-4 text-sm text-destructive">{error}</p>}
     {!!pendingFiles.length && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2">{pendingFiles.map((file, index) => <span key={index} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-secondary px-2 py-1 text-xs"><span className="max-w-36 truncate">{file.name}</span><button type="button" aria-label="Quitar archivo" onClick={() => setPendingFiles(files => files.filter((_, i) => i !== index))}><X className="h-3 w-3" /></button></span>)}</div>}
+    {recorder.status !== 'idle' && <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2 text-sm"><span>{recorder.status === 'requesting' ? 'Solicitando micrófono…' : `Grabando · ${formatDuration(recorder.elapsed)}`}</span><div className="flex gap-3"><button type="button" onClick={recorder.cancel} className="text-muted-foreground">Cancelar</button><button type="button" onClick={recorder.stop} className="font-semibold text-primary">Terminar</button></div></div>}
     <form onSubmit={send} className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Adjuntar archivos" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Paperclip className="h-5 w-5" /></button>
+      <button type="button" onClick={() => void recorder.start()} disabled={recorder.status !== 'idle' || sending || pendingFiles.length >= 5} aria-label="Grabar nota de voz" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-50"><Mic className="h-5 w-5" /></button>
       <input value={text} onChange={e => setText(e.target.value)} maxLength={10000} placeholder="Mensaje al grupo…" className="h-11 min-w-0 flex-1 rounded-full bg-secondary px-4 outline-none" aria-label="Mensaje al grupo" />
       <button disabled={(!text.trim() && !pendingFiles.length) || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
     </form>
