@@ -1,3 +1,4 @@
+import { playMessageSound, unlockMessageAudio } from '@/lib/message-sounds';
 import { refreshCreatorHubDmStatus, type CreatorHubDmNotice } from '@/lib/creator-hub-notifications';
 import { useWelcomeText } from '@/lib/welcome-translations';
 import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
