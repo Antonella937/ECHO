@@ -3,7 +3,7 @@ import { upgradeAccounts } from '../domain/accounts';
 import { repairOrphanedCharacterLinks } from '../domain/character-core';
 import { mergeUniverse, same, type MergeConflict, type Resolutions } from './merge';
 import {
-  loadUniverse, saveUniverse, RevisionConflict, loadRecovery, saveRecovery,
+  loadUniverse, loadUniverseRevision, saveUniverse, RevisionConflict, loadRecovery, saveRecovery,
   loadLegacyState, fingerprint, importedBy, markImported, cacheMigration,
   cachedMigration, moveLocalImagesToPrivateStorage, verifySavedUniverse,
   claimLegacy, legacyOwner,
@@ -34,6 +34,7 @@ export class UniverseSync {
     conflicts: [], legacyAvailable: false, importVerified: false, importing: false,
   };
   private base: SocialState | null = null;
+  private remoteRevision: number | null = null;
   private generation = 0;
   private running: Promise<void> | null = null;
   private disk: Promise<void> = Promise.resolve();
@@ -65,6 +66,7 @@ export class UniverseSync {
         this.io.loadUniverse(this.universeId), this.io.loadRecovery(this.owner), this.io.loadLegacyState(),
       ]);
       if (this.stopped) return;
+      this.remoteRevision = remote.revision;
       if (legacy) {
         const hash = await this.io.fingerprint(legacy);
         const claimedBy = await this.io.legacyOwner(hash);
@@ -146,6 +148,19 @@ export class UniverseSync {
     try {
       await this.disk;
       for (let attempt = 0; attempt < 5; attempt++) {
+        // On an unchanged idle device, a tiny revision probe replaces the
+        // full universe download. Never skip when local edits or conflicts exist.
+        const clean = this.base !== null && this.view.state !== null &&
+          this.view.conflicts.length === 0 && !this.importHash &&
+          Object.keys(this.decisions).length === 0 &&
+          same({ ...this.base, currentCharacterId: '' }, { ...this.view.state, currentCharacterId: '' });
+        if (attempt === 0 && clean && this.remoteRevision !== null && this.io === defaultIO) {
+          const revision = await loadUniverseRevision(this.universeId);
+          if (revision === this.remoteRevision) {
+            this.view.lastSavedAt = Date.now();
+            return;
+          }
+        }
         const remote = await this.io.loadUniverse(this.universeId);
         if (this.stopped) return;
         // Resolutions apply only to the exact remote version the user reviewed.
@@ -182,6 +197,7 @@ export class UniverseSync {
           : mergeUniverse(draft, this.view.state!, saved.state);
         const activeId = this.view.state!.currentCharacterId;
         const active = next.state.characters.some(c => c.id === activeId && !c.archived) ? activeId : 'nela';
+        this.remoteRevision = saved.revision;
         this.base = structuredClone(saved.state);
         this.base.currentCharacterId = active;
         next.state = structuredClone(next.state);
