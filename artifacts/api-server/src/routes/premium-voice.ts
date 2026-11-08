@@ -420,7 +420,7 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
     await gate.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext('elevenlabs-one-off-test'))",[req.userId]);
     const previous=await gate.query(`SELECT count(*)::int AS count FROM echo_voice_usage
       WHERE owner_id=$1 AND message_id LIKE 'eleven-test-%' AND created_at>=now()-interval '24 hours'`,[req.userId]);
-    if(Number(previous.rows[0].count)>=1){
+    if(Number(previous.rows[0].count)>=2){
       await gate.query("ROLLBACK");res.status(429).json({error:"VOICE_TEST_DAILY_LIMIT"});return;
     }
     testId='eleven-test-'+randomUUID();
