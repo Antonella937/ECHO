@@ -25,21 +25,30 @@ export default function MessagesPage() {
   const [groupComposer, setGroupComposer] = useState(false);
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
-  const [acceptedRequests, setAcceptedRequests] = useState<string[]>([]);
-  const [rejectedRequests, setRejectedRequests] = useState<string[]>([]);
-  const requestStorageKey = `echo-dm-requests:${user?.id ?? 'anonymous'}:${me.id}`;
+  const [requestDecisions, setRequestDecisions] = useState<Record<string, 'accepted' | 'rejected' | 'blocked'>>({});
+  const [requestError, setRequestError] = useState('');
+  const [requestLoading, setRequestLoading] = useState(true);
   useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    setRequestLoading(true);
+    const params = new URLSearchParams({ universeId: getActiveUniverseId(user.id), actorId: me.id });
+    void customFetch<{ decisions: Array<{ senderId: string; status: 'accepted' | 'rejected' | 'blocked' }> }>(`/api/dm-requests?${params}`, { method: 'GET', responseType: 'json' })
+      .then(result => { if (active) { setRequestDecisions(Object.fromEntries(result.decisions.map(d => [d.senderId, d.status]))); setRequestError(''); } })
+      .catch(() => { if (active) setRequestError('No se pudieron cargar las solicitudes.'); })
+      .finally(() => { if (active) setRequestLoading(false); });
+    return () => { active = false; };
+  }, [user?.id, me.id]);
+  const updateRequest = async (senderId: string, status: 'accepted' | 'rejected' | 'blocked') => {
+    if (!user?.id) return;
     try {
-      const value = JSON.parse(localStorage.getItem(requestStorageKey) ?? '{}') as { accepted?: string[]; rejected?: string[] };
-      setAcceptedRequests(Array.isArray(value.accepted) ? value.accepted : []);
-      setRejectedRequests(Array.isArray(value.rejected) ? value.rejected : []);
-    } catch { setAcceptedRequests([]); setRejectedRequests([]); }
-  }, [requestStorageKey]);
-  const updateRequest = (id: string, accept: boolean) => {
-    const accepted = accept ? [...new Set([...acceptedRequests, id])] : acceptedRequests.filter(x => x !== id);
-    const rejected = accept ? rejectedRequests.filter(x => x !== id) : [...new Set([...rejectedRequests, id])];
-    setAcceptedRequests(accepted); setRejectedRequests(rejected);
-    localStorage.setItem(requestStorageKey, JSON.stringify({ accepted, rejected }));
+      await customFetch('/api/dm-requests', {
+        method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), actorId: me.id, senderId, status }),
+      });
+      setRequestDecisions(old => ({ ...old, [senderId]: status }));
+      setRequestError('');
+    } catch { setRequestError('No se pudo guardar la decisión. Intentá nuevamente.'); }
   };
   useEffect(() => {
     if (!user?.id) return;
@@ -54,12 +63,12 @@ export default function MessagesPage() {
   const followed = new Set(state.follows[me.id] ?? []);
   const requests = threads.filter(({ other }) =>
     !followed.has(other.id) &&
-    !acceptedRequests.includes(other.id) && !rejectedRequests.includes(other.id) &&
+    !requestDecisions[other.id] &&
     !state.messages.some(m => m.senderId === me.id && m.recipientId === other.id)
   );
   const visibleThreads = threads.filter(({ other }) => showRequests
     ? requests.some(r => r.other.id === other.id)
-    : !requests.some(r => r.other.id === other.id) && !rejectedRequests.includes(other.id));
+    : !requests.some(r => r.other.id === other.id) && requestDecisions[other.id] !== 'rejected' && requestDecisions[other.id] !== 'blocked');
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
   const backToInbox = () => { if (showSaved) { setShowSaved(false); window.history.replaceState(null, "", "/messages"); } else navigate("/"); };
@@ -89,6 +98,8 @@ export default function MessagesPage() {
           </div>
         }
       />
+      {requestError && <p role="alert" className="px-4 py-2 text-xs text-destructive">{requestError}</p>}
+      {requestLoading && showRequests && <p className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
       {showSaved ? (
         <section className="px-3 pt-4" data-testid="list-saved-messages">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Mensajes favoritos')}</h2><span className="text-xs text-muted-foreground">{savedMessages.length}</span></div>
@@ -142,7 +153,7 @@ export default function MessagesPage() {
                   </span>
                 )}
               </Link>
-              {showRequests && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => updateRequest(other.id, true)} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => updateRequest(other.id, false)} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button></div>}
+              {showRequests && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => void updateRequest(other.id, 'accepted')} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => void updateRequest(other.id, 'rejected')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button><button type="button" onClick={() => void updateRequest(other.id, 'blocked')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-destructive">Bloquear</button></div>}
             </li>
           ))}
         </ul>
