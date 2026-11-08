@@ -4,6 +4,7 @@ import { paidImageGenerationActivated } from './imageGenerationActivation';
 import { loadImageReferences } from './imageReferences';
 import { reserveImageBudget, settleImageBudget } from './imageBudget';
 import { requestFalImage } from './falImageTransport';
+import { requestFalTextImage, FAL_TEXT_IMAGE_MODEL, FAL_TEXT_IMAGE_ESTIMATED_USD } from './falTextImageTransport';
 import { falProEditEstimatedCostUsd } from './falImagePricing';
 import { saveGeneratedImage } from './generatedImageStorage';
 import { orchestrateImageGeneration } from './imageGenerationOrchestrator';
@@ -32,13 +33,15 @@ export async function generateCharacterImage(input: {
   const references = await loadImageReferences(input.ownerId, editPlan?.referencePaths ?? input.referencePaths);
   if (editPlan) validateImageEditReferences(input.edit!.sourcePath, references);
   // Validate actual image dimensions and model rate card before reserving funds.
-  const estimatedCostUsd = falProEditEstimatedCostUsd(references);
+  const estimatedCostUsd = references.length ? falProEditEstimatedCostUsd(references) : FAL_TEXT_IMAGE_ESTIMATED_USD;
   if (estimatedCostUsd > MAX_IMAGE_COST_USD) throw Error('FAL_IMAGE_ESTIMATE_EXCEEDS_PER_IMAGE_LIMIT');
   return orchestrateImageGeneration({
     reserve: reserveImageBudget,
     settle: settleImageBudget,
     store: (ownerId, result) => saveGeneratedImage(ownerId, result.bytes, result.mimeType),
-    generate: ({ prompt, references: verified }) => requestFalImage({ apiKey, prompt, references: verified }),
+    generate: ({ prompt, references: verified }) => verified.length
+      ? requestFalImage({ apiKey, prompt, references: verified })
+      : requestFalTextImage({ apiKey, prompt }),
   }, {
     ownerId: input.ownerId,
     universeId: input.universeId,
@@ -47,7 +50,7 @@ export async function generateCharacterImage(input: {
     style: input.style,
     references,
     provider: 'fal.ai',
-    model: IMAGE_GENERATION_MODEL,
+    model: references.length ? IMAGE_GENERATION_MODEL : FAL_TEXT_IMAGE_MODEL,
     maximumUsd: MAX_IMAGE_COST_USD,
   });
 }
