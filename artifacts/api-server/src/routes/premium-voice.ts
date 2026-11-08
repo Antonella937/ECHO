@@ -24,6 +24,71 @@ async function checkCharacter(ownerId:string,universeId:string,characterId:strin
  const parsed=SaveUniverseBody.shape.state.safeParse(snapshot.state);
  return parsed.success && parsed.data.characters.some(c=>c.id===characterId && !c.archived);
 }
+
+/** Premium's included ElevenLabs voice catalogue: read-only, never synthesizes audio. */
+type ListedVoice = { voiceId:string; name:string; category:string; previewUrl:string; description:string; accent:string; language:string };
+let catalogueCache: {expires:number;voices:ListedVoice[]} | null = null;
+async function curatedElevenLabsVoices():Promise<ListedVoice[]> {
+ if (catalogueCache && catalogueCache.expires>Date.now()) return catalogueCache.voices;
+ const response=await fetch("https://api.elevenlabs.io/v2/voices?page_size=100",{
+  method:"GET",headers:elevenLabsHeaders(),signal:AbortSignal.timeout(15000)
+ });
+ if(!response.ok)throw Error(`ELEVENLABS_CATALOGUE_HTTP_${response.status}`);
+ const payload=await response.json() as {voices?:Array<{voice_id?:string;name?:string;category?:string;preview_url?:string;description?:string;labels?:Record<string,string>;sharing?:{rate?:number;custom_rate?:number}}>;has_more?:boolean};
+ const voices:ListedVoice[]=[];
+ for(const v of payload.voices??[]){
+  if(!v.voice_id || !/^[a-zA-Z0-9_-]{10,128}$/.test(v.voice_id) || !v.preview_url)continue;
+  // Do not treat the user's private clones as a public generic preset.
+  if(!["premade","professional","high_quality"].includes(v.category??""))continue;
+  // A legacy custom-rate voice may consume more provider credits than ECHO allows.
+  if((v.sharing?.rate??0)>1||(v.sharing?.custom_rate??0)>1)continue;
+  let preview:URL;
+  try{preview=new URL(v.preview_url);}catch{continue;}
+  if(preview.protocol!=="https:" || !["elevenlabs.io","api.elevenlabs.io"].some(host=>preview.hostname===host||preview.hostname.endsWith(`.${host}`)))continue;
+  voices.push({voiceId:v.voice_id,name:String(v.name??"Voice").slice(0,80),category:v.category??"premade",
+    previewUrl:preview.toString(),description:String(v.description??"").slice(0,180),
+    accent:String(v.labels?.accent??"").slice(0,40),language:String(v.labels?.language??"").slice(0,40)});
+  if(voices.length>=12)break;
+ }
+ catalogueCache={expires:Date.now()+10*60_000,voices};
+ return voices;
+}
+router.get("/voices/premium/catalogue",requireAuth,async(req,res)=>{
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!elevenLabsVoiceStatus().generationAvailable){res.json({voices:[],available:false});return;}
+  const voices=await curatedElevenLabsVoices();
+  res.json({voices,available:true});
+ }catch(error){req.log.warn({reason:error instanceof Error?error.message:"UNKNOWN"},"ElevenLabs catalogue unavailable");res.status(503).json({error:"VOICE_CATALOGUE_UNAVAILABLE"});}
+});
+router.post("/voices/premium/catalogue/select",requireAuth,async(req,res)=>{
+ const parsed=key.extend({voiceId:z.string().regex(/^[a-zA-Z0-9_-]{10,128}$/)}).strict().safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_CATALOGUE_SELECTION"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"VOICE_CATALOGUE_DISABLED"});return;}
+  const {universeId,characterId,voiceId}=parsed.data;
+  if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const available=(await curatedElevenLabsVoices()).find(voice=>voice.voiceId===voiceId);
+  if(!available){res.status(409).json({error:"VOICE_NOT_IN_APPROVED_CATALOGUE"});return;}
+  const client=await pool.connect();
+  try{
+   await client.query("BEGIN");
+   const project=await client.query(`INSERT INTO echo_voice_projects(owner_id,universe_id,character_id,mode,prompt,status)
+    VALUES($1,$2,$3,'prompt',$4,'ready')
+    ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET status='ready',updated_at=now()
+    RETURNING id`,[req.userId,universeId,characterId,`Catalogue: ${available.name}`]);
+   const id=project.rows[0].id;
+   const found=await client.query("SELECT id FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 AND provider='elevenlabs_catalog' AND provider_sample_id=$3 AND status='ready' LIMIT 1",[id,req.userId,voiceId]);
+   let sampleId=found.rows[0]?.id;
+   if(!sampleId){const row=await client.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,provider_sample_id,status) VALUES($1,$2,'elevenlabs_catalog',$3,'ready') RETURNING id",[id,req.userId,voiceId]);sampleId=row.rows[0].id;}
+   await client.query("UPDATE echo_voice_projects SET selected_sample_id=$2,updated_at=now() WHERE id=$1",[id,sampleId]);
+   await client.query("COMMIT");
+   res.json({selected:true,projectId:id,sampleId,voiceId,name:available.name});
+  }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+ }catch(error){req.log.warn({reason:error instanceof Error?error.message:"UNKNOWN"},"ElevenLabs catalogue selection failed");res.status(503).json({error:"VOICE_CATALOGUE_SELECTION_UNAVAILABLE"});}
+});
+
 router.get("/voices/premium/projects",async(req,res)=>{
  const parsed=key.safeParse(req.query);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT"});return;}
@@ -297,7 +362,7 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
    FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
    WHERE p.owner_id=$1 AND p.universe_id=$2 AND p.character_id=$3
     AND s.owner_id=$1 AND s.project_id=p.id AND s.status='ready'
-    AND s.provider='elevenlabs' AND s.provider_sample_id IS NOT NULL LIMIT 1`,
+    AND s.provider IN ('elevenlabs','elevenlabs_catalog') AND s.provider_sample_id IS NOT NULL LIMIT 1`,
    [req.userId,universeId,characterId]);
   const voiceId=selected.rows[0]?.provider_sample_id;
   if(!voiceId || !/^[a-zA-Z0-9_-]{10,128}$/.test(voiceId)){res.status(409).json({error:"CUSTOM_VOICE_NOT_SELECTED"});return;}
