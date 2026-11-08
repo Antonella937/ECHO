@@ -350,7 +350,11 @@ export async function runAutonomyLiveCycle(
         opportunity.reason !== "A recent incoming direct message is awaiting a reply.") {
       const activeScenes = await db.execute(sql`SELECT scene_id FROM echo_scenes
         WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
-          AND status = 'active' AND participant_ids @> ${JSON.stringify([character.id])}::jsonb LIMIT 1`);
+          AND status = 'active' AND participant_ids @> ${JSON.stringify([character.id])}::jsonb
+          AND COALESCE((SELECT presence FROM echo_scene_presence p
+            WHERE p.owner_id = echo_scenes.owner_id AND p.universe_id = echo_scenes.universe_id
+              AND p.scene_id = echo_scenes.scene_id AND p.character_id = ${character.id}), 'present') = 'present'
+          LIMIT 1`);
       if (activeScenes.rows.length) {
         await dependencies.repository.complete(ownerId, runId, {
           status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null,
