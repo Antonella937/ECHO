@@ -48,14 +48,28 @@ export function CommentList({ postId, onReply, highlightId }: { postId: string; 
   );
 }
 
-function CommentNode({ comment, replies, onReply, highlightId, depth }: { comment: Comment; replies: Map<string, Comment[]>; onReply(c: Comment): void; highlightId?: string | null; depth: number }) {
-  const children = replies.get(comment.id) ?? [];
+function CommentNode({ comment, replies, onReply, highlightId }: { comment: Comment; replies: Map<string, Comment[]>; onReply(c: Comment): void; highlightId?: string | null; depth: number }) {
+  // Keep the conversation's reply relationships, but render every descendant at
+  // the same visual indentation. Recursive nested <ul>s caused horizontal drift.
+  const threadReplies: Comment[] = [];
+  const visit = (parentId: string) => {
+    for (const reply of replies.get(parentId) ?? []) {
+      threadReplies.push(reply);
+      visit(reply.id);
+    }
+  };
+  visit(comment.id);
+
   return (
-    <li data-testid={`thread-comment-${comment.id}`}>
-      <CommentRow comment={comment} onReply={onReply} small={depth > 0} highlight={highlightId === comment.id} />
-      {children.length > 0 && (
-        <ul className={cn('mt-4 flex flex-col gap-4 border-l border-border/70', depth < 3 ? 'ml-10 pl-3' : 'ml-2 pl-2')}>
-          {children.map((r) => <CommentNode key={r.id} comment={r} replies={replies} onReply={onReply} highlightId={highlightId} depth={depth + 1} />)}
+    <li data-testid={`thread-comment-${comment.id}`} className="min-w-0">
+      <CommentRow comment={comment} onReply={onReply} highlight={highlightId === comment.id} />
+      {threadReplies.length > 0 && (
+        <ul className="mt-4 ml-8 min-w-0 flex flex-col gap-4 border-l border-border/70 pl-3">
+          {threadReplies.map((reply) => (
+            <li key={reply.id} className="min-w-0" data-testid={`thread-comment-${reply.id}`}>
+              <CommentRow comment={reply} onReply={onReply} small highlight={highlightId === reply.id} />
+            </li>
+          ))}
         </ul>
       )}
     </li>
