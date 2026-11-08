@@ -97,6 +97,8 @@ export default function ProfilePage() {
         <div className="mt-4">
           <h2 className="font-display text-[19px] font-medium tracking-wide" data-testid="text-profile-name"><span className="inline-flex min-w-0 items-center gap-1.5"><span className="truncate">{person.name}</span><VerifiedBadge account={person} className="h-[18px] w-[18px] shrink-0" /></span></h2>
           <p className="text-sm text-muted-foreground">@{person.handle} · {person.occupation || accountTypes[person.accountType ?? 'personal']}</p>
+          {person.accountType && person.accountType !== 'personal' && <p className="mt-1 text-xs text-muted-foreground">{person.professionalCategory || t(accountTypes[person.accountType])}</p>}
+          {person.accountType && person.accountType !== 'personal' && (person.contactEmail || person.website) && <div className="mt-2 flex flex-wrap gap-3 text-xs">{person.contactEmail && <a href={`mailto:${person.contactEmail}`} className="text-primary">{t('Contacto')}</a>}{person.website && /^https?:\/\//i.test(person.website) && <a href={person.website} target="_blank" rel="noopener noreferrer" className="text-primary">{t('Sitio web')}</a>}</div>}
           {person.privateAccount && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="h-3.5 w-3.5" /> {t('Cuenta privada')}</p>}
           {person.archived && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground" data-testid="status-profile-archived">
