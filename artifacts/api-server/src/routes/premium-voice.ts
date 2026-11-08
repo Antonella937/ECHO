@@ -315,7 +315,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
  if(!elevenLabsCreationAllowed(req.userId!)){res.status(503).json({error:"VOICE_CREATION_NOT_ENABLED"});return;}
  const parsed=key.safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT",charged:false});return;}
- const availability=elevenLabsVoiceStatus();
+ const availability=elevenLabsVoiceStatus(req.userId!);
  if(!availability.generationAvailable){res.status(503).json({error:availability.reason,charged:false});return;}
  try {
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}
@@ -333,7 +333,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   try {
    await client.query("BEGIN");
    await client.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))",[req.userId,project.id]);
-   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND status IN ('pending','ready') AND created_at>=($2 || '-01')::date",[project.id,month]);
+   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 AND provider='elevenlabs' AND status IN ('pending','ready') AND created_at>=($3 || '-01')::date",[project.id,req.userId,month]);
    if(Number(previous.rows[0].count)>0){await client.query("ROLLBACK");res.status(429).json({error:"VOICE_DESIGN_MONTHLY_PREVIEW_LIMIT",charged:false});return;}
    const reservation=await client.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,status) VALUES($1,$2,'elevenlabs','pending') RETURNING id",[project.id,req.userId]);reservationId=reservation.rows[0].id;
    await client.query("COMMIT");reserved=true;
@@ -374,7 +374,10 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   await pool.query("DELETE FROM echo_voice_samples WHERE id=$1 AND owner_id=$2 AND status='pending'",[reservationId,req.userId]);
   await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
   res.json({projectId:project.id,samples:stored,generated:stored.length});
- }catch{res.status(503).json({error:"VOICE_GENERATION_UNAVAILABLE",charged:"unknown"});}
+ }catch(error){
+  req.log.error({message:error instanceof Error?error.message:"UNKNOWN",code:typeof error==="object"&&error!==null&&"code" in error?String(error.code):"UNKNOWN"},"Premium voice design request failed");
+  if(!res.headersSent)res.status(503).json({error:"VOICE_GENERATION_UNAVAILABLE",charged:"unknown"});
+ }
 });
 router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
  if(!z.string().uuid().safeParse(req.params.id).success){res.status(400).json({error:"INVALID_SAMPLE"});return;}
