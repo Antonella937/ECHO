@@ -3,7 +3,7 @@ import { canGenerateImages } from './imageGenerationAccess';
 import { paidImageGenerationActivated } from './imageGenerationActivation';
 import { loadImageReferences } from './imageReferences';
 import { reserveImageBudget, settleImageBudget } from './imageBudget';
-import { requestOpenRouterImage } from './openRouterImageTransport';
+import { requestFalImage } from './falImageTransport';
 import { saveGeneratedImage } from './generatedImageStorage';
 import { orchestrateImageGeneration } from './imageGenerationOrchestrator';
 import { prepareImageEdit, validateImageEditReferences } from './imageEditPreparation';
@@ -24,7 +24,7 @@ export async function generateCharacterImage(input: {
 }) {
   if (!paidImageGenerationActivated()) throw Error('PAID_IMAGE_GENERATION_DISABLED');
   if (!canGenerateImages(input.ownerId)) throw Error('IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED');
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.FAL_KEY;
   if (!apiKey) throw Error('IMAGE_PROVIDER_KEY_MISSING');
   // Verify all private references and download them before any budget reservation.
   const editPlan = input.edit ? prepareImageEdit({ instruction: input.edit.instruction, sourcePath: input.edit.sourcePath, identityPaths: input.referencePaths }) : null;
@@ -34,7 +34,7 @@ export async function generateCharacterImage(input: {
     reserve: reserveImageBudget,
     settle: settleImageBudget,
     store: (ownerId, result) => saveGeneratedImage(ownerId, result.bytes, result.mimeType),
-    generate: ({ prompt, references: verified }) => requestOpenRouterImage({ apiKey, prompt, references: verified }),
+    generate: ({ prompt, references: verified }) => requestFalImage({ apiKey, prompt, references: verified }),
   }, {
     ownerId: input.ownerId,
     universeId: input.universeId,
@@ -42,7 +42,7 @@ export async function generateCharacterImage(input: {
     prompt: editPlan ? input.preparedPrompt + '\n' + editPlan.prompt : input.preparedPrompt,
     style: input.style,
     references,
-    provider: 'openrouter',
+    provider: 'fal.ai',
     model: IMAGE_GENERATION_MODEL,
     maximumUsd: MAX_IMAGE_COST_USD,
   });
