@@ -39,6 +39,8 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const displayedCommentCount = shownCount(post.displayMetrics?.comments, commentCount);
   const likers = post.likes.map(character).filter(Boolean);
   const tagged = (post.taggedAccountIds ?? []).map(character).filter(Boolean);
+  const collaborators = (post.collaboratorIds ?? []).map(character).filter(Boolean);
+  const invitedMe = (post.collaborationInvites ?? []).includes(me.id);
   const media = postMedia(post);
   const firstLiker = likers.find((c) => c && c.id !== me.id) ?? likers[0];
 
@@ -61,6 +63,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </Link>
         <div className="min-w-0 flex-1 leading-tight">
           <Link href={`/profile/${author.id}`} className="inline-flex items-center gap-1 text-[14.5px] font-semibold">{author.handle}<VerifiedBadge account={author} /></Link>
+          {collaborators.length > 0 && <p className="text-xs text-muted-foreground">{t("Con")} {collaborators.map((c, i) => c && <span key={c.id}><Link href={`/profile/${c.id}`} className="font-semibold">@{c.handle}</Link>{i < collaborators.length - 1 ? ', ' : ''}</span>)}</p>}
           {post.location && <Link href={`/search?location=${encodeURIComponent(post.location)}`} className="block truncate text-xs text-muted-foreground" data-testid={`link-post-location-${post.id}`}>{post.location}</Link>}
         </div>
         {post.pinned && <Pin className="h-4 w-4 text-primary" strokeWidth={1.8} aria-label={t("Fijada")} data-testid={`status-post-pinned-${post.id}`} />}
@@ -91,6 +94,10 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </div>
       )}
 
+      {invitedMe && <div className="mx-4 my-3 rounded-xl border border-border bg-secondary/50 p-3 text-sm">
+        <p className="mb-2 font-medium">{t("Invitación a colaborar en esta publicación")}</p>
+        <div className="flex gap-2"><button type="button" onClick={() => actions.respondCollaboration(post.id, true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{t("Aceptar")}</button><button type="button" onClick={() => actions.respondCollaboration(post.id, false)} className="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold">{t("Rechazar")}</button></div>
+      </div>}
       {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact /></div>}
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
