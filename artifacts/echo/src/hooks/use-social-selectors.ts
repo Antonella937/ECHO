@@ -22,8 +22,11 @@ export function useUnreadCounts() {
 }
 
 export function useFeed() {
-  const { state } = useSocial();
-  return useMemo(() => [...state.posts].sort(byDateDesc), [state.posts]);
+  const { state, me } = useSocial();
+  return useMemo(() => {
+    const followed = new Set(state.follows[me.id] ?? []);
+    return state.posts.filter((post) => post.authorId === me.id || (followed.has(post.authorId) && (!state.characters.find((c) => c.id === post.authorId)?.privateAccount || followed.has(post.authorId)))).sort(byDateDesc);
+  }, [state.posts, state.follows, state.characters, me.id]);
 }
 
 export interface StoryGroup {
