@@ -41,7 +41,7 @@ export function privateDmSceneContext(scene: SceneContext | null, dmParticipants
   if (!scene || dmParticipants.length !== 2 || !dmParticipants.every(id => scene.participantIds.includes(id))) return [];
   // Only shared/public scene observations; never relay private events from the scene.
   return visibleSceneEvents(scene, dmParticipants[0])
-    .filter(event => event.visibility !== 'private' && event.visibility !== 'participants' || event.visibility === 'participants')
+    .filter(event => event.visibility === 'public' || event.visibility === 'participants')
     .slice(-30);
 }
 
