@@ -59,6 +59,21 @@ export default function ScenesPage() {
     }catch{setError(es?'No se pudieron guardar los turnos.':'Could not save turn settings.')}
     finally{setBusy(false)}
   };
+  const generateReply = async (characterId:string)=>{
+    if(!active)return;setBusy(true);setError('');
+    try{
+      await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/reply`,{
+        method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({universeId,characterId})
+      });
+      const [history,listing]=await Promise.all([
+        customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/events?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'}),
+        customFetch<{scenes:Scene[]}>(`/api/scenes?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'})
+      ]);
+      setEvents(history.events);setScenes(listing.scenes);
+    }catch{setError(es?'No se pudo generar la respuesta. Revisá el turno y los créditos de IA.':'Could not generate a reply. Check turn settings and AI credits.')}
+    finally{setBusy(false)}
+  };
   const updateStatus = async (status:'active'|'paused'|'finished')=>{
     if(!active)return;setBusy(true);setError('');
     try{await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/status`,{
@@ -95,7 +110,12 @@ export default function ScenesPage() {
             {active.status!=='finished'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('finished')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Finalizar':'Finish'}</button>}
           </div>
         </div>
-      </details><div className="max-h-96 space-y-3 overflow-y-auto">{events.map(ev=><article key={ev.eventId} className="rounded-xl bg-secondary p-3 text-sm"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap">{ev.text}</p></article>)}</div><form onSubmit={send} className="flex gap-2"><input value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={es?'Escribí en la escena…':'Write in scene…'} className="min-w-0 flex-1 rounded-xl border border-border bg-background p-3"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{es?'Enviar':'Send'}</button></form></section>}
+      </details><div className="flex flex-wrap gap-2">
+        {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
+          className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          ✦ {state.characters.find(c=>c.id===id)?.name??id}
+        </button>)}
+      </div><div className="max-h-96 space-y-3 overflow-y-auto">{events.map(ev=><article key={ev.eventId} className="rounded-xl bg-secondary p-3 text-sm"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap">{ev.text}</p></article>)}</div><form onSubmit={send} className="flex gap-2"><input value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={es?'Escribí en la escena…':'Write in scene…'} className="min-w-0 flex-1 rounded-xl border border-border bg-background p-3"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{es?'Enviar':'Send'}</button></form></section>}
     {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
   </main>;
 }
