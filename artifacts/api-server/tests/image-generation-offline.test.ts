@@ -106,3 +106,27 @@ test('OpenRouter transport rejects successful responses without a trustworthy co
   const fakeFetch = (async () => new Response(JSON.stringify({data:[{b64_json:png.toString('base64'),media_type:'image/png'}]}),{status:200})) as typeof fetch;
   await assert.rejects(requestOpenRouterImage({apiKey:'offline-test-key',prompt:'Portrait',references:[],fetchImpl:fakeFetch}),/IMAGE_PROVIDER_COST_UNKNOWN/);
 });
+
+test('image references are serialized as private base64 data URLs, not public links', () => {
+  const png = Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]);
+  const request = buildOpenRouterImageRequest('Same character in a new scene', [{bytes:png,mimeType:'image/png'}]);
+  assert.equal(request.input_references?.length,1);
+  assert.deepEqual(request.input_references?.[0],{
+    type:'image_url',image_url:{url:'data:image/png;base64,'+png.toString('base64')}
+  });
+  assert.equal(JSON.stringify(request).includes('https://'),false);
+});
+
+test('image generation rejects more than four private references before HTTP', () => {
+  const png = Buffer.from([137,80,78,71,13,10,26,10]);
+  const references = Array.from({length:5},()=>({bytes:png,mimeType:'image/png' as const}));
+  assert.throws(()=>buildOpenRouterImageRequest('Portrait',references),/TOO_MANY_IMAGE_REFERENCES/);
+});
+
+test('transport rejects invalid image bytes even with a successful HTTP response', async () => {
+  const fakeFetch = (async () => new Response(JSON.stringify({
+    data:[{b64_json:Buffer.from('not an image').toString('base64'),media_type:'image/png'}],
+    usage:{cost:0.0184}
+  }),{status:200})) as typeof fetch;
+  await assert.rejects(requestOpenRouterImage({apiKey:'offline-test-key',prompt:'Portrait',references:[],fetchImpl:fakeFetch}),/IMAGE_RESULT_MAGIC_MISMATCH/);
+});
