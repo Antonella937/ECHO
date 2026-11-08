@@ -382,7 +382,7 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
    FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
    WHERE p.owner_id=$1 AND p.universe_id=$2 AND p.character_id=$3
     AND s.owner_id=$1 AND s.project_id=p.id AND s.status='ready'
-    AND s.provider IN ('elevenlabs','elevenlabs_catalog') AND s.provider_sample_id IS NOT NULL LIMIT 1`,
+    AND s.provider IN ('elevenlabs','elevenlabs_catalog','elevenlabs_clone') AND s.provider_sample_id IS NOT NULL LIMIT 1`,
    [req.userId,universeId,characterId]);
   const voiceId=selected.rows[0]?.provider_sample_id;
   if(!voiceId || !/^[a-zA-Z0-9_-]{10,128}$/.test(voiceId)){res.status(409).json({error:"CUSTOM_VOICE_NOT_SELECTED"});return;}
