@@ -2,7 +2,7 @@ import type { Character, Post, Story, SocialState } from './types';
 import { characterConfig, sameCharacterValue, validateCharacterConfig } from './character-core';
 
 export type AccountInput = Pick<Character, 'name' | 'handle' | 'bio' | 'avatar'> &
-  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity'>>;
+  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity' | 'privateAccount'>>;
 export const accountTypes = { personal: 'Personal', band: 'Banda', venue: 'Lugar', organization: 'Organización' } as const;
 const catalog = [
   ['pretty-violence', 'Pretty Violence', 'prettyviolence', 'band'],
@@ -82,7 +82,7 @@ export function formatCount(value: number) {
 export function accountFormValues(c: AccountInput): AccountInput {
   return { name: c.name, handle: c.handle, bio: c.bio, avatar: c.avatar,
     occupation: c.occupation ?? '', location: c.location ?? '', configuration: c.configuration, identity: c.identity,
-    accountType: c.accountType ?? 'personal', verified: c.verified ?? false,
+    accountType: c.accountType ?? 'personal', verified: c.verified ?? false, privateAccount: c.privateAccount ?? false,
     displayMetrics: { followers: c.displayMetrics?.followers ?? null, following: c.displayMetrics?.following ?? null } };
 }
 function formField<T>(current: T, input: T, original: T): T {
@@ -115,6 +115,7 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       avatar: formField(now.avatar, wanted.avatar, before.avatar),
       accountType: formField(now.accountType, wanted.accountType, before.accountType),
       verified: formField(now.verified, wanted.verified, before.verified),
+      privateAccount: formField(now.privateAccount, wanted.privateAccount, before.privateAccount),
       occupation: formField(now.occupation, input.occupation ?? now.occupation, expected.occupation ?? now.occupation),
       location: formField(now.location, input.location ?? now.location, expected.location ?? now.location),
       // Merge identity by field, so saving a new facial/body description cannot
