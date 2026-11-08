@@ -1,3 +1,4 @@
+import { useLanguage } from '@/lib/i18n';
 import { useDiscoveryText } from '@/lib/discovery-translations';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
@@ -21,6 +22,7 @@ import { accountTypes, shownCount, formatCount } from '@/domain/accounts';
 
 export default function ProfilePage() {
   const t = useDiscoveryText();
+  const language = useLanguage();
   const { id } = useParams<{ id: string }>();
   const { state, me, character, actions } = useSocial();
   const [, navigate] = useLocation();
@@ -124,7 +126,7 @@ export default function ProfilePage() {
               <Repeat2 className="h-4 w-4 shrink-0" strokeWidth={1.8} /> {t("Cambiar identidad")}
             </Link>
             <Link href={`/characters/${person.id}/edit`} className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-foreground/90" data-testid="link-profile-character-me">
-              {t("Ficha de personaje")}
+              {person.accountType && person.accountType !== "personal" ? ({ es: "Ficha de la cuenta", en: "Account details", pt: "Detalhes da conta", fr: "Détails du compte", de: "Kontodetails", it: "Dettagli account", ko: "계정 정보", ja: "アカウント詳細", zh: "账号详情" }[language] ?? "Account details") : t("Ficha de personaje")}
             </Link>
           </div>
         ) : (
