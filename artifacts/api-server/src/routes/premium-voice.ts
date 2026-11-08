@@ -152,6 +152,57 @@ router.delete("/voices/premium/references/:id",async(req,res)=>{
  }catch{res.status(503).json({error:"VOICE_STORAGE_UNAVAILABLE"});}
 });
 
+
+/**
+ * Create a persistent ElevenLabs voice from an explicitly consented, verified
+ * reference recording. The browser never receives the provider API key.
+ */
+router.post("/voices/premium/clone",requireAuth,async(req,res)=>{
+ const parsed=key.extend({objectPath:z.string().regex(/^voice-studio\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i),consentConfirmed:z.literal(true)}).strict().safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_CLONE_REQUEST"});return;}
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  const {universeId,characterId,objectPath}=parsed.data;
+  if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const reference=await pool.query("SELECT content_type FROM echo_voice_references WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3 AND object_path=$4 AND status='ready'",[req.userId,universeId,characterId,objectPath]);
+  if(!reference.rowCount){res.status(404).json({error:"VERIFIED_REFERENCE_NOT_FOUND"});return;}
+  const base=process.env.SUPABASE_URL?.replace(/\/$/,""),secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!base||!secret)throw Error("VOICE_STORAGE_NOT_CONFIGURED");
+  const audioResponse=await fetch(`${base}/storage/v1/object/echo-media/${objectPath}`,{headers:{Authorization:`Bearer ${secret}`,apikey:secret},signal:AbortSignal.timeout(20000)});
+  if(!audioResponse.ok){res.status(404).json({error:"VOICE_REFERENCE_AUDIO_NOT_FOUND"});return;}
+  const bytes=Buffer.from(await audioResponse.arrayBuffer());
+  if(bytes.length<100||bytes.length>20*1024*1024){res.status(400).json({error:"VOICE_REFERENCE_SIZE_INVALID"});return;}
+  const mime=String(reference.rows[0].content_type);
+  const ext=mime==="audio/wav"?"wav":mime==="audio/mpeg"?"mp3":"m4a";
+  const form=new FormData();
+  form.append("name",`ECHO ${characterId.slice(0,48)}`);
+  form.append("description","User-authorized custom character voice created in ECHO");
+  form.append("files",new Blob([bytes],{type:mime}),`reference.${ext}`);
+  const createdResponse=await fetch("https://api.elevenlabs.io/v1/voices/add",{
+   method:"POST",headers:{"xi-api-key":process.env.ELEVENLABS_API_KEY!.trim()},body:form,signal:AbortSignal.timeout(60000)
+  });
+  if(!createdResponse.ok){
+   req.log.warn({providerStatus:createdResponse.status},"ElevenLabs voice cloning request rejected");
+   res.status(502).json({error:"ELEVENLABS_VOICE_CLONE_FAILED",providerStatus:createdResponse.status});return;
+  }
+  const created=await createdResponse.json() as {voice_id?:string};
+  if(!created.voice_id||!/^[a-zA-Z0-9_-]{10,128}$/.test(created.voice_id)){res.status(502).json({error:"ELEVENLABS_VOICE_ID_INVALID"});return;}
+  const projectResult=await pool.query(`INSERT INTO echo_voice_projects(owner_id,universe_id,character_id,mode,consent_confirmed,status)
+   VALUES($1,$2,$3,'reference',true,'ready')
+   ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET mode='reference',consent_confirmed=true,status='ready',updated_at=now()
+   RETURNING id`,[req.userId,universeId,characterId]);
+  const projectId=projectResult.rows[0].id;
+  const sample=await pool.query(`INSERT INTO echo_voice_samples(project_id,owner_id,provider,provider_sample_id,status)
+   VALUES($1,$2,'elevenlabs',$3,'ready') RETURNING id`,[projectId,req.userId,created.voice_id]);
+  await pool.query("UPDATE echo_voice_projects SET selected_sample_id=$2,updated_at=now() WHERE id=$1 AND owner_id=$3",[projectId,sample.rows[0].id,req.userId]);
+  res.json({cloned:true,projectId,sampleId:sample.rows[0].id});
+ }catch(error){
+  req.log.error({err:error},"Premium voice cloning failed");
+  res.status(503).json({error:"VOICE_CLONING_UNAVAILABLE"});
+ }
+});
+
 router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
  const parsed=key.safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT",charged:false});return;}
