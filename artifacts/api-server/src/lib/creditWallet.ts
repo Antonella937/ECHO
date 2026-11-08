@@ -73,3 +73,58 @@ export async function creditWallet(ownerId: string, claim = false) {
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
 }
+
+/** Atomically spend credits from expiring balances first; no negative balances or duplicate charges. */
+export async function spendCredits(ownerId: string, kind: Kind, amount: number, operationKey: string) {
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 10 || !/^[a-zA-Z0-9:_-]{8,160}$/.test(operationKey)) throw new Error("INVALID_CREDIT_SPEND");
+  // Ensure monthly entitlements exist before charging.
+  await creditWallet(ownerId);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT owner_id FROM echo_credit_wallets WHERE owner_id=$1 FOR UPDATE", [ownerId]);
+    const prior = await client.query("SELECT 1 FROM echo_credit_ledger WHERE owner_id=$1 AND event_key=$2 LIMIT 1", [ownerId,`spend:${operationKey}`]);
+    if (prior.rowCount) { await client.query("ROLLBACK"); return { charged: false, duplicate: true }; }
+    const grants = await client.query<{id:string;bucket:Bucket;remaining:string;expires_at:Date|null}>(`
+      SELECT g.id::text,g.bucket,g.expires_at,
+      (g.amount + COALESCE((SELECT SUM(d.amount) FROM echo_credit_ledger d WHERE d.owner_id=g.owner_id AND d.event_key LIKE 'debit:' || g.id || ':%'),0))::text AS remaining
+      FROM echo_credit_ledger g WHERE g.owner_id=$1 AND g.kind=$2 AND g.amount>0
+        AND (g.expires_at IS NULL OR g.expires_at>now())
+      ORDER BY CASE g.bucket WHEN 'reward' THEN 0 WHEN 'monthly' THEN 1 ELSE 2 END,
+        g.expires_at ASC NULLS LAST,g.id ASC`,[ownerId,kind]);
+    let remaining = amount;
+    const charges: {id:string;bucket:Bucket;amount:number;expires:Date|null}[] = [];
+    for (const grant of grants.rows) {
+      const available = Math.max(0,Number(grant.remaining));
+      const take = Math.min(remaining,available);
+      if (take) { charges.push({id:grant.id,bucket:grant.bucket,amount:take,expires:grant.expires_at}); remaining -= take; }
+      if (!remaining) break;
+    }
+    if (remaining) { await client.query("ROLLBACK"); return { charged:false, insufficient:true }; }
+    for (const item of charges) {
+      await client.query(`INSERT INTO echo_credit_ledger(owner_id,kind,bucket,amount,event_key,expires_at)
+        VALUES($1,$2,$3,$4,$5,$6)`,[ownerId,kind,item.bucket,-item.amount,`debit:${item.id}:${operationKey}`,item.expires]);
+    }
+    await client.query("COMMIT");
+    return {charged:true};
+  } catch(error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+}
+
+/** Idempotent reversal, tied to the original grant and its original expiry. */
+export async function refundCredits(ownerId:string, operationKey:string) {
+  const client=await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT owner_id FROM echo_credit_wallets WHERE owner_id=$1 FOR UPDATE",[ownerId]);
+    const charges=await client.query<{kind:Kind;bucket:Bucket;amount:number;event_key:string;expires_at:Date|null}>(`
+      SELECT kind,bucket,amount,event_key,expires_at FROM echo_credit_ledger
+      WHERE owner_id=$1 AND event_key LIKE $2 AND amount<0`,[ownerId,`debit:%:${operationKey}`]);
+    for(const item of charges.rows) {
+      await client.query(`INSERT INTO echo_credit_ledger(owner_id,kind,bucket,amount,event_key,expires_at)
+        VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+        [ownerId,item.kind,item.bucket,-item.amount,`refund:${item.event_key}`,item.expires_at]);
+    }
+    await client.query("COMMIT");
+    return {refunded:charges.rows.length>0};
+  } catch(error) {await client.query("ROLLBACK");throw error;} finally {client.release();}
+}
