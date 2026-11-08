@@ -5,6 +5,8 @@ import {
   type AutonomyDryRunResult,
 } from "@workspace/api-zod";
 import { EngineError } from "../ai-engine/contracts";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { previewForOwner } from "../ai-engine/service";
 import { visionService } from "../vision/service";
 import type { TextProvider } from "../ai-engine/contracts";
@@ -342,14 +344,27 @@ export async function runAutonomyLiveCycle(
       return { status, reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };
     }
 
-    // Private AI-to-AI conversations require an explicit bilateral opt-in.
-    // Until the per-peer allowlist is wired to persistent controls, deny by default.
+    // Fail closed: BOTH AI identities must explicitly allow the other in this universe.
     if (opportunity.situation === "dm" && opportunity.recipientId &&
         state.characters.some(peer => peer.id === opportunity.recipientId && !peer.archived)) {
-      await dependencies.repository.complete(ownerId, runId, {
-        status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null,
-      }, universeId);
-      return { status: "no_action", reasonCode: "CHARACTER_DM_REQUIRES_MUTUAL_PERMISSION", characterId: character.id, runId, model: null };
+      let permitted = false;
+      try {
+        const permissions = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
+          FROM echo_character_dm_permissions
+          WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+            AND character_id IN (${character.id}, ${opportunity.recipientId})`);
+        const sender = permissions.rows.find(row => row.character_id === character.id);
+        const receiver = permissions.rows.find(row => row.character_id === opportunity.recipientId);
+        permitted = sender?.enabled === true && receiver?.enabled === true &&
+          Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
+          Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id);
+      } catch { permitted = false; }
+      if (!permitted) {
+        await dependencies.repository.complete(ownerId, runId, {
+          status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null,
+        }, universeId);
+        return { status: "no_action", reasonCode: "CHARACTER_DM_REQUIRES_MUTUAL_PERMISSION", characterId: character.id, runId, model: null };
+      }
     }
 
     const decisionInput = {
