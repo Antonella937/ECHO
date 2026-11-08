@@ -58,3 +58,43 @@ dmConversationPreferencesRouter.put("/dm/conversation-preferences", async (req, 
     res.status(503).json({ error: "DM_PREFERENCES_UNAVAILABLE" });
   }
 });
+
+const dmPermissionPayload = scope.extend({
+  enabled: z.boolean(),
+  allowedPeerIds: z.array(identifier).max(100),
+}).strict();
+dmConversationPreferencesRouter.get("/dm/character-permissions", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
+  const { universeId, characterId } = parsed.data;
+  try {
+    if (!await ownsCharacter(req.userId!, universeId, characterId)) { res.status(403).json({ error: "CHARACTER_NOT_ACCESSIBLE" }); return; }
+    const rows = await db.execute(sql`SELECT enabled, allowed_peer_ids FROM echo_character_dm_permissions
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND character_id = ${characterId} LIMIT 1`);
+    const row = rows.rows[0];
+    res.json({ enabled: row?.enabled === true, allowedPeerIds: Array.isArray(row?.allowed_peer_ids) ? row.allowed_peer_ids : [] });
+  } catch { res.status(503).json({ error: "CHARACTER_PERMISSIONS_UNAVAILABLE" }); }
+});
+dmConversationPreferencesRouter.put("/dm/character-permissions", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const parsed = dmPermissionPayload.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_CHARACTER_PERMISSIONS" }); return; }
+  const { universeId, characterId, enabled, allowedPeerIds } = parsed.data;
+  try {
+    if (!await ownsCharacter(req.userId!, universeId, characterId)) { res.status(403).json({ error: "CHARACTER_NOT_ACCESSIBLE" }); return; }
+    const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId))).limit(1);
+    const state = universe?.state as { characters?: Array<{ id: string; archived?: boolean }> } | null;
+    const validPeers = new Set((state?.characters ?? []).filter(peer => !peer.archived && peer.id !== characterId).map(peer => peer.id));
+    if (allowedPeerIds.some(id => !validPeers.has(id)) || new Set(allowedPeerIds).size !== allowedPeerIds.length) {
+      res.status(400).json({ error: "INVALID_PEER_SELECTION" }); return;
+    }
+    const json = JSON.stringify(allowedPeerIds);
+    await db.execute(sql`INSERT INTO echo_character_dm_permissions (owner_id, universe_id, character_id, enabled, allowed_peer_ids)
+      VALUES (${req.userId!}, ${universeId}, ${characterId}, ${enabled}, ${json}::jsonb)
+      ON CONFLICT (owner_id, universe_id, character_id)
+      DO UPDATE SET enabled = EXCLUDED.enabled, allowed_peer_ids = EXCLUDED.allowed_peer_ids, updated_at = now()`);
+    res.json({ enabled, allowedPeerIds });
+  } catch { res.status(503).json({ error: "CHARACTER_PERMISSIONS_UNAVAILABLE" }); }
+});
