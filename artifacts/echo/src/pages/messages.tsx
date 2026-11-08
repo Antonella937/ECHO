@@ -24,6 +24,7 @@ export default function MessagesPage() {
   const [groups, setGroups] = useState<{ id: string; name: string; participantIds: string[]; archived?: boolean; muted?: boolean }[]>([]);
   const [groupComposer, setGroupComposer] = useState(false);
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
@@ -34,6 +35,14 @@ export default function MessagesPage() {
   const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get("tab") === "favorites");
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
+  const followed = new Set(state.follows[me.id] ?? []);
+  const requests = threads.filter(({ other }) =>
+    !followed.has(other.id) &&
+    !state.messages.some(m => m.senderId === me.id && m.recipientId === other.id)
+  );
+  const visibleThreads = threads.filter(({ other }) => showRequests
+    ? requests.some(r => r.other.id === other.id)
+    : !requests.some(r => r.other.id === other.id));
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
   const backToInbox = () => { if (showSaved) { setShowSaved(false); window.history.replaceState(null, "", "/messages"); } else navigate("/"); };
@@ -48,6 +57,7 @@ export default function MessagesPage() {
         right={
           <div className="flex items-center gap-1">
           <button type="button" onClick={toggleFavorites} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
+          <button type="button" onClick={() => setShowRequests(v => !v)} aria-label={showRequests ? 'Mostrar conversaciones' : 'Solicitudes de mensajes'} aria-pressed={showRequests} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm', showRequests ? 'bg-primary text-primary-foreground' : 'bg-secondary')}><span>Solicitudes{requests.length > 0 ? ` (${requests.length})` : ''}</span></button>
           <button type="button" onClick={() => setShowArchivedGroups(v => !v)} aria-label={showArchivedGroups ? 'Mostrar grupos activos' : 'Mostrar grupos archivados'} aria-pressed={showArchivedGroups} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm', showArchivedGroups ? 'bg-primary text-primary-foreground' : 'bg-secondary')}><Archive className="h-[18px] w-[18px]" /></button>
           <button type="button" onClick={() => setGroupComposer(true)} aria-label="Nuevo grupo" className="tap flex h-11 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-semibold"><Users className="h-[18px] w-[18px]" /><span className="hidden min-[430px]:inline">Grupo</span></button>
           <button
@@ -73,7 +83,7 @@ export default function MessagesPage() {
             </li>; })}</ul>
           )}
         </section>
-      ) : threads.length === 0 && groups.filter(g => Boolean(g.archived) === showArchivedGroups).length === 0 ? (
+      ) : visibleThreads.length === 0 && (showRequests || groups.filter(g => Boolean(g.archived) === showArchivedGroups).length === 0) ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
@@ -92,8 +102,8 @@ export default function MessagesPage() {
         </div>
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
-          {groups.filter(group => Boolean(group.archived) === showArchivedGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
-          {threads.map(({ other, last, unread }) => (
+          {!showRequests && groups.filter(group => Boolean(group.archived) === showArchivedGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
+          {visibleThreads.map(({ other, last, unread }) => (
             <li key={other.id}>
               <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
                 <CharacterAvatar character={other} size={52} />
