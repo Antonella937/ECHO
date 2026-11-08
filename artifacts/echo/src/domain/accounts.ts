@@ -2,8 +2,8 @@ import type { Character, Post, Story, SocialState } from './types';
 import { characterConfig, sameCharacterValue, validateCharacterConfig } from './character-core';
 
 export type AccountInput = Pick<Character, 'name' | 'handle' | 'bio' | 'avatar'> &
-  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity' | 'privateAccount'>>;
-export const accountTypes = { personal: 'Personal', band: 'Banda', venue: 'Lugar', organization: 'Organización' } as const;
+  Partial<Pick<Character, 'accountType' | 'verified' | 'displayMetrics' | 'occupation' | 'location' | 'configuration' | 'identity' | 'privateAccount' | 'professionalCategory' | 'contactEmail' | 'website'>>;
+export const accountTypes = { personal: 'Personal / Personaje IA', artist: 'Artista / Creador', band: 'Banda / Proyecto musical', business: 'Negocio / Marca', venue: 'Lugar / Establecimiento', organization: 'Organización' } as const;
 const catalog = [
   ['pretty-violence', 'Pretty Violence', 'prettyviolence', 'band'],
   ['false-halo', 'False Halo', 'falsehalo', 'band'],
@@ -41,6 +41,8 @@ export function validateAccount(input: AccountInput, state: SocialState, id?: st
   if (state.characters.some(c => c.id !== id && c.handle.toLowerCase().replace(/^@/, '') === handle))
     throw Error('Ese @username ya existe en tu universo, incluso entre las cuentas archivadas.');
   if (input.accountType && !Object.hasOwn(accountTypes, input.accountType)) throw Error('Tipo de cuenta inválido.');
+  if ((input.professionalCategory ?? '').length > 80) throw Error('La categoría admite hasta 80 caracteres.');
+  if ((input.contactEmail ?? '').length > 254 || (input.website ?? '').length > 500) throw Error('Los datos de contacto son demasiado largos.');
   validateMetrics(input.displayMetrics);
   if (input.identity) {
     const identity = input.identity;
@@ -83,6 +85,7 @@ export function accountFormValues(c: AccountInput): AccountInput {
   return { name: c.name, handle: c.handle, bio: c.bio, avatar: c.avatar,
     occupation: c.occupation ?? '', location: c.location ?? '', configuration: c.configuration, identity: c.identity,
     accountType: c.accountType ?? 'personal', verified: c.verified ?? false, privateAccount: c.privateAccount ?? false,
+    professionalCategory: c.professionalCategory ?? '', contactEmail: c.contactEmail ?? '', website: c.website ?? '',
     displayMetrics: { followers: c.displayMetrics?.followers ?? null, following: c.displayMetrics?.following ?? null } };
 }
 function formField<T>(current: T, input: T, original: T): T {
@@ -116,6 +119,9 @@ export function editAccount(state: SocialState, id: string, input: AccountInput,
       accountType: formField(now.accountType, wanted.accountType, before.accountType),
       verified: formField(now.verified, wanted.verified, before.verified),
       privateAccount: formField(now.privateAccount, wanted.privateAccount, before.privateAccount),
+      professionalCategory: formField(now.professionalCategory, wanted.professionalCategory, before.professionalCategory),
+      contactEmail: formField(now.contactEmail, wanted.contactEmail, before.contactEmail),
+      website: formField(now.website, wanted.website, before.website),
       occupation: formField(now.occupation, input.occupation ?? now.occupation, expected.occupation ?? now.occupation),
       location: formField(now.location, input.location ?? now.location, expected.location ?? now.location),
       // Merge identity by field, so saving a new facial/body description cannot
