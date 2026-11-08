@@ -104,6 +104,47 @@ scenesRouter.post("/scenes/events", async (req, res) => {
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
 
+const presenceUpdate = scope.extend({
+  characterId: id, presence: z.enum(["present", "absent", "left"]),
+}).strict();
+scenesRouter.put("/scenes/:sceneId/presence", async (req, res) => {
+  const parsed = presenceUpdate.safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_PRESENCE" }); return; }
+  const { universeId, characterId, presence } = parsed.data;
+  try {
+    const rows = await db.execute(sql`SELECT participant_ids, status FROM echo_scenes
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
+    const scene = rows.rows[0];
+    if (!scene || scene.status === "finished" ||
+        !Array.isArray(scene.participant_ids) || !scene.participant_ids.includes(characterId)) {
+      res.status(403).json({ error: "NOT_A_SCENE_PARTICIPANT" }); return;
+    }
+    await db.execute(sql`INSERT INTO echo_scene_presence (owner_id, universe_id, scene_id, character_id, presence)
+      VALUES (${req.userId!}, ${universeId}, ${sceneId.data}, ${characterId}, ${presence})
+      ON CONFLICT (owner_id, universe_id, scene_id, character_id)
+      DO UPDATE SET presence = EXCLUDED.presence, updated_at = now()`);
+    res.json({ characterId, presence });
+  } catch { res.status(503).json({ error: "SCENE_PRESENCE_UNAVAILABLE" }); }
+});
+scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE" }); return; }
+  try {
+    const rows = await db.execute(sql`SELECT s.participant_ids, p.character_id, p.presence
+      FROM echo_scenes s LEFT JOIN echo_scene_presence p
+        ON p.owner_id = s.owner_id AND p.universe_id = s.universe_id AND p.scene_id = s.scene_id
+      WHERE s.owner_id = ${req.userId!} AND s.universe_id = ${parsed.data.universeId}
+        AND s.scene_id = ${sceneId.data}`);
+    if (!rows.rows.length) { res.status(404).json({ error: "SCENE_NOT_FOUND" }); return; }
+    const participants = rows.rows[0].participant_ids as string[];
+    res.json({ presence: participants.map(characterId => ({
+      characterId, presence: rows.rows.find(row => row.character_id === characterId)?.presence ?? "present",
+    })) });
+  } catch { res.status(503).json({ error: "SCENE_PRESENCE_UNAVAILABLE" }); }
+});
+
 const turnUpdate = scope.extend({
   mode: z.enum(["automatic","manual","ordered"]),
   order: z.array(id).max(20),
@@ -168,6 +209,12 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const participants = Array.isArray(scene?.participant_ids) ? scene.participant_ids : [];
     if (!character || scene?.status !== "active" || !participants.includes(characterId)) {
       res.status(403).json({ error: "SCENE_REPLY_NOT_ALLOWED" }); return;
+    }
+    const presenceRows = await db.execute(sql`SELECT presence FROM echo_scene_presence
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+        AND scene_id = ${sceneId.data} AND character_id = ${characterId}`);
+    if (presenceRows.rows[0]?.presence === "absent" || presenceRows.rows[0]?.presence === "left") {
+      res.status(409).json({ error: "CHARACTER_NOT_PRESENT_IN_SCENE" }); return;
     }
     const turn = scene.turn_settings as { mode?: string; nextCharacterId?: string | null; order?: string[]; cursor?: number } | null;
     if (turn?.mode === "manual" && turn.nextCharacterId !== characterId) {
