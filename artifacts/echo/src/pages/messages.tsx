@@ -99,6 +99,7 @@ export default function MessagesPage() {
           </div>
         }
       />
+      <div className="px-4 py-2"><Link href="/scenes" className="inline-flex rounded-xl border border-border px-4 py-2 text-sm font-semibold">✦ ECHO Scenes</Link></div>
       {requestError && <p role="alert" className="px-4 py-2 text-xs text-destructive">{requestError}</p>}
       {requestLoading && showRequests && <p className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
       {showSaved ? (
