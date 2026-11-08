@@ -11,36 +11,42 @@ export function saveSoundPreferences(next: SoundPreferences) {
   window.dispatchEvent(new Event('echo:sound-preferences'));
 }
 let context: AudioContext | null = null;
-export function unlockMessageAudio() {
+let unlocking: Promise<void> | null = null;
+export function unlockMessageAudio(): Promise<void> {
   try {
     context ??= new AudioContext();
-    if (context.state === 'suspended') void context.resume().catch(() => undefined);
-  } catch { /* browser does not support Web Audio */ }
+    if (context.state === 'running') return Promise.resolve();
+    if (!unlocking) unlocking = context.resume().then(() => undefined).catch(() => undefined).finally(() => { unlocking = null; });
+    return unlocking;
+  } catch { return Promise.resolve(); }
 }
 export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' | 'creatorHub') {
   if (!getSoundPreferences()[kind === 'creatorHub' ? 'notification' : kind]) return;
-  try {
-    unlockMessageAudio();
+  // On iOS the audio context often starts suspended. Wait for resume instead
+  // of silently dropping the very first notification chime.
+  void unlockMessageAudio().then(() => {
     if (!context || context.state !== 'running') return;
-    const now = context.currentTime;
-    const notes = kind === 'creatorHub'
-      ? [{ f: 659.25, t: 0, d: 0.14 }, { f: 987.77, t: 0.12, d: 0.16 }, { f: 1318.51, t: 0.24, d: 0.28 }]
-      : kind === 'incoming'
-      ? [{ f: 880, t: 0, d: 0.16 }, { f: 1318.5, t: 0.11, d: 0.27 }]
-      : kind === 'notification'
-        ? [{ f: 1174.66, t: 0, d: 0.14 }, { f: 1567.98, t: 0.13, d: 0.22 }]
-        : [{ f: 1046.5, t: 0, d: 0.095 }];
-    for (const note of notes) {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = 'sine';
-      oscillator.frequency.value = note.f;
-      gain.gain.setValueAtTime(0.0001, now + note.t);
-      gain.gain.exponentialRampToValueAtTime(0.075, now + note.t + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + note.t + note.d);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start(now + note.t);
-      oscillator.stop(now + note.t + note.d + 0.01);
-    }
-  } catch { /* audio must never interrupt messaging */ }
+    try {
+      const now = context.currentTime + 0.015;
+      const notes = kind === 'creatorHub'
+        ? [{ f: 659.25, t: 0, d: 0.14 }, { f: 987.77, t: 0.12, d: 0.16 }, { f: 1318.51, t: 0.24, d: 0.28 }]
+        : kind === 'incoming'
+        ? [{ f: 880, t: 0, d: 0.16 }, { f: 1318.5, t: 0.11, d: 0.27 }]
+        : kind === 'notification'
+          ? [{ f: 1174.66, t: 0, d: 0.14 }, { f: 1567.98, t: 0.13, d: 0.22 }]
+          : [{ f: 1046.5, t: 0, d: 0.095 }];
+      for (const note of notes) {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.value = note.f;
+        gain.gain.setValueAtTime(0.0001, now + note.t);
+        gain.gain.exponentialRampToValueAtTime(0.075, now + note.t + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + note.t + note.d);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(now + note.t);
+        oscillator.stop(now + note.t + note.d + 0.01);
+      }
+    } catch { /* audio must never interrupt messaging */ }
+  });
 }
