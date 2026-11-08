@@ -256,7 +256,7 @@ export function chooseAutonomyOpportunity(input: {
   };
   const targetPost = [...state.posts].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(post => recent30d(post.createdAt) && relevantAuthor(post.authorId) &&
-      !!post.caption?.trim() && !post.likes.includes(character.id) && !recentTargetUsed("like_post", post.id));
+      !post.likes.includes(character.id) && !recentTargetUsed("like_post", post.id));
   const targetComment = [...state.comments].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => {
       const parent = state.posts.find(post => post.id === item.postId);
