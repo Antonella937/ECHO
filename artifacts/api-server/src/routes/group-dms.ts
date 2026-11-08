@@ -88,4 +88,28 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
   res.status(201).json({ id: messageId, groupId, senderId: actorId, text, createdAt: inserted.rows[0].created_at });
 });
+const editBody = scope.extend({ name: z.string().trim().min(1).max(80) });
+router.patch("/group-dms/:groupId", async (req, res) => {
+  const parsed = editBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_GROUP" }); return; }
+  const { universeId, actorId, name } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`UPDATE echo_group_conversations SET name = ${name}, updated_at = now()
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
+    AND participant_ids ? ${actorId} RETURNING id, name`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ group: result.rows[0] });
+});
+router.post("/group-dms/:groupId/leave", async (req, res) => {
+  const parsed = scope.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_GROUP" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const result = await db.execute(sql`UPDATE echo_group_conversations
+    SET participant_ids = participant_ids - ${actorId}, updated_at = now()
+    WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
+    AND participant_ids ? ${actorId} RETURNING id`);
+  if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ left: true });
+});
 export default router;
