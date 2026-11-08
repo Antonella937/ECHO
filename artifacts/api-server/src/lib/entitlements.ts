@@ -43,6 +43,10 @@ export const ECHO_CREDIT_POLICY = Object.freeze({
     plus: { priceCents: 1299, photoCredits: 60, voiceCredits: 30 },
     premium: { priceCents: 2499, photoCredits: 150, voiceCredits: 100 },
   },
+  permanentSlots: {
+    character: { priceCents: 199, characters: 1, universes: 0 },
+    world: { priceCents: 499, characters: 5, universes: 1 },
+  },
   packs: {
     photo20: { kind: "photo", credits: 20, priceCents: 299 },
     photo50: { kind: "photo", credits: 50, priceCents: 649 },
