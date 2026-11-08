@@ -45,6 +45,22 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [catalogueSelected,setCatalogueSelected]=useState<string|null>(null);
   const [catalogueSaving,setCatalogueSaving]=useState<string|null>(null);
   const [catalogueAudio,setCatalogueAudio]=useState<string|null>(null);
+  const [voiceTestBusy,setVoiceTestBusy]=useState(false);
+  const [voiceTestUrl,setVoiceTestUrl]=useState<string|null>(null);
+  useEffect(()=>()=>{if(voiceTestUrl)URL.revokeObjectURL(voiceTestUrl);},[voiceTestUrl]);
+  const testSelectedVoice=async()=>{
+    if(!characterId||!catalogueSelected||voiceTestBusy||!generationAvailable)return;
+    setVoiceTestBusy(true);setError('');
+    try{
+      const audio=await customFetch<Blob>('/api/voices/premium/synthesize',{method:'POST',responseType:'blob',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({universeId,characterId,text:'Hey, it’s me. Just wanted to say hi.'})});
+      setVoiceTestUrl(URL.createObjectURL(audio));
+    }catch{
+      setError(language==='es'?'No se pudo generar la prueba. Puede faltar activar ElevenLabs o haberse alcanzado el límite diario.':'Could not generate the voice test. ElevenLabs may be disabled or the daily limit may have been reached.');
+    }finally{setVoiceTestBusy(false);}
+  };
+
 
   const loadProject=async()=>{
     if(!characterId)return;
@@ -181,6 +197,12 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
         </div>)}
       </div>
     </section>}
+    {catalogueSelected&&<div className="space-y-2 rounded-xl border border-primary/30 p-3">
+      <p className="text-sm font-medium">{language==='es'?'Probar la voz elegida':'Test the selected voice'}</p>
+      <p className="text-xs text-muted-foreground">{language==='es'?'Genera una frase corta real. Consume 2 créditos de ECHO y créditos de ElevenLabs; máximo una prueba cada 24 horas.':'Generates one real short phrase. Uses 2 ECHO credits and ElevenLabs credits; limited to once every 24 hours.'}</p>
+      <button type="button" disabled={!generationAvailable||voiceTestBusy} onClick={()=>void testSelectedVoice()} className="min-h-11 w-full rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{voiceTestBusy?'…':language==='es'?'Probar voz · 2 créditos':'Test voice · 2 credits'}</button>
+      {voiceTestUrl&&<audio controls autoPlay src={voiceTestUrl} className="w-full"/>}
+    </div>}
 
     <div className="grid grid-cols-2 gap-2">
       <button type="button" aria-pressed={mode === 'prompt'} onClick={() => setMode('prompt')} className={`min-h-11 rounded-xl border px-3 text-sm ${mode === 'prompt' ? 'border-primary bg-primary/10' : 'border-border'}`}><Sparkles className="mr-1 inline h-4 w-4"/>{labels[2]}</button>
