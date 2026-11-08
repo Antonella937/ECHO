@@ -7,11 +7,11 @@ import { MeteredTextProvider } from "../lib/metered-ai";
 import { evaluateGroupAutonomy } from "./group-evaluator";
 import { buildGroupConversationContext } from "./group-context";
 
-const provider = new MeteredTextProviderFactory();
 class MeteredTextProviderFactory {
   private readonly free = new FreeModelProvider();
   forOwner(ownerId: string) { return new MeteredTextProvider(ownerId, "autonomy", this.free); }
 }
+const provider = new MeteredTextProviderFactory();
 const schema = { type: "object", additionalProperties: false, required: ["text"], properties: {
   text: { type: "string", minLength: 1, maxLength: 800 },
 } };
