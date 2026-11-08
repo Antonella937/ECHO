@@ -40,6 +40,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [selectedSampleId,setSelectedSampleId]=useState<string|null>(null);
   const [selecting,setSelecting]=useState<string|null>(null);
   const [generating,setGenerating]=useState(false);
+  const [cloning,setCloning]=useState(false);
   const loadProject=async()=>{
     if(!characterId)return;
     const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
@@ -64,6 +65,17 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       await loadProject();
     }catch{setError(language==='es'?'No se pudo seleccionar esta voz. Intentá de nuevo.':'Could not select this voice. Please try again.');}
     finally{setSelecting(null);}
+  };
+  const cloneReference=async()=>{
+    if(!characterId||!uploadedPath||!consent||cloning)return;
+    setCloning(true);setError('');
+    try{
+      await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode:'reference',prompt:'',language:voiceLanguage,variantCount:count,consentConfirmed:true})});
+      await customFetch('/api/voices/premium/clone',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,objectPath:uploadedPath,consentConfirmed:true})});
+      await loadProject();
+      setSaved(true);
+    }catch{setError(language==='es'?'No se pudo crear la voz personalizada. Revisá la configuración o los límites de ElevenLabs.':'Could not create the custom voice. Check ElevenLabs configuration or limits.');}
+    finally{setCloning(false);}
   };
   const playSample=async(id:string)=>{
     try{const data=await customFetch<{url:string}>(`/api/voices/premium/samples/${id}/play`,{responseType:'json'});setSampleUrl(data.url);}
@@ -149,6 +161,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1"/><span>{labels[13]}</span></label>
       <p className="text-xs text-muted-foreground">{labels[12]}</p>
       <p className="text-xs text-muted-foreground">{uploadedPath?(language==='es'?'Audio guardado de forma privada para este personaje.':'Audio saved privately for this character.'):(language==='es'?'El audio solo se subirá cuando confirmes el consentimiento y guardes.':'Audio uploads only after you confirm consent and save.')}</p>
+      {uploadedPath&&consent&&<button type="button" disabled={!generationAvailable||cloning} onClick={()=>void cloneReference()} className="flex min-h-11 w-full items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{cloning?(language==='es'?'Creando voz…':'Creating voice…'):(language==='es'?'Crear voz personalizada':'Create custom voice')}</button>}
       {references.length>0&&<div className="space-y-2"><p className="text-xs font-medium">{language==='es'?'Audios de referencia guardados':'Saved reference recordings'}</p>{references.map((reference,i)=><div key={reference.id} className="flex items-center gap-2 text-xs"><span className="flex-1">{language==='es'?'Audio':'Recording'} {i+1} · {(reference.size/1024/1024).toFixed(1)} MB</span><button type="button" className="text-primary underline" onClick={()=>void playReference(reference.id)}>{language==='es'?'Escuchar':'Play'}</button><button type="button" className="text-destructive underline" onClick={()=>void deleteReference(reference.id)}>{language==='es'?'Eliminar':'Delete'}</button></div>)}{playingUrl&&<audio controls src={playingUrl} className="w-full"/>}</div>}
     </>}
     <button type="button" disabled={!characterId||saving||(mode==='prompt'&&!prompt.trim())||(mode==='reference'&&(!file||!consent))} onClick={()=>void saveDraft()} className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50">{saving?'…':language==='es'?'Guardar proyecto de voz':'Save voice project'}</button>
