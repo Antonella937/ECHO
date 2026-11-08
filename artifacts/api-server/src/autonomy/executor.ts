@@ -169,11 +169,19 @@ export function applyAutonomyDecision(
       ((item.senderId === characterId && item.recipientId === recipientId) ||
         (item.recipientId === characterId && item.senderId === recipientId)));
     if (!hasRelationship && !hasConversation) throw new SocialExecutionError("DM_RECIPIENT_UNAVAILABLE");
+    const story = opportunity.storyId ? state.stories.find(item => item.id === opportunity.storyId) : undefined;
+    if (opportunity.storyId && (!story || story.authorId !== recipientId ||
+      !recentWithin(story.createdAt, now, DAY_MS) ||
+      !state.follows[characterId]?.includes(story.authorId) ||
+      !canCharacterViewCloseFriendsStory(state, story, characterId) ||
+      state.messages.some(item => item.senderId === characterId && item.storyId === story.id))) {
+      throw new SocialExecutionError("STORY_DM_TARGET_UNAVAILABLE");
+    }
     const message: Message = {
       id: idFactory(), threadId: threadIdFor(characterId, recipientId), senderId: characterId, recipientId,
-      text, createdAt: now, storyId: null, postId: null, readBy: [characterId], origin: "autonomy",
+      text, createdAt: now, storyId: story?.id ?? null, postId: null, readBy: [characterId], origin: "autonomy",
     };
-    const notification = actionNotification(idFactory(), recipientId, characterId, "message", text, now);
+    const notification = actionNotification(idFactory(), recipientId, characterId, "message", text, now, null, null, story?.id ?? null);
     return {
       state: recordAutonomyEvent({ ...state, messages: [...state.messages, message], notifications: [...state.notifications, notification] },
         characterId, { sourceId: message.id, kind: "conversation", text: `Envié un mensaje: ${text}`, targetId: recipientId }, now),
