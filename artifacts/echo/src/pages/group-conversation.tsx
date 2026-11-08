@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useParams } from 'wouter';
-import { ChevronLeft, Send, Users, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, Send, Users, MoreHorizontal, Paperclip, X } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useSocial } from '@/store/social-store';
 import { useUser } from '@clerk/react';
 import { CharacterAvatar } from '@/components/echo/avatar';
+import { AttachmentView } from '@/components/echo/dm-attachment-view';
+import { uploadAttachment, validateAttachments } from '@/lib/dm-attachments';
+import type { MessageAttachment } from '@/domain/types';
 
 type Group = { id: string; name: string; avatar?: string | null; participantIds: string[] };
-type GroupMessage = { id: string; senderId: string; text: string; createdAt: string };
+type GroupMessage = { id: string; senderId: string; text: string; attachments?: MessageAttachment[]; createdAt: string };
 
 export default function GroupConversationPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +23,9 @@ export default function GroupConversationPage() {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -95,18 +101,20 @@ export default function GroupConversationPage() {
   const send = async (event: FormEvent) => {
     event.preventDefault();
     const message = text.trim();
-    if (!message || !id || sending) return;
+    if ((!message && !pendingFiles.length) || !id || sending || uploading) return;
     setSending(true);
     try {
+      setUploading(pendingFiles.length > 0);
+      const attachments = await Promise.all(pendingFiles.map(file => uploadAttachment(file)));
       await customFetch(`/api/group-dms/${encodeURIComponent(id)}/messages`, {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, text: message }),
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, text: message, attachments }),
       });
-      setText('');
+      setText(''); setPendingFiles([]);
       const result = await customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/messages?${scope}`, { method: 'GET', responseType: 'json' });
       setMessages(result.messages); setError('');
     } catch { setError('No se pudo enviar el mensaje.'); }
-    finally { setSending(false); }
+    finally { setSending(false); setUploading(false); }
   };
   return <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
     <header className="z-30 shrink-0 border-b border-border/60 bg-background/95 pt-safe backdrop-blur-xl"><div className="flex h-16 min-w-0 items-center gap-3 px-2">
@@ -134,16 +142,20 @@ export default function GroupConversationPage() {
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>\n        {m.senderId !== me.id && <div className="shrink-0"><CharacterAvatar character={character(m.senderId)} size={30} /></div>}
         <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${m.senderId === me.id ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
           {m.senderId !== me.id && <p className="mb-1 text-xs font-semibold">{character(m.senderId)?.name ?? 'Participante'}</p>}
-          <p className="whitespace-pre-wrap break-words text-sm">{m.text}</p>
+          {m.text && <p className="whitespace-pre-wrap break-words text-sm">{m.text}</p>}
+          {!!m.attachments?.length && <div className="mt-2 flex flex-col gap-2">{m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={m.senderId === me.id} />)}</div>}
           <p className={`mt-1 text-right text-[10px] ${m.senderId === me.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
       </div>)}
       <div ref={bottomRef} />
     </main>
     {error && <p role="alert" className="px-4 text-sm text-destructive">{error}</p>}
+    {!!pendingFiles.length && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2">{pendingFiles.map((file, index) => <span key={index} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-secondary px-2 py-1 text-xs"><span className="max-w-36 truncate">{file.name}</span><button type="button" aria-label="Quitar archivo" onClick={() => setPendingFiles(files => files.filter((_, i) => i !== index))}><X className="h-3 w-3" /></button></span>)}</div>}
     <form onSubmit={send} className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
+      <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Adjuntar archivos" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Paperclip className="h-5 w-5" /></button>
       <input value={text} onChange={e => setText(e.target.value)} maxLength={10000} placeholder="Mensaje al grupo…" className="h-11 min-w-0 flex-1 rounded-full bg-secondary px-4 outline-none" aria-label="Mensaje al grupo" />
-      <button disabled={!text.trim() || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
+      <button disabled={(!text.trim() && !pendingFiles.length) || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
     </form>
   </div>;
 }
