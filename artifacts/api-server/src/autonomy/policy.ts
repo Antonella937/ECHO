@@ -176,8 +176,13 @@ export function chooseAutonomyOpportunity(input: {
   const config = character.configuration;
   const timezone = config?.routine?.timezone?.trim() || "UTC";
   const local = clockParts(now, timezone);
-  const history = countRecentHistory(input.history, now);
-  const recentSocial = recentActorActivity(state, character.id, now);
+  // Social posting and conversational DM replies have independent budgets.
+  // Otherwise frequent DMs permanently suppress posts, likes and comments.
+  const history = countRecentHistory(input.history, now).filter(event =>
+    input.lane === "social" ? event.situation !== "dm" : true);
+  const recentSocial = recentActorActivity(state, character.id, now).filter(time =>
+    input.lane !== "social" || !state.messages.some(message =>
+      message.senderId === character.id && message.origin !== "autonomy" && asTime(message.createdAt) === time));
   const latestActivity = Math.max(
     ...recentSocial,
     asTime(config?.currentState?.lastActivityAt) ?? 0,
