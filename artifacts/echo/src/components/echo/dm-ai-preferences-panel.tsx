@@ -62,7 +62,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
       </select>
       <label className="mb-4 flex items-center gap-3 text-sm"><input type="checkbox" checked={prefs.autonomousInitiative} onChange={e => update('autonomousInitiative', e.target.checked)} />{t('initiative')}</label>
       </div></details>
-      <details className="mb-3 rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{t('characterDms')}</summary>
+      <details className="mb-3 rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{t('peerDm')}</summary>
         <div className="pt-3 space-y-3">
           <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={dmEnabled} onChange={e => setDmEnabled(e.target.checked)} />{t('allow')}</label>
           {peers.filter(peer => peer.id !== characterId).map(peer => <label key={peer.id} className="flex items-center justify-between gap-3 text-sm">
