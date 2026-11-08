@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import groupDmsRouter from "./group-dms";
 import paddleBillingRouter from "./paddle-billing";
 import supportRouter from "./support";
 import universeRouter from "./universe";
@@ -31,6 +32,7 @@ router.use(createConsentSafetyGate());
 router.use(createOwnerConsentRouter());
 
 router.use(healthRouter);
+router.use(groupDmsRouter);
 router.use(paddleBillingRouter);
 router.use(supportRouter);
 router.use(universeRouter);
