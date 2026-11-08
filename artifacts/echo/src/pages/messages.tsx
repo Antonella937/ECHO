@@ -1,8 +1,11 @@
 import { useMessagesText } from '@/lib/messages-translations';
 import { useLanguage } from '@/lib/i18n';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { customFetch } from '@workspace/api-client-react';
+import { useUser } from '@clerk/react';
+import { getActiveUniverseId } from '@/store/persistence';
 import { Link, useLocation } from 'wouter';
-import { Bookmark, PenSquare, Search, X } from 'lucide-react';
+import { Bookmark, PenSquare, Search, X, Users } from 'lucide-react';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useSocial } from '@/store/social-store';
 import { useThreads } from '@/hooks/use-social-selectors';
@@ -16,7 +19,17 @@ const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 
 export default function MessagesPage() {
   const t = useMessagesText();
+  const { user } = useUser();
   const { me, state, character, actions } = useSocial();
+  const [groups, setGroups] = useState<{ id: string; name: string; participantIds: string[] }[]>([]);
+  const [groupComposer, setGroupComposer] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    const load = () => customFetch<{ groups: typeof groups }>(`/api/group-dms?${new URLSearchParams({ universeId: getActiveUniverseId(user.id), actorId: me.id })}`, { method: 'GET', responseType: 'json' }).then(result => { if (active) setGroups(result.groups); }).catch(() => undefined);
+    void load();
+    return () => { active = false; };
+  }, [user?.id, me.id, groupComposer]);
   const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get("tab") === "favorites");
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
@@ -34,6 +47,7 @@ export default function MessagesPage() {
         right={
           <div className="flex items-center gap-1">
           <button type="button" onClick={toggleFavorites} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
+          <button type="button" onClick={() => setGroupComposer(true)} aria-label="Nuevo grupo" className="tap flex h-11 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-semibold"><Users className="h-[18px] w-[18px]" /><span className="hidden min-[430px]:inline">Grupo</span></button>
           <button
             onClick={() => setComposing(true)}
             aria-label={t("Nueva conversación")}
@@ -57,7 +71,7 @@ export default function MessagesPage() {
             </li>; })}</ul>
           )}
         </section>
-      ) : threads.length === 0 ? (
+      ) : threads.length === 0 && groups.length === 0 ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
@@ -76,6 +90,7 @@ export default function MessagesPage() {
         </div>
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
+          {groups.map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div></Link></li>)}
           {threads.map(({ other, last, unread }) => (
             <li key={other.id}>
               <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
@@ -106,6 +121,7 @@ export default function MessagesPage() {
         {t('Los personajes con autonomía activada pueden responderte por aquí. Las respuestas pueden tardar unos minutos.')}
       </p>
       <NewConversationSheet open={composing} onClose={() => setComposing(false)} />
+      <NewGroupSheet open={groupComposer} onClose={() => setGroupComposer(false)} />
     </div>
   );
 }
@@ -173,4 +189,38 @@ function NewConversationSheet({ open, onClose }: { open: boolean; onClose(): voi
       )}
     </Sheet>
   );
+}
+
+function NewGroupSheet({ open, onClose }: { open: boolean; onClose(): void }) {
+  const { user } = useUser();
+  const { me, state } = useSocial();
+  const [, navigate] = useLocation();
+  const [name, setName] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const members = state.characters.filter(c => c.id !== me.id && !c.archived);
+  const create = async () => {
+    if (!name.trim() || selected.length < 2 || saving || !user?.id) return;
+    setSaving(true); setError('');
+    try {
+      const group = await customFetch<{ id: string }>('/api/group-dms', {
+        method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), actorId: me.id, name: name.trim(), participantIds: selected }),
+      });
+      onClose(); setName(''); setSelected([]); navigate(`/messages/group/${group.id}`);
+    } catch { setError('No se pudo crear el grupo.'); }
+    finally { setSaving(false); }
+  };
+  return <Sheet open={open} onClose={onClose} title="Nuevo grupo" testId="sheet-new-group">
+    <label className="block text-sm font-medium">Nombre del grupo</label>
+    <input value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="Ej. PRETTY VIOLENCE" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3" />
+    <p className="mt-5 mb-2 text-sm font-medium">Seleccioná al menos dos participantes</p>
+    <div className="max-h-72 space-y-1 overflow-y-auto">{members.map(c => <label key={c.id} className="flex min-h-12 items-center gap-3 rounded-xl px-2 hover:bg-secondary">
+      <input type="checkbox" checked={selected.includes(c.id)} onChange={e => setSelected(old => e.target.checked ? [...old, c.id] : old.filter(id => id !== c.id))} />
+      <CharacterAvatar character={c} size={36} /><span className="text-sm">{c.name}</span>
+    </label>)}</div>
+    {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+    <button onClick={() => void create()} disabled={!name.trim() || selected.length < 2 || saving} className="mt-5 h-11 w-full rounded-full bg-primary font-semibold text-primary-foreground disabled:opacity-50">Crear grupo</button>
+  </Sheet>;
 }
