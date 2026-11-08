@@ -43,10 +43,13 @@ export interface Character {
   avatar: MediaRef;
   providerRef: CharacterProviderRef;
   identity: IdentityReference;
-  accountType?: 'personal' | 'band' | 'venue' | 'organization';
+  accountType?: 'personal' | 'artist' | 'band' | 'business' | 'venue' | 'organization';
   verified?: boolean;
   archived?: boolean;
   privateAccount?: boolean;
+  professionalCategory?: string;
+  contactEmail?: string;
+  website?: string;
   /** Fictional base audience; actual relationships remain in follows. */
   displayMetrics?: { followers?: number | null; following?: number | null };
 }
