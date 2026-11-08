@@ -1,4 +1,4 @@
-import { synthesizeBasicVoice } from "../lib/basicVoiceProvider";
+import { basicVoiceProviderReady, synthesizeBasicVoiceAudio } from "../lib/basicVoiceProvider";
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
 import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
@@ -53,12 +53,7 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
     const voiceId = character.configuration?.voice?.basicVoiceId ?? "";
     const voice = voices[voiceId];
     if (!voice) { res.status(409).json({ error: "CHARACTER_VOICE_NOT_SELECTED" }); return; }
-    const endpoint = process.env.ECHO_KOKORO_TTS_URL;
-    if (!endpoint) { res.status(503).json({ error: "VOICE_ENGINE_NOT_CONFIGURED" }); return; }
-    const url = new URL(endpoint);
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
-      res.status(503).json({ error: "VOICE_ENGINE_INVALID_CONFIGURATION" }); return;
-    }
+    if (!basicVoiceProviderReady()) { res.status(503).json({ error: "VOICE_ENGINE_NOT_CONFIGURED" }); return; }
     const now = Date.now();
     const recent = (recentRequests.get(req.userId!) ?? []).filter(time => now - time < 60_000);
     if (recent.length >= 5) { res.status(429).json({ error: "VOICE_RATE_LIMITED" }); return; }
@@ -72,21 +67,15 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
       res.status(429).json({error:audioCredit.reason,remainingCredits:audioCredit.remaining});return;
     }
     try {
-    const data = await synthesizeBasicVoice({ text: text.trim(), voice, requestId: audioRequestKey });
-    if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
-        data.toString("ascii", 8, 12) !== "WAVE") {
-      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
-      await completeVoiceNarration(req.userId!, reservation, false);
-      res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
-    }
-    const seconds=wavDurationSeconds(data);
-    if (!Number.isFinite(seconds) || seconds<=0 || seconds>ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds) {
+    const audio = await synthesizeBasicVoiceAudio({ text: text.trim(), voice, requestId: audioRequestKey });
+    if (!Number.isFinite(audio.seconds) || audio.seconds <= 0 || audio.seconds > ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds) {
       await refundFailedCharacterAudio(req.userId!,audioRequestKey);
       await completeVoiceNarration(req.userId!,reservation,false);
       res.status(502).json({error:"VOICE_AUDIO_EXCEEDS_30_SECONDS"});return;
     }
+    const data = audio.bytes;
     await completeVoiceNarration(req.userId!, reservation, true);
-    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Type", audio.mimeType);
     res.setHeader("Cache-Control", "private, no-store");
     res.send(data);
     } catch (error) {
@@ -121,12 +110,7 @@ router.post("/voices/basic/listen", requireAuth, async (req, res) => {
     if (!message) { res.status(404).json({ error: "MESSAGE_NOT_FOUND" }); return; }
     const text = message.text.replace(/\\[Transcripción de nota de voz\\]:/g, "").trim();
     if (!text || text.length > 500) { res.status(422).json({ error: "MESSAGE_NOT_SPEAKABLE" }); return; }
-    const endpoint = process.env.ECHO_KOKORO_TTS_URL;
-    if (!endpoint) { res.status(503).json({ error: "VOICE_ENGINE_NOT_CONFIGURED" }); return; }
-    const url = new URL(endpoint);
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
-      res.status(503).json({ error: "VOICE_ENGINE_INVALID_CONFIGURATION" }); return;
-    }
+    if (!basicVoiceProviderReady()) { res.status(503).json({ error: "VOICE_ENGINE_NOT_CONFIGURED" }); return; }
     const now = Date.now();
     const recent = (recentRequests.get(req.userId!) ?? []).filter(time => now - time < 60_000);
     if (recent.length >= 5) { res.status(429).json({ error: "VOICE_RATE_LIMITED" }); return; }
@@ -140,21 +124,15 @@ router.post("/voices/basic/listen", requireAuth, async (req, res) => {
       res.status(429).json({error:audioCredit.reason,remainingCredits:audioCredit.remaining});return;
     }
     try {
-    const data = await synthesizeBasicVoice({ text: text, voice, requestId: audioRequestKey });
-    if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
-      data.toString("ascii", 8, 12) !== "WAVE") {
-      await refundFailedCharacterAudio(req.userId!,audioRequestKey);
-      await completeVoiceNarration(req.userId!, reservation, false);
-      res.status(502).json({ error: "VOICE_ENGINE_INVALID_AUDIO" }); return;
-    }
-    const seconds=wavDurationSeconds(data);
-    if (!Number.isFinite(seconds) || seconds<=0 || seconds>ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds) {
+    const audio = await synthesizeBasicVoiceAudio({ text: text, voice, requestId: audioRequestKey });
+    if (!Number.isFinite(audio.seconds) || audio.seconds <= 0 || audio.seconds > ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds) {
       await refundFailedCharacterAudio(req.userId!,audioRequestKey);
       await completeVoiceNarration(req.userId!,reservation,false);
       res.status(502).json({error:"VOICE_AUDIO_EXCEEDS_30_SECONDS"});return;
     }
+    const data = audio.bytes;
     await completeVoiceNarration(req.userId!, reservation, true);
-    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Type", audio.mimeType);
     res.setHeader("Cache-Control", "private, no-store");
     res.send(data);
     } catch (error) {
@@ -197,7 +175,7 @@ router.post("/voices/basic/attach-to-dm", requireAuth, async (req, res) => {
         m.text.trim() && m.text.length <= 500 && !m.hiddenForIds?.includes(characterId));
       if (!message) return "CHARACTER_MESSAGE_NOT_FOUND";
       if (message.attachments?.some(a => a.type === "audio")) return "ALREADY_HAS_AUDIO";
-      const attachment = { id: `voice-${messageId}`, type: "audio" as const, url: objectPath, mimeType: "audio/wav" };
+      const attachment = { id: `voice-${messageId}`, type: "audio" as const, url: objectPath, mimeType: audio.mimeType };
       const state = { ...parsed.data, messages: parsed.data.messages.map(m => m.id === messageId
         ? { ...m, attachments: [...(m.attachments ?? []), attachment] } : m) };
       const updated = await tx.update(echoUniversesTable).set({
