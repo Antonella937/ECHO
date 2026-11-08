@@ -1,3 +1,4 @@
+import { synthesizeBasicVoice } from "../lib/basicVoiceProvider";
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
 import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
@@ -71,14 +72,7 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
       res.status(429).json({error:audioCredit.reason,remainingCredits:audioCredit.remaining});return;
     }
     try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
-      body: JSON.stringify({ model: "kokoro", input: text.trim(), voice, response_format: "wav" }),
-      signal: AbortSignal.timeout(45000),
-    });
-    if (!response.ok) { await refundFailedCharacterAudio(req.userId!,audioRequestKey); await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
-    const data = Buffer.from(await response.arrayBuffer());
+    const data = await synthesizeBasicVoice({ text: text.trim(), voice, requestId: audioRequestKey });
     if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
         data.toString("ascii", 8, 12) !== "WAVE") {
       await refundFailedCharacterAudio(req.userId!,audioRequestKey);
@@ -146,14 +140,7 @@ router.post("/voices/basic/listen", requireAuth, async (req, res) => {
       res.status(429).json({error:audioCredit.reason,remainingCredits:audioCredit.remaining});return;
     }
     try {
-    const response = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json",
-        ...(process.env.ECHO_KOKORO_TTS_KEY ? { Authorization: `Bearer ${process.env.ECHO_KOKORO_TTS_KEY}` } : {}) },
-      body: JSON.stringify({ model: "kokoro", input: text, voice, response_format: "wav" }),
-      signal: AbortSignal.timeout(45000),
-    });
-    if (!response.ok) { await refundFailedCharacterAudio(req.userId!,audioRequestKey); await completeVoiceNarration(req.userId!, reservation, false); res.status(502).json({ error: "VOICE_ENGINE_FAILED" }); return; }
-    const data = Buffer.from(await response.arrayBuffer());
+    const data = await synthesizeBasicVoice({ text: text, voice, requestId: audioRequestKey });
     if (data.length < 44 || data.length > 15 * 1024 * 1024 || data.toString("ascii", 0, 4) !== "RIFF" ||
       data.toString("ascii", 8, 12) !== "WAVE") {
       await refundFailedCharacterAudio(req.userId!,audioRequestKey);
