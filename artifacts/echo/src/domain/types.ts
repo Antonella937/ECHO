@@ -149,7 +149,9 @@ export type NotificationKind =
   | 'message'
   | 'story_reply'
   | 'story_like'
-  | 'follow';
+  | 'follow'
+  | 'collaboration_invite'
+  | 'collaboration_accepted';
 
 export interface Notification {
   id: string;
