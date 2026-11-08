@@ -1,6 +1,6 @@
 import type { ImageGenerationReference } from './imageGenerationPayload';
 import type { ImageGenerationResult } from './imageGenerationProvider';
-import { falProEditEstimatedCostUsd } from './falImagePricing';
+import { falProEditEstimatedCostUsd, FAL_OUTPUT_WIDTH, FAL_OUTPUT_HEIGHT } from './falImagePricing';
 
 export const FAL_IMAGE_MODEL = 'fal-ai/flux-2-pro/edit';
 const MAX_BYTES = 24_000_000;
@@ -34,14 +34,13 @@ export async function requestFalImage(input: {
     method: 'POST',
     headers: { Authorization: `Key ${input.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      prompt: input.prompt, image_urls, image_size: 'portrait_4_3',
+      prompt: input.prompt, image_urls, image_size: { width: FAL_OUTPUT_WIDTH, height: FAL_OUTPUT_HEIGHT },
       output_format: 'jpeg', sync_mode: true, enable_safety_checker: true,
     }),
     signal: AbortSignal.timeout(120_000),
   });
   if (!response.ok) throw Error(`FAL_IMAGE_HTTP_${response.status}`);
   if (Number(response.headers.get('content-length') || 0) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
-  const requestId = falRequestId(response.headers);
   const raw = await response.text();
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   let payload: any;
