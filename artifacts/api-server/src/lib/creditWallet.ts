@@ -83,7 +83,7 @@ export async function spendCredits(ownerId: string, kind: Kind, amount: number, 
   try {
     await client.query("BEGIN");
     await client.query("SELECT owner_id FROM echo_credit_wallets WHERE owner_id=$1 FOR UPDATE", [ownerId]);
-    const prior = await client.query("SELECT 1 FROM echo_credit_ledger WHERE owner_id=$1 AND event_key=$2 LIMIT 1", [ownerId,`spend:${operationKey}`]);
+    const prior = await client.query("SELECT 1 FROM echo_credit_ledger WHERE owner_id=$1 AND event_key LIKE $2 LIMIT 1", [ownerId,`debit:%:${operationKey}`]);
     if (prior.rowCount) { await client.query("ROLLBACK"); return { charged: false, duplicate: true }; }
     const grants = await client.query<{id:string;bucket:Bucket;remaining:string;expires_at:Date|null}>(`
       SELECT g.id::text,g.bucket,g.expires_at,
