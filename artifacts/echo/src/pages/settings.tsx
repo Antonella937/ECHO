@@ -68,7 +68,7 @@ export default function SettingsPage() {
           <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
             {st('Todo lo que publiques, comentes o envíes saldrá con este perfil.')}
           </p>
-          <AccountManager />
+          <details className="group mt-3 rounded-2xl border border-border bg-card/40" data-testid="details-account-manager"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{st("Cuentas e identidad activa")} · {state.characters.filter(c=>!c.archived).length}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border px-3 pb-3"><AccountManager /></div></details>
         </section>
 
         <section className="mt-9" aria-labelledby="creator-h">
@@ -81,6 +81,7 @@ export default function SettingsPage() {
 
         <section className="mt-9" aria-labelledby="close-friends-h" data-testid="section-close-friends">
           <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> {st('Mejores amigos · ')}{me.name}</h2>
+          <details className="group mt-3 rounded-2xl border border-border bg-card/40" data-testid="details-close-friends"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{st('Mejores amigos · ')}{(state.closeFriends?.[me.id] ?? []).length}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border px-3 pb-3">
           <p className="mt-2 px-1 text-xs text-muted-foreground">{st("Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.")}</p>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-3">
             {state.characters.filter(c => c.id !== me.id && !c.archived).map(c => {
@@ -91,6 +92,7 @@ export default function SettingsPage() {
               </button>;
             })}
           </div>
+          </div></details>
         </section>
 
         <AppearanceSection />
