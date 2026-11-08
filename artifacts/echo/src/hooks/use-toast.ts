@@ -2,7 +2,8 @@ import * as React from 'react';
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast';
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = 1000;
+const TOAST_AUTO_DISMISS_DELAY = 3000;
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -50,6 +51,7 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+const autoDismissTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -109,6 +111,11 @@ export const reducer = (state: State, action: Action): State => {
       };
     }
     case 'REMOVE_TOAST':
+      if (action.toastId !== undefined) {
+        const timeout = autoDismissTimeouts.get(action.toastId);
+        if (timeout) clearTimeout(timeout);
+        autoDismissTimeouts.delete(action.toastId);
+      }
       if (action.toastId === undefined) {
         return {
           ...state,
@@ -144,6 +151,13 @@ function toast({ ...props }: Toast) {
       toast: { ...props, id },
     });
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });
+
+  // Dismiss transient confirmations even when Radix's hover/focus timer is paused.
+  const autoDismissTimeout = setTimeout(() => {
+    autoDismissTimeouts.delete(id);
+    dismiss();
+  }, TOAST_AUTO_DISMISS_DELAY);
+  autoDismissTimeouts.set(id, autoDismissTimeout);
 
   dispatch({
     type: 'ADD_TOAST',
