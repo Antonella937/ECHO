@@ -13,7 +13,7 @@ export function mp3DurationSeconds(data: Buffer): number | null {
  while(offset+4<=data.length){
   if(offset+128===data.length && data.toString("ascii",offset,offset+3)==="TAG")break;
   const header=data.readUInt32BE(offset);
-  if((header&0xffe00000)!==0xffe00000)return null;
+  if(((header&0xffe00000)>>>0)!==0xffe00000)return null;
   const version=(header>>>19)&3,layer=(header>>>17)&3;
   const bitrateIndex=(header>>>12)&15,frequencyIndex=(header>>>10)&3;
   const padding=(header>>>9)&1;
