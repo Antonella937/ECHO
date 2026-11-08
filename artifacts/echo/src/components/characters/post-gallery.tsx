@@ -3,7 +3,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useLanguage, type Language } from '@/lib/i18n';
 import { galleryLabels } from '@/lib/gallery-translations';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { ImagePlus, Trash2, CalendarClock } from 'lucide-react';
 
 type Photo = { id:string; mediaRef:string; description:string; visionStatus?:string; visionAnalysis?:{sceneDescription?:string}|null; reusable:boolean; reserved:boolean; usedCount:number; lastUsedAt:string|null };
 const copy:Record<Language,[string,string,string,string,string,string,string,string,string,string]> = {
@@ -17,13 +17,21 @@ const copy:Record<Language,[string,string,string,string,string,string,string,str
  ja:['投稿ギャラリー','将来の自発的な投稿に使う非公開写真です。外見の参考画像とは別です。','写真を追加','再利用可能','保留（投稿しない）','使用済み','未使用','削除','ギャラリーを更新できませんでした。','先にキャラクターを保存してください。'],
  zh:['发帖图库','供角色日后自主发布的私人照片，与外观参考图分开。','上传照片','允许重复使用','保留（不发布）','已使用','未使用','删除','无法更新图库。','请先保存角色。']
 };
-export function CharacterPostGallery({characterId,universeId='primary'}:{characterId?:string;universeId?:string}) {
+type Scheduled = {id:string;galleryPhotoId:string;caption:string;scheduledAt:string;status:string};
+export function CharacterPostGallery({characterId,universeId='primary',accountType='personal'}:{characterId?:string;universeId?:string;accountType?:string}) {
  const lang=useLanguage();const t=copy[lang];const resolve=useMediaResolver();
+ const professional=accountType!=='personal';
+ const [scheduled,setScheduled]=useState<Scheduled[]>([]);
+ const [selected,setSelected]=useState<string|null>(null);
+ const [caption,setCaption]=useState('');
+ const [dateTime,setDateTime]=useState('');
  const [photos,setPhotos]=useState<Photo[]>([]);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
  const picker=useRef<HTMLInputElement>(null);
  const query=new URLSearchParams({universeId,characterId:characterId??''}).toString();
- const reload=async()=>{if(!characterId)return;const result=await customFetch<{photos:Photo[]}>('/api/character-gallery?'+query,{responseType:'json'});setPhotos(result.photos);};
+ const reload=async()=>{if(!characterId)return;const result=await customFetch<{photos:Photo[]}>('/api/character-gallery?'+query,{responseType:'json'});setPhotos(result.photos);if(professional){const jobs=await customFetch<{posts:Scheduled[]}>('/api/scheduled-posts?'+query,{responseType:'json'});setScheduled(jobs.posts);}};
  useEffect(()=>{let active=true;if(!characterId)return;void customFetch<{photos:Photo[]}>('/api/character-gallery?'+query,{responseType:'json'}).then(r=>{if(active)setPhotos(r.photos)}).catch(()=>{if(active)setError(t[8])});return()=>{active=false};},[characterId,universeId]);
+ async function schedule(){if(!selected||!dateTime)return;setBusy(true);setError('');try{await customFetch('/api/scheduled-posts',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,galleryPhotoId:selected,caption,scheduledAt:new Date(dateTime).toISOString()})});setSelected(null);setCaption('');setDateTime('');await reload();}catch(e){setError(e instanceof Error?e.message:t[8]);}finally{setBusy(false)}}
+ async function cancel(id:string){setBusy(true);try{await customFetch('/api/scheduled-posts/'+id,{method:'DELETE',responseType:'json'});await reload()}catch{setError(t[8])}finally{setBusy(false)}}
  async function add(files:FileList|null){if(!files?.length||!characterId)return;setBusy(true);setError('');try{for(const file of Array.from(files)){if(!file.type.startsWith('image/'))continue;const mediaRef=await uploadPrivateImage(await compressImage(file,1440));const created=await customFetch<{photo:Photo}>('/api/character-gallery',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId,universeId,mediaRef,reusable:false})});await customFetch('/api/character-gallery/'+encodeURIComponent(created.photo.id)+'/analyze',{method:'POST',responseType:'json'}).catch(()=>{});}await reload();}catch{setError(t[8]);}finally{setBusy(false);if(picker.current)picker.current.value='';}}
  async function patch(photo:Photo,change:Partial<Pick<Photo,'reusable'|'reserved'|'description'>>){setBusy(true);try{await customFetch('/api/character-gallery/'+encodeURIComponent(photo.id),{method:'PATCH',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)});await reload();}catch{setError(t[8])}finally{setBusy(false)}}
  async function remove(photo:Photo){setBusy(true);try{await customFetch('/api/character-gallery/'+encodeURIComponent(photo.id),{method:'DELETE',responseType:'json'});await reload();}catch{setError(t[8])}finally{setBusy(false)}}
@@ -36,8 +44,11 @@ export function CharacterPostGallery({characterId,universeId='primary'}:{charact
     <textarea aria-label={galleryLabels[lang].description} placeholder={galleryLabels[lang].description+'…'} defaultValue={photo.description} key={photo.id+photo.description} maxLength={500} rows={2} disabled={busy} onBlur={e=>{if(e.target.value!==photo.description)void patch(photo,{description:e.target.value})}} className="mt-2 w-full resize-none rounded-lg border border-border bg-background p-2 text-xs"/><p className="mt-2 text-xs text-muted-foreground">{photo.visionAnalysis?.sceneDescription ?? (photo.visionStatus === 'complete' ? '' : lang === 'es' ? 'Análisis visual pendiente' : 'Visual analysis pending')}</p><p className="my-2 text-xs text-muted-foreground">{photo.usedCount?t[5]+' · '+photo.usedCount:t[6]}</p>
     <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={photo.reusable} disabled={busy} onChange={e=>void patch(photo,{reusable:e.target.checked})}/>{t[3]}</label>
     <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={photo.reserved} disabled={busy} onChange={e=>void patch(photo,{reserved:e.target.checked})}/>{t[4]}</label>
+    {professional && <button type="button" disabled={busy} onClick={()=>{setSelected(photo.id);setCaption(photo.description)}} className="mb-2 flex items-center gap-1 text-xs text-primary"><CalendarClock size={14}/>{lang==="es"?"Programar publicación":"Schedule post"}</button>}
     <button type="button" disabled={busy} onClick={()=>void remove(photo)} className="flex items-center gap-1 text-xs text-destructive"><Trash2 size={13}/>{t[7]}</button>
    </div>)}</div></>:<p className="text-xs text-muted-foreground">{t[9]}</p>}
+  {professional && selected && <div className="mt-4 rounded-xl border border-border p-3"><h4 className="text-sm font-semibold">{lang==="es"?"Programar publicación":"Schedule post"}</h4><textarea value={caption} maxLength={600} onChange={e=>setCaption(e.target.value)} placeholder="Caption" className="mt-2 w-full rounded-lg border border-border bg-background p-2 text-sm"/><input type="datetime-local" value={dateTime} onChange={e=>setDateTime(e.target.value)} className="mt-2 w-full rounded-lg border border-border bg-background p-2 text-sm"/><div className="mt-3 flex gap-2"><button type="button" disabled={busy||!dateTime||new Date(dateTime).getTime()<=Date.now()+30000} onClick={()=>void schedule()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">{lang==="es"?"Confirmar programación":"Confirm schedule"}</button><button type="button" onClick={()=>setSelected(null)} className="px-3 text-sm">{lang==="es"?"Volver":"Back"}</button></div></div>}
+  {professional && scheduled.length>0 && <div className="mt-5"><h4 className="text-sm font-semibold">{lang==="es"?"Publicaciones programadas":"Scheduled posts"}</h4>{scheduled.map(job=><div key={job.id} className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-xs"><span>{new Date(job.scheduledAt).toLocaleString(lang)} · {job.status} · {job.caption.slice(0,60)}</span>{job.status==="pending"&&<button type="button" onClick={()=>void cancel(job.id)} className="text-destructive">{lang==="es"?"Cancelar":"Cancel"}</button>}</div>)}</div>}
   {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
  </section>;
 }
