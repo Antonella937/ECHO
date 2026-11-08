@@ -156,7 +156,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav */}
       {!inConversation && (
         <nav className="echo-dark-surface echo-mobile-nav fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom,0px),0.25rem)] lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
-          <div className="mx-auto mb-0 flex h-[var(--nav-height)] max-w-[440px] items-center justify-around rounded-[26px] border border-border/80 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
+          <div className="mx-auto mb-0 flex h-[var(--nav-height)] max-w-[440px] items-center justify-between gap-0.5 rounded-[26px] border border-border/80 px-2 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
             {items.map((it) => {
               const active = it.match(location);
               return (
@@ -164,7 +164,7 @@ export function Shell({ children }: { children: ReactNode }) {
                   key={it.href}
                   href={it.href}
                   aria-label={it.label}
-                  className={cn('tap relative grid h-12 w-12 place-items-center rounded-full', active ? 'text-foreground' : 'text-muted-foreground')}
+                  className={cn('tap relative grid h-12 min-w-0 flex-1 place-items-center rounded-full', active ? 'text-foreground' : 'text-muted-foreground')}
                   data-testid={`link-nav-${it.label.toLowerCase()}`}
                 >
                   <it.icon className="h-[25px] w-[25px]" strokeWidth={active ? 2 : 1.5} />
@@ -176,7 +176,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link
               href={`/profile/${me.id}`}
               aria-label={t('profile')}
-              className="tap grid h-12 w-12 place-items-center"
+              className="tap grid h-12 min-w-0 flex-1 place-items-center"
               data-testid="link-nav-profile"
             >
               <span className={cn('rounded-full p-[2px]', profileActive ? 'bg-foreground' : 'bg-transparent')}>
