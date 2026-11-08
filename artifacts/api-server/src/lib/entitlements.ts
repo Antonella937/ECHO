@@ -30,3 +30,41 @@ export const ECHO_AUDIO_POLICY = Object.freeze({
  maxGeneratedAudioSeconds: 30,
  creditsPerGeneratedAudio: 1,
 });
+
+
+/**
+ * Launch pricing and credit policy, shared by future server-side wallet handlers.
+ * Catalog only: does not grant balances, charge cards, or authorize generation.
+ * All prices are USD cents to avoid floating-point billing errors.
+ */
+export const ECHO_CREDIT_POLICY = Object.freeze({
+  monthlyPlans: {
+    free: { priceCents: 0, photoCredits: 10, voiceCredits: 0 },
+    plus: { priceCents: 1299, photoCredits: 60, voiceCredits: 30 },
+    premium: { priceCents: 2499, photoCredits: 150, voiceCredits: 100 },
+  },
+  packs: {
+    photo20: { kind: "photo", credits: 20, priceCents: 299 },
+    photo50: { kind: "photo", credits: 50, priceCents: 649 },
+    photo100: { kind: "photo", credits: 100, priceCents: 1199 },
+    voice50: { kind: "voice", credits: 50, priceCents: 299 },
+  },
+  costs: {
+    standardPhoto: 1,
+    groupPhoto: 2,
+    premiumPhoto: 3,
+    basicVoice: 1,
+    customVoice: 2,
+  },
+  monthlyRewardCaps: {
+    free: { photo: 5, voice: 0 },
+    plus: { photo: 15, voice: 0 },
+    premium: { photo: 25, voice: 5 },
+  },
+  rewardExpiresAfterDays: 30,
+  customVoiceMonthlyMaintenanceCents: 100,
+  /** Actual billing remains disabled until provider pricing and checkout are verified. */
+  checkoutEnabled: false,
+  /** No credit grants or deductions before a transactional database ledger exists. */
+  walletEnabled: false,
+} as const);
