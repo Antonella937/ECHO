@@ -121,7 +121,7 @@ export default function SettingsPage() {
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
             <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
               <span>{st("Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.")}</span></p>
-            <p className="mt-2.5 pl-[26px]">{st("La autonomía de texto puede habilitarse para cuentas autorizadas de la beta privada, con controles individuales y pausa general. La generación de imágenes IA sigue desactivada.")}</p>
+            <p className="mt-2.5 pl-[26px]">{st("La autonomía de texto se gestiona con controles individuales y pausa general. Las imágenes IA se pueden generar manualmente; las publicaciones autónomas con imágenes tienen controles independientes.")}</p>
             <p className="mt-2.5 pl-[26px]">{st("Las fotos de ejemplo son ilustrativas y no muestran a personas reales.")}</p>
             <p className="mt-2.5 pl-[26px]">{st("Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.")}</p>
           </div>
@@ -254,7 +254,7 @@ function ImageGenerationStyleSection() {
             <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span></span>
         </button>)}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">{st("La preferencia se sincroniza con este universo. Se aplicará al generador cuando esté conectado; elegir un estilo no genera imágenes ni consume créditos.")}</p>
+      <p className="mt-3 text-xs text-muted-foreground">{st("La preferencia se sincroniza con este universo y se usa al generar imágenes. Cambiar el estilo no genera imágenes ni consume créditos.")}</p>
     </div>
   </section>;
 }
