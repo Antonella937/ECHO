@@ -98,7 +98,7 @@ router.get("/voices/premium/projects",async(req,res)=>{
   const result=await pool.query(`SELECT id,mode,prompt,language,variant_count AS "variantCount",consent_confirmed AS "consentConfirmed",status,selected_sample_id AS "selectedSampleId"
   FROM echo_voice_projects WHERE owner_id=$1 AND universe_id=$2 AND character_id=$3`,[req.userId,parsed.data.universeId,parsed.data.characterId]);
   const project=result.rows[0]??null;
-  const samples=project?(await pool.query(`SELECT id,status,audio_object_path AS "audioObjectPath" FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 ORDER BY created_at,id`,[project.id,req.userId])).rows:[];
+  const samples=project?(await pool.query(`SELECT id,status,provider,provider_sample_id AS "providerVoiceId",audio_object_path AS "audioObjectPath" FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 ORDER BY created_at,id`,[project.id,req.userId])).rows:[];
   res.json({project,samples,generationAvailable:elevenLabsVoiceStatus().generationAvailable,provider:elevenLabsVoiceStatus().provider});
  }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
 });
