@@ -21,7 +21,7 @@ export interface ImageGenerationResult {
   model: string;
   billedUsd: number;
 }
-export const IMAGE_GENERATION_MODEL = 'qwen/qwen-image-2.1-turbo';
+export const IMAGE_GENERATION_MODEL = 'fal-ai/flux-2-pro/edit';
 export const MAX_IMAGE_REFERENCE_COUNT = 4;
 export const MAX_IMAGE_COST_USD = 0.10;
 // Paid generation remains disabled until provider validation and owner approval.
@@ -29,7 +29,7 @@ export const MAX_IMAGE_COST_USD = 0.10;
 /** Conservative status: no API key or feature flag alone proves that a production budget is active. */
 export function imageGenerationAvailability() {
   return {
-    enabled: paidImageGenerationActivated() && Boolean(process.env.OPENROUTER_API_KEY) && Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    enabled: paidImageGenerationActivated() && Boolean(process.env.FAL_KEY) && Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
     reason: paidImageGenerationActivated() ? 'IMAGE_BUDGET_AND_ACCOUNT_APPROVAL_REQUIRED' : 'PAID_IMAGE_GENERATION_DISABLED',
     // Model capability verified against public docs; production contract and
     // per-account data-transfer consent still require separate approval.
@@ -40,7 +40,7 @@ export function imageGenerationAvailability() {
     monthlySpendingLimitUsd: 0,
     paidCallsMade: 0,
     prerequisites: {
-      openRouterKeyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+      falKeyConfigured: Boolean(process.env.FAL_KEY),
       privateStorageConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
       providerValidated: process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED === 'true',
       paidFeatureFlagEnabled: process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED === 'true',
