@@ -42,16 +42,31 @@ export async function requestFalImage(input: {
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   let payload: any;
   try { payload = JSON.parse(raw); } catch { throw Error('FAL_IMAGE_INVALID_JSON'); }
-  const url = payload?.images?.[0]?.url;
+  return parseFalImagePayload(payload);
+
+}
+
+/**
+ * Offline response parser. fal.ai may return a data URI when sync_mode is
+ * enabled, or a hosted image URL. Hosted URLs are rejected until a bounded,
+ * allowlisted downloader is implemented.
+ *
+ * The estimated price is deliberately NOT represented as billedUsd here:
+ * reconciliation must be explicit before a paid request is permitted.
+ */
+export function parseFalImagePayload(payload: unknown): { bytes: Buffer; mimeType: 'image/jpeg' } {
+  if (!payload || typeof payload !== 'object') throw Error('FAL_IMAGE_INVALID_RESPONSE');
+  const images = (payload as { images?: unknown }).images;
+  if (!Array.isArray(images) || images.length !== 1) throw Error('FAL_IMAGE_UNEXPECTED_COUNT');
+  const image = images[0];
+  if (!image || typeof image !== 'object') throw Error('FAL_IMAGE_INVALID_RESPONSE');
+  const url = (image as { url?: unknown }).url;
   if (typeof url !== 'string' || !url.startsWith('data:image/jpeg;base64,')) {
-    throw Error('FAL_IMAGE_UNEXPECTED_OUTPUT');
+    throw Error('FAL_IMAGE_HOSTED_URL_NOT_YET_SUPPORTED');
   }
-  const bytes = Buffer.from(url.slice('data:image/jpeg;base64,'.length), 'base64');
-  if (!bytes.length || bytes.length > MAX_BYTES || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
-    throw Error('FAL_IMAGE_INVALID_BYTES');
-  }
-  // fal's model response does not contain authoritative billed USD.
-  // Do not fabricate a cost: keep the paid route disabled until a trusted
-  // per-request cost reconciliation mechanism is implemented.
-  throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
+  const encoded = url.slice('data:image/jpeg;base64,'.length);
+  if (!encoded || encoded.length > Math.ceil(MAX_BYTES * 4 / 3) + 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw Error('FAL_IMAGE_INVALID_BASE64');
+  const bytes = Buffer.from(encoded, 'base64');
+  if (!bytes.length || bytes.length > MAX_BYTES || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) throw Error('FAL_IMAGE_INVALID_BYTES');
+  return { bytes, mimeType: 'image/jpeg' };
 }
