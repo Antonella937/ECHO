@@ -181,6 +181,21 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
   resolveMedia: ReturnType<typeof useMediaResolver>;
 }) {
     const t = useNotificationsText();
+    const language = useLanguage();
+    const collaborationVerbs: Record<string, [string, string]> = {
+      es: ['te invitó a colaborar en una publicación', 'aceptó tu invitación a colaborar'],
+      en: ['invited you to collaborate on a post', 'accepted your collaboration invitation'],
+      pt: ['convidou você para colaborar em uma publicação', 'aceitou seu convite de colaboração'],
+      fr: ['vous a invité à collaborer à une publication', 'a accepté votre invitation à collaborer'],
+      de: ['hat dich eingeladen, an einem Beitrag mitzuarbeiten', 'hat deine Einladung zur Zusammenarbeit angenommen'],
+      it: ['ti ha invitato a collaborare a un post', 'ha accettato il tuo invito a collaborare'],
+      ko: ['게시물 공동 작업에 초대했습니다', '공동 작업 초대를 수락했습니다'],
+      ja: ['投稿への共同制作に招待しました', '共同制作への招待を承認しました'],
+      zh: ['邀请你共同创作帖子', '接受了你的共同创作邀请'],
+    };
+    const verb = n.kind === 'collaboration_invite' || n.kind === 'collaboration_accepted'
+      ? (collaborationVerbs[language] ?? collaborationVerbs.en)[n.kind === 'collaboration_invite' ? 0 : 1]
+      : t(VERB[n.kind]);
     const localizeExcerpt = useLocalizedNotificationExcerpt();
     const actor = character(n.actorId);
     const others = n.actorIds.filter((a) => a !== n.actorId).map(character).filter(Boolean);
@@ -196,7 +211,7 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
           <span className="min-w-0 flex-1 text-[14px] leading-snug">
             <span className="font-semibold">{actor.handle}</span><VerifiedBadge account={actor} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" />
             {others.length > 0 && <span className="text-foreground/85" data-testid={`text-notification-group-${n.id}`}>{others.length === 1 ? `${t(" y ")}${others[0]!.handle}` : `${t(" y ")}${others.length}${t(" más")}`}</span>}
-            {others.length === 0 && n.count > 1 && <span className="text-muted-foreground"> ({n.count})</span>} <span className="text-foreground/85">{t(VERB[n.kind])}</span>
+            {others.length === 0 && n.count > 1 && <span className="text-muted-foreground"> ({n.count})</span>} <span className="text-foreground/85">{verb}</span>
             {n.excerpt && <span className="text-muted-foreground">: {localizeExcerpt(n.excerpt)}</span>}
             <span className="ml-1.5 text-xs text-muted-foreground/80">{timeAgo(n.createdAt)}</span>
           </span>
