@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/react';
 import { customFetch } from '@workspace/api-client-react';
 import { Link, useLocation } from 'wouter';
-import { Bell, Bookmark, Home, Palette, PlusSquare, Send, Settings } from 'lucide-react';
+import { Bell, Bookmark, Home, Palette, PlusSquare, Search, Send, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const items = [
     { href: '/', label: t('home'), icon: Home, match: (l: string) => l === '/' },
+    { href: '/search', label: shared('Buscar'), icon: Search, match: (l: string) => l.startsWith('/search') },
     { href: '/messages', label: t('messages'), icon: Send, badge: messages, match: (l: string) => l.startsWith('/messages') },
     { href: '/create', label: t('create'), icon: PlusSquare, match: (l: string) => l.startsWith('/create') },
     { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications + creatorUnread + creatorDmUnread, match: (l: string) => l.startsWith('/notifications') },
