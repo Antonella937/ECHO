@@ -23,6 +23,6 @@ export function selectInbox(state: SocialState, characterId: string): ThreadSumm
     const messages = grouped.get(other.id);
     if (!messages?.length) return [];
     const last = messages.reduce((a, b) => a.createdAt >= b.createdAt ? a : b);
-    return [{ other, last, unread: messages.filter(m => m.recipientId === characterId && !m.readBy.includes(characterId)).length }];
+    return [{ other, last, unread: last.senderId === characterId ? 0 : messages.filter(m => m.recipientId === characterId && !m.readBy.includes(characterId) && m.createdAt > (messages.filter(x => x.senderId === characterId).reduce((latest, x) => x.createdAt > latest ? x.createdAt : latest, ''))).length }];
   }).sort((a, b) => b.last.createdAt.localeCompare(a.last.createdAt));
 }
