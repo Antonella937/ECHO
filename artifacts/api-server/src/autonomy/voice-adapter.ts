@@ -21,7 +21,7 @@ const storageReady = () => {
 };
 
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
-export async function resolveAutonomousVoiceId(ownerId: string, universeId: string, characterId: string, basicVoiceId?: string | null): Promise<string | null> {
+export async function resolveAutonomousVoiceId({ ownerId, universeId, characterId, basicVoiceId }: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string | null }): Promise<string | null> {
   if (await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus().generationAvailable) {
     const selected = await pool.query(`SELECT s.provider_sample_id
       FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
