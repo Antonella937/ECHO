@@ -328,6 +328,21 @@ export async function executeAutonomyDecision(input: {
       return { status: "blocked", reasonCode: "INVALID_UNIVERSE" };
     }
 
+    // A rejected request is a UI preference; a blocked sender is a hard delivery restriction.
+    // Check inside the same transaction that commits autonomous messages.
+    if (input.decision.action === "draft" && input.decision.situation === "dm" && input.opportunity.recipientId) {
+      const blocked = await tx.execute(sql`SELECT 1 FROM echo_dm_request_decisions
+        WHERE owner_id = ${input.ownerId} AND universe_id = ${universeId}
+          AND actor_id = ${input.opportunity.recipientId} AND sender_id = ${input.characterId}
+          AND status = 'blocked' LIMIT 1`);
+      if (blocked.rows.length) {
+        await tx.update(echoAutonomyRunsTable).set({
+          status: "blocked", lastErrorCode: "DM_RECIPIENT_BLOCKED_SENDER", finishedAt: now, updatedAt: now,
+        }).where(and(eq(echoAutonomyRunsTable.ownerId, input.ownerId),
+          eq(echoAutonomyRunsTable.universeId, universeId), eq(echoAutonomyRunsTable.id, run.id)));
+        return { status: "blocked", reasonCode: "DM_RECIPIENT_BLOCKED_SENDER" };
+      }
+    }
     const state = stored.data.state;
     const character = state.characters.find((item) => item.id === input.characterId && !item.archived);
     if (!character) return { status: "blocked", reasonCode: "CHARACTER_NOT_ACTIVE" };
