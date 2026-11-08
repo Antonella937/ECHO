@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useUser } from '@clerk/react';
+import { customFetch } from '@workspace/api-client-react';
 import { useSceneSettingsText } from '@/lib/scene-settings-i18n';
 
 type Style = 'natural' | 'narrative' | 'mixed';
@@ -16,17 +17,25 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId }:
   const t = useSceneSettingsText();
   const [prefs, setPrefs] = useState<Preferences>(defaults);
   const [status, setStatus] = useState('');
-  const key = `echo:dm-ai:draft:${user?.id ?? 'anonymous'}:${universeId}:${characterId}`;
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
-    try { setPrefs({ ...defaults, ...JSON.parse(localStorage.getItem(key) || '{}') }); }
-    catch { setPrefs(defaults); }
+    if (!open || !user?.id) return;
+    let active = true;
     setStatus('');
-  }, [key]);
+    customFetch<{ preferences: Preferences }>(`/api/dm/conversation-preferences?${new URLSearchParams({universeId, characterId})}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
+      .then(result => { if (active) setPrefs({ ...defaults, ...result.preferences }); })
+      .catch(() => { if (active) setStatus(t('failed')); });
+    return () => { active = false; };
+  }, [open, user?.id, universeId, characterId]);
   if (!open) return null;
   const update = <K extends keyof Preferences>(field: K, value: Preferences[K]) => setPrefs(p => ({ ...p, [field]: value }));
-  const save = () => {
-    try { localStorage.setItem(key, JSON.stringify(prefs)); setStatus(t('saved')); }
-    catch { setStatus(t('failed')); }
+  const save = async () => {
+    setSaving(true);
+    try {
+      await customFetch('/api/dm/conversation-preferences', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, preferences: prefs }) });
+      setStatus(t('savedOnline'));
+    } catch { setStatus(t('failed')); }
+    finally { setSaving(false); }
   };
   return <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onClick={onClose}>
     <section role="dialog" aria-modal="true" aria-label={t('aiSettings')} onClick={e => e.stopPropagation()} className="max-h-[75dvh] w-[min(94vw,26rem)] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-xl">
@@ -47,7 +56,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId }:
       </select>
       <label className="mb-4 flex items-center gap-3 text-sm"><input type="checkbox" checked={prefs.autonomousInitiative} onChange={e => update('autonomousInitiative', e.target.checked)} />{t('initiative')}</label>
       </div></details>
-      <button type="button" onClick={save} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">{t('save')}</button>
+      <button type="button" onClick={save} disabled={saving} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">{t('save')}</button>
       {status && <p role="status" className="mt-3 text-xs text-muted-foreground">{status}</p>}
     </section>
   </div>;
