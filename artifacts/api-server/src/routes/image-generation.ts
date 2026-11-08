@@ -199,11 +199,14 @@ router.post('/ai-engine/images/storage-self-test', requireAuth, async (req, res)
     res.status(404).json({ error: 'NOT_FOUND' });
     return;
   }
+  // A synthetic 1x1 PNG, never a user photo or a paid provider request.
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==', 'base64');
   let objectPath: string | undefined;
   let uploaded = false;
   let readBack = false;
-  let cleaned = false;
+  let storageDeleted = false;
+  let recordDeleted = false;
+  let failure: unknown;
   try {
     objectPath = await saveGeneratedImage(req.userId!, png, 'image/png');
     uploaded = true;
@@ -218,32 +221,39 @@ router.post('/ai-engine/images/storage-self-test', requireAuth, async (req, res)
     const received = Buffer.from(await response.arrayBuffer());
     if (!received.equals(png)) throw Error('STORAGE_SELF_TEST_CONTENT_MISMATCH');
     readBack = true;
-    res.json({ status: 'passed', uploaded, readBack, cleanup: 'pending_finally' });
   } catch (error) {
+    failure = error;
     req.log.error({ err: error }, 'Image storage self-test failed');
-    res.status(503).json({ status: 'failed', uploaded, readBack });
-  } finally {
-    if (objectPath) {
-      try {
-    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (!base || !key) throw Error('STORAGE_NOT_CONFIGURED');
-    const remotePath = objectPath.slice('/objects/'.length);
-        const response = await fetch(`${base}/storage/v1/object/echo-media/${remotePath}`, {
-          method: 'DELETE', headers: { Authorization: `Bearer ${key}`, apikey: key },
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!response.ok) throw Error('STORAGE_SELF_TEST_DELETE_FAILED');
-        await db.delete(echoMediaTable).where(and(
-          eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath),
-        ));
-        cleaned = true;
-      } catch (error) {
-        req.log.error({ err: error, objectPath }, 'Image storage self-test cleanup requires attention');
-      }
-      req.log.info({ cleaned }, 'Image storage self-test cleanup');
+  }
+  if (objectPath) {
+    try {
+      const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!base || !key) throw Error('STORAGE_NOT_CONFIGURED');
+      const remotePath = objectPath.slice('/objects/'.length);
+      const url = `${base}/storage/v1/object/echo-media/${remotePath}`;
+      const headers = { Authorization: `Bearer ${key}`, apikey: key };
+      const deletion = await fetch(url, { method: 'DELETE', headers, redirect: 'error', signal: AbortSignal.timeout(10000) });
+      if (!deletion.ok) throw Error('STORAGE_SELF_TEST_DELETE_FAILED');
+      const check = await fetch(url, { headers, redirect: 'error', signal: AbortSignal.timeout(10000) });
+      if (check.status !== 404) throw Error('STORAGE_SELF_TEST_DELETE_NOT_CONFIRMED');
+      storageDeleted = true;
+      await db.delete(echoMediaTable).where(and(
+        eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath),
+      ));
+      const remaining = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+        .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath))).limit(1);
+      if (remaining.length) throw Error('STORAGE_SELF_TEST_DB_DELETE_NOT_CONFIRMED');
+      recordDeleted = true;
+    } catch (error) {
+      failure ??= error;
+      req.log.error({ err: error, objectPath }, 'Image storage self-test cleanup requires attention');
     }
   }
+  const passed = !failure && uploaded && readBack && storageDeleted && recordDeleted;
+  res.status(passed ? 200 : 503).json({
+    status: passed ? 'passed' : 'failed', uploaded, readBack, storageDeleted, recordDeleted,
+  });
 });
 
 export default router;
