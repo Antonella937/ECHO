@@ -6,7 +6,7 @@ import type { ImageGenerationReference } from './imageGenerationPayload';
 // Keep this model-specific rate card under review before enabling paid calls.
 export const FAL_FIRST_OUTPUT_MP_USD = 0.03;
 export const FAL_ADDITIONAL_MP_USD = 0.015;
-export const FAL_MP_PIXELS = 1024 * 1024;
+export const FAL_MP_PIXELS = 1_000_000;
 export const FAL_OUTPUT_WIDTH = 768;
 export const FAL_OUTPUT_HEIGHT = 1024;
 export const FAL_MAX_INPUT_MP_PER_REFERENCE = 2;
@@ -61,11 +61,19 @@ export function falProEditEstimatedCostUsd(references: ImageGenerationReference[
   const outputMp = Math.max(1, Math.ceil(outputWidth * outputHeight / FAL_MP_PIXELS));
   if (outputMp > 4) throw Error('FAL_OUTPUT_TOO_LARGE');
   let additionalMp = outputMp - 1;
+  let totalInputPixels = 0;
   for (const ref of references) {
     const { width, height } = imageDimensions(ref);
-    const mp = Math.max(1, Math.ceil(width * height / FAL_MP_PIXELS));
-    if (mp > FAL_MAX_INPUT_MP_PER_REFERENCE) throw Error('FAL_REFERENCE_RESOLUTION_EXCEEDS_BUDGET');
-    additionalMp += mp;
+    const pixels = width * height;
+    if (pixels > FAL_MAX_INPUT_MP_PER_REFERENCE * FAL_MP_PIXELS) throw Error('FAL_REFERENCE_RESOLUTION_EXCEEDS_BUDGET');
+    totalInputPixels += pixels;
   }
+  // Charge conservatively by rounding each reference up separately.
+  // Never underestimate the sum even if the provider rounds aggregate input.
+  for (const ref of references) {
+    const { width, height } = imageDimensions(ref);
+    additionalMp += Math.ceil(width * height / FAL_MP_PIXELS);
+  }
+  if (totalInputPixels > 9 * FAL_MP_PIXELS) throw Error('FAL_TOTAL_INPUT_RESOLUTION_EXCEEDS_LIMIT');
   return Number((FAL_FIRST_OUTPUT_MP_USD + additionalMp * FAL_ADDITIONAL_MP_USD).toFixed(8));
 }
