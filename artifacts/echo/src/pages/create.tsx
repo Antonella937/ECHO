@@ -1,4 +1,5 @@
 import { usePostComposeText } from '@/lib/post-compose-translations';
+import { useLanguage } from '@/lib/i18n';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { Link, useLocation, useSearch } from 'wouter';
@@ -22,6 +23,19 @@ type Mode = 'post' | 'story';
 
 export default function CreatePage() {
   const t = usePostComposeText();
+  const language = useLanguage();
+  const extraLabels: Record<string, string[]> = {
+    es: ['Invitar colaboradores', 'La publicación aparecerá en sus perfiles cuando acepten.', 'Agregar encuesta', 'Pregunta', 'Opción', 'Agregar opción', 'Quitar opción', 'Completá la pregunta y al menos dos opciones.'],
+    en: ['Invite collaborators', 'The post will appear on their profiles after they accept.', 'Add poll', 'Question', 'Option', 'Add option', 'Remove option', 'Enter a question and at least two options.'],
+    pt: ['Convidar colaboradores', 'A publicação aparecerá nos perfis após aceitarem.', 'Adicionar enquete', 'Pergunta', 'Opção', 'Adicionar opção', 'Remover opção', 'Preencha a pergunta e pelo menos duas opções.'],
+    fr: ['Inviter des collaborateurs', 'La publication apparaîtra sur leur profil après acceptation.', 'Ajouter un sondage', 'Question', 'Option', 'Ajouter une option', 'Retirer une option', 'Saisissez une question et au moins deux options.'],
+    de: ['Mitwirkende einladen', 'Der Beitrag erscheint nach der Annahme auf ihren Profilen.', 'Umfrage hinzufügen', 'Frage', 'Option', 'Option hinzufügen', 'Option entfernen', 'Gib eine Frage und mindestens zwei Optionen ein.'],
+    it: ['Invita collaboratori', 'Il post apparirà sui loro profili dopo che avranno accettato.', 'Aggiungi sondaggio', 'Domanda', 'Opzione', 'Aggiungi opzione', 'Rimuovi opzione', 'Inserisci una domanda e almeno due opzioni.'],
+    ko: ['공동 작업자 초대', '수락하면 해당 프로필에도 게시물이 표시됩니다.', '투표 추가', '질문', '선택지', '선택지 추가', '선택지 삭제', '질문과 두 개 이상의 선택지를 입력하세요.'],
+    ja: ['共同投稿者を招待', '承認後に相手のプロフィールにも表示されます。', 'アンケートを追加', '質問', '選択肢', '選択肢を追加', '選択肢を削除', '質問と2つ以上の選択肢を入力してください。'],
+    zh: ['邀请共同创作者', '接受邀请后帖子将显示在他们的主页上。', '添加投票', '问题', '选项', '添加选项', '删除选项', '请输入问题和至少两个选项。'],
+  };
+  const extra = (index: number) => (extraLabels[language] ?? extraLabels.en)[index];
   const resolveMedia = useMediaResolver();
   const search = useSearch();
   const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
@@ -222,7 +236,7 @@ export default function CreatePage() {
       }
       validatePostMedia(items);
       if (pollEnabled && (!pollQuestion.trim() || pollOptions.filter(v => v.trim()).length < 2 || pollOptions.some(v => !v.trim()))) {
-        setError(t('Completá la pregunta y al menos dos opciones.')); return;
+        setError(extra(7)); return;
       }
       const poll = pollEnabled ? { question: pollQuestion.trim().slice(0, 200), options: pollOptions.map((text, i) => ({ id: `option_${i}`, text: text.trim().slice(0, 100) })), votes: {} as Record<string, string> } : undefined;
       const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), ...(collaborators.length ? { collaborationInvites: collaborators } : {}), ...(poll ? { poll } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
@@ -439,15 +453,15 @@ export default function CreatePage() {
               />
             </label>
             <div className="mt-3"><AccountMultiPicker value={tagged} onChange={setTagged} label={t("Etiquetar cuentas")} excludeId={me.id} testId="picker-post-tags" /></div>
-            <div className="mt-3"><AccountMultiPicker value={collaborators} onChange={setCollaborators} label={t("Invitar colaboradores")} excludeId={me.id} max={10} testId="picker-post-collaborators" />
-              <p className="mt-1 text-xs text-muted-foreground">{t("La publicación aparecerá en sus perfiles cuando acepten.")}</p>
+            <div className="mt-3"><AccountMultiPicker value={collaborators} onChange={setCollaborators} label={extra(0)} excludeId={me.id} max={10} testId="picker-post-collaborators" />
+              <p className="mt-1 text-xs text-muted-foreground">{extra(1)}</p>
             </div>
             <section className="mt-3 rounded-2xl border border-border p-3">
-              <label className="flex items-center justify-between gap-3 text-sm font-medium">{t("Agregar encuesta")}<Switch checked={pollEnabled} onCheckedChange={setPollEnabled} /></label>
+              <label className="flex items-center justify-between gap-3 text-sm font-medium">{extra(2)}<Switch checked={pollEnabled} onCheckedChange={setPollEnabled} /></label>
               {pollEnabled && <div className="mt-3 grid gap-2">
-                <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value.slice(0, 200))} maxLength={200} placeholder={t("Pregunta")} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />
-                {pollOptions.map((option, i) => <input key={i} value={option} onChange={e => setPollOptions(old => old.map((v, j) => i === j ? e.target.value.slice(0, 100) : v))} maxLength={100} placeholder={`${t("Opción")} ${i + 1}`} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />)}
-                <div className="flex gap-2">{pollOptions.length < 4 && <button type="button" onClick={() => setPollOptions(old => [...old, ''])} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t("Agregar opción")}</button>}{pollOptions.length > 2 && <button type="button" onClick={() => setPollOptions(old => old.slice(0, -1))} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t("Quitar opción")}</button>}</div>
+                <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value.slice(0, 200))} maxLength={200} placeholder={extra(3)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />
+                {pollOptions.map((option, i) => <input key={i} value={option} onChange={e => setPollOptions(old => old.map((v, j) => i === j ? e.target.value.slice(0, 100) : v))} maxLength={100} placeholder={`${extra(4)} ${i + 1}`} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />)}
+                <div className="flex gap-2">{pollOptions.length < 4 && <button type="button" onClick={() => setPollOptions(old => [...old, ''])} className="rounded-lg bg-secondary px-3 py-2 text-xs">{extra(5)}</button>}{pollOptions.length > 2 && <button type="button" onClick={() => setPollOptions(old => old.slice(0, -1))} className="rounded-lg bg-secondary px-3 py-2 text-xs">{extra(6)}</button>}</div>
               </div>}
             </section>
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
