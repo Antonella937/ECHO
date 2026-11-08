@@ -105,7 +105,7 @@ export function AutonomySettingsSection() {
         {t("Autonomía de texto")}
       </h2>
       <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
-        {settings?.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar solos con IA de texto. Las imágenes IA permanecen apagadas.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
+        {settings?.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar con IA de texto. La generación manual de imágenes está disponible; las acciones autónomas con imágenes se controlan por separado.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
       </p>
       <div className="mt-3 divide-y divide-border rounded-2xl border border-border bg-card/60">
         <div className="flex items-center gap-3 p-4">
@@ -215,7 +215,7 @@ export function AutonomySettingsSection() {
                     onChange={(event) => setDmDrafts((old) => ({ ...old, [character.characterId]: { ...old[character.characterId], dmInstructions: event.target.value } }))}
                   />
                 </label>
-                <p className="text-xs text-muted-foreground">{t("Las fotos estarán disponibles cuando se habilite la función y respetarán el límite diario de tu plan. Los audios requieren habilitación específica y no pueden solicitarse libremente.")}</p>
+                <p className="text-xs text-muted-foreground">{t("Las fotos y notas de voz autónomas respetan los permisos, preferencias y límites de tu plan. Los audios necesitan autorización y presupuesto habilitados.")}</p>
                 <button type="button" className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50" disabled={update.isPending} onClick={() => saveDmPreferences(character.characterId)}>{t("Guardar preferencias")}</button>
               </div>
             )}
