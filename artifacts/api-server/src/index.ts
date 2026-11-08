@@ -1,5 +1,4 @@
 import app from "./app";
-import { probeFalImagePricing } from "./lib/falProviderPreflight";
 import { publishDueScheduledPosts } from "./lib/scheduledPosts";
 import { logger } from "./lib/logger";
 import { startAutonomyBackgroundWorker } from "./autonomy/runtime";
@@ -30,12 +29,8 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  // Verify both image models without making a paid generation request.
-  if (process.env.FAL_KEY) {
-    void probeFalImagePricing(process.env.FAL_KEY)
-      .then(result => logger.info({ imageModels: result.models.map(m => m.endpointId) }, "ECHO_IMAGE_PROVIDER_PREFLIGHT_OK"))
-      .catch(error => logger.warn({ reason: error instanceof Error ? error.message : "UNKNOWN" }, "ECHO_IMAGE_PROVIDER_PREFLIGHT_FAILED"));
-  }
+  // Provider readiness is checked on demand; never run a timed response-stream
+  // preflight during boot, where an aborted stream can emit an unhandled error.
 });
 
 process.on("SIGTERM", () => autonomyWorker.stop());
