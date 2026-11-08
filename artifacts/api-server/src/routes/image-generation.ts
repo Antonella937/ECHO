@@ -142,12 +142,13 @@ router.get('/ai-engine/images/status', requireAuth, async (req, res) => {
   const availability = imageGenerationAvailability();
   try {
     const budget = await readImageBudgetReadiness();
-    // Conservative public readiness: provider contract and production
-    // activation still require explicit owner validation and approval.
+    // Report account eligibility and budget readiness without a paid request.
     res.json({
       ...availability,
       enabled: availability.enabled && access.allowed && budget.canReserveOneImage,
-      reason: availability.enabled && access.allowed && budget.canReserveOneImage ? 'READY_FOR_PAID_GENERATION' : 'PAID_IMAGE_GENERATION_DISABLED',
+      reason: !access.allowed ? 'IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED' :
+        !availability.enabled ? 'PAID_IMAGE_GENERATION_DISABLED' :
+        !budget.canReserveOneImage ? 'IMAGE_BUDGET_NOT_READY' : 'READY_FOR_PAID_GENERATION',
       access,
       monthlySpendingLimitUsd: budget.ceilingUsd,
       prerequisites: { ...availability.prerequisites, budgetActivated: budget.canReserveOneImage },
