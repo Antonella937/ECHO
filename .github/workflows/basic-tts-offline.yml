@@ -8,6 +8,8 @@ on:
       - 'artifacts/api-server/src/autonomy/voice-adapter.ts'
       - 'artifacts/api-server/tests/basic-voice-provider.test.ts'
       - 'artifacts/api-server/tests/deapi-speech.test.ts'
+      - 'artifacts/api-server/tests/basic-voice-audio.test.ts'
+      - 'artifacts/api-server/src/lib/mp3Duration.ts'
       - '.github/workflows/basic-tts-offline.yml'
   pull_request:
     paths:
@@ -17,6 +19,8 @@ on:
       - 'artifacts/api-server/src/autonomy/voice-adapter.ts'
       - 'artifacts/api-server/tests/basic-voice-provider.test.ts'
       - 'artifacts/api-server/tests/deapi-speech.test.ts'
+      - 'artifacts/api-server/tests/basic-voice-audio.test.ts'
+      - 'artifacts/api-server/src/lib/mp3Duration.ts'
       - '.github/workflows/basic-tts-offline.yml'
   workflow_dispatch:
 
@@ -38,7 +42,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Verify provider contracts without API keys or paid calls
-        run: pnpm --filter @workspace/api-server exec tsx --test tests/basic-voice-provider.test.ts tests/deapi-speech.test.ts
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/basic-voice-provider.test.ts tests/deapi-speech.test.ts tests/basic-voice-audio.test.ts tests/mp3-duration.test.ts
         env:
           ECHO_BASIC_TTS_PROVIDER: kokoro
           ECHO_DEAPI_TTS_KEY: ''
