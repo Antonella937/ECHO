@@ -30,6 +30,7 @@ export default function ProfilePage() {
   const { openStories } = useStoryViewer();
   const person = character(id);
   const [editing, setEditing] = useState(false);
+  const [showMutualFollowers, setShowMutualFollowers] = useState(false);
   const [tab, setTab] = useState<'posts' | 'tagged'>('posts');
   const posts = useMemo(() => {
     const own = state.posts.filter((p) => p.authorId === id).sort(byDateDesc);
@@ -54,7 +55,10 @@ export default function ProfilePage() {
   const pendingRequests = state.followRequests?.[me.id] ?? [];
   const stories = state.stories.filter((s) => s.authorId === person.id && isStoryActive(s) && canViewStory(s, me.id, state));
   const unseen = !isMe && stories.some((s) => !s.seenBy.includes(me.id));
-  const friends = (state.follows[person.id] ?? []).map(character).filter(Boolean);
+  const myFollowing = new Set(state.follows[me.id] ?? []);
+  const mutualFollowers = state.characters.filter((c) => c.id !== me.id && c.id !== person.id && !c.archived && myFollowing.has(c.id) && (state.follows[c.id] ?? []).includes(person.id));
+  const mutualLabel = ({ es: 'Seguido por', en: 'Followed by', pt: 'Seguido por', fr: 'Suivi par', de: 'Gefolgt von', it: 'Seguito da', ko: '팔로우한 사람', ja: 'フォロー中', zh: '关注者' } as Record<string, string>)[language] ?? 'Followed by';
+  const moreLabel = ({ es: 'y {count} personas más', en: 'and {count} more', pt: 'e mais {count}', fr: 'et {count} autres', de: 'und {count} weitere', it: 'e altri {count}', ko: '외 {count}명', ja: 'ほか{count}人', zh: '及其他{count}人' } as Record<string, string>)[language] ?? 'and {count} more';
   const real = realFollowCounts(state, person.id);
   const followers = shownCount(person.displayMetrics?.followers, real.followers);
   const following = shownCount(person.displayMetrics?.following, real.following);
@@ -148,19 +152,34 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {friends.length > 0 && (
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {friends.map((f) => f && <CharacterAvatar key={f.id} character={f} size={24} className="rounded-full ring-2 ring-background" />)}
+        {mutualFollowers.length > 0 && (
+          <div className="mt-6 min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex shrink-0 -space-x-2">
+                {mutualFollowers.slice(0, 2).map((f) => <CharacterAvatar key={f.id} character={f} size={24} className="rounded-full ring-2 ring-background" />)}
+              </div>
+              <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {mutualLabel}{' '}
+                {mutualFollowers.slice(0, 2).map((f, i) => (
+                  <span key={f.id}>
+                    {i > 0 ? ', ' : ''}
+                    <Link href={`/profile/${f.id}`} className="font-semibold text-foreground" data-testid={`link-profile-friend-${f.id}`}>{f.name.split(' ')[0]}</Link>
+                  </span>
+                ))}
+                {mutualFollowers.length > 2 && (
+                  <> <button type="button" className="font-semibold text-foreground" onClick={() => setShowMutualFollowers(!showMutualFollowers)}>{moreLabel.replace('{count}', String(mutualFollowers.length - 2))}</button></>
+                )}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Amistad con {friends.map((f, i) => f && (
-                <span key={f.id}>
-                  <Link href={`/profile/${f.id}`} className="font-semibold text-foreground" data-testid={`link-profile-friend-${f.id}`}>{f.name.split(' ')[0]}</Link>
-                  {i < friends.length - 1 ? ' y ' : ''}
-                </span>
-              ))}
-            </p>
+            {showMutualFollowers && mutualFollowers.length > 2 && (
+              <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border p-2">
+                {mutualFollowers.map((f) => (
+                  <Link key={f.id} href={`/profile/${f.id}`} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary">
+                    <CharacterAvatar character={f} size={28} /><span className="truncate">@{f.handle}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>
