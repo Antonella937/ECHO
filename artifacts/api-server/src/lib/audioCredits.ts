@@ -22,7 +22,8 @@ export async function reserveCharacterAudioCredit(args: {
   const outcome = await spendCredits(args.ownerId,"voice",cost,args.requestKey);
   const wallet = await creditWallet(args.ownerId);
   const remaining = Object.values(wallet.balances.voice).reduce((sum,amount)=>sum+amount,0);
-  return outcome.charged || outcome.duplicate
+  if (outcome.duplicate) return {allowed:false,remaining,reason:"VOICE_REQUEST_ALREADY_PROCESSED"};
+  return outcome.charged
     ? {allowed:true,remaining}
     : {allowed:false,remaining,reason:"MONTHLY_AUDIO_CREDITS_EXHAUSTED"};
 }
