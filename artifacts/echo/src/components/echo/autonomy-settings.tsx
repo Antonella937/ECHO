@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from "react";
 import { useEffect } from "react";
@@ -129,7 +130,7 @@ export function AutonomySettingsSection() {
             {t("No se pudieron cargar los controles de autonomía. No se habilitó ninguna cuenta.")}
           </div>
         )}
-        <div className="p-4">
+        <details className="group" data-testid="details-social-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Autonomía social")} · {settings?.characters.filter(c=>c.enabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Autonomía social")}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t("Elegí quién puede publicar, comentar, dar me gusta y reaccionar por su cuenta.")}</p>
         </div>
@@ -157,7 +158,8 @@ export function AutonomySettingsSection() {
             </button>
           </div>
         ))}
-        <div className="p-4">
+        </div></details>
+        <details className="group" data-testid="details-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Mensajes autónomos")} · {settings?.characters.filter(c=>c.dmEnabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Mensajes autónomos")}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden responder mensajes privados automáticamente. Este permiso es independiente de la actividad social.")}</p>
         </div>
@@ -218,6 +220,7 @@ export function AutonomySettingsSection() {
             )}
           </div>
         ))}
+        </div></details>
       </div>
 
       {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">{t("La simulación no se completó.")}</p><p className="mt-1">{t('Código:')} <code>{previewError}</code>. {t("No se ejecutó ninguna acción social.")}</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>{t("Copiar código de error")}</button></div>}
