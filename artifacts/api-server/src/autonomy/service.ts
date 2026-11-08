@@ -269,6 +269,7 @@ export async function runAutonomyLiveCycle(
       remainingCharacters: number;
       preference: "off" | "occasional" | "frequent";
       dispatch(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }): Promise<void>;
+      resolveVoiceId(input: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string | null }): Promise<string | null>;
     };
   },
 ): Promise<{ status: string; reasonCode: string; characterId: string; runId: string | null; model: string | null }> {
@@ -396,7 +397,8 @@ export async function runAutonomyLiveCycle(
             message.origin === "autonomy" && message.text === preview.decision.text?.trim());
           const incoming = [...state.messages].reverse().find(message =>
             message.senderId === opportunity.recipientId && message.recipientId === character.id);
-          const voiceId = character.configuration?.voice?.basicVoiceId;
+          const voiceId = await delivery.resolveVoiceId({ ownerId, universeId, characterId: character.id,
+            basicVoiceId: character.configuration?.voice?.basicVoiceId });
           if (outgoing && voiceId && !outgoing.attachments?.some(a => a.type === "audio")) {
             const policy: VoiceDecisionInput = {
               voiceId, ownerEnabled: delivery.ownerEnabled, engineReady: delivery.engineReady,
