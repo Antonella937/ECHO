@@ -87,7 +87,7 @@ export async function spendCredits(ownerId: string, kind: Kind, amount: number, 
     if (prior.rowCount) { await client.query("ROLLBACK"); return { charged: false, duplicate: true }; }
     const grants = await client.query<{id:string;bucket:Bucket;remaining:string;expires_at:Date|null}>(`
       SELECT g.id::text,g.bucket,g.expires_at,
-      (g.amount + COALESCE((SELECT SUM(d.amount) FROM echo_credit_ledger d WHERE d.owner_id=g.owner_id AND d.event_key LIKE 'debit:' || g.id || ':%'),0))::text AS remaining
+      (g.amount + COALESCE((SELECT SUM(d.amount) FROM echo_credit_ledger d WHERE d.owner_id=g.owner_id AND (d.event_key LIKE 'debit:' || g.id || ':%' OR d.event_key LIKE 'refund:debit:' || g.id || ':%')),0))::text AS remaining
       FROM echo_credit_ledger g WHERE g.owner_id=$1 AND g.kind=$2 AND g.amount>0
         AND (g.expires_at IS NULL OR g.expires_at>now())
       ORDER BY CASE g.bucket WHEN 'reward' THEN 0 WHEN 'monthly' THEN 1 ELSE 2 END,
