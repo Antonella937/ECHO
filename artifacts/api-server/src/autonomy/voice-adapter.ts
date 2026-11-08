@@ -26,7 +26,7 @@ export async function resolveAutonomousVoiceId(ownerId: string, universeId: stri
       FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
       WHERE p.owner_id=$1 AND p.universe_id=$2 AND p.character_id=$3
         AND p.status='ready' AND s.owner_id=$1 AND s.project_id=p.id
-        AND s.provider='elevenlabs' AND s.status='ready' LIMIT 1`, [ownerId, universeId, characterId]);
+        AND s.provider IN ('elevenlabs','elevenlabs_catalog') AND s.status='ready' LIMIT 1`, [ownerId, universeId, characterId]);
     const id = selected.rows[0]?.provider_sample_id;
     if (typeof id === "string" && /^[a-zA-Z0-9_-]{10,128}$/.test(id)) return `elevenlabs:${id}`;
   }
