@@ -31,3 +31,22 @@ export function eligibleGroupSpeakers(input: GroupAutonomyPolicyInput): string[]
     return !Number.isFinite(last) || input.now.getTime() - last >= 15 * 60_000;
   }).map(c => c.id);
 }
+
+/** One response maximum per evaluation, preferring a speaker other than the last sender.
+ * This is deliberately deterministic to make retries idempotent at the scheduler boundary.
+ */
+export function chooseGroupSpeaker(input: GroupAutonomyPolicyInput & {
+  lastSenderId?: string | null;
+  lastMessageAt?: Date | string | null;
+  lastMessageText?: string | null;
+}): string | null {
+  const eligible = eligibleGroupSpeakers(input);
+  if (!eligible.length) return null;
+  const lastAt = asTime(input.lastMessageAt);
+  if (!Number.isFinite(lastAt) || lastAt > input.now.getTime() ||
+      input.now.getTime() - lastAt > 24 * 60 * 60_000 ||
+      !input.lastMessageText?.trim()) return null;
+  // Do not react immediately; let human participants finish typing.
+  if (input.now.getTime() - lastAt < 2 * 60_000) return null;
+  return eligible.find(id => id !== input.lastSenderId) ?? null;
+}
