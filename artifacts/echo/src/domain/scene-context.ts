@@ -30,7 +30,7 @@ export function visibleSceneEvents(scene: SceneContext, viewerId: string): Scene
     .filter(event => event.sceneId === scene.sceneId)
     .filter(event => {
       if (event.visibility === 'public') return true;
-      if (event.visibility === 'participants') return scene.participantIds.includes(viewerId);
+      if (event.visibility === 'participants') return (event.audienceIds?.length ?? 0) > 0\n        ? event.audienceIds!.includes(viewerId) || event.actorId === viewerId\n        : scene.participantIds.includes(viewerId);
       return event.actorId === viewerId || (event.audienceIds ?? []).includes(viewerId);
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
@@ -41,7 +41,7 @@ export function privateDmSceneContext(scene: SceneContext | null, dmParticipants
   if (!scene || dmParticipants.length !== 2 || !dmParticipants.every(id => scene.participantIds.includes(id))) return [];
   // Only shared/public scene observations; never relay private events from the scene.
   return visibleSceneEvents(scene, dmParticipants[0])
-    .filter(event => event.visibility === 'public' || event.visibility === 'participants')
+    .filter(event => event.visibility === 'public' || (event.visibility === 'participants' && (!event.audienceIds?.length || dmParticipants.every(id => event.actorId === id || event.audienceIds!.includes(id)))))
     .slice(-30);
 }
 
