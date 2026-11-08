@@ -21,11 +21,12 @@ test("submits Kokoro request, polls completed job and returns MP3", async () => 
     calls++;
     if (calls === 1) {
       assert.equal(String(url), "https://api.deapi.ai/api/v2/audio/speech");
-      const body = JSON.parse(String(init?.body));
-      assert.equal(body.model, "Kokoro");
-      assert.equal(body.lang, "en-us");
-      assert.equal(body.voice, "af_heart");
-      assert.equal(body.format, "mp3");
+      assert.ok(init?.body instanceof FormData);
+      assert.equal(init.body.get("model"), "Kokoro");
+      assert.equal(init.body.get("lang"), "en-us");
+      assert.equal(init.body.get("voice"), "af_heart");
+      assert.equal(init.body.get("format"), "mp3");
+      assert.equal(init.body.get("mode"), "custom_voice");
       return Response.json({ data: { request_id: "test-job-1" } });
     }
     if (calls === 2) {
