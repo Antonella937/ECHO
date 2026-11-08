@@ -40,10 +40,12 @@ export function createConsentSafetyGate(
         if (!media || media.ownerId !== ownerId) return unavailable();
         // Existing storage authorization still checks exact association, privacy and archives.
       }
+      // Image prompt preparation is a private, non-generating preview; it does not transfer media or spend credits.
+      const safeImagePreview = req.method === "POST" && (path === "/ai-engine/images/prepare" || path === "/ai-engine/images/prepare-edit");
       const authorizedPrivateAutonomy = AUTONOMY_PRIVATE_BETA_ENABLED &&
         path.startsWith("/autonomy/") && isAutonomyOwnerAuthorized(ownerId);
       if ((/^\/universe\/[^/]+\/sharing$/.test(path) && req.body?.sharingEnabled === true) ||
-        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy)) {
+        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy && !safeImagePreview)) {
         res.status(409).json({ error: "LEGAL_DOCUMENTS_UNAVAILABLE", externalUseAllowed: false });
         return;
       }
