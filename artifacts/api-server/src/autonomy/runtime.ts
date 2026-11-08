@@ -15,6 +15,9 @@ import { runAutonomyLiveCycle, type LiveAutonomyRepository } from "./service";
 import { logger } from "../lib/logger";
 import { runAutonomyWorkerTick, startAutonomyWorker } from "./worker";
 import { readUniverse } from "../lib/universeRepository";
+import { runGroupAutonomyOnce } from "./group-executor";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { dispatchAutonomousVoice, getVoiceOwnerControls } from "./voice-adapter";
 
 const provider = new FreeModelProvider();
@@ -29,6 +32,7 @@ const repository: LiveAutonomyRepository = {
 
 export function startAutonomyBackgroundWorker() {
   let lastSocialSlotAttempted = -1;
+  let lastGroupSlotAttempted = -1;
   return startAutonomyWorker({
     enabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
     tick: async () => {
@@ -64,6 +68,25 @@ export function startAutonomyBackgroundWorker() {
           }
         },
       });
+      if (result.status === "completed" && socialSlot !== lastGroupSlotAttempted) {
+        lastGroupSlotAttempted = socialSlot;
+        try {
+          // One group at most per tick. Avoid fan-out and unexpected provider usage.
+          const groups = await db.execute(sql`SELECT owner_id, universe_id, id
+            FROM echo_group_conversations
+            WHERE autonomy_enabled = true
+              AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
+              AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - autonomy_interval_minutes * interval '1 minute')
+            ORDER BY updated_at ASC LIMIT 1`);
+          const group = groups.rows[0];
+          if (group) {
+            const outcome = await runGroupAutonomyOnce(String(group.owner_id), String(group.universe_id), String(group.id));
+            logger.info({ status: outcome.status, reason: "reason" in outcome ? outcome.reason : undefined }, "Group autonomy tick");
+          }
+        } catch (error) {
+          logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" }, "Group autonomy tick failed");
+        }
+      }
       if (result.status === "completed") {
         lastSocialSlotAttempted = socialSlot;
         logger.info({
