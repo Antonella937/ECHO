@@ -59,6 +59,7 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: '/create', label: t('create'), icon: PlusSquare, match: (l: string) => l.startsWith('/create') },
     { href: '/notifications', label: t('notifications'), icon: Bell, badge: notifications + creatorUnread + creatorDmUnread, match: (l: string) => l.startsWith('/notifications') },
   ];
+  const mobileItems = items.filter(it => it.href !== '/create');
   const profileActive = location === `/profile/${me.id}`;
   const friends = (state.follows[me.id] ?? []).map(character).filter(Boolean);
 
@@ -157,7 +158,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {!inConversation && (
         <nav className="echo-dark-surface echo-mobile-nav fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom,0px),0.25rem)] lg:hidden" aria-label={shared("Navegación principal")} data-testid="nav-mobile">
           <div className="mx-auto mb-0 flex h-[var(--nav-height)] max-w-[440px] items-center justify-between gap-0.5 rounded-[26px] border border-border/80 px-2 bg-[hsl(240_4%_8%/0.88)] shadow-lg backdrop-blur-xl">
-            {items.map((it) => {
+            {mobileItems.map((it) => {
               const active = it.match(location);
               return (
                 <Link
