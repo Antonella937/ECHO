@@ -221,7 +221,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     </section>}
     {(catalogueSelected||selectedCustomVoice)&&<div className="space-y-2 rounded-xl border border-primary/30 p-3">
       <p className="text-sm font-medium">{language==='es'?'Probar la voz elegida':'Test the selected voice'}</p>
-      <p className="text-xs text-muted-foreground">{language==='es'?'Genera una frase corta real. Consume 2 créditos de ECHO y créditos de ElevenLabs; máximo una prueba cada 24 horas.':'Generates one real short phrase. Uses 2 ECHO credits and ElevenLabs credits; limited to once every 24 hours.'}</p>
+      <p className="text-xs text-muted-foreground">{language==='es'?'Genera una frase corta real. Consume 2 créditos de ECHO y créditos de ElevenLabs; máximo dos pruebas cada 24 horas.':'Generates one real short phrase. Uses 2 ECHO credits and ElevenLabs credits; limited to two tests every 24 hours.'}</p>
       <button type="button" disabled={!generationAvailable||voiceTestBusy} onClick={()=>void testSelectedVoice()} className="min-h-11 w-full rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{voiceTestBusy?'…':language==='es'?'Probar voz · 2 créditos':'Test voice · 2 credits'}</button>
       {voiceTestUrl&&<audio controls autoPlay src={voiceTestUrl} className="w-full"/>}
     </div>}
