@@ -210,7 +210,7 @@ export function applyAutonomyDecision(
       state: {
         ...state,
         stories: state.stories.map((item) => item.id === target.id
-          ? { ...item, reactions: [...(item.reactions ?? []), reaction] } : item),
+          ? { ...item, seenBy: [...new Set([...item.seenBy, characterId])], reactions: [...(item.reactions ?? []), reaction] } : item),
         notifications: [...state.notifications, notification],
       },
       changed: true, targetId: target.id,
