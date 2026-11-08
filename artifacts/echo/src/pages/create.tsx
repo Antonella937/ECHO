@@ -46,6 +46,7 @@ export default function CreatePage() {
   const [alsoStory, setAlsoStory] = useState(false);
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [tagged, setTagged] = useState<string[]>([]);
+  const [collaborators, setCollaborators] = useState<string[]>([]);
   const [mentioned, setMentioned] = useState<string[]>([]);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [musicTitle, setMusicTitle] = useState('');
@@ -217,7 +218,7 @@ export default function CreatePage() {
         return;
       }
       validatePostMedia(items);
-      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
+      const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), ...(collaborators.length ? { collaborationInvites: collaborators } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
       const cover = items.find((m) => m.type === 'image');
       if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
       toast({ title: t('Publicado'), description: `${t('Como')} ${me.name}` });
@@ -431,6 +432,9 @@ export default function CreatePage() {
               />
             </label>
             <div className="mt-3"><AccountMultiPicker value={tagged} onChange={setTagged} label={t("Etiquetar cuentas")} excludeId={me.id} testId="picker-post-tags" /></div>
+            <div className="mt-3"><AccountMultiPicker value={collaborators} onChange={setCollaborators} label={t("Invitar colaboradores")} excludeId={me.id} max={10} testId="picker-post-collaborators" />
+              <p className="mt-1 text-xs text-muted-foreground">{t("La publicación aparecerá en sus perfiles cuando acepten.")}</p>
+            </div>
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
               <span className="block text-sm font-medium">{t("Permitir comentarios")}</span>
               <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} data-testid="switch-comments-enabled" />
