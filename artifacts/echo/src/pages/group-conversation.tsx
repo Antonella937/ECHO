@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useParams } from 'wouter';
-import { ChevronLeft, Send, Users, MoreHorizontal, Paperclip, X, Mic, Square } from 'lucide-react';
+import { ChevronLeft, Send, Users, MoreHorizontal, Search, Pin, Paperclip, X, Mic, Square } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useSocial } from '@/store/social-store';
@@ -13,7 +13,7 @@ import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import type { MessageAttachment } from '@/domain/types';
 
 type Group = { id: string; name: string; avatar?: string | null; participantIds: string[] };
-type GroupMessage = { id: string; senderId: string; text: string; attachments?: MessageAttachment[]; createdAt: string };
+type GroupMessage = { id: string; senderId: string; text: string; attachments?: MessageAttachment[]; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
 
 export default function GroupConversationPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +24,9 @@ export default function GroupConversationPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [text, setText] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<GroupMessage[]>([]);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -82,6 +85,26 @@ export default function GroupConversationPage() {
       setAutonomyEnabled(result.enabled); setAutonomyInterval(result.intervalMinutes); setError('');
     } catch { setError('No se pudo guardar la configuración de autonomía.'); }
     finally { setSavingSettings(false); }
+  };
+  const togglePin = async (message: GroupMessage) => {
+    if (!id) return;
+    try {
+      await customFetch(`/api/group-dms/${encodeURIComponent(id)}/messages/${encodeURIComponent(message.id)}/pin`, {
+        method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, pinned: !message.pinnedAt }),
+      });
+      setMessages(old => old.map(m => m.id === message.id ? { ...m, pinnedAt: message.pinnedAt ? null : new Date().toISOString() } : m));
+      setError('');
+    } catch { setError('No se pudo actualizar el mensaje fijado.'); }
+  };
+  const searchMessages = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!id || !searchQuery.trim()) { setSearchResults([]); return; }
+    try {
+      const params = new URLSearchParams({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, q: searchQuery.trim() });
+      const result = await customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/search?${params}`, { method: 'GET', responseType: 'json' });
+      setSearchResults(result.messages); setError('');
+    } catch { setError('No se pudo buscar en la conversación.'); }
   };
   const saveAvatar = async (avatar: string | null) => {
     if (!group || savingSettings) return;
@@ -170,8 +193,13 @@ export default function GroupConversationPage() {
       <button onClick={() => navigate('/messages')} aria-label="Volver" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><ChevronLeft className="h-6 w-6" /></button>
       <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible rounded-full bg-secondary">{group?.avatar ? <img src={resolveMedia(group.avatar)} alt="" className="h-11 w-11 rounded-full object-cover" /> : <Users className="h-5 w-5" />}<span className="absolute -bottom-1 -right-1 rounded-full border-2 border-background bg-primary px-1 text-[10px] text-primary-foreground">{group?.participantIds.length ?? 0}</span></div>
       <div className="min-w-0 flex-1"><h1 className="truncate text-[15px] font-semibold">{group?.name ?? 'Grupo'}</h1><p className="truncate text-xs text-muted-foreground">{group?.participantIds.map(x => character(x)?.name ?? x).join(', ')}</p></div>
+      <button onClick={() => { setSearchOpen(old => !old); setSearchResults([]); }} aria-label="Buscar mensajes" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Search className="h-5 w-5" /></button>
       <button onClick={() => { setGroupName(group?.name ?? ''); setAvatarUrl(group?.avatar ?? ''); setSettingsOpen(true); }} aria-label="Opciones del grupo" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><MoreHorizontal className="h-6 w-6" /></button>
     </div></header>
+    {searchOpen && <div className="shrink-0 border-b border-border bg-background p-3">
+      <form onSubmit={searchMessages} className="flex gap-2"><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar en esta conversación" className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm" /><button type="submit" className="rounded-xl bg-secondary px-3 text-sm">Buscar</button></form>
+      {!!searchResults.length && <div className="mt-2 max-h-44 space-y-2 overflow-y-auto">{searchResults.map(m => <div key={m.id} className="rounded-lg bg-secondary p-2 text-xs"><strong>{character(m.senderId)?.name ?? m.senderId}</strong><p className="break-words">{m.text}</p></div>)}</div>}
+    </div>}
     {settingsOpen && <div className="border-b border-border bg-background p-4">
       <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Información del grupo</h2><button onClick={() => setSettingsOpen(false)} className="text-sm text-muted-foreground">Cerrar</button></div>
       <label className="mb-1 block text-xs text-muted-foreground">Nombre</label>
@@ -189,7 +217,7 @@ export default function GroupConversationPage() {
       <button onClick={() => void addMembers()} disabled={savingSettings || !addMemberIds.length} className="mt-2 rounded-xl bg-secondary px-3 py-2 text-sm disabled:opacity-50">Agregar al grupo</button>
       <div className="mt-4 border-t border-border pt-3">
         <p className="font-semibold">Autonomía del grupo</p>
-        <p className="mt-1 text-xs text-muted-foreground">Configuración anticipada: el motor de respuestas grupales todavía no está conectado. Activar esta opción no genera mensajes por ahora.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Los personajes autorizados pueden intervenir automáticamente según el intervalo seleccionado.</p>
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={autonomyEnabled} disabled={!autonomyLoaded || savingSettings} onChange={e => void saveAutonomy(e.target.checked, autonomyInterval)} /> Permitir autonomía grupal</label>
         <label className="mt-3 block text-xs text-muted-foreground">Intervalo mínimo entre intervenciones</label>
         <select value={autonomyInterval} disabled={!autonomyLoaded || savingSettings} onChange={e => void saveAutonomy(autonomyEnabled, Number(e.target.value))} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
@@ -200,11 +228,13 @@ export default function GroupConversationPage() {
     </div>}
     <main className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-5" data-testid="group-messages">
       {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">Mandá el primer mensaje para empezar la conversación.</p></div>}
+      {messages.filter(m => m.pinnedAt).length > 0 && <div className="mb-3 rounded-xl bg-secondary/70 px-3 py-2 text-xs"><Pin className="mr-1 inline h-3 w-3" /> {messages.filter(m => m.pinnedAt).length} mensaje(s) fijado(s)</div>}
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>\n        {m.senderId !== me.id && <div className="shrink-0"><CharacterAvatar character={character(m.senderId)} size={30} /></div>}
         <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${m.senderId === me.id ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
           {m.senderId !== me.id && <p className="mb-1 text-xs font-semibold">{character(m.senderId)?.name ?? 'Participante'}</p>}
           {m.text && <p className="whitespace-pre-wrap break-words text-sm">{m.text}</p>}
           {!!m.attachments?.length && <div className="mt-2 flex flex-col gap-2">{m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={m.senderId === me.id} />)}</div>}
+          <button type="button" onClick={() => void togglePin(m)} className="mt-1 flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100"><Pin className="h-3 w-3" />{m.pinnedAt ? 'Desfijar' : 'Fijar'}</button>
           <p className={`mt-1 text-right text-[10px] ${m.senderId === me.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
       </div>)}
