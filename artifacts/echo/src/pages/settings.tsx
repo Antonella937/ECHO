@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const t = useTranslation();
   const st = useSettingsText();
   const language = useLanguage();
+  const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
 
   return (
     <div>
@@ -81,10 +82,11 @@ export default function SettingsPage() {
 
         <section className="mt-9" aria-labelledby="close-friends-h" data-testid="section-close-friends">
           <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> {st('Mejores amigos · ')}{me.name}</h2>
-          <details className="group mt-3 rounded-2xl border border-border bg-card/40" data-testid="details-close-friends"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{st('Mejores amigos · ')}{(state.closeFriends?.[me.id] ?? []).length}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border px-3 pb-3">
+          <details className="group mt-3 rounded-2xl border border-border bg-card/40" data-testid="details-close-friends"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{st('Mejores amigos · ')}{closeFriendContacts.filter(c => (state.closeFriends?.[me.id] ?? []).includes(c.id)).length}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border px-3 pb-3">
           <p className="mt-2 px-1 text-xs text-muted-foreground">{st("Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.")}</p>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-3">
-            {state.characters.filter(c => c.id !== me.id && !c.archived).map(c => {
+            {closeFriendContacts.length === 0 && <p className="px-2 py-4 text-xs text-muted-foreground">{language === 'es' ? 'Todavía no hay contactos que se sigan mutuamente con esta cuenta.' : 'No mutual-follow contacts for this account yet.'}</p>}
+            {closeFriendContacts.map(c => {
               const selected = (state.closeFriends?.[me.id] ?? []).includes(c.id);
               return <button key={c.id} type="button" aria-pressed={selected} onClick={() => actions.toggleCloseFriend(c.id)} className="flex min-h-12 w-full items-center justify-between gap-3 border-b border-border/50 px-2 text-left text-sm last:border-0" data-testid={`button-close-friend-${c.id}`}>
                 <span className="truncate">{c.name} <span className="text-xs text-muted-foreground">@{c.handle}</span></span>
