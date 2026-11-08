@@ -38,11 +38,15 @@ export async function requestFalImage(input: {
   });
   if (!response.ok) throw Error(`FAL_IMAGE_HTTP_${response.status}`);
   if (Number(response.headers.get('content-length') || 0) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
+  const requestId = falRequestId(response.headers);
   const raw = await response.text();
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   let payload: any;
   try { payload = JSON.parse(raw); } catch { throw Error('FAL_IMAGE_INVALID_JSON'); }
   await resolveFalImagePayload(payload, fetchImpl);
+  // Retain the provider request ID for an eventual billing-line-item match.
+  // Do not invent a billedUsd value from the price estimate.
+  if (!requestId) throw Error('FAL_IMAGE_REQUEST_ID_MISSING');
   throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
 
 }
@@ -114,4 +118,10 @@ export function parseFalImagePayload(payload: unknown): { bytes: Buffer; mimeTyp
   const bytes = Buffer.from(encoded, 'base64');
   if (!bytes.length || bytes.length > MAX_BYTES || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) throw Error('FAL_IMAGE_INVALID_BYTES');
   return { bytes, mimeType: 'image/jpeg' };
+}
+
+/** Extract the provider's request identifier without trusting arbitrary headers. */
+export function falRequestId(headers: Pick<Headers, 'get'>): string | null {
+  const id = headers.get('x-fal-request-id');
+  return id && /^[a-zA-Z0-9_-]{8,128}$/.test(id) ? id : null;
 }
