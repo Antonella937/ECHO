@@ -264,7 +264,7 @@ export function chooseAutonomyOpportunity(input: {
         relevantAuthor(parent.authorId) &&
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
-  const targetStory = [...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+  const targetStory = [...state.stories].sort((a, b) => Number(a.seenBy.includes(character.id)) - Number(b.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       (!item.closeFriendsOnly || ((state.closeFriends?.[item.authorId] ?? []).includes(character.id) &&
@@ -340,7 +340,7 @@ export function chooseAutonomyOpportunity(input: {
   }
   if (selected.situation === "story_reaction" && targetStory) {
     return { situation: "story_reaction", storyId: targetStory.id, reasonCode: "OPPORTUNITY_SELECTED",
-      reason: "A recently viewed, unexpired story has a caption and can receive a text-only reaction.", localHour: local.hour, timezone };
+      reason: "An accessible story from a followed account can be viewed without reacting or optionally receive a reaction.", localHour: local.hour, timezone };
   }
   if (selected.situation === "dm_reaction" && targetMessage) {
     return { situation: "dm_reaction", messageId: targetMessage.id, reasonCode: "OPPORTUNITY_SELECTED",
