@@ -265,9 +265,10 @@ export function chooseAutonomyOpportunity(input: {
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
   const targetStory = [...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
-    .find(item => recent24h(item.createdAt) && item.authorId !== character.id && !!item.caption?.trim() &&
-      item.seenBy.includes(character.id) &&
+    .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
+      (!item.closeFriendsOnly || ((state.closeFriends?.[item.authorId] ?? []).includes(character.id) &&
+        (item.allowedViewerIds ?? state.closeFriends?.[item.authorId] ?? []).includes(character.id))) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
   const targetMessage = [...state.messages].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => item.recipientId === character.id && item.senderId !== character.id &&
