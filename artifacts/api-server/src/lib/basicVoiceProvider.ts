@@ -54,8 +54,22 @@ export async function synthesizeBasicVoiceAudio(request: BasicVoiceRequest): Pro
   }
   if (provider !== "kokoro") throw new BasicVoiceProviderError("VOICE_PROVIDER_NOT_IMPLEMENTED");
   const bytes = await synthesizeBasicVoice(request);
-  // The existing route validates WAV duration; leave the legacy contract unchanged.
-  return { bytes, mimeType: "audio/wav", seconds: 0 };
+  const byteRate = bytes.length >= 32 ? bytes.readUInt32LE(28) : 0;
+  let seconds = Number.NaN;
+  if (byteRate > 0) {
+    for (let offset = 12; offset + 8 <= bytes.length;) {
+      const chunkSize = bytes.readUInt32LE(offset + 4);
+      if (bytes.toString("ascii", offset, offset + 4) === "data") {
+        if (offset + 8 + chunkSize <= bytes.length) seconds = chunkSize / byteRate;
+        break;
+      }
+      offset += 8 + chunkSize + (chunkSize % 2);
+    }
+  }
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 30) {
+    throw new BasicVoiceProviderError("VOICE_ENGINE_INVALID_AUDIO");
+  }
+  return { bytes, mimeType: "audio/wav", seconds };
 }
 
 /**
