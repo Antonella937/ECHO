@@ -185,7 +185,7 @@ export function chooseAutonomyOpportunity(input: {
       message.senderId === character.id && message.origin !== "autonomy" && asTime(message.createdAt) === time));
   const latestActivity = Math.max(
     ...recentSocial,
-    asTime(config?.currentState?.lastActivityAt) ?? 0,
+    ...(input.lane === "social" ? [] : [asTime(config?.currentState?.lastActivityAt) ?? 0]),
     ...history.map((event) => event.createdAt.getTime()),
     0,
   );
