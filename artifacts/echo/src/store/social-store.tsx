@@ -96,7 +96,8 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     coordinator.current = engine;
     void engine.initialize();
     const refresh = () => { if (document.visibilityState !== 'hidden') void engine.sync(); };
-    const timer = window.setInterval(refresh, 5000);
+    // Avoid downloading the entire universe every five seconds; focus/visibility still refresh immediately.
+    const timer = window.setInterval(refresh, 20000);
     window.addEventListener('online', refresh);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
