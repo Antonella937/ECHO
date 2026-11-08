@@ -231,12 +231,22 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     }
     const history = await db.execute(sql`SELECT event_id, actor_id, text, visibility, audience_ids FROM echo_scene_events
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND text <> ''
-      ORDER BY created_at DESC, event_id DESC LIMIT 30`);
+      ORDER BY created_at DESC, event_id DESC LIMIT 60`);
     const visible = [...history.rows].reverse().filter(e =>
       e.actor_id === characterId ||
       (e.visibility === "public") ||
       (e.visibility === "participants" && (!Array.isArray(e.audience_ids) || !e.audience_ids.length || e.audience_ids.includes(characterId))) ||
       (e.visibility === "private" && Array.isArray(e.audience_ids) && e.audience_ids.includes(characterId)));
+    const memoryRows = await db.execute(sql`SELECT summary, last_event_id FROM echo_scene_memory
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+        AND scene_id = ${sceneId.data} AND character_id = ${characterId} LIMIT 1`);
+    const priorMemory = memoryRows.rows[0];
+    const previousSummary = typeof priorMemory?.summary === "string" ? priorMemory.summary : "";
+    const previousCheckpoint = typeof priorMemory?.last_event_id === "string" ? priorMemory.last_event_id : null;
+    const checkpointIndex = previousCheckpoint ? visible.findIndex(e => e.event_id === previousCheckpoint) : -1;
+    const unsummarized = checkpointIndex >= 0 ? visible.slice(checkpointIndex + 1) : visible;
+    // Keep a generous recent window; summarize only events the character could see.
+    const oldEvents = unsummarized.length > 30 ? unsummarized.slice(0, -20) : [];
     const trigger = visible.at(-1);
     if (!trigger || trigger.actor_id === characterId) { res.status(409).json({ error: "NO_NEW_SCENE_TURN" }); return; }
     const eventId = randomUUID();
@@ -264,13 +274,33 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     // canon never imports global conversations, DMs, or other scene histories.
     const context = JSON.stringify({ scene: { sceneId: sceneId.data, title: scene.title, premise: scene.premise, canon: scene.canon },
       character: { ...character, avatar: undefined, identity: undefined, referenceImages: undefined },
-      participants: people, visibleEvents: visible.map(e => ({ actorId: e.actor_id, text: e.text })).slice(-25) }).slice(0,18000);
+      participants: people, sceneMemory: previousSummary,
+      visibleEvents: visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text })) }).slice(0,18000);
     const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
     const decoded: unknown = JSON.parse(completion.text);
     const result = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded);
     await db.execute(sql`UPDATE echo_scene_events SET text = ${result.text} WHERE owner_id = ${ownerId}
       AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND event_id = ${eventId}`);
     reservedId = null;
+    if (oldEvents.length) {
+      try {
+        const memorySchema = { type: "object", additionalProperties: false, required: ["summary"],
+          properties: { summary: { type: "string", maxLength: 5000 } } };
+        const memorySystem = "Summarize only factual events, decisions, conflicts and unresolved threads explicitly visible to this fictional character. Do not invent facts, include private DMs, or merge other scenes. Return JSON {summary:string}.";
+        const memoryContext = JSON.stringify({
+          previousSummary, sceneId: sceneId.data, characterId,
+          events: oldEvents.map(e => ({ actorId: e.actor_id, text: e.text })),
+        }).slice(0,15000);
+        const memoryCompletion = await provider.complete({ system: memorySystem, context: memoryContext, outputSchema: memorySchema });
+        const memoryResult = z.object({ summary: z.string().max(5000) }).parse(JSON.parse(memoryCompletion.text));
+        const checkpoint = oldEvents.at(-1)?.event_id as string | undefined;
+        if (checkpoint) await db.execute(sql`INSERT INTO echo_scene_memory
+          (owner_id, universe_id, scene_id, character_id, summary, last_event_id)
+          VALUES (${ownerId}, ${universeId}, ${sceneId.data}, ${characterId}, ${memoryResult.summary}, ${checkpoint})
+          ON CONFLICT (owner_id, universe_id, scene_id, character_id)
+          DO UPDATE SET summary = EXCLUDED.summary, last_event_id = EXCLUDED.last_event_id, updated_at = now()`);
+      } catch { /* Summary failure must not discard a successful scene reply. */ }
+    }
     const next = { ...turn, nextCharacterId: null, cursor: turn?.order?.length ? ((turn.order.indexOf(characterId) + 1) % turn.order.length) : 0 };
     const nextJson = JSON.stringify(next);
     await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${nextJson}::jsonb, updated_at = now()
