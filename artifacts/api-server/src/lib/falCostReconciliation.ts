@@ -13,6 +13,11 @@ export function reconcileFalCharge(input: {
   const { record, expectedRequestId, expectedEndpointId, maximumUsd } = input;
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw Error('FAL_BILLING_RECORD_INVALID');
   const r = record as Record<string, unknown>;
+  // Workspace usage summaries are aggregate records, not request-level bills.
+  // Reject them even if a caller accidentally attaches a request_id.
+  if ('quantity' in r || 'unit_price' in r || 'bucket' in r || 'results' in r || 'summary' in r || 'time_series' in r) {
+    throw Error('FAL_AGGREGATE_USAGE_NOT_REQUEST_BILLING');
+  }
   if (typeof r.request_id !== 'string' || r.request_id !== expectedRequestId) throw Error('FAL_BILLING_REQUEST_MISMATCH');
   if (typeof r.endpoint_id !== 'string' || r.endpoint_id !== expectedEndpointId) throw Error('FAL_BILLING_MODEL_MISMATCH');
   if (r.currency !== 'USD') throw Error('FAL_BILLING_CURRENCY_MISMATCH');
