@@ -188,6 +188,12 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const scene = prepareImageScene(input.data.prompt, character, characters, selected);
     const referencePaths = scene.referencePaths;
     const preparedPrompt = scene.preparedPrompt;
+    // FLUX.2 Pro Edit requires at least one reference. Reject before spending
+    // a user's photo credits; text-only generation needs a separate model.
+    if (!referencePaths.length) {
+      res.status(422).json({ error: 'IMAGE_REFERENCE_REQUIRED_FOR_EDIT_MODEL', chargedPhotoCredits: 0 });
+      return;
+    }
     const creditOperation = randomUUID();
     const cost = scene.people.length > 1 ? 2 : 1;
     const charge = await spendCredits(req.userId!, 'photo', cost, creditOperation);
