@@ -1,0 +1,41 @@
+name: ECHO OpenRouter image offline tests
+on:
+  push:
+    paths:
+      - 'artifacts/api-server/src/lib/image*.ts'
+      - 'artifacts/api-server/src/lib/openRouterImage*.ts'
+      - 'artifacts/api-server/src/lib/generatedImageStorage.ts'
+      - 'artifacts/api-server/tests/image*.test.ts'
+      - '.github/workflows/openrouter-image-offline.yml'
+  pull_request:
+    paths:
+      - 'artifacts/api-server/src/lib/image*.ts'
+      - 'artifacts/api-server/src/lib/openRouterImage*.ts'
+      - 'artifacts/api-server/src/lib/generatedImageStorage.ts'
+      - 'artifacts/api-server/tests/image*.test.ts'
+      - '.github/workflows/openrouter-image-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run image generation tests without API keys or provider calls
+        run: pnpm --filter @workspace/api-server run test:image-offline
+        env:
+          DATABASE_URL: postgres://offline:offline@127.0.0.1:1/offline
+          ECHO_PAID_IMAGE_GENERATION_ENABLED: 'false'
+          ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED: 'false'
