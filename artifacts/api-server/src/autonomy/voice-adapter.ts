@@ -15,9 +15,9 @@ const voices: Record<string, string> = {
 };
 const month = () => new Date().toISOString().slice(0, 7);
 const storageReady = () => {
-  const base = process.env.SUPABASE_URL?.replace(/\/$/, "");
-  return !!process.env.SUPABASE_SERVICE_ROLE_KEY && !!base && /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base);
-};
+  const raw = process.env.SUPABASE_URL;
+  if (!raw || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false;
+  try { const url = new URL(raw); return url.protocol === "https:" && url.hostname.endsWith(".supabase.co") && !url.username && !url.password; } catch { return false; }
 
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
 export async function resolveAutonomousVoiceId(ownerId: string, universeId: string, characterId: string, basicVoiceId?: string | null): Promise<string | null> {
@@ -73,7 +73,7 @@ export async function completeVoiceNarration(ownerId: string, id: string, succee
 /** Voice is attached only after the text DM is committed; TTS failures never roll back the text. */
 export async function dispatchAutonomousVoice(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }) {
   if (!await canUseBasicVoices(input.ownerId) || !input.text.trim() || input.text.length > 500 || !storageReady()) return;
-  const base = process.env.SUPABASE_URL!.replace(/\\/$/, "");
+  const base = new URL(process.env.SUPABASE_URL!).origin;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   const custom = input.voiceId.startsWith("elevenlabs:");
   let audioBytes: Buffer;
