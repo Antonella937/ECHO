@@ -1,0 +1,44 @@
+name: ECHO basic TTS provider offline tests
+on:
+  push:
+    paths:
+      - 'artifacts/api-server/src/lib/basicVoiceProvider.ts'
+      - 'artifacts/api-server/src/lib/deapiSpeech.ts'
+      - 'artifacts/api-server/src/routes/basic-voice.ts'
+      - 'artifacts/api-server/src/autonomy/voice-adapter.ts'
+      - 'artifacts/api-server/tests/basic-voice-provider.test.ts'
+      - 'artifacts/api-server/tests/deapi-speech.test.ts'
+      - '.github/workflows/basic-tts-offline.yml'
+  pull_request:
+    paths:
+      - 'artifacts/api-server/src/lib/basicVoiceProvider.ts'
+      - 'artifacts/api-server/src/lib/deapiSpeech.ts'
+      - 'artifacts/api-server/src/routes/basic-voice.ts'
+      - 'artifacts/api-server/src/autonomy/voice-adapter.ts'
+      - 'artifacts/api-server/tests/basic-voice-provider.test.ts'
+      - 'artifacts/api-server/tests/deapi-speech.test.ts'
+      - '.github/workflows/basic-tts-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tts-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify provider contracts without API keys or paid calls
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/basic-voice-provider.test.ts tests/deapi-speech.test.ts
+        env:
+          ECHO_BASIC_TTS_PROVIDER: kokoro
+          ECHO_DEAPI_TTS_KEY: ''
