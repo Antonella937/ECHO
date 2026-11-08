@@ -1,7 +1,7 @@
 import { useDiscoveryText } from '@/lib/discovery-translations';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Archive, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
+import { Archive, LockKeyhole, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -46,6 +46,10 @@ export default function ProfilePage() {
     );
 
   const isMe = person.id === me.id;
+  const isFollowing = (state.follows[me.id] ?? []).includes(person.id);
+  const isRequested = (state.followRequests?.[person.id] ?? []).includes(me.id);
+  const canSeeContent = isMe || !person.privateAccount || isFollowing;
+  const pendingRequests = state.followRequests?.[me.id] ?? [];
   const stories = state.stories.filter((s) => s.authorId === person.id && isStoryActive(s) && canViewStory(s, me.id, state));
   const unseen = !isMe && stories.some((s) => !s.seenBy.includes(me.id));
   const friends = (state.follows[person.id] ?? []).map(character).filter(Boolean);
@@ -93,6 +97,7 @@ export default function ProfilePage() {
         <div className="mt-4">
           <h2 className="font-display text-[19px] font-medium tracking-wide" data-testid="text-profile-name"><span className="inline-flex min-w-0 items-center gap-1.5"><span className="truncate">{person.name}</span><VerifiedBadge account={person} className="h-[18px] w-[18px] shrink-0" /></span></h2>
           <p className="text-sm text-muted-foreground">@{person.handle} · {person.occupation || accountTypes[person.accountType ?? 'personal']}</p>
+          {person.privateAccount && <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="h-3.5 w-3.5" /> {t('Cuenta privada')}</p>}
           {person.archived && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground" data-testid="status-profile-archived">
               <Archive className="h-3.5 w-3.5" /> {t("Cuenta archivada · historial conservado")}
@@ -104,8 +109,10 @@ export default function ProfilePage() {
           </p>}
         </div>
 
+        {isMe && pendingRequests.length > 0 && <div className="mt-4 space-y-2">{pendingRequests.map(requesterId => { const requester = character(requesterId); return requester && <div key={requesterId} className="flex items-center gap-2 rounded-xl border border-border p-2 text-sm"><CharacterAvatar character={requester} size={32} /><span className="min-w-0 flex-1 truncate">@{requester.handle}</span><button className="rounded-lg bg-primary px-2 py-2 text-primary-foreground" onClick={() => actions.respondFollowRequest(requesterId, true)}>{t('Aceptar')}</button><button className="rounded-lg bg-secondary px-2 py-2" onClick={() => actions.respondFollowRequest(requesterId, false)}>{t('Rechazar')}</button></div>; })}</div>}
         {isMe ? (
           <div className="mt-5 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => actions.setPrivateAccount(person.id, !person.privateAccount)} className="tap col-span-2 h-11 rounded-xl border border-border text-sm font-semibold">{person.privateAccount ? t("Cuenta privada · Cambiar a pública") : t("Cuenta pública · Cambiar a privada")}</button>
             <Link href="/create" className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground" data-testid="link-profile-create">
               <PlusSquare className="h-4 w-4" strokeWidth={2} /> {t("Nueva publicación")}
             </Link>
@@ -121,6 +128,7 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-2">
+            <button type="button" disabled={person.archived} onClick={() => actions.toggleFollow(person.id)} className="tap col-span-2 flex h-11 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50" data-testid="button-profile-follow">{isFollowing ? t("Siguiendo") : isRequested ? t("Solicitado") : person.privateAccount ? t("Solicitar seguir") : t("Seguir")}</button>
             <button
               onClick={() => navigate(`/messages/${person.id}`)}
               className="tap flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
@@ -179,7 +187,7 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {tab === 'tagged' ? (
+      {!canSeeContent ? <EmptyState title={t('Esta cuenta es privada')} body={t('Seguí esta cuenta para ver sus publicaciones.')} /> : tab === 'tagged' ? (
         tagged.length === 0
           ? <EmptyState title={isMe ? t("Nadie te etiquetó todavía") : t("Sin etiquetas")} body={t("Las publicaciones donde aparezca esta cuenta se verán aquí.")} />
           : <PhotoGrid posts={tagged} />
