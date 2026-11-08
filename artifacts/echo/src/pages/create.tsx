@@ -63,6 +63,7 @@ export default function CreatePage() {
   const [collaborators, setCollaborators] = useState<string[]>([]);
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
+  const [pollDuration, setPollDuration] = useState('24');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [mentioned, setMentioned] = useState<string[]>([]);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
@@ -238,7 +239,7 @@ export default function CreatePage() {
       if (pollEnabled && (!pollQuestion.trim() || pollOptions.filter(v => v.trim()).length < 2 || pollOptions.some(v => !v.trim()))) {
         setError(extra(7)); return;
       }
-      const poll = pollEnabled ? { question: pollQuestion.trim().slice(0, 200), options: pollOptions.map((text, i) => ({ id: `option_${i}`, text: text.trim().slice(0, 100) })), votes: {} as Record<string, string> } : undefined;
+      const poll = pollEnabled ? { question: pollQuestion.trim().slice(0, 200), options: pollOptions.map((text, i) => ({ id: `option_${i}`, text: text.trim().slice(0, 100) })), votes: {} as Record<string, string>, closesAt: new Date(Date.now() + Number(pollDuration) * 60 * 60_000).toISOString() } : undefined;
       const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), ...(collaborators.length ? { collaborationInvites: collaborators } : {}), ...(poll ? { poll } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
       const cover = items.find((m) => m.type === 'image');
       if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
@@ -461,6 +462,9 @@ export default function CreatePage() {
               {pollEnabled && <div className="mt-3 grid gap-2">
                 <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value.slice(0, 200))} maxLength={200} placeholder={extra(3)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />
                 {pollOptions.map((option, i) => <input key={i} value={option} onChange={e => setPollOptions(old => old.map((v, j) => i === j ? e.target.value.slice(0, 100) : v))} maxLength={100} placeholder={`${extra(4)} ${i + 1}`} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm" />)}
+                <select aria-label="Poll duration" value={pollDuration} onChange={e => setPollDuration(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                  <option value="1">1 h</option><option value="6">6 h</option><option value="24">24 h</option><option value="72">72 h</option><option value="168">7 d</option>
+                </select>
                 <div className="flex gap-2">{pollOptions.length < 4 && <button type="button" onClick={() => setPollOptions(old => [...old, ''])} className="rounded-lg bg-secondary px-3 py-2 text-xs">{extra(5)}</button>}{pollOptions.length > 2 && <button type="button" onClick={() => setPollOptions(old => old.slice(0, -1))} className="rounded-lg bg-secondary px-3 py-2 text-xs">{extra(6)}</button>}</div>
               </div>}
             </section>
