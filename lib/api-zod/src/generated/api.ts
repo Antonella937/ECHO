@@ -1248,7 +1248,12 @@ export const GetUniverseResponse = zod.object({
   "provider": zod.string().nullable()
 })
 }).optional(),
-  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "accountType": zod.enum(['personal', 'artist', 'band', 'business', 'venue', 'organization']).optional(),
+  "privateAccount": zod.boolean().optional(),
+  "professionalCategory": zod.string().max(80).optional(),
+  "contactEmail": zod.string().max(254).optional(),
+  "website": zod.string().max(500).optional(),
+  "accountIdentity": zod.object({"description":zod.string().max(2500).optional(),"voice":zod.string().max(2500).optional(),"facts":zod.string().max(2500).optional()}).optional(),
   "verified": zod.boolean().optional(),
   "archived": zod.boolean().optional(),
   "displayMetrics": zod.object({
@@ -1771,7 +1776,12 @@ export const SaveUniverseBody = zod.object({
   "provider": zod.string().nullable()
 })
 }).optional(),
-  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "accountType": zod.enum(['personal', 'artist', 'band', 'business', 'venue', 'organization']).optional(),
+  "privateAccount": zod.boolean().optional(),
+  "professionalCategory": zod.string().max(80).optional(),
+  "contactEmail": zod.string().max(254).optional(),
+  "website": zod.string().max(500).optional(),
+  "accountIdentity": zod.object({"description":zod.string().max(2500).optional(),"voice":zod.string().max(2500).optional(),"facts":zod.string().max(2500).optional()}).optional(),
   "verified": zod.boolean().optional(),
   "archived": zod.boolean().optional(),
   "displayMetrics": zod.object({
@@ -2282,7 +2292,12 @@ export const SaveUniverseResponse = zod.object({
   "provider": zod.string().nullable()
 })
 }).optional(),
-  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "accountType": zod.enum(['personal', 'artist', 'band', 'business', 'venue', 'organization']).optional(),
+  "privateAccount": zod.boolean().optional(),
+  "professionalCategory": zod.string().max(80).optional(),
+  "contactEmail": zod.string().max(254).optional(),
+  "website": zod.string().max(500).optional(),
+  "accountIdentity": zod.object({"description":zod.string().max(2500).optional(),"voice":zod.string().max(2500).optional(),"facts":zod.string().max(2500).optional()}).optional(),
   "verified": zod.boolean().optional(),
   "archived": zod.boolean().optional(),
   "displayMetrics": zod.object({
@@ -2843,7 +2858,12 @@ export const VerifyUniverseResponse = zod.object({
   "provider": zod.string().nullable()
 })
 }).optional(),
-  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "accountType": zod.enum(['personal', 'artist', 'band', 'business', 'venue', 'organization']).optional(),
+  "privateAccount": zod.boolean().optional(),
+  "professionalCategory": zod.string().max(80).optional(),
+  "contactEmail": zod.string().max(254).optional(),
+  "website": zod.string().max(500).optional(),
+  "accountIdentity": zod.object({"description":zod.string().max(2500).optional(),"voice":zod.string().max(2500).optional(),"facts":zod.string().max(2500).optional()}).optional(),
   "verified": zod.boolean().optional(),
   "archived": zod.boolean().optional(),
   "displayMetrics": zod.object({
@@ -3676,7 +3696,12 @@ export const CreateCreatorUniverseBody = zod.object({
   "provider": zod.string().nullable()
 })
 }).optional(),
-  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "accountType": zod.enum(['personal', 'artist', 'band', 'business', 'venue', 'organization']).optional(),
+  "privateAccount": zod.boolean().optional(),
+  "professionalCategory": zod.string().max(80).optional(),
+  "contactEmail": zod.string().max(254).optional(),
+  "website": zod.string().max(500).optional(),
+  "accountIdentity": zod.object({"description":zod.string().max(2500).optional(),"voice":zod.string().max(2500).optional(),"facts":zod.string().max(2500).optional()}).optional(),
   "verified": zod.boolean().optional(),
   "archived": zod.boolean().optional(),
   "displayMetrics": zod.object({
@@ -4187,7 +4212,12 @@ export const CreateCreatorUniverseResponse = zod.object({
   "provider": zod.string().nullable()
 })
 }).optional(),
-  "accountType": zod.enum(['personal', 'band', 'venue', 'organization']).optional(),
+  "accountType": zod.enum(['personal', 'artist', 'band', 'business', 'venue', 'organization']).optional(),
+  "privateAccount": zod.boolean().optional(),
+  "professionalCategory": zod.string().max(80).optional(),
+  "contactEmail": zod.string().max(254).optional(),
+  "website": zod.string().max(500).optional(),
+  "accountIdentity": zod.object({"description":zod.string().max(2500).optional(),"voice":zod.string().max(2500).optional(),"facts":zod.string().max(2500).optional()}).optional(),
   "verified": zod.boolean().optional(),
   "archived": zod.boolean().optional(),
   "displayMetrics": zod.object({
