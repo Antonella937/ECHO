@@ -3,8 +3,21 @@ import { and, eq, lte } from "drizzle-orm";
 import { db, echoScheduledPostsTable, echoUniversesTable, echoCharacterGalleryTable } from "@workspace/db";
 const professional = new Set(["artist","band","business","venue","organization"]);
 export async function publishDueScheduledPosts(now = new Date()) {
- const due = await db.select({id:echoScheduledPostsTable.id}).from(echoScheduledPostsTable)
-  .where(and(eq(echoScheduledPostsTable.status,"pending"),lte(echoScheduledPostsTable.scheduledAt,now))).limit(50);
+ let due: Array<{ id: string }>;
+ try {
+  due = await db.select({id:echoScheduledPostsTable.id}).from(echoScheduledPostsTable)
+   .where(and(eq(echoScheduledPostsTable.status,"pending"),lte(echoScheduledPostsTable.scheduledAt,now))).limit(50);
+ } catch (error) {
+  // A pending migration must not crash the API during startup or polling.
+  // PostgreSQL 42P01 means the scheduled posts table has not been created yet.
+  const cause = (error as { cause?: { code?: string } }).cause;
+  if (cause?.code === "42P01") {
+   console.warn("Scheduled posts unavailable: apply the echo_scheduled_posts migration");
+   return;
+  }
+  console.error("Scheduled posts polling failed", error);
+  return;
+ }
  for (const item of due) {
   try {
    await db.transaction(async tx => {
