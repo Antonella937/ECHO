@@ -676,7 +676,17 @@ components:
       required: [id, handle, name, occupation, bio, location, avatar, providerRef, identity]
       properties:
         configuration: { $ref: "#/components/schemas/CharacterConfiguration" }
-        accountType: { type: string, enum: [personal, band, venue, organization] }
+        accountType: { type: string, enum: [personal, artist, band, business, venue, organization] }
+        privateAccount: { type: boolean }
+        professionalCategory: { type: string, maxLength: 80 }
+        contactEmail: { type: string, maxLength: 254 }
+        website: { type: string, maxLength: 500 }
+        accountIdentity:
+          type: object
+          properties:
+            description: { type: string, maxLength: 2500 }
+            voice: { type: string, maxLength: 2500 }
+            facts: { type: string, maxLength: 2500 }
         verified: { type: boolean }
         archived: { type: boolean }
         displayMetrics:
