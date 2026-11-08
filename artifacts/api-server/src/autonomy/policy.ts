@@ -25,6 +25,8 @@ export type Opportunity = {
   commentId?: string;
   recipientId?: string;
   storyId?: string;
+  /** A text-only story uses the existing post draft schema without expanding model actions. */
+  publishStory?: boolean;
   messageId?: string;
   reasonCode:
     | "OPPORTUNITY_SELECTED"
@@ -347,7 +349,9 @@ export function chooseAutonomyOpportunity(input: {
       reason: "A recent, visible message has text context and has not been reacted to by this character.", localHour: local.hour, timezone };
   }
   if (selected.situation === "post") {
-    return { situation: "post", reasonCode: "OPPORTUNITY_SELECTED", reason: "The current social pace permits considering a text post.", localHour: local.hour, timezone };
+    const storyCount = state.stories.filter(item => item.authorId === character.id && recentDate(item.createdAt)).length;
+    const publishStory = storyCount < 1 && random() < 0.35;
+    return { situation: "post", ...(publishStory ? { publishStory: true } : {}), reasonCode: "OPPORTUNITY_SELECTED", reason: "The current social pace permits considering a text post.", localHour: local.hour, timezone };
   }
   return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "The selected opportunity no longer has a valid target.", localHour: local.hour, timezone };
 }
