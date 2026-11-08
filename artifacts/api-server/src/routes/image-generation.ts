@@ -236,7 +236,22 @@ router.post('/ai-engine/images/storage-self-test', requireAuth, async (req, res)
       const deletion = await fetch(url, { method: 'DELETE', headers, redirect: 'error', signal: AbortSignal.timeout(10000) });
       if (!deletion.ok) throw Error('STORAGE_SELF_TEST_DELETE_FAILED');
       const check = await fetch(url, { headers, redirect: 'error', signal: AbortSignal.timeout(10000) });
-      if (check.status !== 404) throw Error('STORAGE_SELF_TEST_DELETE_NOT_CONFIRMED');
+      if (check.ok) throw Error('STORAGE_SELF_TEST_DELETE_NOT_CONFIRMED_OBJECT_STILL_READABLE');
+      // Supabase Storage can report a missing object as HTTP 400 or 404,
+      // depending on the storage API version. Verify the structured error,
+      // not only the HTTP status, to avoid treating other 400s as success.
+      const missingBody = await check.text();
+      let missingCode = '';
+      try {
+        const parsed = JSON.parse(missingBody) as { error?: string; code?: string; message?: string; statusCode?: string };
+        missingCode = [parsed.error, parsed.code, parsed.message, parsed.statusCode].filter(Boolean).join(' ').toLowerCase();
+      } catch {}
+      const confirmedMissing = check.status === 404 ||
+        (check.status === 400 && /not.?found|does not exist|no such object|resource not found/i.test(missingCode));
+      if (!confirmedMissing) {
+        req.log.warn({ status: check.status, errorCode: missingCode.slice(0, 160) }, 'Supabase deletion verification unexpected response');
+        throw Error('STORAGE_SELF_TEST_DELETE_NOT_CONFIRMED');
+      }
       storageDeleted = true;
       await db.delete(echoMediaTable).where(and(
         eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath),
