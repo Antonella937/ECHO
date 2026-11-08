@@ -13,12 +13,12 @@ export function AccountMultiPicker({ value, onChange, label, excludeId, max = 20
   const [q, setQ] = useState('');
   const query = q.trim().toLowerCase().replace(/^@/, '');
   const options = state.characters.filter((c) => !c.archived && c.id !== excludeId && !value.includes(c.id) &&
-    (!query || c.handle.toLowerCase().includes(query) || c.name.toLowerCase().includes(query))).slice(0, 6);
+    (query.length > 0 && (c.handle.toLowerCase().includes(query) || c.name.toLowerCase().includes(query)))).slice(0, 6);
   return (
     <div className="rounded-2xl border border-input bg-card px-3 py-2.5" data-testid={testId}>
       <div className="mb-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
       {value.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex min-w-0 flex-wrap gap-1.5">
           {value.map((id) => {
             const c = character(id);
             return (
@@ -33,11 +33,11 @@ export function AccountMultiPicker({ value, onChange, label, excludeId, max = 20
         <>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar cuenta…")} aria-label={label}
             className="h-10 w-full bg-transparent text-[15px] placeholder:text-muted-foreground focus:outline-none" data-testid={`${testId}-search`} />
-          {(query || value.length === 0) && options.length > 0 && (
-            <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
+          {query.length > 0 && options.length > 0 && (
+            <div className="max-h-56 space-y-1 overflow-y-auto overflow-x-hidden pb-0.5">
               {options.map((c) => (
                 <button key={c.id} type="button" onClick={() => { onChange([...value, c.id]); setQ(''); }}
-                  className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-border pl-1 pr-3 text-xs font-medium hover:border-primary/50" data-testid={`${testId}-add-${c.id}`}>
+                  className="flex h-10 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs font-medium hover:bg-secondary" data-testid={`${testId}-add-${c.id}`}>
                   <CharacterAvatar character={c} size={28} /> @{c.handle}
                 </button>
               ))}
