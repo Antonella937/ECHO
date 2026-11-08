@@ -6,6 +6,7 @@ import { requireAuth } from '../middlewares/requireAuth';
 import { readUniverse } from '../lib/universeRepository';
 import { db, echoMediaTable } from '@workspace/db';
 import { and, eq, inArray } from 'drizzle-orm';
+import { saveGeneratedImage } from '../lib/generatedImageStorage';
 import { imageGenerationAvailability } from '../lib/imageGenerationProvider';
 import { buildCharacterImagePrompt, imageStyleInstructions } from '../lib/imagePromptBuilder';
 import { prepareImageScene } from '../lib/imageScenePreparation';
@@ -183,6 +184,65 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
   } catch (error) {
     req.log.error({ err: error }, 'Image generation failed');
     res.status(503).json({ error: 'IMAGE_GENERATION_UNAVAILABLE' });
+  }
+});
+
+/**
+ * One-shot private storage diagnostic. Disabled unless explicitly enabled in
+ * Render and restricted to an allowlisted authenticated tester.
+ * Uses a tiny synthetic PNG; never calls fal.ai or reads personal photos.
+ */
+router.post('/ai-engine/images/storage-self-test', requireAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (process.env.ECHO_IMAGE_STORAGE_SELF_TEST_ENABLED !== 'true' ||
+      !imageGenerationAccessStatus(req.userId).allowed) {
+    res.status(404).json({ error: 'NOT_FOUND' });
+    return;
+  }
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==', 'base64');
+  let objectPath: string | undefined;
+  let uploaded = false;
+  let readBack = false;
+  let cleaned = false;
+  try {
+    objectPath = await saveGeneratedImage(req.userId!, png, 'image/png');
+    uploaded = true;
+    const base = process.env.SUPABASE_URL?.replace(/\\/$/, '');
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!base || !key) throw Error('STORAGE_NOT_CONFIGURED');
+    const remotePath = objectPath.replace(/^\\/objects\\//, '');
+    const url = `${base}/storage/v1/object/echo-media/${remotePath}`;
+    const headers = { Authorization: `Bearer ${key}`, apikey: key };
+    const response = await fetch(url, { headers, redirect: 'error', signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw Error('STORAGE_SELF_TEST_READ_FAILED');
+    const received = Buffer.from(await response.arrayBuffer());
+    if (!received.equals(png)) throw Error('STORAGE_SELF_TEST_CONTENT_MISMATCH');
+    readBack = true;
+    res.json({ status: 'passed', uploaded, readBack, cleanup: 'pending_finally' });
+  } catch (error) {
+    req.log.error({ err: error }, 'Image storage self-test failed');
+    res.status(503).json({ status: 'failed', uploaded, readBack });
+  } finally {
+    if (objectPath) {
+      try {
+        const base = process.env.SUPABASE_URL?.replace(/\\/$/, '');
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!base || !key) throw Error('STORAGE_NOT_CONFIGURED');
+        const remotePath = objectPath.replace(/^\\/objects\\//, '');
+        const response = await fetch(`${base}/storage/v1/object/echo-media/${remotePath}`, {
+          method: 'DELETE', headers: { Authorization: `Bearer ${key}`, apikey: key },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!response.ok) throw Error('STORAGE_SELF_TEST_DELETE_FAILED');
+        await db.delete(echoMediaTable).where(and(
+          eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath),
+        ));
+        cleaned = true;
+      } catch (error) {
+        req.log.error({ err: error, objectPath }, 'Image storage self-test cleanup requires attention');
+      }
+      req.log.info({ cleaned }, 'Image storage self-test cleanup');
+    }
   }
 });
 
