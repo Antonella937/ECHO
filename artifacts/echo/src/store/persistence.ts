@@ -68,6 +68,16 @@ export async function loadUniverse(universeId = 'primary'): Promise<UniverseEnve
   });
 }
 
+/** Fetch just the server revision, without transferring the entire social state. */
+export async function loadUniverseRevision(universeId = 'primary'): Promise<number> {
+  const result = await customFetch<{ revision: number }>(`/api/universe/revision?${new URLSearchParams({ universeId })}`, {
+    method: 'GET', responseType: 'json', cache: 'no-store',
+  });
+  if (!Number.isSafeInteger(result.revision) || result.revision < 0)
+    throw new Error('Invalid universe revision response');
+  return result.revision;
+}
+
 export async function saveUniverse(state: SocialState, expectedRevision: number, universeId = 'primary'): Promise<UniverseEnvelope> {
   const data: UniverseInput = { state, expectedRevision };
   try {
