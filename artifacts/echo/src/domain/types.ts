@@ -47,6 +47,7 @@ export interface Character {
   verified?: boolean;
   archived?: boolean;
   privateAccount?: boolean;
+  accountIdentity?: { description: string; voice: string; facts: string };
   professionalCategory?: string;
   contactEmail?: string;
   website?: string;
