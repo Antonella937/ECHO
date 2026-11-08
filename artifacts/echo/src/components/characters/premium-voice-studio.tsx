@@ -41,10 +41,35 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [selecting,setSelecting]=useState<string|null>(null);
   const [generating,setGenerating]=useState(false);
   const [cloning,setCloning]=useState(false);
+  const [catalogue,setCatalogue]=useState<{voiceId:string;name:string;previewUrl:string;accent:string;language:string;description:string}[]>([]);
+  const [catalogueSelected,setCatalogueSelected]=useState<string|null>(null);
+  const [catalogueSaving,setCatalogueSaving]=useState<string|null>(null);
+  const [catalogueAudio,setCatalogueAudio]=useState<string|null>(null);
+
   const loadProject=async()=>{
     if(!characterId)return;
-    const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
+    const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string;provider?:string;providerVoiceId?:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
     setGenerationAvailable(data.generationAvailable);setSamples(data.samples);setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
+    const selected=data.samples.find(s=>s.id===data.project?.selectedSampleId) as {provider?:string;providerVoiceId?:string}|undefined;
+    setCatalogueSelected(selected?.provider==='elevenlabs_catalog'?selected.providerVoiceId??null:null);
+  };
+  useEffect(()=>{
+    if(access!=='allowed')return;
+    let cancelled=false;
+    void customFetch<{voices:{voiceId:string;name:string;previewUrl:string;accent:string;language:string;description:string}[]}>('/api/voices/premium/catalogue',{responseType:'json'})
+      .then(data=>{if(!cancelled)setCatalogue(data.voices);})
+      .catch(()=>{if(!cancelled)setCatalogue([]);});
+    return()=>{cancelled=true;};
+  },[access]);
+  const selectCatalogue=async(voiceId:string)=>{
+    if(!characterId||catalogueSaving)return;
+    setCatalogueSaving(voiceId);setError('');
+    try {
+      await customFetch('/api/voices/premium/catalogue/select',{method:'POST',responseType:'json',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,voiceId})});
+      setCatalogueSelected(voiceId);await loadProject();
+    }catch{setError(language==='es'?'No se pudo elegir esta voz de ElevenLabs.':'Could not select this ElevenLabs voice.');}
+    finally{setCatalogueSaving(null);}
   };
   const generate=async()=>{
     if(!characterId||generating)return;
@@ -141,6 +166,22 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   return <section className="mt-6 space-y-4 rounded-2xl border border-primary/30 bg-card/60 p-4" data-testid="premium-voice-studio">
     <div className="flex items-center gap-2"><AudioLines className="h-5 w-5 text-primary"/><h3 className="text-sm font-semibold">{labels[0]}</h3></div>
     <p className="text-xs text-muted-foreground">{labels[1]}</p>
+    {catalogue.length>0&&<section className="space-y-3 rounded-xl border border-border p-3" data-testid="elevenlabs-premium-catalogue">
+      <h4 className="text-sm font-semibold">{language==='es'?'Voces ElevenLabs · Premium':'ElevenLabs voices · Premium'}</h4>
+      <p className="text-xs text-muted-foreground">{language==='es'?'Escuchá muestras existentes sin consumir créditos de generación. Las respuestas nuevas sí utilizan tu cuota.':'Play existing samples without generating audio. New voice replies still use your quota.'}</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {catalogue.map(voice=><div key={voice.voiceId} className="space-y-2 rounded-xl border border-border p-3">
+          <p className="text-sm font-semibold">{voice.name}</p>
+          <p className="text-xs text-muted-foreground">{[voice.language,voice.accent].filter(Boolean).join(' · ')||voice.description||'ElevenLabs'}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={()=>setCatalogueAudio(catalogueAudio===voice.previewUrl?null:voice.previewUrl)} className="min-h-10 flex-1 rounded-full border border-border px-3 text-xs">{catalogueAudio===voice.previewUrl?(language==='es'?'Cerrar muestra':'Close preview'):(language==='es'?'Escuchar':'Listen')}</button>
+            <button type="button" disabled={!characterId||!!catalogueSaving} onClick={()=>void selectCatalogue(voice.voiceId)} aria-pressed={catalogueSelected===voice.voiceId} className="min-h-10 flex-1 rounded-full bg-primary/10 px-3 text-xs font-semibold disabled:opacity-50">{catalogueSaving===voice.voiceId?'…':catalogueSelected===voice.voiceId?'✓':language==='es'?'Elegir':'Select'}</button>
+          </div>
+          {catalogueAudio===voice.previewUrl&&<audio src={voice.previewUrl} autoPlay controls className="w-full" />}
+        </div>)}
+      </div>
+    </section>}
+
     <div className="grid grid-cols-2 gap-2">
       <button type="button" aria-pressed={mode === 'prompt'} onClick={() => setMode('prompt')} className={`min-h-11 rounded-xl border px-3 text-sm ${mode === 'prompt' ? 'border-primary bg-primary/10' : 'border-border'}`}><Sparkles className="mr-1 inline h-4 w-4"/>{labels[2]}</button>
       <button type="button" aria-pressed={mode === 'reference'} onClick={() => setMode('reference')} className={`min-h-11 rounded-xl border px-3 text-sm ${mode === 'reference' ? 'border-primary bg-primary/10' : 'border-border'}`}><FileAudio className="mr-1 inline h-4 w-4"/>{labels[3]}</button>
