@@ -19,7 +19,7 @@ import { runGroupAutonomyOnce } from "./group-executor";
 import { runCollaborationAutonomyOnce } from "./collaboration-executor";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { dispatchAutonomousVoice, getVoiceOwnerControls } from "./voice-adapter";
+import { dispatchAutonomousVoice, getVoiceOwnerControls, resolveAutonomousVoiceId } from "./voice-adapter";
 
 const provider = new FreeModelProvider();
 const repository: LiveAutonomyRepository = {
@@ -56,7 +56,7 @@ export function startAutonomyBackgroundWorker() {
           now,
           lane: input.lane,
           voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
-            ...controls, dispatch: dispatchAutonomousVoice,
+            ...controls, dispatch: dispatchAutonomousVoice, resolveVoiceId: resolveAutonomousVoiceId,
           } : undefined).catch(() => undefined),
             });
             if (outcome.status === "no_action" || outcome.status === "rate_limited" || outcome.status === "disabled") {
