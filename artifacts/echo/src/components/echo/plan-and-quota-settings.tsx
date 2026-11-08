@@ -95,12 +95,16 @@ export function PlanAndQuotaSettings() {
       <h3 className="text-sm font-semibold">{t("ECHO Credit Store")}</h3>
       <p className="mt-1 text-xs text-muted-foreground">{t("Packs propuestos · Compras desactivadas durante la beta")}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">{([{ name: '20 Photo Credits', price: '$2.99' }, { name: '50 Photo Credits', price: '$6.49' }, { name: '100 Photo Credits', price: '$11.99' }, { name: '50 Voice Credits', price: '$2.99' }] as const).map(pack => <div key={pack.name} className="rounded-xl border border-border p-3"><div className="text-xs font-semibold">{pack.name}</div><div className="mt-1 text-lg font-bold">{pack.price}</div><div className="mt-1 text-[10px] text-muted-foreground">{t("Próximamente")}</div></div>)}</div>
-      <p className="mt-3 text-[11px] text-muted-foreground">{t("Las recompensas diarias y los saldos se activarán cuando esté implementado el registro seguro de créditos en el servidor.")}</p>
-    </div>
-    <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
-      <h3 className="text-sm font-semibold">{t("Ampliar mi universo")}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{complimentary ? t("Tus espacios de personajes y mundos están incluidos de por vida. No necesitás comprar ampliaciones.") : t("Espacios adicionales mensuales, independientes del plan principal.")}</p>
-      {([['character', t("+1 personaje")], ['world', t("+1 mundo")]] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="mt-3 flex min-h-14 w-full items-center justify-between rounded-xl border border-border px-3 text-left text-sm font-semibold"><span><Plus className="mr-2 inline h-4 w-4" /> {label}</span>{complimentary && <span className="ml-auto mr-2 text-[11px] text-primary">{t("Incluido")}</span>}<ChevronRight className="h-4 w-4" /></button>)}
+      <div className="mt-4 border-t border-border pt-3">
+        <h4 className="text-xs font-semibold">{t("Ampliar mi universo")}</h4>
+        <p className="mt-1 text-xs text-muted-foreground">{complimentary ? t("Tus espacios de personajes y mundos están incluidos de por vida. No necesitás comprar ampliaciones.") : t("Espacios adicionales mensuales, independientes del plan principal.")}</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {(['character','world'] as const).map(id => <button key={id} type="button" onClick={() => setDetails(details === id ? null : id)} className="min-h-16 rounded-xl border border-border p-3 text-left text-xs font-semibold">
+            <Plus className="mb-1 h-4 w-4" />{id === 'character' ? t("+1 personaje") : t("+1 mundo")}
+            <span className="mt-1 block text-[10px] text-muted-foreground">{complimentary ? t("Incluido") : t("Próximamente")}</span>
+          </button>)}
+        </div>
+      </div>
     </div>
     <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
       <h3 className="text-sm font-semibold">{t("Complementos independientes")}</h3>
