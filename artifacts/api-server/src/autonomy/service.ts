@@ -363,7 +363,7 @@ export async function runAutonomyLiveCycle(
     } finally {
       activeDmTyping.delete(typingId);
     }
-    if (preview.decision.action === "none") {
+    if (preview.decision.action === "none" && !(opportunity.situation === "story_reaction" && opportunity.storyId)) {
       await dependencies.repository.complete(ownerId, runId, {
         status: "no_action", action: "none", situation: preview.decision.situation,
         targetId: preview.targetId ?? null, sourceRevision: preview.sourceRevision,
