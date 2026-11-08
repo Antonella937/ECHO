@@ -44,6 +44,26 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   const [catalogue,setCatalogue]=useState<{voiceId:string;name:string;previewUrl:string;accent:string;language:string;description:string}[]>([]);
   const [catalogueSelected,setCatalogueSelected]=useState<string|null>(null);
   const [selectedCustomVoice,setSelectedCustomVoice]=useState(false);
+  const [voiceAutonomy,setVoiceAutonomy]=useState<{enabled:boolean;preference:"off"|"occasional"|"frequent";monthlyCharacterLimit:number;maxDailyMessages:number}>({enabled:false,preference:"off",monthlyCharacterLimit:800,maxDailyMessages:2});
+  const [voiceAutonomySaving,setVoiceAutonomySaving]=useState(false);
+  const [voiceAutonomySaved,setVoiceAutonomySaved]=useState(false);
+  useEffect(()=>{
+    if(access!=="allowed")return;
+    let cancelled=false;
+    void customFetch<{controls:typeof voiceAutonomy}>('/api/voices/premium/autonomy-controls',{responseType:'json'})
+      .then(data=>{if(!cancelled)setVoiceAutonomy(data.controls);}).catch(()=>{});
+    return()=>{cancelled=true;};
+  },[access]);
+  const saveVoiceAutonomy=async()=>{
+    if(voiceAutonomySaving)return;
+    setVoiceAutonomySaving(true);setVoiceAutonomySaved(false);setError('');
+    try{
+      const data=await customFetch<{controls:typeof voiceAutonomy}>('/api/voices/premium/autonomy-controls',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify(voiceAutonomy)});
+      setVoiceAutonomy(data.controls);setVoiceAutonomySaved(true);
+    }catch{setError(language==='es'?'No se pudieron guardar los límites de audios autónomos.':'Could not save autonomous voice limits.');}
+    finally{setVoiceAutonomySaving(false);}
+  };
+
   const [catalogueSaving,setCatalogueSaving]=useState<string|null>(null);
   const [catalogueAudio,setCatalogueAudio]=useState<string|null>(null);
   const [voiceTestBusy,setVoiceTestBusy]=useState(false);
@@ -205,6 +225,19 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       <button type="button" disabled={!generationAvailable||voiceTestBusy} onClick={()=>void testSelectedVoice()} className="min-h-11 w-full rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{voiceTestBusy?'…':language==='es'?'Probar voz · 2 créditos':'Test voice · 2 credits'}</button>
       {voiceTestUrl&&<audio controls autoPlay src={voiceTestUrl} className="w-full"/>}
     </div>}
+
+    <div className="space-y-3 rounded-xl border border-border p-3" data-testid="premium-voice-autonomy-controls">
+      <h4 className="text-sm font-semibold">{language==='es'?'Audios automáticos en mensajes':'Automatic voice notes in messages'}</h4>
+      <p className="text-xs text-muted-foreground">{language==='es'?'Desactivados por defecto. Para que un personaje mande audios espontáneos, habilitá este presupuesto y elegí «Voz» en sus preferencias de mensajes autónomos. Cada audio personalizado consume 2 créditos ECHO y cuota de ElevenLabs.':'Off by default. To send spontaneous audio, enable this budget and choose Voice in the character autonomous DM preferences. Each custom audio uses 2 ECHO credits plus ElevenLabs usage.'}</p>
+      <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={voiceAutonomy.enabled} onChange={e=>{setVoiceAutonomy(v=>({...v,enabled:e.target.checked,preference:e.target.checked&&v.preference==='off'?'occasional':!e.target.checked?'off':v.preference}));setVoiceAutonomySaved(false);}} />{language==='es'?'Permitir notas de voz autónomas':'Allow autonomous voice notes'}</label>
+      {voiceAutonomy.enabled&&<div className="grid grid-cols-2 gap-3">
+        <label className="space-y-1 text-xs">{language==='es'?'Frecuencia':'Frequency'}<select className="w-full rounded-lg border bg-background p-2" value={voiceAutonomy.preference} onChange={e=>setVoiceAutonomy(v=>({...v,preference:e.target.value as "occasional"|"frequent"}))}><option value="occasional">{language==='es'?'Ocasional':'Occasional'}</option><option value="frequent">{language==='es'?'Frecuente':'Frequent'}</option></select></label>
+        <label className="space-y-1 text-xs">{language==='es'?'Máximo por día':'Daily maximum'}<select className="w-full rounded-lg border bg-background p-2" value={voiceAutonomy.maxDailyMessages} onChange={e=>setVoiceAutonomy(v=>({...v,maxDailyMessages:Number(e.target.value)}))}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
+        <label className="col-span-2 space-y-1 text-xs">{language==='es'?'Límite mensual de caracteres (100–3000)':'Monthly character limit (100–3000)'}<input type="number" min={100} max={3000} step={100} className="w-full rounded-lg border bg-background p-2" value={voiceAutonomy.monthlyCharacterLimit} onChange={e=>setVoiceAutonomy(v=>({...v,monthlyCharacterLimit:Number(e.target.value)}))}/></label>
+      </div>}
+      <button type="button" disabled={voiceAutonomySaving} onClick={()=>void saveVoiceAutonomy()} className="min-h-10 w-full rounded-lg border border-primary/40 px-3 text-sm text-primary disabled:opacity-50">{voiceAutonomySaving?'…':language==='es'?'Guardar límites de audio':'Save audio limits'}</button>
+      {voiceAutonomySaved&&<p role="status" className="text-xs text-primary">{language==='es'?'Límites guardados':'Limits saved'}</p>}
+    </div>
 
     <div className="grid grid-cols-2 gap-2">
       <button type="button" aria-pressed={mode === 'prompt'} onClick={() => setMode('prompt')} className={`min-h-11 rounded-xl border px-3 text-sm ${mode === 'prompt' ? 'border-primary bg-primary/10' : 'border-border'}`}><Sparkles className="mr-1 inline h-4 w-4"/>{labels[2]}</button>
