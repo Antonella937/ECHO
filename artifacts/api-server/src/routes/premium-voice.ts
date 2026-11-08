@@ -34,17 +34,17 @@ async function curatedElevenLabsVoices():Promise<ListedVoice[]> {
   method:"GET",headers:elevenLabsHeaders(),signal:AbortSignal.timeout(15000)
  });
  if(!response.ok)throw Error(`ELEVENLABS_CATALOGUE_HTTP_${response.status}`);
- const payload=await response.json() as {voices?:Array<{voice_id?:string;name?:string;category?:string;preview_url?:string;description?:string;labels?:Record<string,string>;sharing?:{rate?:number;custom_rate?:number}}>;has_more?:boolean};
+ const payload=await response.json() as {voices?:Array<{voice_id?:string;name?:string;category?:string;preview_url?:string;description?:string;labels?:Record<string,string>;is_legacy?:boolean;sharing?:{rate?:number;custom_rate?:number}}>;has_more?:boolean};
  const voices:ListedVoice[]=[];
  for(const v of payload.voices??[]){
   if(!v.voice_id || !/^[a-zA-Z0-9_-]{10,128}$/.test(v.voice_id) || !v.preview_url)continue;
   // Do not treat the user's private clones as a public generic preset.
-  if(!["premade","professional","high_quality"].includes(v.category??""))continue;
+  if(v.category!=="premade" || v.is_legacy===true)continue;
   // A legacy custom-rate voice may consume more provider credits than ECHO allows.
   if((v.sharing?.rate??0)>1||(v.sharing?.custom_rate??0)>1)continue;
   let preview:URL;
   try{preview=new URL(v.preview_url);}catch{continue;}
-  if(preview.protocol!=="https:" || !["elevenlabs.io","api.elevenlabs.io"].some(host=>preview.hostname===host||preview.hostname.endsWith(`.${host}`)))continue;
+  if(preview.protocol!=="https:" || !["elevenlabs.io","storage.googleapis.com"].some(host=>preview.hostname===host||preview.hostname.endsWith(`.${host}`)))continue;
   voices.push({voiceId:v.voice_id,name:String(v.name??"Voice").slice(0,80),category:v.category??"premade",
     previewUrl:preview.toString(),description:String(v.description??"").slice(0,180),
     accent:String(v.labels?.accent??"").slice(0,40),language:String(v.labels?.language??"").slice(0,40)});
