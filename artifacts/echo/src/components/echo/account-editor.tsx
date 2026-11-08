@@ -35,6 +35,9 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
   const [avatar, setAvatar] = useState('asset:account-default');
   const [type, setType] = useState<AccountType>('personal');
   const [verified, setVerified] = useState(false);
+  const [identityDescription, setIdentityDescription] = useState('');
+  const [identityVoice, setIdentityVoice] = useState('');
+  const [identityFacts, setIdentityFacts] = useState('');
   const [professionalCategory, setProfessionalCategory] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -59,6 +62,9 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setAvatar(account?.avatar ?? 'asset:account-default');
     setType(account?.accountType ?? 'personal');
     setVerified(account?.verified ?? false);
+    setIdentityDescription(account?.accountIdentity?.description ?? '');
+    setIdentityVoice(account?.accountIdentity?.voice ?? '');
+    setIdentityFacts(account?.accountIdentity?.facts ?? '');
     setProfessionalCategory(account?.professionalCategory ?? '');
     setContactEmail(account?.contactEmail ?? '');
     setWebsite(account?.website ?? '');
@@ -83,6 +89,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     try {
       const input: AccountInput = {
         name, handle: handle.toLowerCase(), bio, avatar, accountType: type, verified, privateAccount,
+        accountIdentity: { description: identityDescription.trim(), voice: identityVoice.trim(), facts: identityFacts.trim() },
         professionalCategory: type === 'personal' ? '' : professionalCategory.trim(),
         contactEmail: type === 'personal' ? '' : contactEmail.trim(), website: type === 'personal' ? '' : website.trim(),
         displayMetrics: { followers: parseBase(followers), following: parseBase(following) },
@@ -165,6 +172,16 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
           </select>
         </Field>
         {type !== "personal" && <>
+          <div className="mt-5 rounded-xl bg-secondary/40 p-3 text-sm font-semibold">{t("Ficha de identidad")} <p className="mt-1 text-xs font-normal text-muted-foreground">{t("Contexto interno para publicaciones y respuestas de la cuenta. No aparece en el perfil público.")}</p></div>
+          <Field id="acc-identity-description" label={t("¿Qué es esta cuenta?")}>
+            <textarea id="acc-identity-description" maxLength={2500} rows={3} value={identityDescription} onChange={e => setIdentityDescription(e.target.value)} className={cn(inputCls, "h-auto resize-none py-3")} data-testid="input-account-identity-description" />
+          </Field>
+          <Field id="acc-identity-voice" label={t("¿Cómo se comunica?")}>
+            <textarea id="acc-identity-voice" maxLength={2500} rows={2} value={identityVoice} onChange={e => setIdentityVoice(e.target.value)} className={cn(inputCls, "h-auto resize-none py-3")} data-testid="input-account-identity-voice" />
+          </Field>
+          <Field id="acc-identity-facts" label={t("Información importante")}>
+            <textarea id="acc-identity-facts" maxLength={2500} rows={3} value={identityFacts} onChange={e => setIdentityFacts(e.target.value)} className={cn(inputCls, "h-auto resize-none py-3")} data-testid="input-account-identity-facts" />
+          </Field>
           <Field id="acc-category" label={t("Categoría profesional")}>
             <input id="acc-category" maxLength={80} value={professionalCategory} onChange={e => setProfessionalCategory(e.target.value)} placeholder={type === "band" ? "Rock / Metal" : type === "business" ? "Diseño de indumentaria" : "Arte / Música"} className={inputCls} data-testid="input-professional-category" />
           </Field>
