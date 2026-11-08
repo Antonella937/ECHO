@@ -112,8 +112,8 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           const percent = voteCount ? Math.round(count * 100 / voteCount) : 0;
           return <button key={option.id} type="button" disabled={pollClosed} onClick={() => actions.votePoll(post.id, option.id)} aria-pressed={myVote === option.id}
             className="relative min-h-11 overflow-hidden rounded-xl border border-border bg-secondary/40 text-left text-sm disabled:cursor-default" data-testid={`poll-option-${post.id}-${option.id}`}>
-            {myVote && <span className="absolute inset-y-0 left-0 bg-primary/20" style={{ width: `${percent}%` }} />}
-            <span className="relative flex justify-between gap-2 px-3 py-3"><span className={myVote === option.id ? 'font-semibold' : ''}>{option.text}</span>{myVote && <span className="font-semibold">{percent}%</span>}</span>
+            {(myVote || pollClosed) && <span className="absolute inset-y-0 left-0 bg-primary/20" style={{ width: `${percent}%` }} />}
+            <span className="relative flex justify-between gap-2 px-3 py-3"><span className={myVote === option.id ? 'font-semibold' : ''}>{option.text}</span>{(myVote || pollClosed) && <span className="font-semibold">{percent}%</span>}</span>
           </button>;
         })}</div>
         <p className="mt-2 text-xs text-muted-foreground">{voteCount} {pollLabels[0]}{pollClosed ? ` · ${pollLabels[1]}` : ''}</p>
