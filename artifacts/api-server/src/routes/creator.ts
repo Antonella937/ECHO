@@ -4,7 +4,7 @@ import { db, echoMediaTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
-import { resolveEchoPlan } from "../lib/entitlements";
+import { ECHO_CREDIT_POLICY, resolveEchoPlan } from "../lib/entitlements";
 import {
   configureAiBudget,
   creatorUsageSummary,
@@ -39,6 +39,32 @@ const createUniverseSchema = z.object({
 }).strict();
 
 router.use("/creator", authenticate);
+
+// Authenticated catalog for the upcoming server-side wallet.
+// No client-supplied plan, balance mutations, or checkout actions are trusted.
+router.get("/creator/credits/catalog", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  try {
+    const plan = await resolveEchoPlan(req.userId!);
+    const policy = ECHO_CREDIT_POLICY;
+    res.json({
+      plan,
+      included: policy.monthlyPlans[plan],
+      rewardCaps: policy.monthlyRewardCaps[plan],
+      rewardExpiresAfterDays: policy.rewardExpiresAfterDays,
+      costs: policy.costs,
+      packs: policy.packs,
+      customVoiceMonthlyMaintenanceCents: policy.customVoiceMonthlyMaintenanceCents,
+      walletEnabled: policy.walletEnabled,
+      checkoutEnabled: policy.checkoutEnabled,
+      balances: null,
+      dailyReward: { available: false, reason: "WALLET_NOT_YET_CONNECTED" },
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Could not resolve credit catalog");
+    res.status(503).json({ error: "CREDIT_CATALOG_UNAVAILABLE" });
+  }
+});
 
 router.get("/creator/account", async (req, res): Promise<void> => {
   const ownerId = req.userId!;
