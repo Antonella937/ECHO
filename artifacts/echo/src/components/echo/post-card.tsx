@@ -29,6 +29,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const author = character(post.authorId);
   const [sheet, setSheet] = useState<null | 'comments' | 'likers' | 'share' | 'options'>(null);
   const [burst, setBurst] = useState(0);
+  const [showPhotoTags, setShowPhotoTags] = useState(false);
   const lastTap = useRef(0);
   if (!author) return null;
 
@@ -82,6 +83,11 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
               </span>
             )}
           />
+          {tagged.length > 0 && <button type="button" onClick={() => setShowPhotoTags(v => !v)} aria-label={t("Con")} aria-expanded={showPhotoTags} className="absolute bottom-3 left-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white shadow-md" data-testid={`button-photo-tags-${post.id}`}><UserRound className="h-4 w-4" /></button>}
+          {showPhotoTags && tagged.length > 0 && <div className="absolute bottom-14 left-3 z-10 max-w-[85%] rounded-xl bg-black/80 p-2 text-white shadow-lg" data-testid={`overlay-photo-tags-${post.id}`}>
+            <p className="mb-1 text-[11px] opacity-75">{t("Con")}</p>
+            <div className="flex flex-wrap gap-1.5">{tagged.map(c => c && <Link key={c.id} href={`/profile/${c.id}`} className="rounded-lg bg-white/15 px-2.5 py-1.5 text-xs font-medium hover:bg-white/25">@{c.handle}</Link>)}</div>
+          </div>}
         </div>
       )}
 
