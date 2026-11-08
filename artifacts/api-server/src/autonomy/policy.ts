@@ -10,6 +10,8 @@ import type {
 } from "@workspace/api-zod";
 import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
 
+import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
+
 export type AutonomySituation = CharacterDecisionInput["situation"];
 export type ExecutedAutonomyAction = {
   status: string;
