@@ -209,7 +209,10 @@ function NewGroupSheet({ open, onClose }: { open: boolean; onClose(): void }) {
         body: JSON.stringify({ universeId: getActiveUniverseId(user.id), actorId: me.id, name: name.trim(), participantIds: selected }),
       });
       onClose(); setName(''); setSelected([]); navigate(`/messages/group/${group.id}`);
-    } catch { setError('No se pudo crear el grupo.'); }
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : '';
+      setError(detail ? `No se pudo crear el grupo: ${detail}` : 'No se pudo crear el grupo. Intentá nuevamente.');
+    }
     finally { setSaving(false); }
   };
   return <Sheet open={open} onClose={onClose} title="Nuevo grupo" testId="sheet-new-group">
