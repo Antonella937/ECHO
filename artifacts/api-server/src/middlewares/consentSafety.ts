@@ -42,15 +42,19 @@ export function createConsentSafetyGate(
       }
       // Image prompt preparation is a private, non-generating preview; it does not transfer media or spend credits.
       const safeImagePreview = req.method === "POST" && (path === "/ai-engine/images/prepare" || path === "/ai-engine/images/prepare-edit");
+      // A private synthetic storage diagnostic makes no AI/provider calls. The route also enforces auth and its own allowlist.
+      const safeStorageDiagnostic = req.method === "POST" && path === "/ai-engine/images/storage-self-test" &&
+        process.env.ECHO_IMAGE_STORAGE_SELF_TEST_ENABLED === "true" &&
+        (process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS ?? "").split(",").map(id => id.trim()).includes(ownerId);
       const authorizedPrivateAutonomy = AUTONOMY_PRIVATE_BETA_ENABLED &&
         path.startsWith("/autonomy/") && isAutonomyOwnerAuthorized(ownerId);
       if ((/^\/universe\/[^/]+\/sharing$/.test(path) && req.body?.sharingEnabled === true) ||
-        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy && !safeImagePreview)) {
+        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy && !safeImagePreview && !safeStorageDiagnostic)) {
         res.status(409).json({ error: "LEGAL_DOCUMENTS_UNAVAILABLE", externalUseAllowed: false });
         return;
       }
       // Always allow reading and reducing sharing, including legacy owners with no draft row.
-      if (authorizedPrivateAutonomy || ["GET", "HEAD", "OPTIONS"].includes(req.method) ||
+      if (authorizedPrivateAutonomy || safeStorageDiagnostic || ["GET", "HEAD", "OPTIONS"].includes(req.method) ||
         (/^\/universe\/[^/]+\/sharing$/.test(path) && req.body?.sharingEnabled === false)) return next();
       if (!(await getOwnerConsent(ownerId)).draftAcknowledged) {
         res.status(403).json({ error: "ALPHA_ACKNOWLEDGEMENT_REQUIRED" });
