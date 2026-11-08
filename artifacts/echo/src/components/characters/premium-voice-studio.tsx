@@ -85,8 +85,8 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
 
   const loadProject=async()=>{
     if(!characterId)return;
-    const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string;provider?:string;providerVoiceId?:string}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
-    setGenerationAvailable(data.generationAvailable);setSamples(data.samples.filter(s=>s.provider!=='elevenlabs_catalog'));setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
+    const data=await customFetch<{project:{id:string;selectedSampleId?:string|null}|null;samples:{id:string;status:string;provider?:string;providerVoiceId?:string;audioObjectPath?:string|null}[];generationAvailable:boolean}>(`/api/voices/premium/projects?universeId=${encodeURIComponent(universeId)}&characterId=${encodeURIComponent(characterId)}`,{responseType:'json'});
+    setGenerationAvailable(data.generationAvailable);setSamples(data.samples.filter(s=>s.provider==='elevenlabs' && s.status==='ready' && Boolean(s.audioObjectPath)));setProjectId(data.project?.id??null);setSelectedSampleId(data.project?.selectedSampleId??null);
     const selected=data.samples.find(s=>s.id===data.project?.selectedSampleId) as {provider?:string;providerVoiceId?:string}|undefined;
     setCatalogueSelected(selected?.provider==='elevenlabs_catalog'?selected.providerVoiceId??null:null);
     setSelectedCustomVoice(Boolean(selected && ['elevenlabs','elevenlabs_clone'].includes(selected.provider??'') && selected.providerVoiceId));
