@@ -18,15 +18,17 @@ export async function requestFalImage(input: {
 }): Promise<ImageGenerationResult> {
   if (!input.apiKey.trim()) throw Error('IMAGE_PROVIDER_KEY_MISSING');
   if (!input.references.length || input.references.length > 4) throw Error('FAL_EDIT_REQUIRES_1_TO_4_REFERENCES');
+  // Validate all reference payloads before any potentially billable request.
+  for (const ref of input.references) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(ref.mimeType) ||
+        !ref.bytes.length || ref.bytes.length > 15_000_000) throw Error('INVALID_IMAGE_REFERENCE');
+  }
   // No billable call until the model pricing and reconciliation contract is verified.
   // This fails before transmitting any references or consuming fal.ai credits.
   throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
   const fetchImpl = input.fetchImpl ?? fetch;
-  const image_urls = input.references.map(ref => {
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(ref.mimeType) ||
-        !ref.bytes.length || ref.bytes.length > 15_000_000) throw Error('INVALID_IMAGE_REFERENCE');
-    return `data:${ref.mimeType};base64,${ref.bytes.toString('base64')}`;
-  });
+  const image_urls = input.references.map(ref =>
+    `data:${ref.mimeType};base64,${ref.bytes.toString('base64')}`);
   const response = await fetchImpl('https://fal.run/fal-ai/flux-2-pro/edit', {
     method: 'POST',
     headers: { Authorization: `Key ${input.apiKey}`, 'Content-Type': 'application/json' },
