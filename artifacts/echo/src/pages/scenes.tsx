@@ -17,6 +17,7 @@ export default function ScenesPage() {
   const [scenes,setScenes] = useState<Scene[]>([]);
   const [selected,setSelected] = useState<string|null>(null);
   const [events,setEvents] = useState<SceneEvent[]>([]);
+  const [presence,setPresence] = useState<Record<string,'present'|'absent'|'left'>>({});
   const [title,setTitle] = useState('');
   const [premise,setPremise] = useState('');
   const [canon,setCanon] = useState<'main'|'alternate'>('main');
@@ -37,13 +38,28 @@ export default function ScenesPage() {
       .then(r=>{if(active)setEvents(r.events)}).catch(()=>{if(active)setError(es?'No se pudieron cargar los eventos.':'Could not load events.')});
     return()=>{active=false};
   },[selected,universeId,me.id]);
+  useEffect(()=>{if(!selected)return;let mounted=true;
+    void customFetch<{presence:{characterId:string;presence:'present'|'absent'|'left'}[]}>(`/api/scenes/${encodeURIComponent(selected)}/presence?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'})
+      .then(r=>{if(mounted)setPresence(Object.fromEntries(r.presence.map(p=>[p.characterId,p.presence])));})
+      .catch(()=>{});
+    return()=>{mounted=false};
+  },[selected,universeId]);
+  const updatePresence=async(characterId:string,value:'present'|'absent'|'left')=>{
+    if(!selected)return;setBusy(true);setError('');
+    try{await customFetch(`/api/scenes/${encodeURIComponent(selected)}/presence`,{
+      method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({universeId,characterId,presence:value})
+    });setPresence(old=>({...old,[characterId]:value}));}
+    catch{setError(es?'No se pudo actualizar la presencia.':'Could not update presence.')}
+    finally{setBusy(false)}
+  };
   const create = async (e:FormEvent) => {e.preventDefault();if(!participants.length)return;setBusy(true);setError('');
     try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);}
     catch{setError(es?'No se pudo crear la escena.':'Could not create scene.')}finally{setBusy(false)}
   };
   const send = async (e:FormEvent) => {e.preventDefault();if(!selected||!message.trim())return;setBusy(true);setError('');
     try {await customFetch('/api/scenes/events',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,sceneId:selected,actorId:me.id,text:message.trim(),visibility:'participants',audienceIds:[]})});setMessage('');
-      const r=await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(selected)}/events?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'});setEvents(r.events);
+      const r=await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(selected)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,{method:'GET',responseType:'json'});setEvents(r.events);
       if(autoReply && active?.status==='active' && active.turnSettings?.mode!=='manual'){
         const ai=active.participantIds.filter(id=>id!==me.id);
         const turn=active.turnSettings;
@@ -84,7 +100,7 @@ export default function ScenesPage() {
         body:JSON.stringify({universeId,characterId})
       });
       const [history,listing]=await Promise.all([
-        customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/events?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'}),
+        customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,{method:'GET',responseType:'json'}),
         customFetch<{scenes:Scene[]}>(`/api/scenes?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'})
       ]);
       setEvents(history.events);setScenes(listing.scenes);
@@ -141,6 +157,16 @@ export default function ScenesPage() {
             {active.participantIds.filter(id=>id!==me.id).map(id=><option key={id} value={id}>{state.characters.find(c=>c.id===id)?.name??id}</option>)}
           </select>
           <button type="button" disabled={busy||!nextSpeaker||active.status!=='active'} onClick={()=>void updateTurns(active.turnSettings?.mode??'automatic',nextSpeaker)} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Elegir próximo turno':'Choose next turn'}</button>
+          <div className="space-y-2"><div className="text-sm font-medium">{es?'Presencia narrativa':'Narrative presence'}</div>
+            {active.participantIds.map(id=><label key={id} className="flex items-center justify-between gap-2 text-sm">
+              <span>{state.characters.find(c=>c.id===id)?.name??id}</span>
+              <select disabled={busy||active.status==='finished'} value={presence[id]??'present'} onChange={e=>void updatePresence(id,e.target.value as 'present'|'absent'|'left')} className="rounded-lg border border-border bg-background p-2">
+                <option value="present">{es?'Presente':'Present'}</option>
+                <option value="absent">{es?'Ausente':'Absent'}</option>
+                <option value="left">{es?'Se retiró':'Left'}</option>
+              </select>
+            </label>)}
+          </div>
           <div className="flex gap-2">
             {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('paused')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Pausar':'Pause'}</button>}
             {active.status==='paused'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('active')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Reanudar':'Resume'}</button>}
