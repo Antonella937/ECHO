@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { randomInt } from "node:crypto";
 import { ECHO_CREDIT_POLICY, resolveEchoPlan } from "./entitlements";
 
 type Kind = "photo" | "voice";
@@ -41,10 +42,13 @@ export async function creditWallet(ownerId: string, claim = false) {
         [ownerId,month+"-01",monthEnd(now).toISOString().slice(0,10)]);
       const photoRemaining = Math.max(0,cap.photo - Number(used.rows[0].photo));
       const voiceRemaining = Math.max(0,cap.voice - Number(used.rows[0].voice));
-      // Deterministic tiered rewards; no hidden random odds or user-supplied amounts.
-      const proposedPhoto = plan === "free" ? 1 : plan === "plus" ? (streak === 7 ? 2 : 1) : (streak === 7 ? 3 : 1);
+      // Transparent reward odds: Free 50% for 1 Photo; Plus equal odds for 0/1/2;
+      // Premium equal odds for 1/2/3. Day 7 guarantees the tier maximum.
+      // Premium Voice: 10% chance of 1 credit daily, guaranteed on day 7.
+      const proposedPhoto = streak === 7 ? (plan === "free" ? 1 : plan === "plus" ? 2 : 3)
+        : plan === "free" ? randomInt(2) : plan === "plus" ? randomInt(3) : randomInt(1,4);
       const photo = Math.min(proposedPhoto,photoRemaining);
-      const voice = plan === "premium" && streak === 7 ? Math.min(1,voiceRemaining) : 0;
+      const voice = plan === "premium" && (streak === 7 || randomInt(10) === 0) ? Math.min(1,voiceRemaining) : 0;
       const inserted = await client.query(`INSERT INTO echo_daily_reward_claims(owner_id,claim_date,streak,photo_credits,voice_credits)
         VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING claim_date`,
         [ownerId,today,streak,photo,voice]);
