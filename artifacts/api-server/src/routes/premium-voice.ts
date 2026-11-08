@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import { mp3DurationSeconds } from "../lib/mp3Duration";
 import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -258,8 +259,11 @@ router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
   if(!response.ok){await refundFailedCharacterAudio(req.userId!,operation);operation=null;res.status(502).json({error:"CUSTOM_VOICE_GENERATION_FAILED"});return;}
   const audio=Buffer.from(await response.arrayBuffer());
   if(audio.length<100 || audio.length>10*1024*1024){await refundFailedCharacterAudio(req.userId!,operation);operation=null;res.status(502).json({error:"CUSTOM_VOICE_INVALID_AUDIO"});return;}
-  // Short text reduces the risk of exceeding the 30-second allowance; actual
-  // duration still needs validation before this route is enabled publicly.
+  const duration=mp3DurationSeconds(audio);
+  if(duration===null || duration<=0 || duration>30){
+   await refundFailedCharacterAudio(req.userId!,operation);operation=null;
+   res.status(502).json({error:"CUSTOM_VOICE_AUDIO_DURATION_INVALID"});return;
+  }
   res.setHeader("Content-Type","audio/mpeg");
   res.setHeader("Cache-Control","private, no-store");
   res.send(audio);
