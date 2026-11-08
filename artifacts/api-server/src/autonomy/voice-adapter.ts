@@ -15,8 +15,8 @@ const voices: Record<string, string> = {
 };
 const month = () => new Date().toISOString().slice(0, 7);
 const storageReady = () => {
-  const base = process.env.SUPABASE_URL?.replace(/\\/$/, "");
-  return !!process.env.SUPABASE_SERVICE_ROLE_KEY && !!base && /^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/.test(base);
+  const base = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  return !!process.env.SUPABASE_SERVICE_ROLE_KEY && !!base && /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base);
 };
 
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
