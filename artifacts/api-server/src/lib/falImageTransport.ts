@@ -42,9 +42,58 @@ export async function requestFalImage(input: {
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   let payload: any;
   try { payload = JSON.parse(raw); } catch { throw Error('FAL_IMAGE_INVALID_JSON'); }
-  parseFalImagePayload(payload);
+  await resolveFalImagePayload(payload, fetchImpl);
   throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
 
+}
+
+/**
+ * Convert a fal.ai response to image bytes. Hosted URLs are fetched only from
+ * the known fal.ai image CDN over HTTPS, with redirects disabled and size caps.
+ * This is intentionally separate from the billable provider request.
+ */
+export async function resolveFalImagePayload(payload: unknown, fetchImpl: typeof fetch = fetch): Promise<{ bytes: Buffer; mimeType: 'image/jpeg' }> {
+  const image = falImageObject(payload);
+  const url = image.url;
+  if (url.startsWith('data:image/jpeg;base64,')) return parseFalImagePayload(payload);
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw Error('FAL_IMAGE_INVALID_URL'); }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port ||
+      !['fal.media', 'v3.fal.media', 'storage.googleapis.com'].includes(parsed.hostname) ||
+      parsed.hostname === 'storage.googleapis.com' && !parsed.pathname.startsWith('/fal-cdn/')) {
+    throw Error('FAL_IMAGE_URL_NOT_ALLOWED');
+  }
+  const response = await fetchImpl(url, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+  if (!response.ok || !response.body) throw Error('FAL_IMAGE_DOWNLOAD_FAILED');
+  if (Number(response.headers.get('content-length') || 0) > MAX_BYTES) throw Error('FAL_IMAGE_TOO_LARGE');
+  const mime = response.headers.get('content-type')?.split(';')[0]?.toLowerCase();
+  if (mime !== 'image/jpeg') throw Error('FAL_IMAGE_UNEXPECTED_MIME');
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of response.body) {
+    const bytes = Buffer.from(chunk);
+    size += bytes.length;
+    if (size > MAX_BYTES) throw Error('FAL_IMAGE_TOO_LARGE');
+    chunks.push(bytes);
+  }
+  const bytes = Buffer.concat(chunks);
+  validateJpeg(bytes);
+  return { bytes, mimeType: 'image/jpeg' };
+}
+
+function falImageObject(payload: unknown): { url: string } {
+  if (!payload || typeof payload !== 'object') throw Error('FAL_IMAGE_INVALID_RESPONSE');
+  const images = (payload as { images?: unknown }).images;
+  if (!Array.isArray(images) || images.length !== 1) throw Error('FAL_IMAGE_UNEXPECTED_COUNT');
+  const image = images[0];
+  if (!image || typeof image !== 'object') throw Error('FAL_IMAGE_INVALID_RESPONSE');
+  const url = (image as { url?: unknown }).url;
+  if (typeof url !== 'string' || !url) throw Error('FAL_IMAGE_INVALID_URL');
+  return { url };
+}
+function validateJpeg(bytes: Buffer): void {
+  if (bytes.length < 4 || bytes.length > MAX_BYTES || bytes[0] !== 0xff || bytes[1] !== 0xd8 ||
+      bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) throw Error('FAL_IMAGE_INVALID_BYTES');
 }
 
 /**
@@ -56,13 +105,8 @@ export async function requestFalImage(input: {
  * reconciliation must be explicit before a paid request is permitted.
  */
 export function parseFalImagePayload(payload: unknown): { bytes: Buffer; mimeType: 'image/jpeg' } {
-  if (!payload || typeof payload !== 'object') throw Error('FAL_IMAGE_INVALID_RESPONSE');
-  const images = (payload as { images?: unknown }).images;
-  if (!Array.isArray(images) || images.length !== 1) throw Error('FAL_IMAGE_UNEXPECTED_COUNT');
-  const image = images[0];
-  if (!image || typeof image !== 'object') throw Error('FAL_IMAGE_INVALID_RESPONSE');
-  const url = (image as { url?: unknown }).url;
-  if (typeof url !== 'string' || !url.startsWith('data:image/jpeg;base64,')) {
+  const { url } = falImageObject(payload);
+  if (!url.startsWith('data:image/jpeg;base64,')) {
     throw Error('FAL_IMAGE_HOSTED_URL_NOT_YET_SUPPORTED');
   }
   const encoded = url.slice('data:image/jpeg;base64,'.length);
