@@ -64,6 +64,12 @@ scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
   try {
     const viewer = id.safeParse(req.query.viewerId);
     if (!viewer.success) { res.status(400).json({ error: "VIEWER_REQUIRED" }); return; }
+    const [viewerUniverse] = await db.select({ state: echoUniversesTable.state })
+      .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, req.userId!),
+        eq(echoUniversesTable.universeId, parsed.data.universeId))).limit(1);
+    if ((viewerUniverse?.state as { currentCharacterId?: string } | null)?.currentCharacterId !== viewer.data) {
+      res.status(403).json({ error: "SCENE_VIEWER_IDENTITY_MISMATCH" }); return;
+    }
     const scenes = await db.execute(sql`SELECT participant_ids FROM echo_scenes WHERE owner_id = ${req.userId!}
       AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data} LIMIT 1`);
     const members = scenes.rows[0]?.participant_ids;
