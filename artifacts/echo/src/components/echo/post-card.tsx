@@ -41,6 +41,10 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const tagged = (post.taggedAccountIds ?? []).map(character).filter(Boolean);
   const collaborators = (post.collaboratorIds ?? []).map(character).filter(Boolean);
   const invitedMe = (post.collaborationInvites ?? []).includes(me.id);
+  const poll = post.poll;
+  const myVote = poll?.votes?.[me.id];
+  const voteCount = poll ? Object.values(poll.votes ?? {}).length : 0;
+  const pollClosed = !!(poll?.closesAt && new Date(poll.closesAt).getTime() <= Date.now());
   const media = postMedia(post);
   const firstLiker = likers.find((c) => c && c.id !== me.id) ?? likers[0];
 
@@ -98,6 +102,19 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         <p className="mb-2 font-medium">{t("Invitación a colaborar en esta publicación")}</p>
         <div className="flex gap-2"><button type="button" onClick={() => actions.respondCollaboration(post.id, true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{t("Aceptar")}</button><button type="button" onClick={() => actions.respondCollaboration(post.id, false)} className="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold">{t("Rechazar")}</button></div>
       </div>}
+      {poll && <section className="mx-4 my-3 rounded-2xl border border-border bg-card p-4" data-testid={`post-poll-${post.id}`}>
+        <h3 className="mb-3 text-sm font-semibold">{poll.question}</h3>
+        <div className="grid gap-2">{poll.options.map(option => {
+          const count = Object.values(poll.votes ?? {}).filter(id => id === option.id).length;
+          const percent = voteCount ? Math.round(count * 100 / voteCount) : 0;
+          return <button key={option.id} type="button" disabled={pollClosed} onClick={() => actions.votePoll(post.id, option.id)} aria-pressed={myVote === option.id}
+            className="relative min-h-11 overflow-hidden rounded-xl border border-border bg-secondary/40 text-left text-sm disabled:cursor-default" data-testid={`poll-option-${post.id}-${option.id}`}>
+            {myVote && <span className="absolute inset-y-0 left-0 bg-primary/20" style={{ width: `${percent}%` }} />}
+            <span className="relative flex justify-between gap-2 px-3 py-3"><span className={myVote === option.id ? 'font-semibold' : ''}>{option.text}</span>{myVote && <span className="font-semibold">{percent}%</span>}</span>
+          </button>;
+        })}</div>
+        <p className="mt-2 text-xs text-muted-foreground">{voteCount} {t("votos")}{pollClosed ? ` · ${t("Finalizada")}` : ''}</p>
+      </section>}
       {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact /></div>}
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
