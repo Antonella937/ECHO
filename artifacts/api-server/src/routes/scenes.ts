@@ -70,7 +70,7 @@ scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
     if (!Array.isArray(members) || !members.includes(viewer.data)) { res.status(403).json({ error: "SCENE_VIEWER_NOT_ALLOWED" }); return; }
     const rows = await db.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId", visibility, audience_ids AS "audienceIds", text, created_at AS "createdAt"
       FROM echo_scene_events WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}
-      AND scene_id = ${sceneId.data} ORDER BY created_at, event_id LIMIT 500`);
+      AND scene_id = ${sceneId.data} AND text <> '' ORDER BY created_at, event_id LIMIT 500`);
     res.json({ events: rows.rows.filter(row => row.visibility === "public" || row.actorId === viewer.data || (Array.isArray(row.audienceIds) ? row.audienceIds.includes(viewer.data) : false) || (row.visibility === "participants" && (!Array.isArray(row.audienceIds) || row.audienceIds.length === 0))) });
   } catch { res.status(503).json({ error: "SCENE_EVENTS_UNAVAILABLE" }); }
 });
@@ -177,7 +177,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       }
     }
     const history = await db.execute(sql`SELECT event_id, actor_id, text, visibility, audience_ids FROM echo_scene_events
-      WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND text <> ''
       ORDER BY created_at DESC, event_id DESC LIMIT 30`);
     const visible = [...history.rows].reverse().filter(e => e.visibility !== "private" &&
       (e.visibility === "public" || !Array.isArray(e.audience_ids) || !e.audience_ids.length || e.audience_ids.includes(characterId) || e.actor_id === characterId));
