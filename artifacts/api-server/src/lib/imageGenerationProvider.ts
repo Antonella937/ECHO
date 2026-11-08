@@ -1,4 +1,5 @@
 import { paidImageGenerationActivated } from './imageGenerationActivation';
+import { imageGenerationAccessMode } from './imageGenerationAccess';
 /**
  * Paid image-provider boundary.
  *
@@ -31,7 +32,7 @@ export const MAX_IMAGE_COST_USD = 0.20;
 /** Conservative status: no API key or feature flag alone proves that a production budget is active. */
 export function imageGenerationAvailability() {
   return {
-    enabled: paidImageGenerationActivated() && Boolean(process.env.FAL_KEY) && Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) && Boolean(process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS?.trim()),
+    enabled: paidImageGenerationActivated() && Boolean(process.env.FAL_KEY) && Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) && (imageGenerationAccessMode() === 'authenticated_users' || Boolean(process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS?.trim())),
     reason: paidImageGenerationActivated() ? 'BUDGET_AND_ACCOUNT_CHECK_REQUIRED' : 'PAID_IMAGE_GENERATION_DISABLED',
     // Model capability verified against public docs; production contract and
     // per-account data-transfer consent still require separate approval.
@@ -46,7 +47,7 @@ export function imageGenerationAvailability() {
       privateStorageConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
       providerValidated: process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED === 'true',
       paidFeatureFlagEnabled: process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED === 'true',
-      ownerAllowlistConfigured: Boolean(process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS?.trim()),
+      ownerAllowlistConfigured: imageGenerationAccessMode() === 'authenticated_users' || Boolean(process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS?.trim()),
       budgetActivated: false,
     },
   };
