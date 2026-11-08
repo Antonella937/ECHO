@@ -37,12 +37,14 @@ export async function synthesizeDeapiMp3(input: { text: string; voice: string; r
   const key = process.env.ECHO_DEAPI_TTS_KEY;
   if (!key) throw new DeapiSpeechError("DEAPI_NOT_CONFIGURED");
   if (!input.text.trim() || input.text.length > 500) throw new DeapiSpeechError("DEAPI_INVALID_TEXT");
-  const headers = { Authorization: `Bearer ${key}`, Accept: "application/json", "Content-Type": "application/json" };
+  const headers = { Authorization: `Bearer ${key}`, Accept: "application/json" };
+  const form = new FormData();
+  for (const [field, value] of Object.entries({
+    model: "Kokoro", text: input.text, voice: input.voice, lang: voiceLanguage(input.voice),
+    speed: "1", format: "mp3", sample_rate: "24000", mode: "custom_voice",
+  })) form.append(field, value);
   const submitted = await json(await fetch(`${ROOT}/audio/speech`, {
-    method: "POST", headers,
-    body: JSON.stringify({ model: "Kokoro", text: input.text, voice: input.voice,
-      lang: voiceLanguage(input.voice), speed: 1, format: "mp3", sample_rate: 24000 }),
-    signal: AbortSignal.timeout(15_000),
+    method: "POST", headers, body: form, signal: AbortSignal.timeout(15_000),
   }));
   const id: unknown = submitted.data?.request_id;
   if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new DeapiSpeechError("DEAPI_INVALID_JOB_ID");
