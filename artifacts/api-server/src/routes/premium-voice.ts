@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
@@ -224,6 +226,50 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
   res.json({url:new URL(data.signedURL!,base).toString()});
  }catch{res.status(503).json({error:"VOICE_SAMPLE_PLAYBACK_UNAVAILABLE"});}
 });
+/**
+ * Manual premium speech: only the owner's selected ready sample can speak.
+ * Voice design previews remain a separate provider-cost flow.
+ */
+router.post("/voices/premium/synthesize",requireAuth,async(req,res)=>{
+ const parsed=key.extend({text:z.string().trim().min(1).max(500)}).strict().safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_REQUEST"});return;}
+ const {universeId,characterId,text}=parsed.data;
+ let operation:string|null=null;
+ try{
+  if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
+  if(!await checkCharacter(req.userId!,universeId,characterId)){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const selected=await pool.query<{provider_sample_id:string}>(`SELECT s.provider_sample_id
+   FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
+   WHERE p.owner_id=$1 AND p.universe_id=$2 AND p.character_id=$3
+    AND s.owner_id=$1 AND s.project_id=p.id AND s.status='ready'
+    AND s.provider='elevenlabs' AND s.provider_sample_id IS NOT NULL LIMIT 1`,
+   [req.userId,universeId,characterId]);
+  const voiceId=selected.rows[0]?.provider_sample_id;
+  if(!voiceId || !/^[a-zA-Z0-9_-]{10,128}$/.test(voiceId)){res.status(409).json({error:"CUSTOM_VOICE_NOT_SELECTED"});return;}
+  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  operation=randomUUID();
+  const charge=await reserveCharacterAudioCredit({ownerId:req.userId!,characterId,requestKey:operation,engine:"custom",requestedSeconds:30});
+  if(!charge.allowed){res.status(402).json({error:charge.reason,remainingCredits:charge.remaining});return;}
+  const response=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`,{
+   method:"POST",headers:{...elevenLabsHeaders(),"Content-Type":"application/json","Accept":"audio/mpeg"},
+   body:JSON.stringify({text,model_id:"eleven_multilingual_v2",output_format:"mp3_44100_128"}),
+   signal:AbortSignal.timeout(45000)
+  });
+  if(!response.ok){await refundFailedCharacterAudio(req.userId!,operation);operation=null;res.status(502).json({error:"CUSTOM_VOICE_GENERATION_FAILED"});return;}
+  const audio=Buffer.from(await response.arrayBuffer());
+  if(audio.length<100 || audio.length>10*1024*1024){await refundFailedCharacterAudio(req.userId!,operation);operation=null;res.status(502).json({error:"CUSTOM_VOICE_INVALID_AUDIO"});return;}
+  // Provider audio duration is not trusted from text length; the 30-second
+  // entitlement is enforced by a conservative request character limit.
+  res.setHeader("Content-Type","audio/mpeg");
+  res.setHeader("Cache-Control","private, no-store");
+  res.send(audio);
+ }catch(error){
+  if(operation) await refundFailedCharacterAudio(req.userId!,operation).catch(()=>{});
+  req.log.error({err:error},"Premium voice synthesis failed");
+  if(!res.headersSent)res.status(503).json({error:"CUSTOM_VOICE_UNAVAILABLE"});
+ }
+});
+
 router.post("/voices/premium/select",requireAuth,async(req,res)=>{
  const parsed=z.object({projectId:z.string().uuid(),sampleId:z.string().uuid()}).strict().safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_SELECTION"});return;}
