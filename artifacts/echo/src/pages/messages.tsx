@@ -5,7 +5,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { Link, useLocation } from 'wouter';
-import { Bookmark, PenSquare, Search, X, Users } from 'lucide-react';
+import { Bookmark, PenSquare, Search, X, Users, Archive, BellOff } from 'lucide-react';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useSocial } from '@/store/social-store';
 import { useThreads } from '@/hooks/use-social-selectors';
@@ -21,8 +21,9 @@ export default function MessagesPage() {
   const t = useMessagesText();
   const { user } = useUser();
   const { me, state, character, actions } = useSocial();
-  const [groups, setGroups] = useState<{ id: string; name: string; participantIds: string[] }[]>([]);
+  const [groups, setGroups] = useState<{ id: string; name: string; participantIds: string[]; archived?: boolean; muted?: boolean }[]>([]);
   const [groupComposer, setGroupComposer] = useState(false);
+  const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
@@ -47,6 +48,7 @@ export default function MessagesPage() {
         right={
           <div className="flex items-center gap-1">
           <button type="button" onClick={toggleFavorites} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
+          <button type="button" onClick={() => setShowArchivedGroups(v => !v)} aria-label={showArchivedGroups ? 'Mostrar grupos activos' : 'Mostrar grupos archivados'} aria-pressed={showArchivedGroups} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm', showArchivedGroups ? 'bg-primary text-primary-foreground' : 'bg-secondary')}><Archive className="h-[18px] w-[18px]" /></button>
           <button type="button" onClick={() => setGroupComposer(true)} aria-label="Nuevo grupo" className="tap flex h-11 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-semibold"><Users className="h-[18px] w-[18px]" /><span className="hidden min-[430px]:inline">Grupo</span></button>
           <button
             onClick={() => setComposing(true)}
@@ -71,7 +73,7 @@ export default function MessagesPage() {
             </li>; })}</ul>
           )}
         </section>
-      ) : threads.length === 0 && groups.length === 0 ? (
+      ) : threads.length === 0 && groups.filter(g => g.archived === showArchivedGroups).length === 0 ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
@@ -90,7 +92,7 @@ export default function MessagesPage() {
         </div>
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
-          {groups.map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div></Link></li>)}
+          {groups.filter(group => group.archived === showArchivedGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
           {threads.map(({ other, last, unread }) => (
             <li key={other.id}>
               <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
