@@ -36,7 +36,7 @@ export default function ScenesPage() {
     return()=>{active=false};
   },[selected,universeId]);
   const create = async (e:FormEvent) => {e.preventDefault();if(!participants.length)return;setBusy(true);setError('');
-    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:participants})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);}
+    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);}
     catch{setError(es?'No se pudo crear la escena.':'Could not create scene.')}finally{setBusy(false)}
   };
   const send = async (e:FormEvent) => {e.preventDefault();if(!selected||!message.trim())return;setBusy(true);setError('');
