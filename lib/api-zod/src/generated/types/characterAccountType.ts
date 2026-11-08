@@ -11,6 +11,8 @@ export type CharacterAccountType = typeof CharacterAccountType[keyof typeof Char
 
 export const CharacterAccountType = {
   personal: 'personal',
+  artist: 'artist',
+  business: 'business',
   band: 'band',
   venue: 'venue',
   organization: 'organization',
