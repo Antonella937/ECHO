@@ -129,7 +129,7 @@ router.get('/ai-engine/images/status', requireAuth, async (req, res) => {
     });
   } catch (error) {
     req.log.warn({ err: error }, 'Image budget readiness unavailable');
-    res.json({ ...availability, access, budgetStatus: 'unavailable' });
+    res.json({ ...availability, enabled: false, reason: 'IMAGE_BUDGET_STATUS_UNAVAILABLE', access, budgetStatus: 'unavailable', monthlySpendingLimitUsd: 0, prerequisites: { ...availability.prerequisites, budgetActivated: false } });
   }
 });
 
