@@ -101,6 +101,19 @@ export function applyAutonomyDecision(
 
   if (decision.action === "draft" && decision.situation === "post") {
     if (!text) throw new SocialExecutionError("EMPTY_POST_TEXT");
+    if (opportunity.publishStory) {
+      // Text-only story: do not invent a photo or reuse private gallery media.
+      if (state.stories.some(item => item.authorId === characterId && recentWithin(item.createdAt, now, DAY_MS))) {
+        throw new SocialExecutionError("DAILY_STORY_CAP");
+      }
+      const story: Story = {
+        id: idFactory(), authorId: characterId, image: "", caption: text.slice(0, 600),
+        createdAt: now, seenBy: [], origin: "autonomy",
+      };
+      return { state: recordAutonomyEvent({ ...state, stories: [...state.stories, story] }, characterId,
+        { sourceId: story.id, kind: "post", text: `Historia publicada: ${story.caption}` }, now),
+        changed: true, targetId: story.id };
+    }
     const post: Post = {
       id: idFactory(), authorId: characterId, image: "", caption: text, location: "",
       createdAt: now, likes: [], savedBy: [], origin: "autonomy", illustrative: false, commentsEnabled: true,
