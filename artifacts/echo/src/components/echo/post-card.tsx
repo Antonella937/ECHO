@@ -49,7 +49,6 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const voteCount = poll ? Object.values(poll.votes ?? {}).length : 0;
   const pollClosed = !!(poll?.closesAt && new Date(poll.closesAt).getTime() <= Date.now());
   const media = postMedia(post);
-  const firstLiker = likers.find((c) => c && c.id !== me.id) ?? likers[0];
 
   const onImageTap = () => {
     const now = Date.now();
@@ -139,20 +138,8 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
       </div>
 
       <div className="px-4">
-        {post.likes.length > 0 ? (
-          <button onClick={() => setSheet('likers')} className="text-left text-[14px]" data-testid={`button-likers-${post.id}`}>
-            {t('Le gusta a')} <span className="font-semibold">{firstLiker?.id === me.id ? t('ti') : firstLiker?.handle}</span>
-            {post.likes.length > 1 && (
-              <>
-                {' '}{t('y a')} <span className="font-semibold">{post.likes.length - 1 === 1 ? t('1 persona más') : `${post.likes.length - 1} ${t('personas más')}`}</span>
-              </>
-            )}
-          </button>
-        ) : shownCount(post.displayMetrics?.likes, post.likes.length) === 0 ? (
-          <p className="text-[14px] text-muted-foreground">{t("Sé la primera persona en darle me gusta")}</p>
-        ) : null}
         <div className="mt-1 flex items-center gap-3 text-[13px] text-muted-foreground">
-          <span data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> {t("me gusta")}</span>
+          <button type="button" onClick={() => setSheet("likers")} className="text-left hover:text-foreground" data-testid={`text-likes-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(shownCount(post.displayMetrics?.likes, post.likes.length))}</span> {t("me gusta")}</button>
           <span data-testid={`text-comments-count-${post.id}`}><span className="font-semibold text-foreground">{formatCount(displayedCommentCount)}</span> {t("comentarios")}</span>
           <span className="flex-1" />
           <PostMetricsEditor post={post} actualComments={commentCount} />
