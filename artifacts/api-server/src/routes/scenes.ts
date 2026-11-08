@@ -62,10 +62,16 @@ scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
   const sceneId = id.safeParse(req.params.sceneId);
   if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE" }); return; }
   try {
+    const viewer = id.safeParse(req.query.viewerId);
+    if (!viewer.success) { res.status(400).json({ error: "VIEWER_REQUIRED" }); return; }
+    const scenes = await db.execute(sql`SELECT participant_ids FROM echo_scenes WHERE owner_id = ${req.userId!}
+      AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data} LIMIT 1`);
+    const members = scenes.rows[0]?.participant_ids;
+    if (!Array.isArray(members) || !members.includes(viewer.data)) { res.status(403).json({ error: "SCENE_VIEWER_NOT_ALLOWED" }); return; }
     const rows = await db.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId", visibility, audience_ids AS "audienceIds", text, created_at AS "createdAt"
       FROM echo_scene_events WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}
       AND scene_id = ${sceneId.data} ORDER BY created_at, event_id LIMIT 500`);
-    res.json({ events: rows.rows });
+    res.json({ events: rows.rows.filter(row => row.visibility === "public" || row.actorId === viewer.data || (Array.isArray(row.audienceIds) ? row.audienceIds.includes(viewer.data) : false) || (row.visibility === "participants" && (!Array.isArray(row.audienceIds) || row.audienceIds.length === 0))) });
   } catch { res.status(503).json({ error: "SCENE_EVENTS_UNAVAILABLE" }); }
 });
 scenesRouter.post("/scenes/events", async (req, res) => {
@@ -77,7 +83,9 @@ scenesRouter.post("/scenes/events", async (req, res) => {
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId} LIMIT 1`);
     const scene = rows.rows[0];
     const participants = Array.isArray(scene?.participant_ids) ? scene.participant_ids : [];
-    if (scene?.status !== "active" || !participants.includes(actorId) ||
+    const activeState = await availableCharacters(req.userId!, universeId);
+    const identity = activeState && (actorId === (await db.select({state:echoUniversesTable.state}).from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1))[0]?.state as { me?: { id?: string } } | undefined)?.me?.id;
+    if (!identity || scene?.status !== "active" || !participants.includes(actorId) ||
         audienceIds.some(a => !participants.includes(a))) {
       res.status(403).json({ error: "SCENE_EVENT_NOT_ALLOWED" }); return;
     }
