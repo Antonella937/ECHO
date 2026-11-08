@@ -31,12 +31,12 @@ export const MAX_IMAGE_COST_USD = 0.20;
 /** Conservative status: no API key or feature flag alone proves that a production budget is active. */
 export function imageGenerationAvailability() {
   return {
-    enabled: false, // Transport cost reconciliation is not implemented; never advertise readiness.
-    reason: 'FAL_IMAGE_COST_RECONCILIATION_REQUIRED',
+    enabled: paidImageGenerationActivated() && Boolean(process.env.FAL_KEY) && Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) && Boolean(process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS?.trim()),
+    reason: paidImageGenerationActivated() ? 'BUDGET_AND_ACCOUNT_CHECK_REQUIRED' : 'PAID_IMAGE_GENERATION_DISABLED',
     // Model capability verified against public docs; production contract and
     // per-account data-transfer consent still require separate approval.
     providerDocumentationChecked: true as const,
-    externalReferenceTransferApproved: false as const,
+    externalReferenceTransferApproved: false as const, // Per-request acknowledgement required; never blanket approval.
     model: IMAGE_GENERATION_MODEL,
     maximumReferences: MAX_IMAGE_REFERENCE_COUNT,
     monthlySpendingLimitUsd: 0,
