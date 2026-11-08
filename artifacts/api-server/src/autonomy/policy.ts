@@ -217,7 +217,10 @@ export function chooseAutonomyOpportunity(input: {
 
   // A story reply is a private DM, not a public story reaction. Keep it in the
   // existing DM lane so bilateral permissions and delivery limits still apply.
-  if (input.lane === "dm" && !unanswered && random() < 0.18) {
+  if (input.lane === "dm" && !unanswered &&
+      history.length < (input.maxActionsPerDay ?? 2) &&
+      (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
+      random() < 0.18) {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = [...state.stories].reverse().find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
@@ -237,6 +240,8 @@ export function chooseAutonomyOpportunity(input: {
   if (latestActivity > 0 && now.getTime() - latestActivity < cooldownMs) {
     return { situation: null, reasonCode: "COOLDOWN", reason: "Minimum cooldown has not elapsed.", localHour: local.hour, timezone };
   }
+  // Executed autonomous actions are already in history; do not count them twice
+  // merely because their resulting posts/messages also exist in the state.
   if (recentSocial.length + history.length >= (input.maxActionsPerDay ?? 2)) {
     return { situation: null, reasonCode: "DAILY_CAP", reason: "Character daily action cap reached.", localHour: local.hour, timezone };
   }
@@ -289,6 +294,7 @@ export function chooseAutonomyOpportunity(input: {
     .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
+      !item.seenBy.includes(character.id) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
   const targetMessage = [...state.messages].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => item.recipientId === character.id && item.senderId !== character.id &&
@@ -302,12 +308,9 @@ export function chooseAutonomyOpportunity(input: {
     const time = asTime(value);
     return time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS;
   };
-  const postCount = state.posts.filter((item) => item.authorId === character.id && recentDate(item.createdAt)).length +
-    history.filter((item) => item.situation === "post").length;
-  const commentCount = state.comments.filter((item) => item.authorId === character.id && recentDate(item.createdAt)).length +
-    history.filter((item) => item.situation === "comment").length;
-  const dmCount = state.messages.filter((item) => item.senderId === character.id && recentDate(item.createdAt)).length +
-    history.filter((item) => item.situation === "dm").length;
+  const postCount = state.posts.filter((item) => item.authorId === character.id && recentDate(item.createdAt)).length;
+  const commentCount = state.comments.filter((item) => item.authorId === character.id && recentDate(item.createdAt)).length;
+  const dmCount = state.messages.filter((item) => item.senderId === character.id && recentDate(item.createdAt)).length;
   const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency) }] : []),
