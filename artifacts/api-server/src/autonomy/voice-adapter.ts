@@ -1,4 +1,4 @@
-import { synthesizeBasicVoice } from "../lib/basicVoiceProvider";
+import { basicVoiceProviderReady, synthesizeBasicVoiceAudio } from "../lib/basicVoiceProvider";
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, echoMediaTable, echoVoiceBudgetsTable, echoVoiceUsageTable, echoUniversesTable } from "@workspace/db";
@@ -15,7 +15,7 @@ const month = () => new Date().toISOString().slice(0, 7);
 export async function getVoiceOwnerControls(ownerId: string) {
   if (!await canUseBasicVoices(ownerId)) return null;
   const [row] = await db.select().from(echoVoiceBudgetsTable).where(eq(echoVoiceBudgetsTable.ownerId, ownerId)).limit(1);
-  const enabled = row?.enabled === true && !!process.env.ECHO_KOKORO_TTS_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const enabled = row?.enabled === true && basicVoiceProviderReady() && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!enabled) return null;
   const [spent] = await db.select({ total: sql<number>`coalesce(sum(${echoVoiceUsageTable.characters}),0)` })
     .from(echoVoiceUsageTable).where(and(eq(echoVoiceUsageTable.ownerId, ownerId), eq(echoVoiceUsageTable.monthKey, month())));
@@ -52,12 +52,9 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
   if (!await canUseBasicVoices(input.ownerId)) return;
   const voice = voices[input.voiceId];
   if (!voice || !input.text.trim() || input.text.length > 500) return;
-  const endpoint = process.env.ECHO_KOKORO_TTS_URL;
   const base = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!endpoint || !base || !key || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base)) return;
-  const url = new URL(endpoint);
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return;
+  if (!basicVoiceProviderReady() || !base || !key || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base)) return;
   const reserved = await db.transaction(async tx => {
     const [budget] = await tx.select().from(echoVoiceBudgetsTable)
       .where(eq(echoVoiceBudgetsTable.ownerId, input.ownerId)).for("update").limit(1);
@@ -74,11 +71,11 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
   });
   if (!reserved) return;
   try {
-    const bytes = await synthesizeBasicVoice({ text: input.text, voice, requestId: input.messageId });
-    if (bytes.length < 44 || bytes.length > 15 * 1024 * 1024 || bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WAVE") throw Error("INVALID_WAV");
+    const audio = await synthesizeBasicVoiceAudio({ text: input.text, voice, requestId: input.messageId });
+    const { bytes } = audio;
     const objectPath = `/objects/uploads/${randomUUID()}`;
     const uploaded = await fetch(`${base}/storage/v1/object/echo-media/${objectPath.slice("/objects/".length)}`, {
-      method: "POST", headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": "audio/wav", "x-upsert": "false" },
+      method: "POST", headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": audio.mimeType, "x-upsert": "false" },
       body: bytes, signal: AbortSignal.timeout(20000),
     });
     if (!uploaded.ok) throw Error("VOICE_UPLOAD_FAILED");
@@ -91,7 +88,7 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
       const message = parsed.data.messages.find(m => m.id === input.messageId && m.senderId === input.characterId && m.text === input.text);
       if (!message || message.attachments?.some(a => a.type === "audio")) throw Error("VOICE_MESSAGE_CHANGED");
       await tx.insert(echoMediaTable).values({ ownerId: input.ownerId, objectPath });
-      const attachment = { id: `voice-${input.messageId}`, type: "audio" as const, url: objectPath, mimeType: "audio/wav" };
+      const attachment = { id: `voice-${input.messageId}`, type: "audio" as const, url: objectPath, mimeType: audio.mimeType };
       const state = { ...parsed.data, messages: parsed.data.messages.map(m => m.id === input.messageId
         ? { ...m, attachments: [...(m.attachments ?? []), attachment] } : m) };
       await tx.update(echoUniversesTable).set({ state, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date() })
