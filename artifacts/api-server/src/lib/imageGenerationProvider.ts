@@ -1,3 +1,4 @@
+import { paidImageGenerationActivated } from './imageGenerationActivation';
 /**
  * Paid image-provider boundary.
  *
@@ -28,8 +29,8 @@ export const MAX_IMAGE_COST_USD = 0.10;
 /** Conservative status: no API key or feature flag alone proves that a production budget is active. */
 export function imageGenerationAvailability() {
   return {
-    enabled: false as boolean,
-    reason: 'PAID_IMAGE_GENERATION_DISABLED' as string,
+    enabled: paidImageGenerationActivated() && Boolean(process.env.OPENROUTER_API_KEY) && Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    reason: paidImageGenerationActivated() ? 'IMAGE_BUDGET_AND_ACCOUNT_APPROVAL_REQUIRED' : 'PAID_IMAGE_GENERATION_DISABLED',
     // Model capability verified against public docs; production contract and
     // per-account data-transfer consent still require separate approval.
     providerDocumentationChecked: true as const,
