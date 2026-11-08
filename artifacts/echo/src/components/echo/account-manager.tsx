@@ -24,6 +24,10 @@ export function AccountManager() {
   const [professionalCreation, setProfessionalCreation] = useState(false);
   const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
   const archivedCount = state.characters.filter((c) => c.archived).length;
+  const groups = [
+    { id: 'people', label: language === 'es' ? 'Personajes y personas' : 'Characters & people', accounts: list.filter(c => !c.accountType || c.accountType === 'personal' || c.accountType === 'artist') },
+    { id: 'professional', label: language === 'es' ? 'Proyectos y cuentas profesionales' : 'Projects & professional accounts', accounts: list.filter(c => c.accountType && c.accountType !== 'personal' && c.accountType !== 'artist') },
+  ].filter(group => group.accounts.length > 0);
 
   return (
     <div>
@@ -53,7 +57,7 @@ export function AccountManager() {
             {tab === 'archived' ? translate('No hay cuentas archivadas. Todo sigue a la vista.') : translate('Sin cuentas activas.')}
           </p>
         )}
-        {list.map((c) => {
+        {groups.map(group => <div key={group.id} className="space-y-2"><div className="flex items-center justify-between px-1 pt-2"><h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{group.label}</h3><span className="text-xs text-muted-foreground">{group.accounts.length}</span></div>{group.accounts.map((c) => {
           const active = c.id === me.id;
           return (
             <div key={c.id} className={cn('flex items-center gap-2 rounded-2xl border p-2 pr-1.5', active ? 'border-primary/50 bg-accent/40' : 'border-border')} data-testid={`row-account-${c.id}`}>
@@ -91,7 +95,7 @@ export function AccountManager() {
               </button>
             </div>
           );
-        })}
+        })}</div>)}
       </div>
 
       <AccountEditor open={editing !== undefined || professionalCreation} accountId={professionalCreation ? null : editing} initialType={professionalCreation ? "band" : "personal"} onClose={() => { setEditing(undefined); setProfessionalCreation(false); }} />
