@@ -62,6 +62,7 @@ export default function SettingsPage() {
           </Link>
         </section>
 
+        {(user?.id === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" || user?.id === "user_3LfRV9oK9WP655tpVF3kavfwgtx") && <Link href="/settings/image-storage-diagnostic" className="mt-4 flex min-h-14 items-center rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold">Diagnóstico privado de imágenes</Link>}
         <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">{st("Mi plan y suscripciones")} <span className="text-xs text-muted-foreground">{st("Ver planes y complementos ›")}</span></Link>
 
         <section className="mt-9" aria-labelledby="identity-h">
