@@ -105,12 +105,24 @@ const publicAccountGate: express.RequestHandler = (req, res, next) => {
 };
 app.use("/api", accessMode === "public" ? publicAccountGate : betaSeatMode ? privateBetaSeats : betaAllowlistGate);
 
-// Register a private Creator Hub profile as soon as an account uses ECHO, not when Creator Hub opens.
+// Register Creator Hub profiles on first use, without a database SELECT on every API request.
+// Concurrent requests for the same account share one bootstrap; failed attempts remain retryable.
+const creatorBootstrapCache = new Map<string, number>();
+const creatorBootstrapInFlight = new Map<string, Promise<void>>();
+const CREATOR_BOOTSTRAP_TTL_MS = 15 * 60_000;
 app.use("/api", async (req, _res, next) => {
   if (req.path === "/healthz") return next();
   const ownerId = getAuth(req).userId;
-  if (ownerId) {
-    try { await ensureCreatorProfile(ownerId); }
+  if (ownerId && (creatorBootstrapCache.get(ownerId) ?? 0) <= Date.now()) {
+    let pending = creatorBootstrapInFlight.get(ownerId);
+    if (!pending) {
+      pending = ensureCreatorProfile(ownerId).then(() => {
+        if (creatorBootstrapCache.size >= 1000) creatorBootstrapCache.clear();
+        creatorBootstrapCache.set(ownerId, Date.now() + CREATOR_BOOTSTRAP_TTL_MS);
+      }).finally(() => { creatorBootstrapInFlight.delete(ownerId); });
+      creatorBootstrapInFlight.set(ownerId, pending);
+    }
+    try { await pending; }
     catch (error) { logger.warn({ error: error instanceof Error ? error.message : "unknown" }, "Creator Hub automatic profile registration failed"); }
   }
   next();
