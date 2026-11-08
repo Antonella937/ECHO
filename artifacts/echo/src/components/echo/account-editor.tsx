@@ -35,6 +35,9 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
   const [avatar, setAvatar] = useState('asset:account-default');
   const [type, setType] = useState<AccountType>('personal');
   const [verified, setVerified] = useState(false);
+  const [professionalCategory, setProfessionalCategory] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [website, setWebsite] = useState('');
   const [privateAccount, setPrivateAccount] = useState(false);
   const [followers, setFollowers] = useState('');
   const [following, setFollowing] = useState('');
@@ -56,6 +59,9 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setAvatar(account?.avatar ?? 'asset:account-default');
     setType(account?.accountType ?? 'personal');
     setVerified(account?.verified ?? false);
+    setProfessionalCategory(account?.professionalCategory ?? '');
+    setContactEmail(account?.contactEmail ?? '');
+    setWebsite(account?.website ?? '');
     setPrivateAccount(account?.privateAccount ?? false);
     setFollowers(account?.displayMetrics?.followers?.toString() ?? '');
     setFollowing(account?.displayMetrics?.following?.toString() ?? '');
@@ -77,6 +83,8 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     try {
       const input: AccountInput = {
         name, handle: handle.toLowerCase(), bio, avatar, accountType: type, verified, privateAccount,
+        professionalCategory: type === 'personal' ? '' : professionalCategory.trim(),
+        contactEmail: type === 'personal' ? '' : contactEmail.trim(), website: type === 'personal' ? '' : website.trim(),
         displayMetrics: { followers: parseBase(followers), following: parseBase(following) },
       };
       if (isNew) {
@@ -156,6 +164,17 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
             {Object.entries(accountTypes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </Field>
+        {type !== "personal" && <>
+          <Field id="acc-category" label={t("Categoría profesional")}>
+            <input id="acc-category" maxLength={80} value={professionalCategory} onChange={e => setProfessionalCategory(e.target.value)} placeholder={type === "band" ? "Rock / Metal" : type === "business" ? "Diseño de indumentaria" : "Arte / Música"} className={inputCls} data-testid="input-professional-category" />
+          </Field>
+          <Field id="acc-contact-email" label={t("Email de contacto")}>
+            <input id="acc-contact-email" type="email" maxLength={254} value={contactEmail} onChange={e => setContactEmail(e.target.value)} className={inputCls} data-testid="input-professional-email" />
+          </Field>
+          <Field id="acc-website" label={t("Sitio web")}>
+            <input id="acc-website" type="url" maxLength={500} value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://" className={inputCls} data-testid="input-professional-website" />
+          </Field>
+        </>}
         <label className="mt-4 flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border px-4">
           <span className="text-sm">{t("Insignia verificada")}</span>
           <input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} className="h-5 w-5 accent-[hsl(var(--primary))]" data-testid="checkbox-account-verified" />
