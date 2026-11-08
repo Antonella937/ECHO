@@ -20,10 +20,11 @@ interface Props {
   onClose(): void;
   /** Account to edit; omit/null to create a new one. */
   accountId?: string | null;
+  initialType?: AccountType;
   onCreated?(id: string): void;
 }
 
-export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
+export function AccountEditor({ open, onClose, accountId, onCreated, initialType = 'personal' }: Props) {
   const t = useAccountManagementText();
   const actionText = useCharacterAccountActionsText();
   const { state, character, actions } = useSocial();
@@ -60,7 +61,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setHandle(account?.handle ?? '');
     setBio(account?.bio ?? '');
     setAvatar(account?.avatar ?? 'asset:account-default');
-    setType(account?.accountType ?? 'personal');
+    setType(account?.accountType ?? initialType);
     setVerified(account?.verified ?? false);
     setIdentityDescription(account?.accountIdentity?.description ?? '');
     setIdentityVoice(account?.accountIdentity?.voice ?? '');
@@ -76,7 +77,7 @@ export function AccountEditor({ open, onClose, accountId, onCreated }: Props) {
     setConfirmDelete(false);
     setDeleteHandle('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, accountId]);
+  }, [open, accountId, initialType]);
 
   const real = account ? realFollowCounts(state, account.id) : { followers: 0, following: 0 };
   const deletionBlock = account ? deletionBlockReason(state, account.id) : null;
