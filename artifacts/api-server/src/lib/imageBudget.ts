@@ -3,6 +3,9 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db, echoImageBudgetMonthsTable, echoImageGenerationJobsTable } from '@workspace/db';
 
 export const MICRO_USD_PER_DOLLAR = 100_000_000;
+// Controlled public launch: maximum two paid attempts per authenticated account.
+// Enforced inside the same serialized transaction as the global budget reservation.
+export const IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER = 2;
 export const monthKeyUtc = (date = new Date()) => date.toISOString().slice(0, 7);
 export const toMicroUsd = (usd: number) => {
   if (!Number.isFinite(usd) || usd < 0) throw Error('INVALID_IMAGE_COST');
@@ -29,6 +32,14 @@ export async function reserveImageBudget(input: {
         sql`${echoImageBudgetMonthsTable.ceilingMicroUsd} >= ${echoImageBudgetMonthsTable.reservedMicroUsd} + ${echoImageBudgetMonthsTable.spentMicroUsd} + ${reserve}`,
       )).returning();
     if (!budget) throw Error('IMAGE_MONTHLY_BUDGET_EXHAUSTED_OR_DISABLED');
+    // The budget-row UPDATE serializes all reservations, preventing concurrent
+    // requests from bypassing the per-owner launch limit.
+    const existing = await tx.select({ id: echoImageGenerationJobsTable.id })
+      .from(echoImageGenerationJobsTable)
+      .where(and(eq(echoImageGenerationJobsTable.ownerId, input.ownerId),
+        eq(echoImageGenerationJobsTable.monthKey, monthKey)))
+      .limit(IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER);
+    if (existing.length >= IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER) throw Error('IMAGE_LAUNCH_ACCOUNT_LIMIT_REACHED');
     const id = randomUUID();
     await tx.insert(echoImageGenerationJobsTable).values({
       id, ownerId: input.ownerId, universeId: input.universeId, characterId: input.characterId,
