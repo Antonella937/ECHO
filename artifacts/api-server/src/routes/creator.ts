@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { ECHO_CREDIT_POLICY, resolveEchoPlan } from "../lib/entitlements";
+import { creditWallet } from "../lib/creditWallet";
 import {
   configureAiBudget,
   creatorUsageSummary,
@@ -42,6 +43,21 @@ router.use("/creator", authenticate);
 
 // Authenticated catalog for the upcoming server-side wallet.
 // No client-supplied plan, balance mutations, or checkout actions are trusted.
+router.get("/creator/credits/wallet", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  try { res.json(await creditWallet(req.userId!)); }
+  catch (error) { req.log.error({ err: error }, "Credit wallet read failed"); res.status(503).json({ error: "CREDIT_WALLET_UNAVAILABLE" }); }
+});
+
+router.post("/creator/credits/daily-reward", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  try {
+    const result = await creditWallet(req.userId!, true);
+    if (!result.dailyReward.claimedNow) { res.status(409).json({ error: "DAILY_REWARD_ALREADY_CLAIMED", wallet: result }); return; }
+    res.json(result);
+  } catch (error) { req.log.error({ err: error }, "Daily credit reward failed"); res.status(503).json({ error: "DAILY_REWARD_UNAVAILABLE" }); }
+});
+
 router.get("/creator/credits/catalog", async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "private, no-store");
   try {
