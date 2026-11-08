@@ -40,6 +40,9 @@ export default function GroupConversationPage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [autonomyEnabled, setAutonomyEnabled] = useState(false);
+  const [autonomyInterval, setAutonomyInterval] = useState(60);
+  const [autonomyLoaded, setAutonomyLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, [messages.length]);
   const scope = new URLSearchParams({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id });
@@ -59,6 +62,27 @@ export default function GroupConversationPage() {
     const interval = window.setInterval(() => void load(), 10000);
     return () => { active = false; window.clearInterval(interval); };
   }, [id, user?.id, me.id]);
+  useEffect(() => {
+    if (!settingsOpen || !id || !user?.id) return;
+    let active = true;
+    setAutonomyLoaded(false);
+    void customFetch<{ enabled: boolean; intervalMinutes: number }>(`/api/group-dms/${encodeURIComponent(id)}/autonomy?${scope}`, { method: 'GET', responseType: 'json' })
+      .then(result => { if (active) { setAutonomyEnabled(result.enabled); setAutonomyInterval(result.intervalMinutes); setAutonomyLoaded(true); } })
+      .catch(() => { if (active) { setAutonomyLoaded(false); setError('No se pudo cargar la configuración de autonomía.'); } });
+    return () => { active = false; };
+  }, [settingsOpen, id, user?.id, me.id]);
+  const saveAutonomy = async (enabled: boolean, intervalMinutes: number) => {
+    if (!group || savingSettings || !autonomyLoaded) return;
+    setSavingSettings(true);
+    try {
+      const result = await customFetch<{ enabled: boolean; intervalMinutes: number }>(`/api/group-dms/${encodeURIComponent(group.id)}/autonomy`, {
+        method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, enabled, intervalMinutes }),
+      });
+      setAutonomyEnabled(result.enabled); setAutonomyInterval(result.intervalMinutes); setError('');
+    } catch { setError('No se pudo guardar la configuración de autonomía.'); }
+    finally { setSavingSettings(false); }
+  };
   const saveAvatar = async (avatar: string | null) => {
     if (!group || savingSettings) return;
     setSavingSettings(true);
@@ -163,6 +187,15 @@ export default function GroupConversationPage() {
       <p className="mt-3 text-xs font-medium">Agregar participantes</p>
       <div className="mt-2 max-h-32 overflow-y-auto">{state.characters.filter(c => !c.archived && c.id !== me.id && !group?.participantIds.includes(c.id)).map(c => <label key={c.id} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={addMemberIds.includes(c.id)} onChange={e => setAddMemberIds(old => e.target.checked ? [...old, c.id] : old.filter(x => x !== c.id))} />{c.name}</label>)}</div>
       <button onClick={() => void addMembers()} disabled={savingSettings || !addMemberIds.length} className="mt-2 rounded-xl bg-secondary px-3 py-2 text-sm disabled:opacity-50">Agregar al grupo</button>
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="font-semibold">Autonomía del grupo</p>
+        <p className="mt-1 text-xs text-muted-foreground">Configuración anticipada: el motor de respuestas grupales todavía no está conectado. Activar esta opción no genera mensajes por ahora.</p>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={autonomyEnabled} disabled={!autonomyLoaded || savingSettings} onChange={e => void saveAutonomy(e.target.checked, autonomyInterval)} /> Permitir autonomía grupal</label>
+        <label className="mt-3 block text-xs text-muted-foreground">Intervalo mínimo entre intervenciones</label>
+        <select value={autonomyInterval} disabled={!autonomyLoaded || savingSettings} onChange={e => void saveAutonomy(autonomyEnabled, Number(e.target.value))} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+          <option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>1 hora</option><option value={180}>3 horas</option><option value={360}>6 horas</option>
+        </select>
+      </div>
       <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>
     </div>}
     <main className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-5" data-testid="group-messages">
