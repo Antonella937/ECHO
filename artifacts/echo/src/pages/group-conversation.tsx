@@ -9,7 +9,7 @@ import { CharacterAvatar } from '@/components/echo/avatar';
 import { AttachmentView } from '@/components/echo/dm-attachment-view';
 import { uploadAttachment, validateAttachments, formatDuration } from '@/lib/dm-attachments';
 import { useVoiceRecorder } from '@/lib/use-voice-recorder';
-import { uploadPrivateFile } from '@/lib/media';
+import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import type { MessageAttachment } from '@/domain/types';
 
 type Group = { id: string; name: string; avatar?: string | null; participantIds: string[] };
@@ -19,6 +19,7 @@ export default function GroupConversationPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const { me, character, state } = useSocial();
+  const resolveMedia = useMediaResolver();
   const [, navigate] = useLocation();
   const [group, setGroup] = useState<Group | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -143,7 +144,7 @@ export default function GroupConversationPage() {
   return <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
     <header className="z-30 shrink-0 border-b border-border/60 bg-background/95 pt-safe backdrop-blur-xl"><div className="flex h-16 min-w-0 items-center gap-3 px-2">
       <button onClick={() => navigate('/messages')} aria-label="Volver" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><ChevronLeft className="h-6 w-6" /></button>
-      <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible rounded-full bg-secondary">{group?.avatar ? <img src={group.avatar} alt="" className="h-11 w-11 rounded-full object-cover" /> : <Users className="h-5 w-5" />}<span className="absolute -bottom-1 -right-1 rounded-full border-2 border-background bg-primary px-1 text-[10px] text-primary-foreground">{group?.participantIds.length ?? 0}</span></div>
+      <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible rounded-full bg-secondary">{group?.avatar ? <img src={resolveMedia(group.avatar)} alt="" className="h-11 w-11 rounded-full object-cover" /> : <Users className="h-5 w-5" />}<span className="absolute -bottom-1 -right-1 rounded-full border-2 border-background bg-primary px-1 text-[10px] text-primary-foreground">{group?.participantIds.length ?? 0}</span></div>
       <div className="min-w-0 flex-1"><h1 className="truncate text-[15px] font-semibold">{group?.name ?? 'Grupo'}</h1><p className="truncate text-xs text-muted-foreground">{group?.participantIds.map(x => character(x)?.name ?? x).join(', ')}</p></div>
       <button onClick={() => { setGroupName(group?.name ?? ''); setAvatarUrl(group?.avatar ?? ''); setSettingsOpen(true); }} aria-label="Opciones del grupo" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><MoreHorizontal className="h-6 w-6" /></button>
     </div></header>
