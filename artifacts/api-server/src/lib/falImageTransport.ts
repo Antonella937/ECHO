@@ -1,5 +1,6 @@
 import type { ImageGenerationReference } from './imageGenerationPayload';
 import type { ImageGenerationResult } from './imageGenerationProvider';
+import { falProEditEstimatedCostUsd } from './falImagePricing';
 
 export const FAL_IMAGE_MODEL = 'fal-ai/flux-2-pro/edit';
 const MAX_BYTES = 24_000_000;
@@ -23,9 +24,9 @@ export async function requestFalImage(input: {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(ref.mimeType) ||
         !ref.bytes.length || ref.bytes.length > 15_000_000) throw Error('INVALID_IMAGE_REFERENCE');
   }
-  // No billable call until the model pricing and reconciliation contract is verified.
-  // This fails before transmitting any references or consuming fal.ai credits.
-  throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
+  // The budget ledger records a conservative estimated charge, not a provider invoice.
+  // Any discrepancy is retained against the reserved ceiling until reconciled.
+  const estimatedCostUsd = falProEditEstimatedCostUsd(input.references);
   const fetchImpl = input.fetchImpl ?? fetch;
   const image_urls = input.references.map(ref =>
     `data:${ref.mimeType};base64,${ref.bytes.toString('base64')}`);
@@ -45,11 +46,10 @@ export async function requestFalImage(input: {
   if (Buffer.byteLength(raw) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
   let payload: any;
   try { payload = JSON.parse(raw); } catch { throw Error('FAL_IMAGE_INVALID_JSON'); }
-  await resolveFalImagePayload(payload, fetchImpl);
-  // Retain the provider request ID for an eventual billing-line-item match.
-  // Do not invent a billedUsd value from the price estimate.
-  if (!requestId) throw Error('FAL_IMAGE_REQUEST_ID_MISSING');
-  throw Error('FAL_IMAGE_COST_RECONCILIATION_REQUIRED');
+  const image = await resolveFalImagePayload(payload, fetchImpl);
+  // This is the conservative locally computed amount, NOT a verified fal invoice.
+  // The caller reserves a larger ceiling and must not display it as actual billing.
+  return { ...image, provider: 'fal.ai', model: FAL_IMAGE_MODEL, billedUsd: estimatedCostUsd };
 
 }
 
