@@ -23,7 +23,7 @@ export interface ImageGenerationResult {
 }
 export const IMAGE_GENERATION_MODEL = 'fal-ai/flux-2-pro/edit';
 export const MAX_IMAGE_REFERENCE_COUNT = 4;
-export const MAX_IMAGE_COST_USD = 0.10;
+// Conservative reservation for a 1 MP output plus multiple input references.\n// Actual price must be computed from decoded image dimensions before activation.\nexport const MAX_IMAGE_COST_USD = 0.20;
 // Paid generation remains disabled until provider validation and owner approval.
 
 /** Conservative status: no API key or feature flag alone proves that a production budget is active. */
