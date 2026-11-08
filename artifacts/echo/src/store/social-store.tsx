@@ -45,7 +45,8 @@ export interface SocialActions {
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
   respondCollaboration(postId: string, accept: boolean): void;
-  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; collaborationInvites?: string[]; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
+  votePoll(postId: string, optionId: string): void;
+  createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; collaborationInvites?: string[]; poll?: import('@/domain/types').Post['poll']; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
   createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
   deletePost(postId: string): void;
   deleteStory(storyId: string): void;
@@ -328,10 +329,13 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (!['dark', 'light', 'system'].includes(appearance.theme) || !/^#[a-f0-9]{6}$/i.test(appearance.accent)) throw new Error('Apariencia inválida.');
         coordinator.current?.edit(s => ({ ...s, appearance }));
       },
+      votePoll(postId, optionId) {
+        dispatch({ type: 'post.poll.voted', postId, actorId: myId(), optionId });
+      },
       respondCollaboration(postId, accept) {
         dispatch({ type: 'post.collaboration.responded', postId, actorId: myId(), accept });
       },
-      createPost({ image, media, caption, location, taggedAccountIds, collaborationInvites, commentsEnabled, musicClip }) {
+      createPost({ image, media, caption, location, taggedAccountIds, collaborationInvites, poll, commentsEnabled, musicClip }) {
         if (media) validatePostMedia(media);
         const id = uid('p');
         dispatch({
@@ -349,6 +353,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
             origin: 'user',
             illustrative: false,
             ...(taggedAccountIds ? { taggedAccountIds } : {}),
+            ...(poll ? { poll } : {}),
             ...(collaborationInvites?.length ? { collaborationInvites: [...new Set(collaborationInvites)].filter(id => id !== myId()).slice(0, 10) } : {}),
             ...(commentsEnabled !== undefined ? { commentsEnabled } : {}),
             ...(musicClip ? { musicClip } : {}),
