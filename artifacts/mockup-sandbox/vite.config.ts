@@ -7,7 +7,7 @@ import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 const port = Number(process.env.PORT ?? 5174);
 
 if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+  throw new Error(`Invalid PORT value: "${process.env.PORT ?? 5174}"`);
 }
 
 const basePath = process.env.BASE_PATH ?? '/';
