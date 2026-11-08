@@ -46,10 +46,18 @@ export function createConsentSafetyGate(
       const safeStorageDiagnostic = req.method === "POST" && path === "/ai-engine/images/storage-self-test" &&
         process.env.ECHO_IMAGE_STORAGE_SELF_TEST_ENABLED === "true" &&
         (process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS ?? "").split(",").map(id => id.trim()).includes(ownerId);
+      // Private image generation is permitted only with a server-side owner allowlist,
+      // active provider controls, and the exact per-request transfer acknowledgement.
+      // Public AI endpoints remain blocked while legal documents are unavailable.
+      const privateImageGeneration = req.method === "POST" && path === "/ai-engine/images/generate" &&
+        process.env.ECHO_PAID_IMAGE_GENERATION_ENABLED === "true" &&
+        process.env.ECHO_IMAGE_PROVIDER_CONTRACT_VERIFIED === "true" &&
+        (process.env.ECHO_IMAGE_GENERATION_ALLOWED_USER_IDS ?? "").split(",").map(id => id.trim()).includes(ownerId) &&
+        req.body?.imageTransferAcknowledgement === "image-transfer-preview-v1";
       const authorizedPrivateAutonomy = AUTONOMY_PRIVATE_BETA_ENABLED &&
         path.startsWith("/autonomy/") && isAutonomyOwnerAuthorized(ownerId);
       if ((/^\/universe\/[^/]+\/sharing$/.test(path) && req.body?.sharingEnabled === true) ||
-        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy && !safeImagePreview && !safeStorageDiagnostic)) {
+        ((path.startsWith("/ai-engine/") || path.startsWith("/autonomy/")) && req.method !== "GET" && !authorizedPrivateAutonomy && !safeImagePreview && !safeStorageDiagnostic && !privateImageGeneration)) {
         res.status(409).json({ error: "LEGAL_DOCUMENTS_UNAVAILABLE", externalUseAllowed: false });
         return;
       }
