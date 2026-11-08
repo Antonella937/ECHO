@@ -209,7 +209,10 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
    stored.push({id:inserted.rows[0].id});
   }
   if(!stored.length){await pool.query("UPDATE echo_voice_samples SET status=$2 WHERE id=$1",[reservationId,"failed"]);res.status(502).json({error:"VOICE_PREVIEWS_COULD_NOT_BE_STORED",charged:"unknown"});return;}
-  await pool.query("UPDATE echo_voice_samples SET status=$2 WHERE id=$1",[reservationId,'completed']);await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
+  // The reservation is not a playable sample. Remove it once real samples are stored;
+  // the ready samples themselves enforce the monthly preview limit.
+  await pool.query("DELETE FROM echo_voice_samples WHERE id=$1 AND owner_id=$2 AND status='pending'",[reservationId,req.userId]);
+  await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
   res.json({projectId:project.id,samples:stored,generated:stored.length});
  }catch{res.status(503).json({error:"VOICE_GENERATION_UNAVAILABLE",charged:"unknown"});}
 });
