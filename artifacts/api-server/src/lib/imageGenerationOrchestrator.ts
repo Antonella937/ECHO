@@ -51,9 +51,12 @@ export async function orchestrateImageGeneration(deps: GenerationDependencies, i
   try {
     objectPath = await deps.store(input.ownerId, result);
   } catch (error) {
-    await deps.settle(reservation.id, { status: 'failed', reportedCostUsd: result.billedUsd });
+    // Provider billing is not reconciled: conservatively retain the full reservation.
+    await deps.settle(reservation.id, { status: 'failed', reportedCostUsd: input.maximumUsd });
     throw error;
   }
-  await deps.settle(reservation.id, { status: 'succeeded', reportedCostUsd: result.billedUsd, objectPath });
+  // Do not release reserved funds based on a model price estimate. The provider's
+  // actual charge has not been reconciled, so account for the full cap.
+  await deps.settle(reservation.id, { status: 'succeeded', reportedCostUsd: input.maximumUsd, objectPath });
   return { objectPath, billedUsd: result.billedUsd, jobId: reservation.id };
 }
