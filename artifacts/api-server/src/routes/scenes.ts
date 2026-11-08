@@ -86,3 +86,46 @@ scenesRouter.post("/scenes/events", async (req, res) => {
     res.status(201).json({ eventId });
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
+
+const turnUpdate = scope.extend({
+  mode: z.enum(["automatic","manual","ordered"]),
+  order: z.array(id).max(20),
+  nextCharacterId: id.nullable().default(null),
+}).strict();
+scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
+  const parsed = turnUpdate.safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_TURN_SETTINGS" }); return; }
+  const { universeId, mode, order, nextCharacterId } = parsed.data;
+  try {
+    const result = await db.execute(sql`SELECT participant_ids, turn_settings, status FROM echo_scenes
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data} LIMIT 1`);
+    const scene = result.rows[0];
+    if (!scene || scene.status === "finished") { res.status(404).json({ error: "SCENE_NOT_ACTIVE" }); return; }
+    const participants = Array.isArray(scene.participant_ids) ? scene.participant_ids.filter((x): x is string => typeof x === "string") : [];
+    if (new Set(order).size !== order.length || order.some(x => !participants.includes(x)) ||
+        (nextCharacterId !== null && !participants.includes(nextCharacterId))) {
+      res.status(400).json({ error: "INVALID_TURN_PARTICIPANTS" }); return;
+    }
+    const completeOrder = [...order, ...participants.filter(x => !order.includes(x))];
+    const current = scene.turn_settings as { cursor?: number } | null;
+    const settings = { mode, participantIds: participants, order: completeOrder, nextCharacterId,
+      cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)) };
+    const payload = JSON.stringify(settings);
+    await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${payload}::jsonb, updated_at = now()
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
+    res.json({ turnSettings: settings });
+  } catch { res.status(503).json({ error: "SCENE_TURNS_UNAVAILABLE" }); }
+});
+scenesRouter.put("/scenes/:sceneId/status", async (req, res) => {
+  const parsed = scope.extend({ status: z.enum(["active","paused","finished"]) }).strict().safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_STATUS" }); return; }
+  try {
+    const result = await db.execute(sql`UPDATE echo_scenes SET status = ${parsed.data.status}, updated_at = now()
+      WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data}
+        AND status <> 'finished' RETURNING scene_id`);
+    if (!result.rows.length) { res.status(404).json({ error: "SCENE_NOT_EDITABLE" }); return; }
+    res.json({ status: parsed.data.status });
+  } catch { res.status(503).json({ error: "SCENE_STATUS_UNAVAILABLE" }); }
+});
