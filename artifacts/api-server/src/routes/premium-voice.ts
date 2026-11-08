@@ -282,11 +282,62 @@ router.post("/voices/premium/select",requireAuth,async(req,res)=>{
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_SELECTION"});return;}
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
-  const result=await pool.query(`UPDATE echo_voice_projects p SET selected_sample_id=$3,updated_at=now()
-   WHERE p.id=$1 AND p.owner_id=$2 AND EXISTS(SELECT 1 FROM echo_voice_samples s WHERE s.id=$3 AND s.project_id=p.id AND s.owner_id=$2 AND s.status='ready')
-   RETURNING p.id,p.selected_sample_id AS "selectedSampleId"`,[parsed.data.projectId,req.userId,parsed.data.sampleId]);
-  if(!result.rowCount){res.status(409).json({error:"VOICE_SAMPLE_NOT_READY_OR_NOT_OWNED"});return;}
-  res.json({project:result.rows[0]});
- }catch{res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});}
+  if(!elevenLabsVoiceStatus().generationAvailable){res.status(503).json({error:"CUSTOM_VOICE_PROVIDER_UNAVAILABLE"});return;}
+  const projectResult=await pool.query(`SELECT p.id,p.owner_id,p.universe_id,p.character_id,p.prompt,p.selected_sample_id,
+    s.id AS sample_id,s.provider_sample_id,s.status AS sample_status
+    FROM echo_voice_projects p JOIN echo_voice_samples s ON s.project_id=p.id
+    WHERE p.id=$1 AND p.owner_id=$2 AND s.id=$3 AND s.owner_id=$2 AND s.status='ready'`,
+    [parsed.data.projectId,req.userId,parsed.data.sampleId]);
+  const project=projectResult.rows[0];
+  if(!project){res.status(409).json({error:"VOICE_SAMPLE_NOT_READY_OR_NOT_OWNED"});return;}
+  if(project.selected_sample_id===parsed.data.sampleId){
+    res.json({project:{id:project.id,selectedSampleId:project.selected_sample_id},alreadySelected:true});return;
+  }
+  if(!project.prompt || project.prompt.trim().length<20 || project.prompt.length>1000){
+    res.status(409).json({error:"VOICE_DESCRIPTION_UNAVAILABLE"});return;
+  }
+  const {state}=await readUniverse(req.userId!,project.universe_id);
+  const character=(Array.isArray(state?.characters)?state.characters:[]).find((item:any)=>item?.id===project.character_id);
+  if(!character){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
+  const createResponse=await fetch("https://api.elevenlabs.io/v1/text-to-voice",{
+    method:"POST",headers:elevenLabsHeaders(),
+    body:JSON.stringify({
+      voice_name:String(character.name??"ECHO Character").slice(0,80),
+      voice_description:project.prompt,
+      generated_voice_id:project.provider_sample_id,
+      labels:{application:"ECHO",character_id:String(project.character_id).slice(0,64)}
+    }),
+    signal:AbortSignal.timeout(30000)
+  });
+  if(!createResponse.ok){
+    let providerStatus=createResponse.status;
+    req.log.warn({providerStatus},"ElevenLabs could not save selected voice preview");
+    res.status(502).json({error:"ELEVENLABS_VOICE_SAVE_FAILED",providerStatus});return;
+  }
+  const created=await createResponse.json() as {voice_id?:string};
+  if(!created.voice_id || !/^[a-zA-Z0-9_-]{10,128}$/.test(created.voice_id)){
+    res.status(502).json({error:"ELEVENLABS_VOICE_ID_INVALID"});return;
+  }
+  const previous=await pool.query(`SELECT s.provider_sample_id FROM echo_voice_projects p
+    JOIN echo_voice_samples s ON s.id=p.selected_sample_id
+    WHERE p.id=$1 AND p.owner_id=$2 AND s.provider='elevenlabs'`,
+    [project.id,req.userId]);
+  await pool.query("UPDATE echo_voice_samples SET provider_sample_id=$3 WHERE id=$1 AND owner_id=$2",
+    [parsed.data.sampleId,req.userId,created.voice_id]);
+  const result=await pool.query(`UPDATE echo_voice_projects SET selected_sample_id=$3,updated_at=now()
+    WHERE id=$1 AND owner_id=$2 RETURNING id,selected_sample_id AS "selectedSampleId"`,
+    [project.id,req.userId,parsed.data.sampleId]);
+  // Remove a previously selected ECHO-created voice after the replacement is safely saved.
+  const oldVoiceId=previous.rows[0]?.provider_sample_id;
+  if(oldVoiceId && oldVoiceId!==created.voice_id){
+    await fetch(`https://api.elevenlabs.io/v1/voices/${encodeURIComponent(oldVoiceId)}`,{
+      method:"DELETE",headers:elevenLabsHeaders(),signal:AbortSignal.timeout(15000)
+    }).catch(()=>{});
+  }
+  res.json({project:result.rows[0],voiceCreated:true});
+ }catch(error){
+  req.log.error({err:error},"Premium voice selection failed");
+  res.status(503).json({error:"VOICE_STUDIO_STORAGE_UNAVAILABLE"});
+ }
 });
 export default router;
