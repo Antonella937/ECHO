@@ -11,7 +11,7 @@ import { ingestGeneratedMusic } from "./musicPrivateStorage";
 export type MusicJobMode = "manual" | "autonomous";
 export type MusicJobInput = {
   ownerId: string; characterId: string; mode: MusicJobMode; title: string;
-  verifiedEntitlement: boolean; prompt: string; lyrics?: string; instrumental: boolean;
+  verifiedEntitlement: boolean; prompt: string; lyrics?: string; instrumental: boolean; vocalId?: string;
 };
 function validOwner(ownerId: string, characterId: string) {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(ownerId) || !/^[a-zA-Z0-9_-]{1,128}$/.test(characterId)) {
@@ -50,6 +50,7 @@ export async function submitReservedMusicJob(input: MusicJobInput, jobId: string
   const model = input.instrumental ? MUREKA_INSTRUMENTAL_MODEL : MUREKA_SONG_MODEL;
   const requestId = await submitMurekaSong({
     prompt: input.prompt, ...(input.instrumental ? {} : input.lyrics ? { lyrics: input.lyrics } : {}),
+    ...(input.instrumental || !input.vocalId ? {} : { vocal_id: input.vocalId }),
     enable_safety_checker: true,
   }, model);
   await db.execute(sql`
