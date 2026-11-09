@@ -35,13 +35,13 @@ function falAudioUrl(value: unknown): string {
 export function parseMurekaSongResult(data: unknown): MurekaSongResult {
   if (!data || typeof data !== "object") throw new Error("MUREKA_RESULT_INVALID");
   const result = data as Record<string, unknown>;
-  const audio = result.audio;
+  // The queue result may be returned as a direct payload or wrapped in data.\n  const payload = result.data && typeof result.data === "object" ? result.data as Record<string, unknown> : result;\n  const audio = payload.audio;
   if (!audio || typeof audio !== "object") throw new Error("MUREKA_AUDIO_MISSING");
   const file = audio as Record<string, unknown>;
-  const duration = typeof result.duration === "number" && Number.isFinite(result.duration)
-    ? Math.max(0, Math.round(result.duration / 1000)) : null;
+  const duration = typeof payload.duration === "number" && Number.isFinite(payload.duration)
+    ? Math.max(0, Math.round((payload.duration as number) / 1000)) : null;
   return {
-    songId: typeof result.song_id === "string" ? result.song_id : null,
+    songId: typeof payload.song_id === "string" ? payload.song_id : null,
     audioUrl: falAudioUrl(file.url),
     durationSeconds: duration,
     contentType: typeof file.content_type === "string" ? file.content_type : null,
