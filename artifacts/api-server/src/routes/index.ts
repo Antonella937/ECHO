@@ -8,7 +8,6 @@ import paddleBillingRouter from "./paddle-billing";
 import supportRouter from "./support";
 import universeRouter from "./universe";
 import universeSharingRouter from "./universe-sharing";
-import storageRouter from "./storage";
 import { createSupabaseStorageRouter } from "./supabase-storage";
 import charactersRouter from "./characters";
 import aiEngineRouter from "./ai-engine";
@@ -43,8 +42,9 @@ router.use(paddleBillingRouter);
 router.use(supportRouter);
 router.use(universeRouter);
 router.use(universeSharingRouter);
-router.use(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-  ? createSupabaseStorageRouter() : storageRouter);
+// Never silently fall back to the retired Replit object-storage sidecar.
+// Supabase reports STORAGE_UNAVAILABLE when its credentials are missing.
+router.use(createSupabaseStorageRouter());
 router.use(charactersRouter);
 router.use(aiEngineRouter);
 router.use(basicVoiceRouter);
