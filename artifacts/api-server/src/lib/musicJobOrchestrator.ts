@@ -10,7 +10,7 @@ import { ingestGeneratedMusic } from "./musicPrivateStorage";
 
 export type MusicJobMode = "manual" | "autonomous";
 export type MusicJobInput = {
-  ownerId: string; characterId: string; mode: MusicJobMode;
+  ownerId: string; characterId: string; mode: MusicJobMode; title: string;
   verifiedEntitlement: boolean; prompt: string; lyrics?: string; instrumental: boolean;
 };
 function validOwner(ownerId: string, characterId: string) {
@@ -31,6 +31,7 @@ export async function reserveMusicJob(input: MusicJobInput): Promise<{ jobId: st
   `);
   const status = firstValue(result, "result");
   if (status !== "RESERVED") throw new Error(`MUSIC_RESERVATION_${status}`);
+  await db.execute(sql`UPDATE echo_music_generation_jobs SET title=${input.title.slice(0,120)}, prompt=${input.prompt.slice(0,5000)}, instrumental=${input.instrumental} WHERE id=${jobId}::uuid AND owner_id=${input.ownerId} AND status='reserved'`);
   return { jobId, status };
 }
 /** Never retry an ambiguous submission: fal may have accepted and billed it.
@@ -72,13 +73,46 @@ export async function pollMusicJob(ownerId: string, jobId: string, model: Mureka
   const state = await checkMurekaSong(row.provider_request_id, model);
   if (state !== "COMPLETED") return { status: state };
   const result = await fetchMurekaSongResult(row.provider_request_id, model);
-  const stored = await ingestGeneratedMusic(result.audioUrl, ownerId, jobId);
-  // The existing echo_music_library uses legacy /objects paths; do not insert a
-  // Supabase key into that field until its streaming route supports Supabase.
-  // Keep the key in the job record until library integration is implemented.
-  await db.execute(sql`
-    UPDATE echo_music_generation_jobs SET audio_path=${stored.storageKey},updated_at=now()
+  // Idempotent storage: once audio_path is set, retry the DB finalization only.
+  const existing = await db.execute(sql`
+    SELECT audio_path FROM echo_music_generation_jobs
     WHERE id=${jobId}::uuid AND owner_id=${ownerId} AND status='processing'
   `);
-  return { status: "AUDIO_STORED_AWAITING_LIBRARY", storageKey: stored.storageKey };
+  const previousKey = existing.rows[0]?.audio_path;
+  const storedKey = typeof previousKey === "string" && previousKey.startsWith("generated/")
+    ? previousKey
+    : (await ingestGeneratedMusic(result.audioUrl, ownerId, jobId)).storageKey;
+  // Persist storage before DB finalization so a transient database failure can
+  // be recovered without re-downloading/re-uploading on the next poll.
+  await db.execute(sql`
+    UPDATE echo_music_generation_jobs SET audio_path=${storedKey},updated_at=now()
+    WHERE id=${jobId}::uuid AND owner_id=${ownerId} AND status='processing'
+  `);
+  // One transaction: save a private library record and mark the job completed.
+  // Never publish the track automatically.
+  const completed = await db.transaction(async tx => {
+    const locked = await tx.execute(sql`
+      SELECT id, character_id, title, prompt, audio_path, status
+      FROM echo_music_generation_jobs
+      WHERE id=${jobId}::uuid AND owner_id=${ownerId} FOR UPDATE
+    `);
+    const job = locked.rows[0] as Record<string, unknown> | undefined;
+    if (!job || job.status !== "processing" || job.audio_path !== storedKey) return false;
+    await tx.execute(sql`
+      INSERT INTO echo_music_library
+        (owner_id,id,character_id,title,prompt,duration_seconds,status,audio_path)
+      VALUES (${ownerId},${jobId},${String(job.character_id)},
+        ${String(job.title || "Generated song")},${String(job.prompt || "")},
+        ${result.durationSeconds ?? 0},'saved_audio',${storedKey})
+      ON CONFLICT (owner_id,id) DO NOTHING
+    `);
+    await tx.execute(sql`
+      UPDATE echo_music_generation_jobs
+      SET status='completed', completed_at=now(), updated_at=now(),
+        duration_seconds=${result.durationSeconds ?? 0}
+      WHERE id=${jobId}::uuid AND owner_id=${ownerId} AND status='processing'
+    `);
+    return true;
+  });
+  return { status: completed ? "COMPLETED" : "NOT_PROCESSING", jobId };
 }
