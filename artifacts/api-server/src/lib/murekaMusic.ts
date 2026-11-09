@@ -10,7 +10,7 @@ const queueApp = (model: MurekaModel) => model.split("/").slice(0, 2).join("/");
 function assertModel(model: MurekaModel): void {
   if (model !== MUREKA_SONG_MODEL && model !== MUREKA_INSTRUMENTAL_MODEL) throw new Error("MUREKA_MODEL_NOT_ALLOWED");
 }
-export type MurekaSongInput = { prompt: string; lyrics?: string; enable_safety_checker: true };
+export type MurekaSongInput = { prompt: string; lyrics?: string; vocal_id?: string; enable_safety_checker: true };
 export type MurekaSongResult = {
   songId: string | null;
   audioUrl: string;
