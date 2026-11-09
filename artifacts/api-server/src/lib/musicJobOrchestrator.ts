@@ -8,6 +8,25 @@ import { sql } from "drizzle-orm";
 import { submitMurekaSong, checkMurekaSong, fetchMurekaSongResult, MUREKA_INSTRUMENTAL_MODEL, MUREKA_SONG_MODEL, type MurekaModel } from "./murekaMusic";
 import { ingestGeneratedMusic } from "./musicPrivateStorage";
 
+/**
+ * Shared voice resolution for manual and future autonomous music jobs.
+ * Fail closed when a character must retain its established vocal identity.
+ * No provider call or credits are consumed by this lookup.
+ */
+export async function resolveCharacterSingingVoice(ownerId: string, characterId: string, options: {
+  instrumental: boolean; requireConfiguredVoice?: boolean;
+}): Promise<string | undefined> {
+  validOwner(ownerId, characterId);
+  if (options.instrumental) return undefined;
+  const result = await db.execute(sql`
+    SELECT mureka_vocal_id FROM echo_character_singing_voices
+    WHERE owner_id=${ownerId} AND character_id=${characterId} LIMIT 1
+  `);
+  const vocalId = result.rows[0]?.mureka_vocal_id;
+  if (typeof vocalId === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(vocalId)) return vocalId;
+  if (options.requireConfiguredVoice !== false) throw new Error("CHARACTER_SINGING_VOICE_NOT_CONFIGURED");
+  return undefined;
+}
 export type MusicJobMode = "manual" | "autonomous";
 export type MusicJobInput = {
   ownerId: string; characterId: string; mode: MusicJobMode; title: string;
