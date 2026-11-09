@@ -68,6 +68,14 @@ router.post("/music/library/save-to-character", async (req, res) => {
       FROM echo_music_library l
       WHERE l.owner_id=${req.userId!} AND l.id=${trackId}
         AND l.status='saved_audio' AND l.audio_path IS NOT NULL
+        AND (
+          l.character_id=${characterId}
+          OR (l.published_at IS NOT NULL AND EXISTS (
+            SELECT 1 FROM echo_music_shares sh
+            WHERE sh.owner_id=l.owner_id AND sh.track_id=l.id
+              AND sh.surface='dm' AND sh.target_id=${characterId}
+          ))
+        )
       ON CONFLICT (owner_id,track_id,character_id) DO NOTHING
       RETURNING track_id
     `);
@@ -76,7 +84,7 @@ router.post("/music/library/save-to-character", async (req, res) => {
         SELECT 1 FROM echo_music_character_saves
         WHERE owner_id=${req.userId!} AND track_id=${trackId} AND character_id=${characterId}
       `);
-      if (!exists.rows.length) { res.status(404).json({ error: "MUSIC_NOT_IN_ACCOUNT_LIBRARY" }); return; }
+      if (!exists.rows.length) { res.status(404).json({ error: "MUSIC_NOT_SHARED_WITH_CHARACTER" }); return; }
     }
     res.json({ saved: true, reusedExistingAudio: true, creditsUsed: 0, characterId, trackId });
   } catch (error) {
