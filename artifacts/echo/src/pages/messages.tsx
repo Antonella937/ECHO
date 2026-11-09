@@ -30,6 +30,8 @@ export default function MessagesPage() {
   const [groupSnapshot, setGroupSnapshot] = useState<{ key: string; groups: InboxGroup[] }>(() => ({ key: groupCacheKey, groups: inboxGroupCache.get(groupCacheKey) ?? [] }));
   const groups = groupSnapshot.key === groupCacheKey ? groupSnapshot.groups : (inboxGroupCache.get(groupCacheKey) ?? []);
   const [groupComposer, setGroupComposer] = useState(false);
+  const [groupLoadError, setGroupLoadError] = useState(false);
+  const [groupRefresh, setGroupRefresh] = useState(0);
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const [requestDecisions, setRequestDecisions] = useState<Record<string, 'accepted' | 'rejected' | 'blocked'>>({});
@@ -65,10 +67,11 @@ export default function MessagesPage() {
       if (!active) return;
       inboxGroupCache.set(key, result.groups);
       setGroupSnapshot({ key, groups: result.groups });
-    }).catch(() => undefined);
+      setGroupLoadError(false);
+    }).catch(() => { if (active) setGroupLoadError(true); });
     void load();
     return () => { active = false; };
-  }, [user?.id, me.id, groupComposer]);
+  }, [user?.id, me.id, groupComposer, groupRefresh]);
   const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get("tab") === "favorites");
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
@@ -112,6 +115,7 @@ export default function MessagesPage() {
       />
       <div className="px-4 py-2"><Link href="/scenes" className="inline-flex rounded-xl border border-border px-4 py-2 text-sm font-semibold">✦ ECHO Scenes</Link></div>
       {requestError && <p role="alert" className="px-4 py-2 text-xs text-destructive">{requestError}</p>}
+      {groupLoadError && <div role="alert" className="mx-4 my-2 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 p-3 text-xs"><span>No se pudieron cargar los grupos. Tus conversaciones no se borraron.</span><button type="button" onClick={() => setGroupRefresh(v => v + 1)} className="shrink-0 rounded-lg bg-secondary px-3 py-2 font-semibold">Reintentar</button></div>}
       {requestLoading && showRequests && <p className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
       {showSaved ? (
         <section className="px-3 pt-4" data-testid="list-saved-messages">
