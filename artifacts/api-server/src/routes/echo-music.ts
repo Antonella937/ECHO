@@ -534,19 +534,25 @@ router.get("/music/generation/:id/audio", async (req, res) => {
 });
 router.get("/music/status", async (req, res) => {
   let paidTestEnabled = false;
+  let testAlreadyUsed = false;
   if (process.env.ECHO_MUSIC_PAID_TEST_ENABLED === 'true') {
     try {
       const founder = await db.execute(sql`SELECT 1 FROM echo_music_entitlements
         WHERE owner_id=${req.userId!} AND status='active' AND provider='founder_grant' LIMIT 1`);
       paidTestEnabled = founder.rows.length > 0;
+      if (paidTestEnabled) {
+        const prior = await db.execute(sql`SELECT 1 FROM echo_music_generation_jobs WHERE owner_id=${req.userId!} LIMIT 1`);
+        testAlreadyUsed = prior.rows.length > 0;
+      }
     } catch (error) { req.log.warn({err:error}, 'Music test eligibility unavailable'); }
   }
   res.json({
     addon: "echo_music",
-    paidTestEnabled,
+    paidTestEnabled: paidTestEnabled && !testAlreadyUsed,
+    testAlreadyUsed,
     addonRequired: true,
     activated: paidTestEnabled,
-    generationEnabled: paidTestEnabled,
+    generationEnabled: paidTestEnabled && !testAlreadyUsed,
     provider: "fal_ai_mureka_v8",
     model: "mureka/v8/generate/song",
     providerConfigured: Boolean(process.env.FAL_KEY?.trim()),
