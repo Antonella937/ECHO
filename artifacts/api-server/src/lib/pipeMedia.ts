@@ -1,35 +1,45 @@
 import type { ServerResponse } from 'node:http';
 import type { Readable } from 'node:stream';
 
-/** One native stream per request. Remove only our listeners, including on abort. */
+/** Never let a late upstream timeout crash the process after a client disconnects. */
 export function pipeMedia(source: NodeJS.ReadableStream, destination: ServerResponse, onError: (error: Error) => void) {
   const stream = source as Readable;
-  const cleanup = () => {
-    stream.off('error', fail);
-    destination.off('close', close);
-    destination.off('finish', finish);
-    destination.off('error', fail);
-  };
-  const close = () => {
-    // Keep the error handler through destruction; never leave an unhandled
-    // late SDK error after a player cancels a range request.
-    stream.unpipe(destination);
-    stream.once('close', cleanup);
-    stream.destroy();
-    if (stream.closed) cleanup();
-  };
-  const finish = () => { cleanup(); };
-  const fail = (error: Error) => {
+  let settled = false;
+  const upstreamError = (error: Error) => {
+    // Keep this listener until the upstream stream actually closes. Some SDKs
+    // emit an AbortSignal timeout after the HTTP response has already closed.
+    if (settled) return;
+    settled = true;
     onError(error);
     stream.unpipe(destination);
-    stream.once('close', cleanup);
+    if (!destination.destroyed) destination.destroy();
     stream.destroy();
-    destination.destroy();
-    if (stream.closed) cleanup();
   };
-  stream.once('error', fail);
-  destination.once('close', close);
-  destination.once('finish', finish);
-  destination.once('error', fail);
+  const upstreamClose = () => {
+    stream.off('error', upstreamError);
+    destination.off('close', clientClose);
+    destination.off('finish', finished);
+    destination.off('error', destinationError);
+  };
+  const clientClose = () => {
+    settled = true;
+    stream.unpipe(destination);
+    if (!stream.destroyed) stream.destroy();
+  };
+  const finished = () => {
+    settled = true;
+    // Do not detach the upstream error handler yet: a delayed abort can fire
+    // before the upstream's own close event.
+    if (!stream.destroyed) stream.destroy();
+  };
+  const destinationError = (error: Error) => {
+    if (!settled) onError(error);
+    clientClose();
+  };
+  stream.on('error', upstreamError);
+  stream.once('close', upstreamClose);
+  destination.once('close', clientClose);
+  destination.once('finish', finished);
+  destination.once('error', destinationError);
   stream.pipe(destination);
 }
