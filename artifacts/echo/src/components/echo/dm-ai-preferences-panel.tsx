@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import { useUser } from '@clerk/react';
 import { customFetch } from '@workspace/api-client-react';
 import { useSceneSettingsText } from '@/lib/scene-settings-i18n';
@@ -38,16 +38,20 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
   const update = <K extends keyof Preferences>(field: K, value: Preferences[K]) => setPrefs(p => ({ ...p, [field]: value }));
   const save = async () => {
     setSaving(true);
-    try {
-      await customFetch('/api/dm/conversation-preferences', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, preferences: prefs }) });
-      setInherited(false);
-      setStatus(t('savedOnline'));
-    } catch { setStatus(t('failed')); }
-    finally { setSaving(false); }
+    setStatus('');
+    setPermissionsStatus('');
+    const results = await Promise.allSettled([
+      customFetch('/api/dm/conversation-preferences', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, preferences: prefs }) }),
+      customFetch('/api/dm/character-permissions', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, enabled: dmEnabled, allowedPeerIds: allowedPeers }) }),
+    ]);
+    if (results[0].status === 'fulfilled') setInherited(false);
+    const succeeded = results.every(result => result.status === 'fulfilled');
+    setStatus(succeeded ? t('savedOnline') : t('failed'));
+    setSaving(false);
   };
   return <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onClick={onClose}>
     <section role="dialog" aria-modal="true" aria-label={t('aiSettings')} onClick={e => e.stopPropagation()} className="max-h-[calc(100dvh-3rem)] w-[min(94vw,26rem)] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-xl">
-      <div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('aiSettings')}</h2><button type="button" onClick={onClose} aria-label={t('close')} className="rounded-full p-2 hover:bg-secondary"><X className="h-5 w-5" /></button></div>
+      <div className="mb-5 flex items-center justify-between gap-2"><button type="button" onClick={onClose} aria-label="Volver a la conversación" className="flex items-center gap-2 rounded-full p-2 hover:bg-secondary"><ArrowLeft className="h-5 w-5" /><span className="text-sm">Volver</span></button><h2 className="text-lg font-semibold">{t('aiSettings')}</h2><button type="button" onClick={onClose} aria-label={t('close')} className="rounded-full p-2 hover:bg-secondary"><X className="h-5 w-5" /></button></div>
       
       <details open className="mb-3 rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{t('conversation')}</summary><div className="pt-3">
       {inherited && <p className="mb-3 text-xs text-muted-foreground">Se están usando los ajustes generales de IA. Guardá para personalizar esta conversación.</p>}
@@ -71,14 +75,6 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
           {peers.filter(peer => peer.id !== characterId).map(peer => <label key={peer.id} className="flex items-center justify-between gap-3 text-sm">
             <span className="truncate">{peer.name}</span><input type="checkbox" disabled={!dmEnabled} checked={allowedPeers.includes(peer.id)} onChange={e => setAllowedPeers(current => e.target.checked ? [...current,peer.id] : current.filter(id => id !== peer.id))} />
           </label>)}
-          <button type="button" disabled={saving} className="w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold" onClick={async () => {
-            setSaving(true); setPermissionsStatus('');
-            try {
-              await customFetch('/api/dm/character-permissions', { method:'PUT', responseType:'json', headers:{'Content-Type':'application/json'}, body:JSON.stringify({universeId,characterId,enabled:dmEnabled,allowedPeerIds:allowedPeers}) });
-              setPermissionsStatus(t('savedOnline'));
-            } catch { setPermissionsStatus(t('failed')); }
-            finally { setSaving(false); }
-          }}>{t('save')}</button>
           {permissionsStatus && <p role="status" className="text-xs text-muted-foreground">{permissionsStatus}</p>}
         </div>
       </details>
