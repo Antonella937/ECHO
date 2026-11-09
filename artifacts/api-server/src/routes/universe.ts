@@ -1,3 +1,4 @@
+import { triggerImmediateDmReply } from "../autonomy/runtime";
 import {
   GetUniverseResponse,
   SaveUniverseBody,
@@ -532,6 +533,19 @@ router.put("/universe", async (req, res): Promise<void> => {
   }
 
   res.json(SaveUniverseResponse.parse(saved));
+  // Fire only for newly committed, human-authored DMs. This is independent of
+  // the periodic autonomy worker and does not trigger on AI-generated saves.
+  if (previousState.success && previous.revision === expectedRevision) {
+    const oldIds = new Set(previousState.data.messages.map(message => message.id));
+    const incoming = enrichedState.messages.filter(message =>
+      !oldIds.has(message.id) && message.senderId === enrichedState.currentCharacterId &&
+      message.recipientId !== message.senderId && message.text.trim().length > 0 &&
+      !message.hiddenForIds?.includes(message.recipientId));
+    for (const message of incoming) {
+      void triggerImmediateDmReply(req.userId!, universeId, message.recipientId, message.id)
+        .catch(error => console.warn("Immediate DM reply failed", { reason: error instanceof Error ? error.message.slice(0,80) : "UNKNOWN" }));
+    }
+  }
   // Dispatch only committed new notifications to the authenticated owner.
   if (previousState.success && previous.revision === expectedRevision && process.env.ECHO_ONESIGNAL_REST_API_KEY) {
     void sendNewOwnerPush(req.userId!, previousState.data, enrichedState).catch(error => {
