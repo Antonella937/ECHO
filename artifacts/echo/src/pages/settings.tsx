@@ -37,13 +37,16 @@ export default function SettingsPage() {
     <div>
       <TopBar title={t("settings")} onBack={back} />
       <div className="px-4 pb-12 pt-5">
-        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">
-          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>
-          <a href="#echo-ai-writing" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de IA" : "AI style"}</a>
-        </nav>
-        <AiWritingStyleSection />
-
-        <div id="echo-autonomy" className="scroll-mt-20"><AutonomySettingsSection /></div>
+        <details className="group mb-6 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid="settings-ai-controls">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <span>{language === 'es' ? 'IA y autonomía' : 'AI & autonomy'}</span>
+            <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-2 border-t border-border px-3 pb-4">
+            <AutonomySettingsSection />
+            <AiWritingStyleSection />
+          </div>
+        </details>
 
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
@@ -107,13 +110,9 @@ export default function SettingsPage() {
           </div></details>
         </section>
 
-        <AiWritingStyleSection />
-
         <AppearanceSection />
 
         <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
-
-        <div id="echo-autonomy" className="scroll-mt-20"><AutonomySettingsSection /></div>
 
         <MessageSoundSettings />
 
