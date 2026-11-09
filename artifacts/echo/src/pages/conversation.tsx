@@ -463,11 +463,13 @@ export default function ConversationPage() {
             <button type="button" onClick={() => fileRef.current?.click()} aria-label={t("Adjuntar foto, video o audio")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-attach">
               <Paperclip className="h-5 w-5" strokeWidth={1.7} />
             </button>
-            <input
+            <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={`${t("Escribir como")} ${me.name.split(' ')[0]}…`}
-              className="h-12 min-w-0 flex-1 rounded-full border border-input bg-card px-5 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
+              rows={1}
+              maxLength={10000}
+              className="max-h-36 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-2xl border border-input bg-card px-5 py-3 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
               aria-label={`${t("Mensaje para")} ${other.name}`}
               data-testid="input-message"
             />
