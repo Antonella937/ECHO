@@ -54,6 +54,15 @@ router.post("/music/library", async (req, res) => {
   const parsed = libraryItem.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_LIBRARY_ITEM" }); return; }
   const item = parsed.data;
+  // Generated tracks are server-managed. A client must never overwrite a
+  // completed generated song or replace its private audio path via upsert.
+  const generated = await db.execute(sql`
+    SELECT id FROM echo_music_generation_jobs
+    WHERE id=${item.id}::uuid AND owner_id=${req.userId!} LIMIT 1
+  `);
+  if (generated.rows.length) {
+    res.status(409).json({ error: "GENERATED_TRACK_SERVER_MANAGED" }); return;
+  }
   if (item.audioPath) {
     if (!item.audioPath.startsWith("/objects/uploads/") || !/^\/objects\/uploads\/[a-f0-9-]+$/i.test(item.audioPath)) {
       res.status(400).json({ error: "INVALID_AUDIO_PATH" }); return;
@@ -101,9 +110,18 @@ router.post("/music/library/:id/publish", async (req, res) => {
     if (!track || track.status !== "saved_audio" || !track.audioPath) {
       res.status(404).json({ error: "SAVED_AUDIO_REQUIRED" }); return;
     }
-    const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
-      eq(echoMediaTable.objectPath, track.audioPath), eq(echoMediaTable.ownerId, req.userId!))).limit(1);
-    if (!owned) { res.status(403).json({ error: "AUDIO_NOT_OWNED" }); return; }
+    // Generated music is owned through its completed Neon generation job,
+    // whereas user-uploaded music is owned through echoMediaTable.
+    const generatedTrack = await db.execute(sql`
+      SELECT id FROM echo_music_generation_jobs
+      WHERE id=${id.data}::uuid AND owner_id=${req.userId!}
+        AND status='completed' AND audio_path=${track.audioPath} LIMIT 1
+    `);
+    if (!generatedTrack.rows.length) {
+      const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
+        eq(echoMediaTable.objectPath, track.audioPath), eq(echoMediaTable.ownerId, req.userId!))).limit(1);
+      if (!owned) { res.status(403).json({ error: "AUDIO_NOT_OWNED" }); return; }
+    }
     const [published] = await db.update(echoMusicLibraryTable).set({ publishedAt: new Date() }).where(and(
       eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, id.data))).returning();
     res.json({ item: published });
