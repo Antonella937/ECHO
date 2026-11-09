@@ -34,7 +34,7 @@ export async function discoverFreeModels(request: typeof fetch = fetch): Promise
   return free;
 }
 
-/** At most 3 distinct free models / 75 seconds per explicit preview. No jobs.
+/** At most 5 distinct free models / 100 seconds per request. No jobs.
  * Cooldowns contain no owner IDs or character data and prevent request storms.
  */
 export class FreeModelProvider implements TextProvider {
@@ -49,7 +49,7 @@ export class FreeModelProvider implements TextProvider {
 
   async complete(input: Parameters<TextProvider['complete']>[0]) {
     const now = this.dependencies.now ?? Date.now;
-    const deadline = now() + 75000;
+    const deadline = now() + 100000;
     if (!this.catalog || this.catalog.until <= now()) {
       this.catalog = { models: await (this.dependencies.discover ?? discoverFreeModels)(), until: now() + 300000 };
     }
@@ -57,7 +57,7 @@ export class FreeModelProvider implements TextProvider {
     const attempts: EngineAttempt[] = [];
     let sent = 0;
     for (const model of models) {
-      if (sent >= 3 || now() >= deadline) break;
+      if (sent >= 5 || now() >= deadline) break;
       if (!model.id.endsWith(':free')) throw new EngineError('FREE_MODEL_REQUIRED');
       if ((this.cooldown.get(model.id) ?? 0) > now()) {
         attempts.push({ model: model.id, outcome: 'skipped', code: 'MODEL_COOLDOWN', usage: unknownUsage() });
