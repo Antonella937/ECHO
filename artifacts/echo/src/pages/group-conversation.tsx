@@ -307,7 +307,7 @@ export default function GroupConversationPage() {
       </button>
       {musicDraftStatus && <p role="status" className="mt-2 text-xs text-muted-foreground">{musicDraftStatus}</p>}
       {showMusicLibrary && <div className="mt-2">
-        <MusicLibraryPicker onCancel={() => setShowMusicLibrary(false)} onSelect={async selection => {
+        <MusicLibraryPicker characterId={me.id} onCancel={() => setShowMusicLibrary(false)} onSelect={async selection => {
           if (!id || !group || savingMusicDraft) return;
           setSavingMusicDraft(true); setMusicDraftStatus('');
           try {
