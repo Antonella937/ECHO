@@ -149,12 +149,14 @@ const turnUpdate = scope.extend({
   mode: z.enum(["automatic","manual","ordered"]),
   order: z.array(id).max(20),
   nextCharacterId: id.nullable().default(null),
+  style: z.enum(["natural","cinematic","literary","concise"]).optional(),
+  autoReply: z.boolean().optional(),
 }).strict();
 scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
   const parsed = turnUpdate.safeParse(req.body);
   const sceneId = id.safeParse(req.params.sceneId);
   if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_TURN_SETTINGS" }); return; }
-  const { universeId, mode, order, nextCharacterId } = parsed.data;
+  const { universeId, mode, order, nextCharacterId, style, autoReply } = parsed.data;
   try {
     const result = await db.execute(sql`SELECT participant_ids, turn_settings, status FROM echo_scenes
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data} LIMIT 1`);
@@ -166,9 +168,10 @@ scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
       res.status(400).json({ error: "INVALID_TURN_PARTICIPANTS" }); return;
     }
     const completeOrder = [...order, ...participants.filter(x => !order.includes(x))];
-    const current = scene.turn_settings as { cursor?: number } | null;
+    const current = scene.turn_settings as { cursor?: number; style?: string; autoReply?: boolean } | null;
     const settings = { mode, participantIds: participants, order: completeOrder, nextCharacterId,
-      cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)) };
+      cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)),
+      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false };
     const payload = JSON.stringify(settings);
     await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${payload}::jsonb, updated_at = now()
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
@@ -216,7 +219,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     if (presenceRows.rows[0]?.presence === "absent" || presenceRows.rows[0]?.presence === "left") {
       res.status(409).json({ error: "CHARACTER_NOT_PRESENT_IN_SCENE" }); return;
     }
-    const turn = scene.turn_settings as { mode?: string; nextCharacterId?: string | null; order?: string[]; cursor?: number } | null;
+    const turn = scene.turn_settings as { mode?: string; nextCharacterId?: string | null; order?: string[]; cursor?: number; style?: string } | null;
     if (turn?.mode === "manual" && turn.nextCharacterId !== characterId) {
       res.status(409).json({ error: "MANUAL_TURN_NOT_SELECTED" }); return;
     }
