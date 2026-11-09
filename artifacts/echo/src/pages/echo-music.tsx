@@ -56,6 +56,12 @@ const musicEnglish: Record<string,string> = {
   "Escuchar canción": "Play track",
   "Descargar": "Download",
   "Guardar voz": "Save voice",
+  "Voz cantada vinculada": "Singing voice linked",
+  "Sin voz cantada configurada": "No singing voice configured",
+  "Proteger identidad vocal": "Protect vocal identity",
+  "Evita generar canciones cantadas con una voz diferente a la del personaje.": "Prevents generating sung tracks with a different voice from the character.",
+  "Continuar con voz nueva": "Continue with a new voice",
+  "Todavía no hay voz cantada vinculada. ¿Querés generar con una voz nueva?": "No singing voice is linked yet. Generate with a new voice?",
   "Preparar voz de Nela": "Prepare Nela voice",
   "Elegí 15 a 30 segundos donde se escuche claramente la cantante.": "Choose 15 to 30 seconds where the singer is clearly audible.",
   "Crear la voz clonada cuesta aproximadamente USD 5 en fal.ai. Esta pantalla no realiza el cargo ni crea el clon.": "Creating a cloned voice costs approximately USD 5 on fal.ai. This screen does not charge or create a clone.",
@@ -356,6 +362,16 @@ export default function EchoMusicPage() {
   const [genre, setGenre] = useState('');
   const [mood, setMood] = useState('');
   const [vocalMode, setVocalMode] = useState<'instrumental' | 'singing'>('instrumental');
+  const [singingVoiceId, setSingingVoiceId] = useState<string | null>(null);
+  const [protectSingingVoice, setProtectSingingVoice] = useState(true);
+  useEffect(() => {
+    let active = true;
+    if (!me?.id) return;
+    setSingingVoiceId(null);
+    customFetch<{vocalId:string|null}>('/api/music/voices/' + encodeURIComponent(me.id), {responseType:'json'})
+      .then(data => {if(active) setSingingVoiceId(data.vocalId ?? null);}).catch(() => {});
+    return () => {active = false;};
+  }, [me?.id]);
   const [lyrics, setLyrics] = useState('');
   const [instruments, setInstruments] = useState('');
   const [language, setLanguage] = useState('en');
@@ -401,6 +417,7 @@ export default function EchoMusicPage() {
   }
   async function generatePaidTest() {
     if (generating || !paidTestEnabled) return;
+    if (vocalMode === 'singing' && !singingVoiceId && !protectSingingVoice && !window.confirm(t('Todavía no hay voz cantada vinculada. ¿Querés generar con una voz nueva?'))) return;
     if (!window.confirm(interfaceLanguage === 'es'
       ? 'Esta prueba enviará una solicitud paga a fal.ai y consumirá una generación. ¿Continuar?'
       : 'This test submits a paid request to fal.ai and uses one generation. Continue?')) return;
@@ -408,7 +425,7 @@ export default function EchoMusicPage() {
     try {
       const result = await customFetch<{jobId:string}>('/api/music/generate', {
         method:'POST', headers:{'Content-Type':'application/json'}, responseType:'json',
-        body:JSON.stringify({ characterId:me.id, durationSeconds, title:title.trim(),
+        body:JSON.stringify({ characterId:me.id, requireConfiguredVoice: vocalMode === 'singing' && protectSingingVoice, durationSeconds, title:title.trim(),
           description:description.trim(), genre:genre.trim(), mood:mood.trim(),
           instruments:instruments.split(',').map(v => v.trim()).filter(Boolean).slice(0,12),
           language, vocalMode, lyrics:vocalMode === 'singing' ? lyrics : '' }),
