@@ -716,8 +716,14 @@ router.post("/music/generate", async (req, res) => {
     const provider = composeMurekaRequest(draft);
     const characterId = draft.characterId;
     if (!characterId) { res.status(400).json({error:'CHARACTER_REQUIRED'}); return; }
+    const singingVoice = draft.vocalMode === 'singing' ? await db.execute(sql`
+      SELECT mureka_vocal_id FROM echo_character_singing_voices
+      WHERE owner_id=${req.userId!} AND character_id=${characterId} LIMIT 1
+    `) : null;
+    const savedVocalId = singingVoice?.rows[0]?.mureka_vocal_id;
     const jobInput = {
       ownerId: req.userId!, characterId, mode: 'manual' as const,
+      vocalId: typeof savedVocalId === 'string' ? savedVocalId : undefined,
       title: draft.title, verifiedEntitlement: true, prompt: provider.prompt,
       lyrics: 'lyrics' in provider ? provider.lyrics : undefined,
       instrumental: draft.vocalMode === 'instrumental',
