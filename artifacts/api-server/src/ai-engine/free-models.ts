@@ -53,7 +53,14 @@ export class FreeModelProvider implements TextProvider {
     if (!this.catalog || this.catalog.until <= now()) {
       this.catalog = { models: await (this.dependencies.discover ?? discoverFreeModels)(), until: now() + 300000 };
     }
-    const models = this.catalog.models;
+    // Keep existing default ordering for natural chats and all non-DM actions.
+    // Narrative DMs prefer the larger reasoning-capable free model when available;
+    // availability, verified zero pricing, and the existing bounded fallbacks still apply.
+    const models = input.conversationMode === 'narrative'
+      ? [...this.catalog.models].sort((a, b) =>
+          Number(b.id === 'nvidia/nemotron-3-ultra-550b-a55b:free') -
+          Number(a.id === 'nvidia/nemotron-3-ultra-550b-a55b:free'))
+      : this.catalog.models;
     const attempts: EngineAttempt[] = [];
     let sent = 0;
     for (const model of models) {
