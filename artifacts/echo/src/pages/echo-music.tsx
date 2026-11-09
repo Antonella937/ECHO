@@ -121,6 +121,12 @@ export default function EchoMusicPage() {
   const t = (label:string) => translateMusic(label, interfaceLanguage);
   const { me } = useSocial();
   const [musicAccess, setMusicAccess] = useState<'loading' | 'active' | 'inactive' | 'error'>('loading');
+  const [paidTestEnabled, setPaidTestEnabled] = useState(false);
+  const [generationJob, setGenerationJob] = useState<string | null>(null);
+  const [generationStatus, setGenerationStatus] = useState('');
+  const [generating, setGenerating] = useState(false);
+  useEffect(() => { customFetch<{paidTestEnabled?:boolean}>('/api/music/status', {responseType:'json'})
+    .then(result => setPaidTestEnabled(Boolean(result.paidTestEnabled))).catch(() => {}); }, []);
   useEffect(() => {
     let mounted = true;
     customFetch<{active:boolean}>('/api/music/entitlement', { responseType:'json' })
@@ -356,7 +362,38 @@ export default function EchoMusicPage() {
       setPreparing(false);
     }
   }
-  if (playerOpen) return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#100d12] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+36px)] pt-[calc(env(safe-area-inset-top,0px)+22px)] text-white">
+  async function generatePaidTest() {
+    if (generating || !paidTestEnabled) return;
+    if (!window.confirm(interfaceLanguage === 'es'
+      ? 'Esta prueba enviará una solicitud paga a fal.ai y consumirá una generación. ¿Continuar?'
+      : 'This test submits a paid request to fal.ai and uses one generation. Continue?')) return;
+    setGenerating(true); setGenerationStatus('');
+    try {
+      const result = await customFetch<{jobId:string}>('/api/music/generate', {
+        method:'POST', headers:{'Content-Type':'application/json'}, responseType:'json',
+        body:JSON.stringify({ characterId:me.id, durationSeconds, title:title.trim(),
+          description:description.trim(), genre:genre.trim(), mood:mood.trim(),
+          instruments:instruments.split(',').map(v => v.trim()).filter(Boolean).slice(0,12),
+          language, vocalMode, lyrics:vocalMode === 'singing' ? lyrics : '' }),
+      });
+      setGenerationJob(result.jobId);
+      setGenerationStatus(interfaceLanguage === 'es' ? 'Generación enviada. Revisá el estado abajo.' : 'Generation submitted. Check status below.');
+    } catch (error) {
+      setGenerationStatus(error instanceof Error ? error.message : 'Music generation failed');
+    } finally { setGenerating(false); }
+  }
+  async function refreshGeneration() {
+    if (!generationJob) return;
+    try {
+      const result = await customFetch<{status:string}>('/api/music/generation/' + encodeURIComponent(generationJob) + '/sync',
+        {method:'POST',responseType:'json'});
+      setGenerationStatus(result.status === 'COMPLETED'
+        ? (interfaceLanguage === 'es' ? '¡Canción lista! Abrí Mi biblioteca para escucharla.' : 'Track ready! Open My library to listen.')
+        : 'Estado: ' + result.status);
+      if (result.status === 'COMPLETED') window.location.reload();
+    } catch (error) { setGenerationStatus(error instanceof Error ? error.message : 'Could not update generation'); }
+  }
+  if (musicAccess === 'active' && playerOpen) return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#100d12] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+36px)] pt-[calc(env(safe-area-inset-top,0px)+22px)] text-white">
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       {coverUrl && <div className="absolute -inset-16 bg-cover bg-center opacity-55 blur-[65px] scale-125" style={{ backgroundImage: `url("${coverUrl}")` }} />}
       <div className="absolute inset-0 bg-gradient-to-b from-[#100d12]/55 via-[#100d12]/75 to-[#100d12]/95" />
@@ -429,6 +466,15 @@ export default function EchoMusicPage() {
     </main>
   </div>;
   return <div><TopBar title="ECHO Music Studio" onBack={back} /><main className="mx-auto max-w-2xl space-y-5 px-4 pb-20 pt-5">
+    {paidTestEnabled && <section className="rounded-2xl border border-primary/40 bg-card p-4">
+      <h2 className="text-base font-semibold">{interfaceLanguage === 'es' ? 'Prueba de generación Mureka' : 'Mureka generation test'}</h2>
+      <p className="mt-1 text-xs text-muted-foreground">{interfaceLanguage === 'es' ? 'Prueba única para la fundadora. Una solicitud paga, con confirmación antes de enviarla.' : 'One-time founder test. One paid request, with confirmation.'}</p>
+      <button type="button" disabled={generating || !title.trim() || !description.trim()} onClick={() => void generatePaidTest()} className="mt-3 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        {generating ? '…' : (interfaceLanguage === 'es' ? 'Generar canción de prueba' : 'Generate test track')}
+      </button>
+      {generationJob && <button type="button" onClick={() => void refreshGeneration()} className="ml-2 rounded-xl border border-border px-4 py-3 text-sm">{interfaceLanguage === 'es' ? 'Actualizar estado' : 'Refresh status'}</button>}
+      {generationStatus && <p role="status" className="mt-2 text-sm">{generationStatus}</p>}
+    </section>}
     <nav aria-label={t("Secciones de ECHO Music")} className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary/60 p-1">
       <button type="button" onClick={() => setStudioTab('create')} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${studioTab === 'create' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}><WandSparkles className="h-4 w-4" /> {t("Crear música")}</button>
       <button type="button" onClick={() => setStudioTab('library')} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${studioTab === 'library' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}><Library className="h-4 w-4" /> {t("Mi biblioteca")}</button>
