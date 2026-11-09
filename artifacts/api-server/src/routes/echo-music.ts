@@ -232,6 +232,33 @@ router.get("/music/published/:id/audio", async (req, res) => {
     const [track] = await db.select().from(echoMusicLibraryTable).where(and(
       eq(echoMusicLibraryTable.id, id.data), isNotNull(echoMusicLibraryTable.publishedAt))).limit(1);
     if (!track?.audioPath) { res.status(404).json({ error: "TRACK_NOT_PUBLISHED" }); return; }
+    // Generated audio is held in private Supabase, not legacy /objects storage.
+    // Only explicitly published tracks can be streamed through this endpoint.
+    if (track.audioPath.startsWith("generated/")) {
+      const generated = await db.execute(sql`
+        SELECT id FROM echo_music_generation_jobs
+        WHERE id=${track.id}::uuid AND owner_id=${track.ownerId}
+          AND status='completed' AND audio_path=${track.audioPath} LIMIT 1
+      `);
+      if (!generated.rows.length) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+      const upstream = await fetchPrivateGeneratedMusic(track.audioPath, req.headers.range);
+      res.status(upstream.status);
+      for (const header of ["content-type", "content-length", "content-range", "accept-ranges"]) {
+        const value = upstream.headers.get(header);
+        if (value) res.setHeader(header, value);
+      }
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      if (!upstream.body) { res.end(); return; }
+      const { Readable } = await import("node:stream");
+      const stream = Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream);
+      stream.on("error", error => {
+        req.log.warn({ err: error }, "Published generated music stream interrupted");
+        if (!res.headersSent) res.status(502).end(); else res.destroy(error);
+      });
+      stream.pipe(res);
+      return;
+    }
     const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
       eq(echoMediaTable.objectPath, track.audioPath), eq(echoMediaTable.ownerId, track.ownerId))).limit(1);
     if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
@@ -338,7 +365,7 @@ router.get("/music/generation/:id/audio", async (req, res) => {
     const result = await db.execute(sql`
       SELECT audio_path FROM echo_music_generation_jobs
       WHERE id = ${parsed.data}::uuid AND owner_id = ${req.userId!}
-        AND audio_path IS NOT NULL LIMIT 1
+        AND status='completed' AND audio_path IS NOT NULL LIMIT 1
     `);
     const key = result.rows[0]?.audio_path;
     if (typeof key !== "string") { res.status(404).json({ error: "GENERATED_AUDIO_NOT_FOUND" }); return; }
