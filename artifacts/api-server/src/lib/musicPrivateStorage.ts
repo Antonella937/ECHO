@@ -81,3 +81,23 @@ export async function ingestGeneratedMusic(
   if (!upload.ok) throw new Error(`MUSIC_PRIVATE_UPLOAD_HTTP_${upload.status}`);
   return { storageKey, mimeType, size };
 }
+
+/** Download an already-ingested private track. The route MUST verify ownership
+ * against Neon before calling this function. Never return the service key.
+ */
+export async function fetchPrivateGeneratedMusic(storageKey: string, range?: string) {
+  if (!/^generated\/[a-zA-Z0-9_-]{1,128}\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.(mp3|wav|ogg|aac|m4a)$/i.test(storageKey)) {
+    throw new Error("MUSIC_STORAGE_KEY_INVALID");
+  }
+  const { url, key, bucket } = storageConfig();
+  const endpoint = new URL(`/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${storageKey}`, url);
+  const headers: Record<string, string> = { Authorization: `Bearer ${key}`, apikey: key };
+  if (range && /^bytes=\d*-\d*$/.test(range)) headers.Range = range;
+  const response = await fetch(endpoint, {
+    headers, redirect: "error", signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok && response.status !== 206) throw new Error(`MUSIC_PRIVATE_DOWNLOAD_HTTP_${response.status}`);
+  const mime = (response.headers.get("content-type") || "").split(";")[0].toLowerCase();
+  if (!MIME_TYPES.has(mime)) throw new Error("MUSIC_PRIVATE_AUDIO_TYPE_INVALID");
+  return response;
+}
