@@ -18,11 +18,17 @@ import { cn } from '@/lib/utils';
 
 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+type InboxGroup = { id: string; name: string; participantIds: string[]; archived?: boolean; muted?: boolean };
+// Keep the last confirmed group list across inbox remounts. Scoped by account and identity.
+const inboxGroupCache = new Map<string, InboxGroup[]>();
+
 export default function MessagesPage() {
   const t = useMessagesText();
   const { user } = useUser();
   const { me, state, character, actions } = useSocial();
-  const [groups, setGroups] = useState<{ id: string; name: string; participantIds: string[]; archived?: boolean; muted?: boolean }[]>([]);
+  const groupCacheKey = user?.id ? `${user.id}:${getActiveUniverseId(user.id)}:${me.id}` : '';
+  const [groupSnapshot, setGroupSnapshot] = useState<{ key: string; groups: InboxGroup[] }>(() => ({ key: groupCacheKey, groups: inboxGroupCache.get(groupCacheKey) ?? [] }));
+  const groups = groupSnapshot.key === groupCacheKey ? groupSnapshot.groups : (inboxGroupCache.get(groupCacheKey) ?? []);
   const [groupComposer, setGroupComposer] = useState(false);
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
@@ -54,7 +60,12 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
-    const load = () => customFetch<{ groups: typeof groups }>(`/api/group-dms?${new URLSearchParams({ universeId: getActiveUniverseId(user.id), actorId: me.id })}`, { method: 'GET', responseType: 'json' }).then(result => { if (active) setGroups(result.groups); }).catch(() => undefined);
+    const key = `${user.id}:${getActiveUniverseId(user.id)}:${me.id}`;
+    const load = () => customFetch<{ groups: InboxGroup[] }>(`/api/group-dms?${new URLSearchParams({ universeId: getActiveUniverseId(user.id), actorId: me.id })}`, { method: 'GET', responseType: 'json' }).then(result => {
+      if (!active) return;
+      inboxGroupCache.set(key, result.groups);
+      setGroupSnapshot({ key, groups: result.groups });
+    }).catch(() => undefined);
     void load();
     return () => { active = false; };
   }, [user?.id, me.id, groupComposer]);
