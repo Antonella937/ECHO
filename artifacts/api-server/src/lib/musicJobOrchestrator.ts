@@ -63,8 +63,8 @@ export async function submitReservedMusicJob(input: MusicJobInput, jobId: string
  * Library publication is a separate owner-authorized action.
  */
 export async function pollMusicJob(ownerId: string, jobId: string, model: MurekaModel) {
-  validOwner(ownerId, ownerId);
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(jobId)) throw new Error("MUSIC_JOB_ID_INVALID");
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(ownerId)) throw new Error("MUSIC_OWNER_INVALID");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) throw new Error("MUSIC_JOB_ID_INVALID");
   const found = await db.execute(sql`
     SELECT provider_request_id, status FROM echo_music_generation_jobs
     WHERE id=${jobId}::uuid AND owner_id=${ownerId} LIMIT 1
