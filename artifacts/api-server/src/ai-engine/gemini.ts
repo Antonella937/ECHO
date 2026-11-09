@@ -6,11 +6,12 @@ import { FreeModelProvider } from './free-models';
  */
 export class GeminiDmProvider implements TextProvider {
   readonly name = 'gemini';
-  constructor(private readonly fallback: TextProvider = new FreeModelProvider(), private readonly request: typeof fetch = fetch) {}
+  constructor(private readonly fallback: TextProvider = new FreeModelProvider(), private readonly request: typeof fetch = fetch, private readonly ownerId?: string) {}
   private async completePaidDm(input: Parameters<TextProvider['complete']>[0]) {
     const narrative = input.conversationMode === 'narrative';
-    const model = narrative ? 'openai/gpt-4.1-mini' : 'openai/gpt-4.1-nano';
-    const maxTokens = narrative ? 1600 : 700;
+    const founder = this.ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ';
+    const model = narrative || founder ? 'openai/gpt-4.1-mini' : 'openai/gpt-4.1-nano';
+    const maxTokens = narrative ? (founder ? 2200 : 1600) : (founder ? 1100 : 700);
     let response: Response;
     try {
       response = await this.request('https://openrouter.ai/api/v1/chat/completions', {
