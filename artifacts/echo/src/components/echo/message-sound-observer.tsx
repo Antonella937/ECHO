@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { useSocial } from '@/store/social-store';
 import { getActiveUniverseId } from '@/store/persistence';
@@ -13,6 +14,7 @@ export function MessageSoundObserver() {
   const universe = user?.id ? getActiveUniverseId(user.id) : 'primary';
   const identity = state.currentCharacterId;
   const ownerId = user?.id ?? '';
+  const groupBaseline = useRef<{ key: string; ids: Map<string, Set<string>> } | null>(null);
   useEffect(() => {
     const onInteraction = () => unlockMessageAudio();
     window.addEventListener('pointerdown', onInteraction, { passive: true });
@@ -31,7 +33,7 @@ export function MessageSoundObserver() {
     const newMessages = state.messages.filter(m => !old.ids.has(m.id) && m.recipientId === identity && m.senderId !== identity);
     const newNotices = state.notifications.filter(n => !old.notificationIds.has(n.id) && n.recipientId === identity);
     if (newMessages.length) playMessageSound('incoming');
-    else if (newNotices.length) playMessageSound('notification');
+    if (newNotices.length) playMessageSound('notification');
     const prefs = ownerId ? readPushPreferences(ownerId) : null;
     if (!prefs?.enabled || !('Notification' in window) || Notification.permission !== 'granted' || document.visibilityState === 'visible') return;
     const show = (category: PushCategory, title: string, body: string, tag: string) => {
@@ -47,5 +49,40 @@ export function MessageSoundObserver() {
       show(category, 'Nueva actividad en ECHO', 'Tenés una nueva notificación', 'echo-activity-' + notice.id);
     }
   }, [state.messages, state.notifications, state.characters, universe, identity, ownerId]);
+  // Group messages live in a separate API table, not state.messages. Polling
+  // keeps foreground sound notifications working without relying on page mounts.
+  useEffect(() => {
+    if (!ownerId || !identity) return;
+    const key = ownerId + ':' + universe + ':' + identity;
+    groupBaseline.current = { key, ids: new Map() };
+    let disposed = false;
+    let busy = false;
+    const poll = async () => {
+      if (disposed || busy || document.visibilityState !== 'visible') return;
+      busy = true;
+      try {
+        const scope = new URLSearchParams({ universeId: universe, actorId: identity });
+        const result = await customFetch<{ groups: Array<{ id: string; name: string; muted?: boolean }> }>(`/api/group-dms?${scope}`, { method: 'GET', responseType: 'json' });
+        const baseline = groupBaseline.current;
+        if (!baseline || baseline.key !== key || disposed) return;
+        for (const group of result.groups.slice(0, 20)) {
+          const thread = await customFetch<{ messages: Array<{ id: string; senderId: string }> }>(`/api/group-dms/${encodeURIComponent(group.id)}/messages?${scope}`, { method: 'GET', responseType: 'json' });
+          if (disposed || groupBaseline.current?.key !== key) return;
+          const ids = new Set(thread.messages.map(message => message.id));
+          const old = baseline.ids.get(group.id);
+          baseline.ids.set(group.id, ids);
+          if (old && !group.muted && thread.messages.some(message => !old.has(message.id) && message.senderId !== identity)) {
+            playMessageSound('group');
+          }
+        }
+      } catch { /* Transient offline state must not interrupt the app. */ }
+      finally { busy = false; }
+    };
+    void poll();
+    const timer = window.setInterval(() => { void poll(); }, 15000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { disposed = true; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [ownerId, universe, identity]);
   return null;
 }
