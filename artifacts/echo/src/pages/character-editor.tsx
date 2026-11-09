@@ -46,6 +46,7 @@ export default function CharacterEditorPage() {
   const account = isNew ? undefined : character(params.id!);
 
   const [mode, setMode] = useState<Mode>(isNew ? 'quick' : 'advanced');
+  const [linkedSourceId, setLinkedSourceId] = useState('');
   const [open, setOpen] = useState<SectionKey | null>('identity');
   const [form, setFormRaw] = useState<BasicForm>(EMPTY);
   const [identity, setIdentityRaw] = useState<IdentityReference>(EMPTY_IDENTITY);
@@ -99,7 +100,7 @@ export default function CharacterEditorPage() {
         setDirty(false);
         toast({ title: t('Personaje guardado') });
       } else {
-        const id = actions.createAccount(input);
+        const id = linkedSourceId ? actions.createLinkedAccount(linkedSourceId, input) : actions.createAccount(input);
         setDirty(false);
         toast({ title: `@${input.handle} creado`, description: t('Podés seguir completando su ficha.') });
         navigate(`/characters/${id}/edit`, { replace: true });
@@ -131,6 +132,33 @@ export default function CharacterEditorPage() {
       <TopBar title={isNew ? t('Nuevo personaje') : `${t('Editar')} ${account!.name}`} onBack={back}
         sub={dirty ? <span className="text-primary" data-testid="status-character-dirty">{t("Cambios sin guardar")}</span> : !isNew ? `${done}/7 ${t("secciones configuradas")}` : undefined} />
       <div className="px-4 pb-40 pt-2" data-testid="page-character-editor">
+        {isNew && (
+          <div className="mb-4 rounded-2xl border border-border bg-card/40 p-4">
+            <label htmlFor="linked-character-source" className="mb-2 block text-sm font-semibold">{t('Tipo de creación')}</label>
+            <select id="linked-character-source" value={linkedSourceId} onChange={(e) => {
+              const id = e.target.value;
+              setLinkedSourceId(id);
+              const source = state.characters.find(c => c.id === id);
+              if (source) {
+                setFormRaw({ name: source.name, handle: '', bio: '', avatar: source.avatar, occupation: source.occupation, location: source.location });
+                setConfigRaw(characterConfig(source));
+                setIdentityRaw(structuredClone(source.identity ?? EMPTY_IDENTITY));
+                setMode('quick');
+              } else {
+                setFormRaw(EMPTY);
+                setConfigRaw(defaultCharacterConfig());
+                setIdentityRaw(structuredClone(EMPTY_IDENTITY));
+              }
+              setDirty(true);
+            }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm" data-testid="select-linked-character">
+              <option value="">{t('Personaje nuevo (identidad independiente)')}</option>
+              {state.characters.filter(c => !c.archived && c.accountType !== 'band' && c.accountType !== 'business' && c.accountType !== 'venue' && c.accountType !== 'organization').map(c => (
+                <option key={c.id} value={c.id}>{t('Segunda cuenta de')} {c.name} (@{c.handle})</option>
+              ))}
+            </select>
+            {linkedSourceId && <p className="mt-2 text-xs text-muted-foreground">{t('Se reutilizan la personalidad y las referencias del personaje. Elegí un @ nuevo. Los seguidores, publicaciones y privacidad de esta cuenta serán independientes.')}</p>}
+          </div>
+        )}
         {isNew && (
           <div className="mt-2 flex rounded-2xl bg-secondary p-1" role="tablist" aria-label={t("Modo de creación")}>
             {([['quick', 'Rápido'], ['advanced', 'Avanzado'], ['assisted', 'Asistido']] as const).map(([m, l]) => (
