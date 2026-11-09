@@ -1,5 +1,6 @@
 import { useConversationText } from '@/lib/conversation-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
+import { MusicLibraryPicker } from '@/components/echo/music-library-picker';
 import { DmAiPreferencesPanel } from '@/components/echo/dm-ai-preferences-panel';
 import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
@@ -49,6 +50,9 @@ export default function ConversationPage() {
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
   const [text, setText] = useState('');
+  const [showMusicLibrary, setShowMusicLibrary] = useState(false);
+  const [musicDraftStatus, setMusicDraftStatus] = useState('');
+  const [savingMusicDraft, setSavingMusicDraft] = useState(false);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -411,6 +415,31 @@ export default function ConversationPage() {
             {pending.filter(p => p.error).map(p => <p key={p.key} className="break-words">{p.error}</p>)}
           </div>
         )}
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <button type="button" onClick={() => { setShowMusicLibrary(value => !value); setMusicDraftStatus(''); }}
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">
+            {showMusicLibrary ? 'Cerrar música' : '🎵 ECHO Music'}
+          </button>
+        </div>
+        {musicDraftStatus && <p role="status" className="mb-2 text-xs text-muted-foreground">{musicDraftStatus}</p>}
+        {showMusicLibrary && <div className="mb-3">
+          <MusicLibraryPicker onCancel={() => setShowMusicLibrary(false)} onSelect={async selection => {
+            if (savingMusicDraft || !other) return;
+            setSavingMusicDraft(true); setMusicDraftStatus('');
+            try {
+              await customFetch('/api/music/share-reference', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trackId: selection.id, surface: 'dm', targetId: other.id,
+                  clipStartSeconds: selection.clipStartSeconds, clipDurationSeconds: selection.clipDurationSeconds }),
+                responseType: 'json',
+              });
+              setMusicDraftStatus('Canción preparada para este chat. Todavía no se envió: falta conectar el adjunto musical al mensaje.');
+              setShowMusicLibrary(false);
+            } catch {
+              setMusicDraftStatus('No se pudo preparar la canción para este chat.');
+            } finally { setSavingMusicDraft(false); }
+          }} />
+        </div>}
         {recorder.status !== 'idle' ? (
           <div className="flex items-center gap-2 pb-1" data-testid="status-recording">
             <button type="button" onClick={() => { recorder.cancel(); setRecordingTip(false); }} aria-label={t("Descartar grabación")} className="tap grid h-12 w-12 place-items-center rounded-full bg-secondary" data-testid="button-cancel-recording"><Trash2 className="h-5 w-5" /></button>
