@@ -5,6 +5,7 @@ import { db, echoMediaTable, echoMusicLibraryTable } from "@workspace/db";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
+import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
 
 /**
  * ECHO Music add-on: offline preparation only.
@@ -230,6 +231,40 @@ router.get("/music/generation/:id", async (req, res) => {
   } catch (error) {
     req.log.error({ err: error }, "Music generation status read failed");
     res.status(503).json({ error: "MUSIC_GENERATION_STATUS_UNAVAILABLE" });
+  }
+});
+// Authenticated playback of generated tracks, scoped to the job owner.
+// This intentionally does not expose Supabase service credentials or URLs.
+router.get("/music/generation/:id/audio", async (req, res) => {
+  const parsed = z.string().uuid().safeParse(req.params.id);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_GENERATION_ID" }); return; }
+  try {
+    const result = await db.execute(sql`
+      SELECT audio_path FROM echo_music_generation_jobs
+      WHERE id = ${parsed.data}::uuid AND owner_id = ${req.userId!}
+        AND audio_path IS NOT NULL LIMIT 1
+    `);
+    const key = result.rows[0]?.audio_path;
+    if (typeof key !== "string") { res.status(404).json({ error: "GENERATED_AUDIO_NOT_FOUND" }); return; }
+    const upstream = await fetchPrivateGeneratedMusic(key, req.headers.range);
+    res.status(upstream.status);
+    for (const header of ["content-type", "content-length", "content-range", "accept-ranges"]) {
+      const value = upstream.headers.get(header);
+      if (value) res.setHeader(header, value);
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    if (!upstream.body) { res.end(); return; }
+    const { Readable } = await import("node:stream");
+    const stream = Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream);
+    stream.on("error", error => {
+      req.log.warn({ err: error }, "Generated music playback interrupted");
+      if (!res.headersSent) res.status(502).end(); else res.destroy(error);
+    });
+    stream.pipe(res);
+  } catch (error) {
+    req.log.error({ err: error }, "Generated music playback failed");
+    if (!res.headersSent) res.status(503).json({ error: "GENERATED_AUDIO_UNAVAILABLE" });
   }
 });
 router.get("/music/status", (_req, res) => {
