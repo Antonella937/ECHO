@@ -43,6 +43,8 @@ export function MusicLibraryPicker({ onSelect, onCancel, storyClip = false, char
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError('');
+    setSelected(null);
     void customFetch<{ items: LibraryTrack[] }>('/api/music/library', { responseType: 'json' })
       .then(result => {
         if (!active) return;
