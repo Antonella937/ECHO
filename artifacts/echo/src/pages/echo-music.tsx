@@ -565,5 +565,15 @@ export default function EchoMusicPage() {
     </section>
     <div className="rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-sm font-semibold">{t("Música para historias y publicaciones")}</h2><p className="mt-2 text-xs text-muted-foreground">{t("Feed.fm Clips: integración preparada, sin activar ni contratar. La reproducción de fragmentos de 15 o 30 segundos se habilitará únicamente después de confirmar el contrato, los derechos para Argentina y el acceso oficial al catálogo. YouTube: búsqueda disponible, sin derechos de reproducción de audio sobre fotos.")}</p></div>
     </>}
+    {voiceSource && <section className="rounded-2xl border border-primary/40 bg-card p-4 space-y-3" aria-label={t("Preparar voz de Nela")}>
+      <h2 className="text-base font-semibold">{t("Preparar voz de Nela")} · {voiceSource.title}</h2>
+      <p className="text-sm text-muted-foreground">{t("Elegí 15 a 30 segundos donde se escuche claramente la cantante.")}</p>
+      <div className="flex gap-2">{[15,20,30].map(seconds => <button key={seconds} type="button" onClick={() => { setVoiceLength(seconds); setVoiceStart(Math.min(voiceStart, Math.max(0,voiceSource.durationSeconds-seconds))); }} className={`rounded-lg px-3 py-2 text-sm ${voiceLength === seconds ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{seconds}s</button>)}</div>
+      <input aria-label={t("Inicio del fragmento")} className="w-full" type="range" min={0} max={Math.max(0,voiceSource.durationSeconds-voiceLength)} step={1} value={voiceStart} onChange={event => setVoiceStart(Number(event.target.value))}/>
+      <p className="text-sm">{formatTime(voiceStart)} – {formatTime(voiceStart+voiceLength)}</p>
+      <p className="text-xs text-muted-foreground">{t("Crear la voz clonada cuesta aproximadamente USD 5 en fal.ai. Esta pantalla no realiza el cargo ni crea el clon.")}</p>
+      <p className="text-xs text-primary">{t("Referencia vocal preparada. Falta activar la clonación con confirmación de pago.")}</p>
+      <button type="button" onClick={() => setVoiceSource(null)} className="rounded-xl border border-border px-4 py-2 text-sm">{t("Cerrar")}</button>
+    </section>}
   </main></div>;
 }
