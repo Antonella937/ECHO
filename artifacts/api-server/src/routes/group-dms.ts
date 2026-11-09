@@ -92,6 +92,95 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
   res.status(201).json({ id: messageId, groupId, senderId: actorId, text, attachments, createdAt: inserted.rows[0].created_at });
 });
+// Share an explicitly published ECHO Music track into a group conversation.
+// The track is referenced, never regenerated or copied. Group membership and
+// track publication are verified server-side before delivery.
+const groupMusicBody = scope.extend({ trackId: z.string().uuid() });
+router.post("/group-dms/:groupId/music", async (req, res) => {
+  const parsed = groupMusicBody.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) {
+    res.status(400).json({ error: "INVALID_GROUP_MUSIC" }); return;
+  }
+  const { universeId, actorId, trackId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) {
+    res.status(403).json({ error: "INVALID_IDENTITY" }); return;
+  }
+  const groupId = String(req.params.groupId);
+  try {
+    const track = await db.execute(sql`
+      SELECT id,title,duration_seconds FROM echo_music_library
+      WHERE owner_id=${req.userId!} AND id=${trackId}
+        AND published_at IS NOT NULL AND status='saved_audio'
+        AND audio_path IS NOT NULL LIMIT 1
+    `);
+    if (!track.rows.length) { res.status(404).json({ error: "MUSIC_NOT_PUBLISHED" }); return; }
+    const title = String(track.rows[0].title);
+    const durationSeconds = Number(track.rows[0].duration_seconds);
+    const attachment = { id: randomUUID(), type: 'music', trackId, title, durationSeconds };
+    const messageId = randomUUID();
+    const inserted = await db.execute(sql`
+      INSERT INTO echo_group_messages
+        (owner_id,universe_id,id,group_id,sender_id,body,attachments,read_by)
+      SELECT ${req.userId!},${universeId},${messageId},id,${actorId},'',
+        ${JSON.stringify([attachment])}::jsonb,${JSON.stringify([actorId])}::jsonb
+      FROM echo_group_conversations
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId}
+        AND id=${groupId} AND participant_ids ? ${actorId}
+      RETURNING id,created_at
+    `);
+    if (!inserted.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+    await db.execute(sql`UPDATE echo_group_conversations SET updated_at=now()
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}`);
+    res.status(201).json({ id: messageId, trackId, attachment, creditsUsed: 0, createdAt: inserted.rows[0].created_at });
+  } catch (error) {
+    req.log.error({ err: error }, "Group music delivery failed");
+    res.status(503).json({ error: "GROUP_MUSIC_UNAVAILABLE" });
+  }
+});
+router.post("/group-dms/:groupId/music/:trackId/save", async (req, res) => {
+  const parsed = scope.safeParse(req.body);
+  const trackId = z.string().uuid().safeParse(req.params.trackId);
+  if (!parsed.success || !trackId.success || !id.safeParse(req.params.groupId).success) {
+    res.status(400).json({ error: "INVALID_GROUP_MUSIC_SAVE" }); return;
+  }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) {
+    res.status(403).json({ error: "INVALID_IDENTITY" }); return;
+  }
+  try {
+    const result = await db.execute(sql`
+      INSERT INTO echo_music_character_saves (owner_id,track_id,character_id)
+      SELECT ${req.userId!},l.id,${actorId}
+      FROM echo_music_library l
+      WHERE l.owner_id=${req.userId!} AND l.id=${trackId.data}
+        AND l.status='saved_audio' AND l.audio_path IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM echo_group_conversations g
+          JOIN echo_group_messages m ON m.owner_id=g.owner_id
+            AND m.universe_id=g.universe_id AND m.group_id=g.id
+          WHERE g.owner_id=${req.userId!} AND g.universe_id=${universeId}
+            AND g.id=${String(req.params.groupId)} AND g.participant_ids ? ${actorId}
+            AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements(m.attachments) a
+              WHERE a->>'type'='music' AND a->>'trackId'=${trackId.data}
+            )
+        )
+      ON CONFLICT (owner_id,track_id,character_id) DO NOTHING
+      RETURNING track_id
+    `);
+    if (!result.rows.length) {
+      const exists = await db.execute(sql`
+        SELECT 1 FROM echo_music_character_saves WHERE owner_id=${req.userId!}
+          AND track_id=${trackId.data} AND character_id=${actorId}
+      `);
+      if (!exists.rows.length) { res.status(403).json({ error: "MUSIC_NOT_SHARED_WITH_CHARACTER" }); return; }
+    }
+    res.json({ saved: true, reusedExistingAudio: true, creditsUsed: 0 });
+  } catch (error) {
+    req.log.error({ err: error }, "Group music save failed");
+    res.status(503).json({ error: "GROUP_MUSIC_SAVE_UNAVAILABLE" });
+  }
+});
 const editBody = scope.extend({ name: z.string().trim().min(1).max(80) });
 router.patch("/group-dms/:groupId", async (req, res) => {
   const parsed = editBody.safeParse(req.body);
