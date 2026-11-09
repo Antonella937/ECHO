@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db, echoMediaTable, echoMusicLibraryTable } from "@workspace/db";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 
@@ -174,6 +174,35 @@ router.get("/music/plan", (_req, res) => {
     providerValidationPending: true });
 });
 
+// Read-only account usage. No free credits are issued by this endpoint:
+// monthly allowances become spendable only after entitlement verification.
+router.get("/music/usage", async (req, res) => {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const result = await db.execute(sql`
+      SELECT mode, source_bucket AS bucket, status, COUNT(*)::integer AS count
+      FROM echo_music_generation_jobs
+      WHERE owner_id = ${req.userId!} AND period_month = ${month}
+        AND status IN ('reserved', 'processing', 'completed')
+      GROUP BY mode, source_bucket, status
+    `);
+    const rows = result.rows as Array<{mode:string;bucket:string;status:string;count:number}>;
+    const manualUsed = rows.filter(row => row.bucket === "monthly_manual")
+      .reduce((sum, row) => sum + Number(row.count), 0);
+    const autonomousUsed = rows.filter(row => row.bucket === "monthly_autonomous")
+      .reduce((sum, row) => sum + Number(row.count), 0);
+    res.json({ month, plan: MUSIC_PLAN,
+      manual: { used: manualUsed, monthlyLimit: MUSIC_PLAN.manualGenerationsPerMonth },
+      autonomous: { used: autonomousUsed, monthlyLimit: MUSIC_PLAN.autonomousGenerationsPerMonth },
+      availableToGenerate: false, entitlementVerified: false,
+      purchasedBalance: null, // Requires a separate, verified purchases ledger.
+      note: "Usage display only. Generation is not activated.",
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Music usage read failed");
+    res.status(503).json({ error: "MUSIC_USAGE_UNAVAILABLE" });
+  }
+});
 router.get("/music/status", (_req, res) => {
   res.json({
     addon: "echo_music",
