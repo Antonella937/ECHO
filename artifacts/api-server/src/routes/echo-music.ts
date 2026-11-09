@@ -626,6 +626,40 @@ router.post("/music/generate/preview", (req, res) => {
     note: "Preview only. No fal.ai API call or credit debit was made.",
   });
 });
+// Safe production preflight. No provider request and no credit reservation.
+// An operator can verify readiness without exposing secrets or spending money.
+router.get("/music/generate/preflight", async (req, res) => {
+  try {
+    const providerConfigured = Boolean(process.env.FAL_KEY?.trim());
+    const storageConfigured = Boolean(process.env.SUPABASE_URL?.trim()
+      && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+    const checks = await db.execute(sql`
+      SELECT
+        to_regprocedure('echo_music_reserve_monthly(uuid,text,text,text,boolean)') IS NOT NULL AS reservation_available,
+        to_regclass('public.echo_music_generation_jobs') IS NOT NULL AS jobs_available,
+        to_regclass('public.echo_music_library') IS NOT NULL AS library_available
+    `);
+    const row = checks.rows[0] as Record<string, unknown> | undefined;
+    const databaseReady = Boolean(row?.reservation_available && row?.jobs_available && row?.library_available);
+    const entitlementReady = false; // Must be verified from a trusted billing webhook/ledger.
+    res.json({
+      providerConfigured, storageConfigured, databaseReady, entitlementReady,
+      paidGenerationEnabled: false,
+      readyForPaidTest: false,
+      blockers: [
+        ...(!providerConfigured ? ['fal_key_missing'] : []),
+        ...(!storageConfigured ? ['private_storage_missing'] : []),
+        ...(!databaseReady ? ['database_reservation_missing'] : []),
+        'verified_music_entitlement_missing',
+        'generation_endpoint_not_activated',
+      ],
+      paidCallsMadeByThisCheck: 0,
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Music preflight failed");
+    res.status(503).json({ error: "MUSIC_PREFLIGHT_UNAVAILABLE", paidCallsMadeByThisCheck: 0 });
+  }
+});
 router.post("/music/generate", (_req, res) => {
   res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", provider: "fal_ai_mureka_v8",
     charged: false, retryable: false, missing: ["verified_entitlement", "atomic_credits", "private_audio_storage"] });
