@@ -163,6 +163,11 @@ const MUSIC_PLAN = Object.freeze({
     { generations: 5, priceUsd: 3.99 },
   ],
 });
+// Job reservations live in Neon, never in browser state. Only one active
+// generation per account can exist at a time; monthly and purchased credits
+// must be atomically reserved before enabling the paid provider adapter.
+// Until billing and quota enforcement are implemented, no reservation endpoint
+// is exposed and the paid generation route remains locked.
 router.get("/music/plan", (_req, res) => {
   res.json({ plan: MUSIC_PLAN, billingEnabled: false, generationEnabled: false,
     autonomousGenerationEnabled: false, purchasesEnabled: false,
