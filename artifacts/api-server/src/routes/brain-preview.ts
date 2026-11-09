@@ -9,7 +9,7 @@ import { VisionError, type VisionContext } from "../vision/contracts";
 import { visionService } from "../vision/service";
 import { MeteredTextProvider } from "../lib/metered-ai";
 
-const provider = new GeminiDmProvider();
+
 
 function warnRequest(req: Request, code: string, message: string): void {
   const log = (req as Request & {
@@ -47,7 +47,7 @@ export function createBrainPreviewRouter(options: BrainPreviewRouteOptions = {})
       const read = options.read ?? readUniverse;
       res.json(await previewForOwner(owner, input.data, {
         read: (ownerId, universeId) => read(ownerId, universeId ?? "primary"),
-        provider: options.providerForOwner?.(owner) ?? new MeteredTextProvider(owner, "brain_text", provider),
+        provider: options.providerForOwner?.(owner) ?? new MeteredTextProvider(owner, "brain_text", new GeminiDmProvider(undefined, fetch, owner)),
         vision: options.visionForOwner ?? ((ownerId, state, decisionInput) =>
           visionService.ensureForDecision(ownerId, state, decisionInput)),
       }));
