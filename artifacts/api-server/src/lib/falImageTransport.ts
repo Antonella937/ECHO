@@ -49,6 +49,15 @@ export async function requestFalImage(input: {
       })) : [];
       console.error('FAL_IMAGE_VALIDATION_FIELDS', JSON.stringify(fields));
     }
+    if (response.status === 422) {
+      const detail = await response.clone().json().catch(() => null) as any;
+      const fields = Array.isArray(detail?.detail) ? detail.detail : [];
+      if (fields.some((entry: any) => entry?.type === 'content_policy_violation')) {
+        const rejected = fields.some((entry: any) => Array.isArray(entry?.loc) && entry.loc.includes('image_urls'))
+          ? 'references' : 'prompt';
+        throw Error('FAL_IMAGE_CONTENT_POLICY_' + rejected.toUpperCase());
+      }
+    }
     throw Error(`FAL_IMAGE_HTTP_${response.status}`);
   }
   if (Number(response.headers.get('content-length') || 0) > MAX_BYTES) throw Error('FAL_IMAGE_RESPONSE_TOO_LARGE');
