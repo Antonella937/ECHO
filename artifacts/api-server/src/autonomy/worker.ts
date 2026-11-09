@@ -3,6 +3,24 @@ import { createHash, randomUUID } from "node:crypto";
 export const AUTONOMY_WORKER_INTERVAL_MS = 2 * 60_000;
 const WORKER_LEASE_MS = 10 * 60_000;
 const SOCIAL_INTERVAL_MS = 30 * 60_000;
+const CHARACTER_TIMEOUT_MS = 45_000;
+
+// A stalled provider must not block all other characters indefinitely.
+// The original operation may still settle; reservation/idempotency protects
+// against duplicate actions when the next worker cycle retries.
+async function boundedCharacterRun<T>(run: () => Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      run(),
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("AUTONOMY_CHARACTER_TIMEOUT")), CHARACTER_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 export interface AutonomyWorkerTarget {
   ownerId: string;
@@ -65,9 +83,9 @@ export async function runAutonomyWorkerTick(input: {
       const idempotencyKey = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
       evaluated += 1;
       try {
-        const result = await input.processCharacter(
+        const result = await boundedCharacterRun(() => input.processCharacter(
           target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane }, now,
-        );
+        ));
         if (result.status === "executed") executed += 1;
         else if (result.status === "no_action" || result.status === "disabled" ||
           result.status === "rate_limited" || result.status === "duplicate" ||
@@ -85,7 +103,7 @@ export async function runAutonomyWorkerTick(input: {
         const idempotencyKey = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
         evaluated++;
         try {
-          const result = await input.processCharacter(target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane: "social" }, now);
+          const result = await boundedCharacterRun(() => input.processCharacter(target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane: "social" }, now));
           if (result.status === "executed") executed++;
           else if (result.status === "failed") failed++;
           else noAction++;
