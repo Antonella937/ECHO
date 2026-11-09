@@ -1,7 +1,7 @@
 /** Short original, iPhone-style chimes synthesized locally (no copyrighted audio assets). */
 const KEY = 'echo:message-sounds';
-export type SoundPreferences = { incoming: boolean; outgoing: boolean; notification: boolean };
-const defaults: SoundPreferences = { incoming: true, outgoing: true, notification: true };
+export type SoundPreferences = { incoming: boolean; outgoing: boolean; notification: boolean; group: boolean };
+const defaults: SoundPreferences = { incoming: true, outgoing: true, notification: true, group: true };
 export function getSoundPreferences(): SoundPreferences {
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
   catch { return defaults; }
@@ -20,7 +20,7 @@ export function unlockMessageAudio(): Promise<void> {
     return unlocking;
   } catch { return Promise.resolve(); }
 }
-export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' | 'creatorHub') {
+export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' | 'creatorHub' | 'group') {
   if (!getSoundPreferences()[kind === 'creatorHub' ? 'notification' : kind]) return;
   // On iOS the audio context often starts suspended. Wait for resume instead
   // of silently dropping the very first notification chime.
@@ -28,7 +28,9 @@ export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' 
     if (!context || context.state !== 'running') return;
     try {
       const now = context.currentTime + 0.015;
-      const notes = kind === 'creatorHub'
+      const notes = kind === 'group'
+        ? [{ f: 523.25, t: 0, d: 0.12 }, { f: 783.99, t: 0.11, d: 0.14 }, { f: 1046.5, t: 0.23, d: 0.26 }]
+        : kind === 'creatorHub'
         ? [{ f: 659.25, t: 0, d: 0.14 }, { f: 987.77, t: 0.12, d: 0.16 }, { f: 1318.51, t: 0.24, d: 0.28 }]
         : kind === 'incoming'
         ? [{ f: 880, t: 0, d: 0.16 }, { f: 1318.5, t: 0.11, d: 0.27 }]
