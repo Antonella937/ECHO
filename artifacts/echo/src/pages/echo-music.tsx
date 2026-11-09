@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
 
-import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3 } from 'lucide-react';
+import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3, Download } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
@@ -54,6 +54,9 @@ const musicEnglish: Record<string,string> = {
   "Audio guardado": "Saved audio",
   "Prompt preparado": "Prepared prompt",
   "Escuchar canción": "Play track",
+  "Descargar": "Download",
+  "Descargando…": "Downloading…",
+  "No se pudo descargar la canción.": "Could not download this track.",
   "Ver borrador": "View draft",
   "Dejar privado": "Make private",
   "Compartir": "Share",
@@ -279,6 +282,30 @@ export default function EchoMusicPage() {
   }
   const audioUrl = resolvedSavedAudio || localAudioUrl;
   const filteredLibrary = library.filter(item => item.status === libraryFilter).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  async function downloadLibraryTrack(item: MusicDraftRecord) {
+    if (downloadingId || item.status !== 'saved_audio' || !item.audioPath?.startsWith('generated/')) return;
+    setDownloadingId(item.id);
+    setLibraryError('');
+    try {
+      const blob = await customFetch<Blob>('/api/music/generation/' + encodeURIComponent(item.id) + '/audio', { responseType: 'blob' });
+      if (!blob.type.startsWith('audio/')) throw new Error('INVALID_GENERATED_AUDIO');
+      const extension = blob.type.includes('wav') ? 'wav' : blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') || blob.type.includes('aac') ? 'm4a' : 'mp3';
+      const filename = (item.title.replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\\s+/g, '_') || 'ECHO_Music') + '.' + extension;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setLibraryError(t("No se pudo descargar la canción."));
+    } finally {
+      setDownloadingId(null);
+    }
+  }
   async function openLibraryItem(item: MusicDraftRecord) {
     if (loadingSharedId) return;
     audioRef.current?.pause();
@@ -495,6 +522,7 @@ export default function EchoMusicPage() {
           <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
           <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? t("Escuchar canción") : t("Ver borrador")}</p></div>
         </button>
+        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" disabled={!!downloadingId} onClick={() => void downloadLibraryTrack(item)} className="flex items-center gap-1 rounded-lg border border-border px-2 py-2 text-xs font-semibold" aria-label={t("Descargar") + ' ' + item.title}><Download className="h-4 w-4" />{downloadingId === item.id ? t("Descargando…") : t("Descargar")}</button>}
         {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir")}</button>}
         {!item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>}
       </article>)}</div>}
