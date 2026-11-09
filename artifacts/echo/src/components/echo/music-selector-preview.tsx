@@ -2,6 +2,7 @@ import { Music2, Search, Check, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { parseYouTubeVideoId } from '@/lib/youtube-music';
+import { MusicLibraryPicker } from '@/components/echo/music-library-picker';
 
 export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistChange, story, selectedTrack, onTrackChange }: {
   title: string;
@@ -13,6 +14,8 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
   onTrackChange?: (track: { id: string; title: string; characterId: string; durationSeconds: number; startSeconds: number; clipSeconds: 15 | 30 } | null) => void;
 }) {
   const [youtubeLink, setYoutubeLink] = useState('');
+  const [showMyLibrary, setShowMyLibrary] = useState(false);
+  const [myLibraryError, setMyLibraryError] = useState('');
   const [sharedTracks, setSharedTracks] = useState<Array<{ id: string; title: string; characterId: string; durationSeconds: number }>>([]);
   const [libraryError, setLibraryError] = useState('');
   useEffect(() => { let active = true; void customFetch<{ items: typeof sharedTracks }>('/api/music/published', { responseType: 'json' }).then(data => { if (active) setSharedTracks(data.items); }).catch(() => { if (active) setLibraryError('No se pudo cargar el catálogo de ECHO Music.'); }); return () => { active = false; }; }, []);
@@ -44,6 +47,26 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
   return <section className="rounded-2xl border border-input bg-card p-4" aria-label="ECHO Music">
     <div className="flex items-center gap-2 text-sm font-semibold"><Music2 className="h-4 w-4 text-primary" /> Música</div>
     <p className="mt-1 text-xs text-muted-foreground">Elegí una canción compartida en ECHO para preparar un fragmento de audio, o agregá una etiqueta musical.</p>
+    <button type="button" onClick={() => { setShowMyLibrary(value => !value); setMyLibraryError(''); }} className="mt-3 flex h-11 w-full items-center gap-2 rounded-xl border border-border bg-secondary px-3 text-left text-sm"><Music2 className="h-4 w-4 text-primary" /> {showMyLibrary ? 'Cerrar Mi biblioteca' : 'Elegir de Mi biblioteca'}</button>
+    {myLibraryError && <p role="alert" className="mt-2 text-xs text-destructive">{myLibraryError}</p>}
+    {showMyLibrary && <div className="mt-3"><MusicLibraryPicker storyClip={story} onCancel={() => setShowMyLibrary(false)} onSelect={selection => {
+      // The existing post/story player serves explicitly published songs only.
+      // Private library entries cannot be attached until a surface-scoped
+      // private sharing flow is implemented and authorized.
+      const published = sharedTracks.find(item => item.id === selection.id);
+      if (!published) {
+        setMyLibraryError('Publicá primero esta canción desde ECHO Music para poder adjuntarla.');
+        return;
+      }
+      const clipSeconds: 15 | 30 = selection.clipDurationSeconds === 30 ? 30 : 15;
+      onTrackChange?.({ id: published.id, title: published.title, characterId: published.characterId,
+        durationSeconds: published.durationSeconds, startSeconds: selection.clipStartSeconds,
+        clipSeconds });
+      onTitleChange(published.title);
+      onArtistChange('ECHO Music');
+      setShowMyLibrary(false);
+      setMyLibraryError('');
+    }} /></div>}
     <div className="mt-3 rounded-xl border border-border bg-secondary/50 p-3">
       <p className="text-xs font-semibold">Canciones compartidas en ECHO</p>
       {libraryError && <p className="mt-2 text-xs text-destructive">{libraryError}</p>}
