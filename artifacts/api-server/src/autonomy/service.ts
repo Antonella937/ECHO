@@ -297,15 +297,9 @@ export async function runAutonomyLiveCycle(
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
-  // Separate per-character DM cadence and deterministic phase: avoids synchronized bursts.
-  if (dependencies.lane === "dm") {
-    const cadence = control.dmFrequency === "frequently" ? 60 : control.dmFrequency === "rarely" ? 360 : 180;
-    const phase = [...character.id].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) % cadence, 0);
-    const minute = Math.floor(now.getTime() / 60_000);
-    if (((minute - phase) % cadence + cadence) % cadence >= 10) {
-      return { status: "no_action", reasonCode: "DM_FREQUENCY_WINDOW", characterId: character.id, runId: null, model: null };
-    }
-  }
+  // DM replies must not wait for a narrow hourly phase. The policy already
+  // enforces per-character cooldown, daily caps and reply deduplication.
+  // Infrequent unsolicited outreach remains probabilistic in the DM lane.
 
   const reservation = await dependencies.repository.reserve(ownerId, character.id, input.idempotencyKey, snapshot.revision, universeId, dependencies.lane ?? "social");
   if (reservation.kind === "rate_limited") {
