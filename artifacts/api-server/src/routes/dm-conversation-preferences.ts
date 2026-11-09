@@ -35,13 +35,7 @@ dmConversationPreferencesRouter.get("/dm/conversation-preferences", async (req, 
     const saved = result.rows[0]?.preferences;
     const valid = preferences.safeParse(saved);
     if (valid.success) { res.json({ preferences: valid.data, inherited: false }); return; }
-    const global = await db.execute(sql`SELECT style, response_length, response_timing FROM echo_ai_style_preferences
-      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} LIMIT 1`);
-    const row = global.rows[0];
-    res.json({ preferences: row ? {
-      style: row.style, responseTiming: row.response_timing, responseLength: row.response_length,
-      autonomousInitiative: true,
-    } : defaults, inherited: true });
+    res.json({ preferences: defaults, inherited: false });
   } catch (error) {
     console.error("DM preferences operation failed", error);
     res.status(503).json({ error: "DM_PREFERENCES_UNAVAILABLE" });
