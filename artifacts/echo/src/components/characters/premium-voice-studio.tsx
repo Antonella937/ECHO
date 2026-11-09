@@ -204,8 +204,9 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
   return <section className="mt-6 space-y-4 rounded-2xl border border-primary/30 bg-card/60 p-4" data-testid="premium-voice-studio">
     <div className="flex items-center gap-2"><AudioLines className="h-5 w-5 text-primary"/><h3 className="text-sm font-semibold">{labels[0]}</h3></div>
     <p className="text-xs text-muted-foreground">{labels[1]}</p>
-    {catalogue.length>0&&<section className="space-y-3 rounded-xl border border-border p-3" data-testid="elevenlabs-premium-catalogue">
-      <h4 className="text-sm font-semibold">{language==='es'?'Voces ElevenLabs · Premium':'ElevenLabs voices · Premium'}</h4>
+    {(catalogueSelected||selectedCustomVoice)&&<p className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm" role="status">{language==='es'?(selectedCustomVoice?'✓ Voz personalizada activa para este personaje':'✓ Voz predeterminada activa para este personaje'):(selectedCustomVoice?'✓ Custom voice active for this character':'✓ Preset voice active for this character')}</p>}
+    {catalogue.length>0&&<details className="space-y-3 rounded-xl border border-border p-3" data-testid="elevenlabs-premium-catalogue">
+      <summary className="cursor-pointer text-sm font-semibold">{language==='es'?'Explorar voces predeterminadas':'Browse preset voices'}</summary>
       <p className="text-xs text-muted-foreground">{language==='es'?'Escuchá muestras existentes sin consumir créditos de generación. Las respuestas nuevas sí utilizan tu cuota.':'Play existing samples without generating audio. New voice replies still use your quota.'}</p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {catalogue.map(voice=><div key={voice.voiceId} className="space-y-2 rounded-xl border border-border p-3">
@@ -218,7 +219,7 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
           {catalogueAudio===voice.previewUrl&&<audio src={voice.previewUrl} autoPlay controls className="w-full" />}
         </div>)}
       </div>
-    </section>}
+    </details>}
     {(catalogueSelected||selectedCustomVoice)&&<div className="space-y-2 rounded-xl border border-primary/30 p-3">
       <p className="text-sm font-medium">{language==='es'?'Probar la voz elegida':'Test the selected voice'}</p>
       <p className="text-xs text-muted-foreground">{language==='es'?'Genera una frase corta real. Consume 2 créditos de ECHO y créditos de ElevenLabs; máximo dos pruebas cada 24 horas.':'Generates one real short phrase. Uses 2 ECHO credits and ElevenLabs credits; limited to two tests every 24 hours.'}</p>
@@ -226,7 +227,8 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       {voiceTestUrl&&<audio controls autoPlay src={voiceTestUrl} className="w-full"/>}
     </div>}
 
-    <div className="space-y-3 rounded-xl border border-border p-3" data-testid="premium-voice-autonomy-controls">
+    <details className="space-y-3 rounded-xl border border-border p-3" data-testid="premium-voice-autonomy-controls">
+      <summary className="cursor-pointer text-sm font-semibold">{language==='es'?'Ajustes avanzados · Audios automáticos':'Advanced settings · Automatic voice notes'}</summary>
       <h4 className="text-sm font-semibold">{language==='es'?'Audios automáticos en mensajes':'Automatic voice notes in messages'}</h4>
       <p className="text-xs text-muted-foreground">{language==='es'?'Desactivados por defecto. Para que un personaje mande audios espontáneos, habilitá este presupuesto y elegí «Voz» en sus preferencias de mensajes autónomos. Cada audio personalizado consume 2 créditos ECHO y cuota de ElevenLabs.':'Off by default. To send spontaneous audio, enable this budget and choose Voice in the character autonomous DM preferences. Each custom audio uses 2 ECHO credits plus ElevenLabs usage.'}</p>
       <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={voiceAutonomy.enabled} onChange={e=>{setVoiceAutonomy(v=>({...v,enabled:e.target.checked,preference:e.target.checked&&v.preference==='off'?'occasional':!e.target.checked?'off':v.preference}));setVoiceAutonomySaved(false);}} />{language==='es'?'Permitir notas de voz autónomas':'Allow autonomous voice notes'}</label>
@@ -237,8 +239,9 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       </div>}
       <button type="button" disabled={voiceAutonomySaving} onClick={()=>void saveVoiceAutonomy()} className="min-h-10 w-full rounded-lg border border-primary/40 px-3 text-sm text-primary disabled:opacity-50">{voiceAutonomySaving?'…':language==='es'?'Guardar límites de audio':'Save audio limits'}</button>
       {voiceAutonomySaved&&<p role="status" className="text-xs text-primary">{language==='es'?'Límites guardados':'Limits saved'}</p>}
-    </div>
+    </details>
 
+    <h4 className="text-sm font-semibold">{language==='es'?'Crear o cambiar voz personalizada':'Create or change a custom voice'}</h4>
     <div className="grid grid-cols-2 gap-2">
       <button type="button" aria-pressed={mode === 'prompt'} onClick={() => setMode('prompt')} className={`min-h-11 rounded-xl border px-3 text-sm ${mode === 'prompt' ? 'border-primary bg-primary/10' : 'border-border'}`}><Sparkles className="mr-1 inline h-4 w-4"/>{labels[2]}</button>
       <button type="button" aria-pressed={mode === 'reference'} onClick={() => setMode('reference')} className={`min-h-11 rounded-xl border px-3 text-sm ${mode === 'reference' ? 'border-primary bg-primary/10' : 'border-border'}`}><FileAudio className="mr-1 inline h-4 w-4"/>{labels[3]}</button>
