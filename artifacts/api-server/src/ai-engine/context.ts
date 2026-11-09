@@ -39,7 +39,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       break;
     case 'dm':
       rejectUnexpected('recipientId', 'storyId');
-      if (!recipient || recipient.id === actor.id || (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
+      if (!recipient || (recipient.personId || recipient.id) === (actor.personId || actor.id) || (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
       break;
     case 'like_post':
       rejectUnexpected('postId');
@@ -138,6 +138,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const otherAliasIds = new Set(personAccounts.map(account => account.id).filter(id => id !== actor.id));
   const aliasConversation = dmTargetId ? latest(state.messages.filter(m =>
     !m.hiddenForIds?.includes(actor.id) &&
+    !personAccounts.some(account => account.id !== actor.id && m.hiddenForIds?.includes(account.id)) &&
     ((otherAliasIds.has(m.senderId) && m.recipientId === dmTargetId) ||
      (otherAliasIds.has(m.recipientId) && m.senderId === dmTargetId))), 8) : [];
   const messages = dmTargetId ? latest(state.messages.filter(m =>
