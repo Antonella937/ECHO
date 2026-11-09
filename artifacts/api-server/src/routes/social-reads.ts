@@ -233,6 +233,18 @@ function projectStory(value: PlainRecord, highlighted: boolean): PlainRecord | n
     createdAt,
     highlighted,
   };
+  // Preserve only the public track reference and clip bounds. Never expose storage URLs.
+  const clip = asRecord(value.musicClip);
+  if (clip) {
+    const trackId = stringField(clip, "trackId");
+    const title = stringField(clip, "title");
+    const startSeconds = clip.startSeconds;
+    const clipSeconds = clip.clipSeconds;
+    if (trackId && title && typeof startSeconds === "number" && Number.isFinite(startSeconds)
+        && startSeconds >= 0 && (clipSeconds === 15 || clipSeconds === 30)) {
+      projected.musicClip = { trackId, title, startSeconds, clipSeconds };
+    }
+  }
   const music = asRecord(value.music);
   if (music) {
     const title = stringField(music, "title");
