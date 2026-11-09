@@ -57,12 +57,23 @@ export default function GroupConversationPage() {
     let active = true;
     const load = async () => {
       try {
-        const [groups, thread] = await Promise.all([
-          customFetch<{ groups: Group[] }>(`/api/group-dms?${scope}`, { method: 'GET', responseType: 'json' }),
-          customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/messages?${scope}`, { method: 'GET', responseType: 'json' }),
+        // Group metadata and messages must load independently: a temporary failure
+        // in one endpoint must not blank the whole conversation.
+        const [groupResult, threadResult] = await Promise.allSettled([
+          customFetch<{ groups: Group[] }>(`/api/group-dms?${scope}`, { method: 'GET', responseType: 'json', cache: 'no-store' }),
+          customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/messages?${scope}`, { method: 'GET', responseType: 'json', cache: 'no-store' }),
         ]);
-        if (active) { setGroup(groups.groups.find(g => g.id === id) ?? null); setMessages(thread.messages); setError(''); }
-      } catch { if (active) setError('No se pudo cargar el grupo.'); }
+        if (!active) return;
+        if (groupResult.status === 'fulfilled') {
+          const found = groupResult.value.groups.find(g => g.id === id);
+          if (found) setGroup(found);
+        }
+        if (threadResult.status === 'fulfilled') setMessages(threadResult.value.messages);
+        setError(groupResult.status === 'rejected' && threadResult.status === 'rejected'
+          ? 'No se pudo conectar con el grupo. Reintentando automáticamente…'
+          : threadResult.status === 'rejected' ? 'No se pudieron actualizar los mensajes. Reintentando…'
+          : groupResult.status === 'rejected' ? 'No se pudieron actualizar los datos del grupo. Reintentando…' : '');
+      } catch { if (active) setError('No se pudo cargar el grupo. Reintentando…'); }
     };
     void load();
     const interval = window.setInterval(() => void load(), 10000);
