@@ -40,18 +40,15 @@ export async function requestFalImage(input: {
     signal: AbortSignal.timeout(120_000),
   });
   if (!response.ok) {
-    // Log only validation field locations and types; never log private images, prompts or provider text.
     if (response.status === 422) {
+      // Read once: Response bodies cannot be consumed twice.
       const detail = await response.json().catch(() => null) as any;
-      const fields = Array.isArray(detail?.detail) ? detail.detail.slice(0, 8).map((e: any) => ({
+      const fields = Array.isArray(detail?.detail) ? detail.detail : [];
+      const safeFields = fields.slice(0, 8).map((e: any) => ({
         field: Array.isArray(e?.loc) ? e.loc.filter((x: unknown) => typeof x === 'string' || typeof x === 'number').slice(0, 5).join('.') : 'unknown',
         type: typeof e?.type === 'string' ? e.type.slice(0, 64) : 'unknown',
-      })) : [];
-      console.error('FAL_IMAGE_VALIDATION_FIELDS', JSON.stringify(fields));
-    }
-    if (response.status === 422) {
-      const detail = await response.clone().json().catch(() => null) as any;
-      const fields = Array.isArray(detail?.detail) ? detail.detail : [];
+      }));
+      console.error('FAL_IMAGE_VALIDATION_FIELDS', JSON.stringify(safeFields));
       if (fields.some((entry: any) => entry?.type === 'content_policy_violation')) {
         const rejected = fields.some((entry: any) => Array.isArray(entry?.loc) && entry.loc.includes('image_urls'))
           ? 'references' : 'prompt';
