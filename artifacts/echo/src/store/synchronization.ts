@@ -75,6 +75,18 @@ export class UniverseSync {
       this.base = recovery && !same(recovery.base, recovery.state) ? recovery.base : remote.state;
       this.view.state = recovery && !same(recovery.base, recovery.state)
         ? recovery.state : remote.state ?? this.seed();
+      // Recovery snapshots may predate highlights restored on the server.
+      // Hydrate server-owned collections before displaying the local draft:
+      // otherwise the UI stays empty while waiting for a sync (or conflicts).
+      if (remote.state && this.view.state) {
+        const localHighlights = this.view.state.highlights ?? [];
+        const remoteHighlights = remote.state.highlights ?? [];
+        const known = new Set(localHighlights.map(h => h.id));
+        this.view.state = {
+          ...this.view.state,
+          highlights: [...localHighlights, ...remoteHighlights.filter(h => !known.has(h.id))],
+        };
+      }
       this.view.state = repairOrphanedCharacterLinks(upgradeAccounts(this.view.state));
       await this.backup();
     } catch (e) { this.view.error = (e as Error).message; }
