@@ -180,13 +180,17 @@ export function chooseAutonomyOpportunity(input: {
   // Otherwise frequent DMs permanently suppress posts, likes and comments.
   const history = countRecentHistory(input.history, now).filter(event =>
     input.lane === "social" ? event.situation !== "dm" : true);
+  // User-authored posts, comments and stories must not exhaust the autonomous
+  // action budget. Keep their timestamps only for a short courtesy pause.
   const recentSocial = recentActorActivity(state, character.id, now).filter(time =>
     input.lane !== "social" || !state.messages.some(message =>
       message.senderId === character.id && message.origin !== "autonomy" && asTime(message.createdAt) === time));
+  const lastManualSocialActivity = input.lane === "social" ? Math.max(0, ...recentSocial) : 0;
+  const autonomousHistory = input.lane === "social" ? history : history;
   const latestActivity = Math.max(
-    ...recentSocial,
+    ...(input.lane === "social" ? [] : recentSocial),
     ...(input.lane === "social" ? [] : [asTime(config?.currentState?.lastActivityAt) ?? 0]),
-    ...history.map((event) => event.createdAt.getTime()),
+    ...autonomousHistory.map((event) => event.createdAt.getTime()),
     0,
   );
   // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
@@ -241,13 +245,19 @@ export function chooseAutonomyOpportunity(input: {
         localHour: local.hour, timezone };
     }
   }
+  // Social activity should have its own cadence, independent of DMs and
+  // manually authored content. Never silently extend the configured interval.
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
+  if (input.lane === "social" && lastManualSocialActivity > 0 &&
+      now.getTime() - lastManualSocialActivity < 15 * 60_000) {
+    return { situation: null, reasonCode: "COOLDOWN", reason: "Recent manual activity: short courtesy pause.", localHour: local.hour, timezone };
+  }
   if (latestActivity > 0 && now.getTime() - latestActivity < cooldownMs) {
     return { situation: null, reasonCode: "COOLDOWN", reason: "Minimum cooldown has not elapsed.", localHour: local.hour, timezone };
   }
   // Executed autonomous actions are already in history; do not count them twice
   // merely because their resulting posts/messages also exist in the state.
-  if (recentSocial.length + history.length >= (input.maxActionsPerDay ?? 2)) {
+  if ((input.lane === "social" ? history.length : recentSocial.length + history.length) >= (input.maxActionsPerDay ?? 2)) {
     return { situation: null, reasonCode: "DAILY_CAP", reason: "Character daily action cap reached.", localHour: local.hour, timezone };
   }
 
@@ -268,7 +278,7 @@ export function chooseAutonomyOpportunity(input: {
   if (social?.allowSilence) opportunityChance *= 0.82;
   if (local.hour < 6 || local.hour >= 23) opportunityChance *= 0.28;
   if (activeRoutine && !/free|leisure|social|salir|tiempo libre/i.test(String(activeRoutine.activity))) opportunityChance *= 0.6;
-  if (recentSocial.length > 0) opportunityChance *= 0.55;
+  if (input.lane !== "social" && recentSocial.length > 0) opportunityChance *= 0.55;
   opportunityChance = Math.max(0.04, Math.min(0.65, opportunityChance));
 
   if (random() >= opportunityChance) {
