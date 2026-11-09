@@ -3,9 +3,9 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db, echoImageBudgetMonthsTable, echoImageGenerationJobsTable } from '@workspace/db';
 
 export const MICRO_USD_PER_DOLLAR = 100_000_000;
-// Controlled public launch: maximum two paid attempts per authenticated account.
+// Controlled beta: maximum four paid attempts per authenticated account.
 // Enforced inside the same serialized transaction as the global budget reservation.
-export const IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER = 2;
+export const IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER = 4;
 export const monthKeyUtc = (date = new Date()) => date.toISOString().slice(0, 7);
 export const toMicroUsd = (usd: number) => {
   if (!Number.isFinite(usd) || usd < 0) throw Error('INVALID_IMAGE_COST');
