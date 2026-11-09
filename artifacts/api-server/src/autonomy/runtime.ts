@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { FreeModelProvider } from "../ai-engine/free-models";
+import { GeminiDmProvider } from "../ai-engine/gemini";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { executeAutonomyDecision } from "./executor";
 import { AUTONOMY_LIVE_EXECUTION_ENABLED } from "./constants";
@@ -22,7 +22,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { dispatchAutonomousVoice, getVoiceOwnerControls, resolveAutonomousVoiceId } from "./voice-adapter";
 
-const provider = new FreeModelProvider();
+const provider = new GeminiDmProvider();
 const repository: LiveAutonomyRepository = {
   read: readUniverse,
   readControls: readOwnerControls,
