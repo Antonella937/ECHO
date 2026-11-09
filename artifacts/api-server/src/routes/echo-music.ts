@@ -6,7 +6,7 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
-import { reserveMusicJob, submitReservedMusicJob, pollMusicJob } from "../lib/musicJobOrchestrator";
+import { reserveMusicJob, submitReservedMusicJob, pollMusicJob, resolveCharacterSingingVoice } from "../lib/musicJobOrchestrator";
 import { MUREKA_SONG_MODEL, MUREKA_INSTRUMENTAL_MODEL } from "../lib/murekaMusic";
 
 /**
@@ -756,17 +756,21 @@ router.post("/music/generate", async (req, res) => {
     const provider = composeMurekaRequest(draft);
     const characterId = draft.characterId;
     if (!characterId) { res.status(400).json({error:'CHARACTER_REQUIRED'}); return; }
-    const singingVoice = draft.vocalMode === 'singing' ? await db.execute(sql`
-      SELECT mureka_vocal_id FROM echo_character_singing_voices
-      WHERE owner_id=${req.userId!} AND character_id=${characterId} LIMIT 1
-    `) : null;
-    const savedVocalId = singingVoice?.rows[0]?.mureka_vocal_id;
-    if (draft.vocalMode === 'singing' && draft.requireConfiguredVoice && typeof savedVocalId !== 'string') {
-      res.status(409).json({error:'CHARACTER_SINGING_VOICE_NOT_CONFIGURED',charged:false}); return;
+    let savedVocalId: string | undefined;
+    try {
+      savedVocalId = await resolveCharacterSingingVoice(req.userId!, characterId, {
+        instrumental: draft.vocalMode === 'instrumental',
+        requireConfiguredVoice: draft.requireConfiguredVoice,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'CHARACTER_SINGING_VOICE_NOT_CONFIGURED') {
+        res.status(409).json({error:'CHARACTER_SINGING_VOICE_NOT_CONFIGURED',charged:false}); return;
+      }
+      throw error;
     }
     const jobInput = {
       ownerId: req.userId!, characterId, mode: 'manual' as const,
-      vocalId: typeof savedVocalId === 'string' ? savedVocalId : undefined,
+      vocalId: savedVocalId,
       title: draft.title, verifiedEntitlement: true, prompt: provider.prompt,
       lyrics: 'lyrics' in provider ? provider.lyrics : undefined,
       instrumental: draft.vocalMode === 'instrumental',
