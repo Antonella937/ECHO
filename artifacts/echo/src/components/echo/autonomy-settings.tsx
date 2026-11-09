@@ -7,23 +7,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetAutonomySettingsQueryKey,
   useGetAutonomySettings,
-  useRunAutonomyDryRun,
   useUpdateAutonomySettings,
 } from "@workspace/api-client-react";
-import type { AutonomyDryRunResult } from "@workspace/api-client-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import { getActiveUniverseId } from "@/store/persistence";
-
-const labels: Record<AutonomyDryRunResult["status"], string> = {
-  previewed: "Preview completado",
-  no_opportunity: "Decisión de silencio",
-  cooldown: "En pausa por cooldown",
-  rate_limited: "Límite alcanzado",
-  duplicate: "Solicitud duplicada",
-  in_progress: "Simulación en curso",
-};
 
 export function AutonomySettingsSection() {
   const t = useAdvancedSettingsText();
@@ -32,10 +20,6 @@ export function AutonomySettingsSection() {
   const client = useQueryClient();
   const query = useGetAutonomySettings({ universeId });
   const update = useUpdateAutonomySettings();
-  const dryRun = useRunAutonomyDryRun();
-  const [latest, setLatest] = useState<AutonomyDryRunResult | null>(null);
-  const [simulatingCharacterId, setSimulatingCharacterId] = useState<string | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
   const [updatingControl, setUpdatingControl] = useState<string | null>(null);
   const settings = query.data;
   const [dmDrafts, setDmDrafts] = useState<Record<string, { dmFrequency: "rarely" | "sometimes" | "frequently"; dmMediaPreference: "text" | "mixed" | "voice"; dmInstructions: string }>>({});
@@ -73,30 +57,6 @@ export function AutonomySettingsSection() {
       onError: () => toast({ title: t("No se pudieron guardar las preferencias de mensajes"), variant: "destructive" }),
       onSettled: () => setUpdatingControl(null),
     });
-  };
-
-  const runPreview = (characterId: string) => {
-    setLatest(null);
-    setPreviewError(null);
-    if (!globalThis.crypto?.randomUUID) {
-      toast({ title: t("Este navegador no permite iniciar una simulación segura"), variant: "destructive" });
-      return;
-    }
-    setSimulatingCharacterId(characterId);
-    dryRun.mutate(
-      { data: { characterId, idempotencyKey: globalThis.crypto.randomUUID(), universeId } },
-      {
-        onSuccess: (result) => { setPreviewError(null); setLatest(result); setSimulatingCharacterId(null); },
-        onError: (error) => {
-          const candidate = error as { data?: { error?: unknown }; response?: { data?: { error?: unknown } }; message?: unknown };
-          const code = candidate.data?.error ?? candidate.response?.data?.error;
-          const safeCode = typeof code === "string" && /^[A-Z][A-Z0-9_]{2,80}$/.test(code) ? code : "AUTONOMY_PREVIEW_UNAVAILABLE";
-          setPreviewError(safeCode);
-          setSimulatingCharacterId(null);
-          toast({ title: t("No se pudo completar la simulación"), description: `${t("Código:")} ${safeCode}. ${t("No se ejecutó ninguna acción social.")}`, variant: "destructive" });
-        },
-      },
-    );
   };
 
   return (
@@ -224,38 +184,6 @@ export function AutonomySettingsSection() {
         </div></details>
       </div>
 
-      {previewError && <div role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs" data-testid="autonomy-dry-run-error"><p className="font-semibold">{t("La simulación no se completó.")}</p><p className="mt-1">{t('Código:')} <code>{previewError}</code>. {t("No se ejecutó ninguna acción social.")}</p><button type="button" className="mt-2 underline" onClick={() => navigator.clipboard?.writeText(previewError)}>{t("Copiar código de error")}</button></div>}
-      {latest && (
-        <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4" aria-live="polite" data-testid="autonomy-dry-run-result">
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-sm font-semibold">
-              {t(labels[latest.status])} · {latest.preview
-                ? latest.preview.decision.action === "draft" ? t("borrador de texto")
-                  : latest.preview.decision.action === "like" ? t("me gusta propuesto")
-                    : latest.preview.decision.action === "react" ? `${t("reacción propuesta")} ${latest.preview.decision.reaction ?? ""}`
-                      : t("no actuar")
-                : t("sin llamada al modelo")}
-            </div>
-            <span className={cn("rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground")}>
-              {t("Solo preview")}
-            </span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{latest.reason}</p>
-          {latest.preview && (
-            <>
-              {latest.preview.decision.text && (
-                <p className="mt-3 whitespace-pre-wrap rounded-xl bg-background/70 p-3 text-[13px] leading-relaxed">
-                  {latest.preview.decision.text}
-                </p>
-              )}
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{latest.preview.decision.reason}</p>
-            </>
-          )}
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            {t("No se publicó, envió, gustó ni reaccionó nada. Ejecución en vivo: desactivada.")}
-          </p>
-        </div>
-      )}
     </section>
   );
 }
