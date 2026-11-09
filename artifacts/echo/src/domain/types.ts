@@ -143,6 +143,8 @@ export interface Story {
 }
 
 export interface Message {
+  musicTrackId?: string;
+  musicTitle?: string;
   editedAt?: ISODate;
   savedByIds?: string[];
   /** Per-character visibility only. Never removes the other participant's copy. */
