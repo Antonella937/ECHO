@@ -18,7 +18,8 @@ export function HighlightsRow({ authorId, isMe }: { authorId: string; isMe: bool
   const { openStoryList } = useStoryViewer();
   const [editing, setEditing] = useState<StoryHighlight | 'new' | null>(null);
   const [unavailable, setUnavailable] = useState<Record<string, string[]>>({});
-  const highlights = getOrderedHighlights(state, authorId).filter(h => isMe || h.storyIds.some(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }));
+  // Cover-only highlights remain visible on linked profiles even before stories are added.
+  const highlights = getOrderedHighlights(state, authorId).filter(h => isMe || (h.storyIds.length === 0 && Boolean(h.coverImage)) || h.storyIds.some(id => { const s = state.stories.find(st => st.id === id); return s && canViewStory(s, me.id, state); }));
   const own = state.stories.filter((s) => s.authorId === authorId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!isMe && !highlights.length) return null;
 
