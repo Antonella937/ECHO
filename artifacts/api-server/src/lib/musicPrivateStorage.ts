@@ -21,7 +21,8 @@ function providerUrl(raw: string): URL {
 function storageConfig() {
   const base = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  const bucket = process.env.ECHO_MUSIC_STORAGE_BUCKET?.trim();
+  // Reuse the existing private ECHO media bucket unless explicitly overridden.
+  const bucket = process.env.ECHO_MUSIC_STORAGE_BUCKET?.trim() || "echo-media";
   if (!base || !key || !bucket || !/^[a-zA-Z0-9_-]{1,80}$/.test(bucket)) {
     throw new Error("MUSIC_PRIVATE_STORAGE_NOT_CONFIGURED");
   }
