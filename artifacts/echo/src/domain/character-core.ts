@@ -186,7 +186,7 @@ export function duplicateCharacter(state: SocialState, id: string, newId: string
   config.currentState = defaultCharacterConfig(original).currentState;
   let n = 1, handle: string;
   do { handle = `${original.handle.slice(0, 22)}_copia${n++}`; } while (state.characters.some(c => c.handle === handle));
-  return { ...structuredClone(original), id: newId, name: `${original.name.slice(0, 73)} (copia)`, handle,
+  return { ...structuredClone(original), id: newId, personId: newId, accountContext: undefined, name: `${original.name.slice(0, 73)} (copia)`, handle,
     configuration: config, verified: false, archived: false, displayMetrics: { followers: null, following: null },
     providerRef: defaultProvider(), identity: { ...original.identity, referenceImages: [], appearance: '', styleNotes: '' } };
 }
