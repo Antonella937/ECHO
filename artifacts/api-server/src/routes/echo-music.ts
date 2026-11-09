@@ -128,6 +128,40 @@ const musicShareRequest = z.object({
   clipStartSeconds: z.number().int().min(0).default(0),
   clipDurationSeconds: z.number().int().min(1).max(60).nullable().default(null),
 }).strict();
+// List only the authenticated account's saved share drafts. No publication
+// or DM delivery occurs here; the surface-specific API must authorize that.
+router.get("/music/share-references", async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT s.id, s.track_id AS "trackId", s.surface,
+        s.target_id AS "targetId", s.clip_start_seconds AS "clipStartSeconds",
+        s.clip_duration_seconds AS "clipDurationSeconds",
+        l.title, l.character_id AS "characterId", l.duration_seconds AS "durationSeconds"
+      FROM echo_music_shares s
+      JOIN echo_music_library l ON l.owner_id=s.owner_id AND l.id=s.track_id
+      WHERE s.owner_id=${req.userId!}
+      ORDER BY s.created_at DESC LIMIT 100
+    `);
+    res.json({ references: result.rows });
+  } catch (error) {
+    req.log.error({ err: error }, "Music share reference listing failed");
+    res.status(503).json({ error: "MUSIC_SHARE_REFERENCES_UNAVAILABLE" });
+  }
+});
+router.delete("/music/share-reference/:id", async (req, res) => {
+  const parsed = z.string().uuid().safeParse(req.params.id);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_SHARE_ID" }); return; }
+  try {
+    const result = await db.execute(sql`
+      DELETE FROM echo_music_shares WHERE id=${parsed.data}::uuid
+        AND owner_id=${req.userId!} RETURNING id
+    `);
+    res.json({ deleted: result.rows.length > 0, publishedContentDeleted: false });
+  } catch (error) {
+    req.log.error({ err: error }, "Music share reference deletion failed");
+    res.status(503).json({ error: "MUSIC_SHARE_REFERENCE_DELETE_UNAVAILABLE" });
+  }
+});
 router.post("/music/share-reference", async (req, res) => {
   const parsed = musicShareRequest.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_SHARE" }); return; }
