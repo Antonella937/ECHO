@@ -40,7 +40,9 @@ function falAudioUrl(value: unknown): string {
 export function parseMurekaSongResult(data: unknown): MurekaSongResult {
   if (!data || typeof data !== "object") throw new Error("MUREKA_RESULT_INVALID");
   const result = data as Record<string, unknown>;
-  // The queue result may be returned as a direct payload or wrapped in data.\n  const payload = result.data && typeof result.data === "object" ? result.data as Record<string, unknown> : result;\n  const audio = payload.audio;
+  // The queue result may be returned as a direct payload or wrapped in data.
+  const payload = result.data && typeof result.data === "object" ? result.data as Record<string, unknown> : result;
+  const audio = payload.audio;
   if (!audio || typeof audio !== "object") throw new Error("MUREKA_AUDIO_MISSING");
   const file = audio as Record<string, unknown>;
   const duration = typeof payload.duration === "number" && Number.isFinite(payload.duration)
