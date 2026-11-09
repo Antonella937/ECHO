@@ -4,6 +4,9 @@ export const AUTONOMY_WORKER_INTERVAL_MS = 2 * 60_000;
 const WORKER_LEASE_MS = 10 * 60_000;
 const SOCIAL_INTERVAL_MS = 30 * 60_000;
 const CHARACTER_TIMEOUT_MS = 45_000;
+const FAILED_CHARACTER_BACKOFF_MS = 15 * 60_000;
+// Only background scans back off; event-driven instant replies remain available.
+const backgroundFailureUntil = new Map<string, number>();
 
 // A stalled provider must not block all other characters indefinitely.
 // The original operation may still settle; reservation/idempotency protects
@@ -81,17 +84,22 @@ export async function runAutonomyWorkerTick(input: {
       const digest = createHash("sha256").update(`dm:${slot}:${characterHash}`).digest("hex");
       // Deterministic RFC 4122 UUID: the API requires UUID keys, including worker runs.
       const idempotencyKey = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+      const failureKey = `${target.ownerId}:${target.universeId}:${target.characterId}:dm`;
+      if ((backgroundFailureUntil.get(failureKey) ?? 0) > now.getTime()) { noAction++; continue; }
       evaluated += 1;
       try {
         const result = await boundedCharacterRun(() => input.processCharacter(
           target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane }, now,
         ));
+        if (result.status === "failed") backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS);
+        else backgroundFailureUntil.delete(failureKey);
         if (result.status === "executed") executed += 1;
         else if (result.status === "no_action" || result.status === "disabled" ||
           result.status === "rate_limited" || result.status === "duplicate" ||
           result.status === "in_progress") noAction += 1;
         else failed += 1;
       } catch {
+        backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS);
         failed += 1;
       }
     }
@@ -101,13 +109,17 @@ export async function runAutonomyWorkerTick(input: {
         if (target.socialEnabled === false) continue;
         const hash = createHash("sha256").update(`social:${socialSlot}:${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex");
         const idempotencyKey = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+        const failureKey = `${target.ownerId}:${target.universeId}:${target.characterId}:social`;
+        if ((backgroundFailureUntil.get(failureKey) ?? 0) > now.getTime()) { noAction++; continue; }
         evaluated++;
         try {
           const result = await boundedCharacterRun(() => input.processCharacter(target.ownerId, { universeId: target.universeId, characterId: target.characterId, idempotencyKey, lane: "social" }, now));
+          if (result.status === "failed") backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS);
+          else backgroundFailureUntil.delete(failureKey);
           if (result.status === "executed") executed++;
           else if (result.status === "failed") failed++;
           else noAction++;
-        } catch { failed++; }
+        } catch { backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS); failed++; }
       }
     }
     return { status: "completed", evaluated, executed, noAction, failed };
