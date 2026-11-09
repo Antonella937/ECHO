@@ -149,15 +149,35 @@ router.get("/music/published/:id/audio", async (req, res) => {
   } catch (error) { req.log.error({ err: error }, "Music stream failed"); if (!res.headersSent) res.status(503).json({ error: "MUSIC_STREAM_UNAVAILABLE" }); }
 });
 
+// ECHO Music commercial configuration. Read-only until a verified provider,
+// subscription billing, and an atomic server-side credit ledger are enabled.
+const MUSIC_PLAN = Object.freeze({
+  monthlyUsd: 9.99,
+  manualGenerationsPerMonth: 10,
+  autonomousGenerationsPerMonth: 1,
+  autonomousCooldownDays: 7,
+  purchasedCreditsExpire: false,
+  autonomousPacks: [
+    { generations: 1, priceUsd: 0.99 },
+    { generations: 3, priceUsd: 2.49 },
+    { generations: 5, priceUsd: 3.99 },
+  ],
+});
+router.get("/music/plan", (_req, res) => {
+  res.json({ plan: MUSIC_PLAN, billingEnabled: false, generationEnabled: false,
+    autonomousGenerationEnabled: false, purchasesEnabled: false,
+    providerValidationPending: true });
+});
+
 router.get("/music/status", (_req, res) => {
   res.json({
     addon: "echo_music",
     addonRequired: true,
     activated: false,
     generationEnabled: false,
-    provider: "elevenlabs_music",
-    model: "music_v2_5",
-    providerConfigured: Boolean(process.env.ELEVENLABS_API_KEY?.trim()),
+    provider: "unselected",
+    model: null,
+    providerConfigured: false,
     providerRequestsEnabled: false,
     paidCallsMade: 0,
     creditsSharedWithVoices: false,
