@@ -22,6 +22,11 @@ export function MusicClipPlayer({ clip, compact = false }: { clip: MusicClip; co
       }).catch(() => { if (active) setError('Audio no disponible'); });
     return () => { active = false; audio.current?.pause(); if (url) URL.revokeObjectURL(url); };
   }, [clip.trackId]);
+  useEffect(() => {
+    if (!audio.current || !src) return;
+    audio.current.pause();
+    audio.current.currentTime = Math.min(clip.startSeconds, Math.max(0, (audio.current.duration || clip.startSeconds + clip.clipSeconds) - 0.1));
+  }, [src, clip.startSeconds, clip.clipSeconds]);
   const toggle = async () => {
     if (!audio.current || !src) return;
     if (!audio.current.paused) { audio.current.pause(); return; }
