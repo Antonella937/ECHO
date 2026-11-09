@@ -5,6 +5,8 @@
 export const MUREKA_SONG_MODEL = "mureka/v8/generate/song";
 export const MUREKA_INSTRUMENTAL_MODEL = "mureka/v8/generate/instrumental";
 export type MurekaModel = typeof MUREKA_SONG_MODEL | typeof MUREKA_INSTRUMENTAL_MODEL;
+// fal queue status/result routes use owner/app, not the submit endpoint suffix.
+const queueApp = (model: MurekaModel) => model.split("/").slice(0, 2).join("/");
 function assertModel(model: MurekaModel): void {
   if (model !== MUREKA_SONG_MODEL && model !== MUREKA_INSTRUMENTAL_MODEL) throw new Error("MUREKA_MODEL_NOT_ALLOWED");
 }
@@ -72,7 +74,7 @@ export async function submitMurekaSong(input: MurekaSongInput, model: MurekaMode
 export async function checkMurekaSong(requestId: string, model: MurekaModel = MUREKA_SONG_MODEL): Promise<"IN_QUEUE" | "IN_PROGRESS" | "COMPLETED"> {
   assertModel(model);
   if (!/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)) throw new Error("MUREKA_REQUEST_ID_INVALID");
-  const response = await fetch(`https://queue.fal.run/${model}/requests/${requestId}/status`, {
+  const response = await fetch(`https://queue.fal.run/${queueApp(model)}/requests/${requestId}/status`, {
     headers: falHeaders(), signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new Error(`MUREKA_STATUS_HTTP_${response.status}`);
@@ -85,7 +87,7 @@ export async function checkMurekaSong(requestId: string, model: MurekaModel = MU
 export async function fetchMurekaSongResult(requestId: string, model: MurekaModel = MUREKA_SONG_MODEL): Promise<MurekaSongResult> {
   assertModel(model);
   if (!/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)) throw new Error("MUREKA_REQUEST_ID_INVALID");
-  const response = await fetch(`https://queue.fal.run/${model}/requests/${requestId}`, {
+  const response = await fetch(`https://queue.fal.run/${queueApp(model)}/requests/${requestId}`, {
     headers: falHeaders(), signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) throw new Error(`MUREKA_RESULT_HTTP_${response.status}`);
