@@ -53,7 +53,7 @@ export interface SocialActions {
   deleteStory(storyId: string): void;
   toggleCloseFriend(characterId: string): void;
   seeStory(storyId: string): void;
-  sendMessage(to: CharacterId, text: string, extra?: { storyId?: string; postId?: string; quoteMessageId?: string; attachments?: MessageAttachment[] }): void;
+  sendMessage(to: CharacterId, text: string, extra?: { storyId?: string; postId?: string; quoteMessageId?: string; attachments?: MessageAttachment[]; musicTrackId?: string; musicTitle?: string }): void;
   markThreadRead(otherId: CharacterId): void;
   markNotificationRead(id: string): void;
   markAllNotificationsRead(): void;
@@ -150,7 +150,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     const myId = () => cur().currentCharacterId;
     const send: SocialActions['sendMessage'] = (to, text, extra) => {
       if (!cur().characters.some(c => c.id === to && !c.archived) || to === myId()) throw new Error('Elegí una cuenta disponible.');
-      if (!text.trim() && !extra?.attachments?.length && !extra?.postId && !extra?.storyId) return;
+      if (!text.trim() && !extra?.attachments?.length && !extra?.postId && !extra?.storyId && !extra?.musicTrackId) return;
       if (extra?.quoteMessageId && !cur().messages.some(m => m.id === extra.quoteMessageId && m.threadId === threadIdFor(myId(), to)))
         throw new Error('La cita debe pertenecer a esta conversación.');
       // Sending a reply means the sender has already engaged with this thread.
@@ -163,7 +163,8 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       dispatch({ type: 'message.sent', message: { id: uid('m'), threadId, senderId: myId(), recipientId: to,
         text: text.trim(), createdAt: new Date().toISOString(), storyId: extra?.storyId ?? null, postId: extra?.postId ?? null,
         readBy: [myId()], origin: 'user', ...(extra?.quoteMessageId ? { quoteMessageId: extra.quoteMessageId } : {}),
-        ...(extra?.attachments?.length ? { attachments: extra.attachments } : {}) } });
+        ...(extra?.attachments?.length ? { attachments: extra.attachments } : {}),
+        ...(extra?.musicTrackId ? { musicTrackId: extra.musicTrackId, musicTitle: extra.musicTitle ?? 'ECHO Music' } : {}) } });
     };
     return {
       createAccount(input) {
