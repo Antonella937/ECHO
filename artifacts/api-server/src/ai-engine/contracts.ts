@@ -3,7 +3,7 @@ import type { CharacterContextAudit } from '@workspace/api-zod';
 /** Provider boundary: text in, text out. No social mutation capability. */
 export interface TextProvider {
   readonly name: string;
-  complete(input: { system: string; context: string; outputSchema: Record<string, unknown>; validate?: (text: string) => void }): Promise<{
+  complete(input: { system: string; context: string; outputSchema: Record<string, unknown>; validate?: (text: string) => void; conversationMode?: 'natural' | 'narrative' }): Promise<{
     text: string; model: string; usage?: EngineUsage; attempts?: EngineAttempt[];
   }>;
 }
