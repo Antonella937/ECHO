@@ -229,6 +229,10 @@ export default function CreatePage() {
         }
         if (storyVideo) { setError(t('Las historias admiten solo fotos.')); return; }
         if (musicPartial) { setError(t("Completá título y artista de la música, o dejá ambos vacíos.")); return; }
+        if (!musicClip && musicTitle.trim().toLowerCase() === 'static in my veins') {
+          setError('La canción figura en el texto, pero no tiene un fragmento de audio adjunto. Volvé a elegirla en Canciones compartidas en ECHO antes de publicar.');
+          return;
+        }
         actions.createStory({ image, caption, closeFriendsOnly, ...(musicClip ? { musicClip } : {}), ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: t('Historia publicada'), description: `${t('Como')} ${me.name}` });
