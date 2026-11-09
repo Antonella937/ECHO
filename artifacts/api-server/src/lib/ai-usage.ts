@@ -89,11 +89,13 @@ export async function reserveAiUsage(ownerId: string, category: AiUsageCategory,
     const autonomyReserveUnits = Math.min(ceiling, Math.max(1, Math.ceil(ceiling * autonomyReservePercent / 100)));
     const categoryBudget = Math.max(0, ceiling - autonomyReserveUnits);
     let blocked: AiBudgetExceededError["code"] | null = null;
-    if (used + weight > ceiling) {
+    // Founder testing is exempt from internal unit ceilings; provider limits still apply.
+    const founderExempt = ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ";
+    if (!founderExempt && used + weight > ceiling) {
       blocked = "AI_MONTHLY_HARD_CEILING";
-    } else if (category === "autonomy" && autonomyUsed + weight > categoryBudget) {
+    } else if (!founderExempt && category === "autonomy" && autonomyUsed + weight > categoryBudget) {
       blocked = "AUTONOMY_BUDGET_PROTECTED";
-    } else if (category !== "autonomy" && nonAutonomyUsed + weight > categoryBudget) {
+    } else if (!founderExempt && category !== "autonomy" && nonAutonomyUsed + weight > categoryBudget) {
       blocked = "AUTONOMY_BUDGET_RESERVED";
     }
     await tx.insert(echoAiUsageEventsTable).values({
