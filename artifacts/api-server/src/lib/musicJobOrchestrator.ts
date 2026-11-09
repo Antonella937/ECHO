@@ -43,6 +43,15 @@ function firstValue(result: {rows: Record<string, unknown>[]}, key: string): str
 export async function reserveMusicJob(input: MusicJobInput): Promise<{ jobId: string; status: string }> {
   validOwner(input.ownerId, input.characterId);
   if (!input.verifiedEntitlement) throw new Error("MUSIC_ENTITLEMENT_REQUIRED");
+  // Autonomous singers must have a reusable voice before any credit is reserved.
+  // A caller-provided ID cannot override the character's saved voice.
+  if (input.mode === "autonomous" && !input.instrumental) {
+    const savedVoice = await resolveCharacterSingingVoice(input.ownerId, input.characterId, {
+      instrumental: false, requireConfiguredVoice: true,
+    });
+    if (input.vocalId && input.vocalId !== savedVoice) throw new Error("MUSIC_CHARACTER_VOICE_MISMATCH");
+    input.vocalId = savedVoice;
+  }
   const jobId = randomUUID();
   const result = await db.execute(sql`
     SELECT echo_music_reserve_monthly(${jobId}::uuid,${input.ownerId},${input.characterId},
@@ -59,6 +68,13 @@ export async function reserveMusicJob(input: MusicJobInput): Promise<{ jobId: st
 export async function submitReservedMusicJob(input: MusicJobInput, jobId: string): Promise<string> {
   validOwner(input.ownerId, input.characterId);
   if (!input.verifiedEntitlement) throw new Error("MUSIC_ENTITLEMENT_REQUIRED");
+  if (input.mode === "autonomous" && !input.instrumental) {
+    const savedVoice = await resolveCharacterSingingVoice(input.ownerId, input.characterId, {
+      instrumental: false, requireConfiguredVoice: true,
+    });
+    if (input.vocalId && input.vocalId !== savedVoice) throw new Error("MUSIC_CHARACTER_VOICE_MISMATCH");
+    input.vocalId = savedVoice;
+  }
   const claim = await db.execute(sql`
     UPDATE echo_music_generation_jobs SET status='processing',updated_at=now()
     WHERE id=${jobId}::uuid AND owner_id=${input.ownerId} AND character_id=${input.characterId}
