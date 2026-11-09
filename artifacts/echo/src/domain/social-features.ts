@@ -8,7 +8,13 @@ export const isStoryActive = (s: Story, now = Date.now()) => {
   return age >= 0 && age < 24 * 60 * 60 * 1000;
 };
 export function canViewStory(story: Story, viewerId: string, state: SocialState): boolean {
-  if (story.authorId === viewerId || !story.closeFriendsOnly) return true;
+  if (story.authorId === viewerId) return true;
+  const author = state.characters.find((c) => c.id === story.authorId);
+  if (!author) return false;
+  // A pending follow request is not permission to view a private account.
+  const followsAuthor = (state.follows[viewerId] ?? []).includes(story.authorId);
+  if (author.privateAccount && !followsAuthor) return false;
+  if (!story.closeFriendsOnly) return true;
   const current = state.closeFriends?.[story.authorId] ?? [];
   return current.includes(viewerId) && (story.allowedViewerIds ?? current).includes(viewerId);
 }
