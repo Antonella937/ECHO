@@ -202,7 +202,20 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         return id;
       },
       updateAccount(id, input, expected) {
-        const next = editAccount(cur(), id, input, expected);
+        const existing = cur().characters.find(c => c.id === id);
+        if (!existing) throw Error('La cuenta ya no existe.');
+        const primary = existing.personId && existing.personId !== id
+          ? cur().characters.find(c => c.id === existing.personId)
+          : undefined;
+        // Alternate accounts cannot fork the shared personality or visual reference.
+        // Their profile fields stay independently editable.
+        const accountInput = primary
+          ? { ...input, configuration: existing.configuration, identity: existing.identity }
+          : input;
+        const accountExpected = primary && expected
+          ? { ...expected, configuration: existing.configuration, identity: existing.identity }
+          : expected;
+        const next = editAccount(cur(), id, accountInput, accountExpected);
         coordinator.current?.edit(() => next);
       },
       duplicateAccount(id) {
