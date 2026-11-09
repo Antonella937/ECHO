@@ -138,13 +138,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {(user?.id === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' || user?.id === 'user_3LfRV9oK9WP655tpVF3kavfwgtx') && (
-          <Link href="/settings/image-storage-diagnostic" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-image-storage-diagnostic">
-            <span>{language === 'es' ? 'Diagnóstico de imágenes' : 'Image storage diagnostic'}</span>
-            <span className="text-xs text-muted-foreground">Supabase · Neon ›</span>
-          </Link>
-        )}
-
         <section className="mt-9" aria-labelledby="storage-h">
           <h2 id="storage-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Almacenamiento")}</h2>
           <div className="mt-3 rounded-2xl border border-border p-4 text-[13px]">
