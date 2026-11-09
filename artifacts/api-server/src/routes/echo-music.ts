@@ -364,6 +364,25 @@ const MUSIC_PLAN = Object.freeze({
 // must be atomically reserved before enabling the paid provider adapter.
 // Until billing and quota enforcement are implemented, no reservation endpoint
 // is exposed and the paid generation route remains locked.
+// Read-only, server-authoritative access. Checkout must be confirmed by a
+// trusted payment webhook before this table is marked active.
+router.get("/music/entitlement", async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT status, current_period_end AS "periodEnd"
+      FROM echo_music_entitlements WHERE owner_id=${req.userId!} LIMIT 1
+    `);
+    const record = result.rows[0] as {status?: string;periodEnd?: string | Date | null}|undefined;
+    const validPeriod = !record?.periodEnd || new Date(record.periodEnd).getTime() > Date.now();
+    const active = Boolean(record && ['active','trialing'].includes(record.status || '') && validPeriod);
+    res.json({ active, status: active ? record!.status : 'inactive',
+      checkoutAvailable: false, priceUsdMonthly: 9.99,
+      message: active ? null : 'Subscription checkout is not active yet.' });
+  } catch (error) {
+    req.log.error({err:error}, 'Music entitlement lookup failed');
+    res.status(503).json({error:'MUSIC_ENTITLEMENT_UNAVAILABLE'});
+  }
+});
 router.get("/music/plan", (_req, res) => {
   res.json({ plan: MUSIC_PLAN, billingEnabled: false, generationEnabled: false,
     autonomousGenerationEnabled: false, purchasesEnabled: false,
