@@ -57,6 +57,11 @@ const musicEnglish: Record<string,string> = {
   "Descargar": "Download",
   "Guardar voz": "Save voice",
   "Voz cantada vinculada": "Singing voice linked",
+  "Identidad vocal": "Voice identity",
+  "Voz hablada y cantada configuradas; timbre aún sin verificar": "Speech and singing voices configured; timbre not yet verified",
+  "Voz hablada configurada; falta vincular la cantada": "Speech voice configured; singing voice not linked",
+  "Voz cantada configurada; falta configurar la hablada": "Singing voice configured; speech voice not configured",
+  "Sin identidad vocal configurada": "No voice identity configured",
   "Vincular voz existente": "Link existing voice",
   "ID de voz de Mureka": "Mureka voice ID",
   "Guardar vínculo": "Save voice link",
@@ -369,6 +374,7 @@ export default function EchoMusicPage() {
   const [mood, setMood] = useState('');
   const [vocalMode, setVocalMode] = useState<'instrumental' | 'singing'>('instrumental');
   const [singingVoiceId, setSingingVoiceId] = useState<string | null>(null);
+  const [voiceConsistency, setVoiceConsistency] = useState('unconfigured');
   const [protectSingingVoice, setProtectSingingVoice] = useState(true);
   const [voiceLinkId, setVoiceLinkId] = useState('');
   const [voiceLinkConsent, setVoiceLinkConsent] = useState(false);
@@ -380,7 +386,7 @@ export default function EchoMusicPage() {
     try {
       await customFetch('/api/music/voices', {method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
         body:JSON.stringify({characterId:me.id,vocalId:voiceLinkId,consentConfirmed:true})});
-      setSingingVoiceId(voiceLinkId); setVoiceLinkId(''); setVoiceLinkConsent(false);
+      setSingingVoiceId(voiceLinkId); setVoiceConsistency(voiceConsistency==='speech_only'?'both_configured_unverified':'singing_only'); setVoiceLinkId(''); setVoiceLinkConsent(false);
     } catch (error) { setVoiceLinkError(error instanceof Error ? error.message : t('No se pudo vincular la voz')); }
     finally {setVoiceLinkBusy(false);}
   }
@@ -388,8 +394,8 @@ export default function EchoMusicPage() {
     let active = true;
     if (!me?.id) return;
     setSingingVoiceId(null);
-    customFetch<{vocalId:string|null}>('/api/music/voices/' + encodeURIComponent(me.id), {responseType:'json'})
-      .then(data => {if(active) setSingingVoiceId(data.vocalId ?? null);}).catch(() => {});
+    customFetch<{vocalId:string|null;consistencyStatus?:string}>('/api/music/voices/' + encodeURIComponent(me.id), {responseType:'json'})
+      .then(data => {if(active) {setSingingVoiceId(data.vocalId ?? null);setVoiceConsistency(data.consistencyStatus ?? 'unconfigured');}}).catch(() => {});
     return () => {active = false;};
   }, [me?.id]);
   const [lyrics, setLyrics] = useState('');
@@ -590,6 +596,8 @@ export default function EchoMusicPage() {
       <label className="block space-y-1 text-sm font-medium">{t("Duración estimada")}<select className={field} value={durationSeconds} onChange={e => setDurationSeconds(Number(e.target.value))}>{[30,60,120,180,240,300].map(seconds => <option key={seconds} value={seconds}>{seconds < 60 ? `${seconds}${t(" segundos")}` : `${seconds/60}${t(seconds===60 ? " minuto" : " minutos")}`}</option>)}</select></label>
       <fieldset className="space-y-2"><legend className="text-sm font-medium">{t("Tipo de canción")}</legend><div className="flex gap-3">{(['instrumental','singing'] as const).map(mode=><label key={mode} className="flex items-center gap-2 text-sm"><input type="radio" checked={vocalMode===mode} onChange={()=>setVocalMode(mode)} />{mode==='instrumental'?t('Instrumental'):t('Con voz')}</label>)}</div></fieldset>
       {vocalMode==='singing' && <div className="rounded-xl border border-border p-3 space-y-2 text-sm">
+        <p className="font-semibold">{t("Identidad vocal")}</p>
+        <p className="text-xs text-muted-foreground">{t(voiceConsistency==='both_configured_unverified'?'Voz hablada y cantada configuradas; timbre aún sin verificar':voiceConsistency==='speech_only'?'Voz hablada configurada; falta vincular la cantada':voiceConsistency==='singing_only'?'Voz cantada configurada; falta configurar la hablada':'Sin identidad vocal configurada')}</p>
         <p className="font-semibold">{singingVoiceId ? t("Voz cantada vinculada") : t("Sin voz cantada configurada")}</p>
         <label className="flex items-center gap-2"><input type="checkbox" checked={protectSingingVoice} onChange={event => setProtectSingingVoice(event.target.checked)}/>{t("Proteger identidad vocal")}</label>
         <p className="text-xs text-muted-foreground">{t("Evita generar canciones cantadas con una voz diferente a la del personaje.")}</p>
