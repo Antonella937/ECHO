@@ -725,13 +725,29 @@ export function createCreatorHubSocialRouter(): IRouter {
   });
   // Account-level, one-time onboarding. No public post or social notification is created.
   router.post("/creator-hub/social/claim-welcome", async (req, res) => {
-    const user = await clerkClient.users.getUser(req.userId!);
+    const ownerId = req.userId!;
+    const user = await clerkClient.users.getUser(ownerId);
+    // Existing accounts already marked in Clerk must never be welcomed again,
+    // even if the database claim is new or the client changes devices.
     if (user.privateMetadata?.echoWelcomeShown === true) {
+      await pool.query("INSERT INTO echo_welcome_claims (owner_id) VALUES ($1) ON CONFLICT DO NOTHING", [ownerId]);
       res.json({ show: false }); return;
     }
-    await clerkClient.users.updateUserMetadata(req.userId!, {
-      privateMetadata: { echoWelcomeShown: true },
-    });
+    // Database uniqueness makes the claim atomic across tabs, devices and requests.
+    const claim = await pool.query(
+      "INSERT INTO echo_welcome_claims (owner_id) VALUES ($1) ON CONFLICT DO NOTHING RETURNING owner_id",
+      [ownerId],
+    );
+    if (claim.rowCount === 0) { res.json({ show: false }); return; }
+    try {
+      await clerkClient.users.updateUserMetadata(ownerId, {
+        privateMetadata: { echoWelcomeShown: true },
+      });
+    } catch (error) {
+      // The database claim is authoritative; a transient Clerk metadata failure
+      // must not cause the welcome to repeat.
+      console.warn("Welcome metadata sync failed", error);
+    }
     res.json({ show: true });
   });
   const announcementPreferenceSchema = z.object({ subscribed: z.boolean() }).strict();
