@@ -18,6 +18,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
   const [prefs, setPrefs] = useState<Preferences>(defaults);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [dmEnabled, setDmEnabled] = useState(false);
   const [allowedPeers, setAllowedPeers] = useState<string[]>([]);
   const [permissionsStatus, setPermissionsStatus] = useState('');
@@ -25,6 +26,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
     if (!open || !user?.id) return;
     let active = true;
     setStatus('');
+    setSaved(false);
     customFetch<{ preferences: Preferences }>(`/api/dm/conversation-preferences?${new URLSearchParams({universeId, characterId})}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
       .then(result => { if (active) { setPrefs({ ...defaults, ...result.preferences }); } })
       .catch(() => { if (active) setStatus(t('failed')); });
@@ -34,7 +36,8 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
     return () => { active = false; };
   }, [open, user?.id, universeId, characterId]);
   if (!open) return null;
-  const update = <K extends keyof Preferences>(field: K, value: Preferences[K]) => setPrefs(p => ({ ...p, [field]: value }));
+  const markDirty = () => { setSaved(false); setStatus(''); };
+  const update = <K extends keyof Preferences>(field: K, value: Preferences[K]) => { markDirty(); setPrefs(p => ({ ...p, [field]: value })); };
   const save = async () => {
     setSaving(true);
     setStatus('');
@@ -44,6 +47,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
       customFetch('/api/dm/character-permissions', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, enabled: dmEnabled, allowedPeerIds: allowedPeers }) }),
     ]);
     const succeeded = results.every(result => result.status === 'fulfilled');
+    setSaved(succeeded);
     setStatus(succeeded ? t('savedOnline') : t('failed'));
     setSaving(false);
   };
@@ -68,15 +72,17 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
       </div></details>
       <details open className="mb-3 rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{t('peerDm')}</summary>
         <div className="pt-3 space-y-3">
-          <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={dmEnabled} onChange={e => setDmEnabled(e.target.checked)} />{t('allow')}</label>
+          <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={dmEnabled} onChange={e => { markDirty(); setDmEnabled(e.target.checked); }} />{t('allow')}</label>
           {peers.filter(peer => peer.id !== characterId).map(peer => <label key={peer.id} className="flex items-center justify-between gap-3 text-sm">
-            <span className="truncate">{peer.name}</span><input type="checkbox" disabled={!dmEnabled} checked={allowedPeers.includes(peer.id)} onChange={e => setAllowedPeers(current => e.target.checked ? [...current,peer.id] : current.filter(id => id !== peer.id))} />
+            <span className="truncate">{peer.name}</span><input type="checkbox" disabled={!dmEnabled} checked={allowedPeers.includes(peer.id)} onChange={e => { markDirty(); setAllowedPeers(current => e.target.checked ? [...current,peer.id] : current.filter(id => id !== peer.id)); }} />
           </label>)}
           {permissionsStatus && <p role="status" className="text-xs text-muted-foreground">{permissionsStatus}</p>}
         </div>
       </details>
-      <button type="button" onClick={save} disabled={saving} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">{t('save')}</button>
-      {status && <p role="status" className="mt-3 text-xs text-muted-foreground">{status}</p>}
+      <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-border bg-background px-4 pb-4 pt-3 shadow-[0_-8px_20px_rgba(0,0,0,0.12)]">
+        {status && <p role="status" aria-live="polite" className={`mb-2 text-center text-sm font-semibold ${saved ? "text-emerald-500" : "text-destructive"}`}>{saved ? "✓ " : ""}{status}</p>}
+        <button type="button" onClick={save} disabled={saving} aria-busy={saving} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-60">{saving ? "Guardando…" : saved ? "✓ Guardado" : t('save')}</button>
+      </div>
     </section>
   </div>;
 }
