@@ -380,6 +380,16 @@ export default function EchoMusicPage() {
   const [voiceLinkConsent, setVoiceLinkConsent] = useState(false);
   const [voiceLinkBusy, setVoiceLinkBusy] = useState(false);
   const [voiceLinkError, setVoiceLinkError] = useState('');
+  async function unlinkSingingVoice() {
+    if (!me?.id || voiceLinkBusy || !window.confirm(interfaceLanguage==='es'?'¿Desvincular la voz cantada? No se borrará del proveedor.':'Unlink the singing voice? It will not be deleted from the provider.')) return;
+    setVoiceLinkBusy(true); setVoiceLinkError('');
+    try {
+      await customFetch('/api/music/voices/' + encodeURIComponent(me.id), {method:'DELETE',responseType:'json'});
+      setSingingVoiceId(null);
+      setVoiceConsistency(voiceConsistency==='both_configured_unverified'?'speech_only':'unconfigured');
+    } catch(error) {setVoiceLinkError(error instanceof Error?error.message:t('No se pudo vincular la voz'));}
+    finally {setVoiceLinkBusy(false);}
+  }
   async function linkExistingSingingVoice() {
     if (!me?.id || !voiceLinkConsent || !/^[a-zA-Z0-9_-]{1,128}$/.test(voiceLinkId) || voiceLinkBusy) return;
     setVoiceLinkBusy(true); setVoiceLinkError('');
@@ -599,6 +609,7 @@ export default function EchoMusicPage() {
         <p className="font-semibold">{t("Identidad vocal")}</p>
         <p className="text-xs text-muted-foreground">{t(voiceConsistency==='both_configured_unverified'?'Voz hablada y cantada configuradas; timbre aún sin verificar':voiceConsistency==='speech_only'?'Voz hablada configurada; falta vincular la cantada':voiceConsistency==='singing_only'?'Voz cantada configurada; falta configurar la hablada':'Sin identidad vocal configurada')}</p>
         <p className="font-semibold">{singingVoiceId ? t("Voz cantada vinculada") : t("Sin voz cantada configurada")}</p>
+        {singingVoiceId&&<button type="button" disabled={voiceLinkBusy} className="text-xs underline text-muted-foreground" onClick={()=>void unlinkSingingVoice()}>{interfaceLanguage==='es'?'Desvincular voz cantada':'Unlink singing voice'}</button>}
         <label className="flex items-center gap-2"><input type="checkbox" checked={protectSingingVoice} onChange={event => setProtectSingingVoice(event.target.checked)}/>{t("Proteger identidad vocal")}</label>
         <p className="text-xs text-muted-foreground">{t("Evita generar canciones cantadas con una voz diferente a la del personaje.")}</p>
         <details className="rounded-lg border border-border p-2">
