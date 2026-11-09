@@ -91,7 +91,8 @@ export function saveHighlight(state: SocialState, actor: string, highlight: Stor
 export function groupNotifications(notifications: Notification[]) {
   const groups = new Map<string, Notification & { ids: string[]; actorIds: string[]; count: number }>();
   for (const n of [...notifications].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
-    const grouped = ['like', 'comment_like', 'comment', 'follow'].includes(n.kind);
+    // Follow requests are individual actionable invitations, not grouped follow events.
+    const grouped = ['like', 'comment_like', 'comment'].includes(n.kind) || (n.kind === 'follow' && n.excerpt !== 'follow_request');
     const key = grouped ? [n.recipientId, n.kind, n.postId, n.commentId, n.storyId, n.createdAt.slice(0, 10)].join(':') : n.id;
     const current = groups.get(key);
     if (!current) groups.set(key, { ...n, ids: [n.id], actorIds: [n.actorId], count: 1 });
