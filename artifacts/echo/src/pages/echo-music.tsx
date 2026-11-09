@@ -55,6 +55,12 @@ const musicEnglish: Record<string,string> = {
   "Prompt preparado": "Prepared prompt",
   "Escuchar canción": "Play track",
   "Descargar": "Download",
+  "Guardar voz": "Save voice",
+  "Preparar voz de Nela": "Prepare Nela voice",
+  "Elegí 15 a 30 segundos donde se escuche claramente la cantante.": "Choose 15 to 30 seconds where the singer is clearly audible.",
+  "Crear la voz clonada cuesta aproximadamente USD 5 en fal.ai. Esta pantalla no realiza el cargo ni crea el clon.": "Creating a cloned voice costs approximately USD 5 on fal.ai. This screen does not charge or create a clone.",
+  "Referencia vocal preparada. Falta activar la clonación con confirmación de pago.": "Vocal reference prepared. Cloning requires payment confirmation before activation.",
+  "Cerrar": "Close",
   "Descargando…": "Downloading…",
   "No se pudo descargar la canción.": "Could not download this track.",
   "Ver borrador": "View draft",
@@ -283,6 +289,9 @@ export default function EchoMusicPage() {
   const audioUrl = resolvedSavedAudio || localAudioUrl;
   const filteredLibrary = library.filter(item => item.status === libraryFilter).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [voiceSource, setVoiceSource] = useState<MusicDraftRecord | null>(null);
+  const [voiceStart, setVoiceStart] = useState(0);
+  const [voiceLength, setVoiceLength] = useState(20);
   async function downloadLibraryTrack(item: MusicDraftRecord) {
     if (downloadingId || item.status !== 'saved_audio' || !item.audioPath?.startsWith('generated/')) return;
     setDownloadingId(item.id);
@@ -522,6 +531,7 @@ export default function EchoMusicPage() {
           <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
           <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? t("Escuchar canción") : t("Ver borrador")}</p></div>
         </button>
+        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(20); }} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{t("Guardar voz")}</button>}
         {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" disabled={!!downloadingId} onClick={() => void downloadLibraryTrack(item)} className="flex items-center gap-1 rounded-lg border border-border px-2 py-2 text-xs font-semibold" aria-label={t("Descargar") + ' ' + item.title}><Download className="h-4 w-4" />{downloadingId === item.id ? t("Descargando…") : t("Descargar")}</button>}
         {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir")}</button>}
         {!item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>}
