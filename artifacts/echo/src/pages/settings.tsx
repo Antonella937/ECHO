@@ -1,5 +1,7 @@
 import { useClerk, useUser } from '@clerk/react';
-import { useEffect, useState } from 'react';\nimport { customFetch } from '@workspace/api-client-react';\nimport { getActiveUniverseId } from '@/store/persistence';
+import { useEffect, useState } from 'react';
+import { customFetch } from '@workspace/api-client-react';
+import { getActiveUniverseId } from '@/store/persistence';
 import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
@@ -34,7 +36,15 @@ export default function SettingsPage() {
   return (
     <div>
       <TopBar title={t("settings")} onBack={back} />
-      <div className="px-4 pb-12 pt-5">\n        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">\n          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>\n          <a href="#echo-ai-writing" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de IA" : "AI style"}</a>\n        </nav>
+      <div className="px-4 pb-12 pt-5">
+        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">
+          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>
+          <a href="#echo-ai-writing" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de IA" : "AI style"}</a>
+        </nav>
+        <AiWritingStyleSection />
+
+        <div id="echo-autonomy" className="scroll-mt-20"><AutonomySettingsSection /></div>
+
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
@@ -97,7 +107,9 @@ export default function SettingsPage() {
           </div></details>
         </section>
 
-        <AiWritingStyleSection />\n\n        <AppearanceSection />
+        <AiWritingStyleSection />
+
+        <AppearanceSection />
 
         <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
 
