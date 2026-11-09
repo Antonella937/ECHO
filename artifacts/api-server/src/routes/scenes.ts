@@ -104,6 +104,35 @@ scenesRouter.post("/scenes/events", async (req, res) => {
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
 
+const globalAiStyle = scope.extend({
+  style: z.enum(["natural", "narrative", "mixed"]),
+  responseLength: z.enum(["short", "balanced", "detailed"]),
+  responseTiming: z.enum(["realistic", "instant"]),
+}).strict();
+scenesRouter.get("/ai-style", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({error:"INVALID_SCOPE"}); return; }
+  try {
+    const result = await db.execute(sql`SELECT style, response_length AS "responseLength",
+      response_timing AS "responseTiming" FROM echo_ai_style_preferences
+      WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}`);
+    res.json(result.rows[0] ?? {style:"natural",responseLength:"balanced",responseTiming:"realistic"});
+  } catch { res.status(503).json({error:"AI_STYLE_UNAVAILABLE"}); }
+});
+scenesRouter.put("/ai-style", async (req, res) => {
+  const parsed = globalAiStyle.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({error:"INVALID_AI_STYLE"}); return; }
+  try {
+    const {universeId,style,responseLength,responseTiming} = parsed.data;
+    if (!await availableCharacters(req.userId!, universeId)) {res.status(403).json({error:"UNIVERSE_NOT_ACCESSIBLE"});return;}
+    await db.execute(sql`INSERT INTO echo_ai_style_preferences (owner_id,universe_id,style,response_length,response_timing)
+      VALUES (${req.userId!},${universeId},${style},${responseLength},${responseTiming})
+      ON CONFLICT (owner_id,universe_id) DO UPDATE SET style=EXCLUDED.style,
+      response_length=EXCLUDED.response_length,response_timing=EXCLUDED.response_timing,updated_at=now()`);
+    res.json({style,responseLength,responseTiming});
+  } catch {res.status(503).json({error:"AI_STYLE_SAVE_FAILED"});}
+});
+
 const presenceUpdate = scope.extend({
   characterId: id, presence: z.enum(["present", "absent", "left"]),
 }).strict();
