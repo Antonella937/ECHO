@@ -22,12 +22,24 @@ const storageReady = () => {
 
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
 export async function resolveAutonomousVoiceId({ ownerId, universeId, characterId, basicVoiceId }: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string | null }): Promise<string | null> {
+  // A linked social account uses the canonical person's selected Premium voice.
+  // Resolve only inside this authenticated owner's universe, never from client input.
+  const [universe] = await db.select({ state: echoUniversesTable.state })
+    .from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId, ownerId),
+      eq(echoUniversesTable.universeId, universeId),
+    )).limit(1);
+  const parsed = universe ? SaveUniverseBody.shape.state.safeParse(universe.state) : null;
+  const account = parsed?.success ? parsed.data.characters.find(c => c.id === characterId) : undefined;
+  const voiceOwnerId = account?.personId && parsed?.success &&
+    parsed.data.characters.some(c => c.id === account.personId)
+    ? account.personId : characterId;
   if (await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus(ownerId).generationAvailable) {
     const selected = await pool.query(`SELECT s.provider_sample_id
       FROM echo_voice_projects p JOIN echo_voice_samples s ON s.id=p.selected_sample_id
       WHERE p.owner_id=$1 AND p.universe_id=$2 AND p.character_id=$3
         AND p.status='ready' AND s.owner_id=$1 AND s.project_id=p.id
-        AND s.provider IN ('elevenlabs','elevenlabs_catalog','elevenlabs_clone') AND s.status='ready' LIMIT 1`, [ownerId, universeId, characterId]);
+        AND s.provider IN ('elevenlabs','elevenlabs_catalog','elevenlabs_clone') AND s.status='ready' LIMIT 1`, [ownerId, universeId, voiceOwnerId]);
     const id = selected.rows[0]?.provider_sample_id;
     if (typeof id === "string" && /^[a-zA-Z0-9_-]{10,128}$/.test(id)) return `elevenlabs:${id}`;
   }
