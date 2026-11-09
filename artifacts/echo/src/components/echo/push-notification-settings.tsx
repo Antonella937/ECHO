@@ -1,7 +1,7 @@
 import { customFetch } from '@workspace/api-client-react';
 import { useCreatorHubDmCopy } from '@/lib/creator-hub-notifications';
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Bell, BellOff } from 'lucide-react';
 import { getOneSignal, connectOneSignalOwner, isOneSignalConfigured } from '@/lib/onesignal';
@@ -32,6 +32,7 @@ export function PushNotificationSettings() {
   const ownerId = user?.id ?? '';
   const [prefs, setPrefs] = useState(() => ownerId ? readPushPreferences(ownerId) : defaults);
   const [notice, setNotice] = useState('');
+  useEffect(() => { if (ownerId) setPrefs(readPushPreferences(ownerId)); }, [ownerId]);
   const syncCreatorHubPush = async (enabled: boolean) => {
     await customFetch("/api/creator-hub/social/dm-notifications/push-preference", { method: "PUT", responseType: "json", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
   };
@@ -53,9 +54,15 @@ export function PushNotificationSettings() {
       const allowed = await client.Notifications.requestPermission();
       if (!allowed) { setNotice(t("No se concedió permiso para notificaciones.")); return; }
       update({ ...prefs, enabled: true });
-      await syncCreatorHubPush(prefs.categories.creatorHub);
-      setNotice(creatorCopy.setting);
-    } catch (error) { setNotice(error instanceof Error ? error.message : t("No se pudo activar OneSignal.")); }
+      setNotice(t('Notificaciones activadas en este dispositivo.'));
+      // Creator Hub preference is optional; its API must not turn a successful
+      // OneSignal subscription into a misleading generic 'Load failed' error.
+      try { await syncCreatorHubPush(prefs.categories.creatorHub); }
+      catch { setNotice(t('Notificaciones activadas. No se pudo sincronizar la preferencia de Creator Hub.')); }
+    } catch (error) {
+      console.warn('OneSignal subscription setup failed', error);
+      setNotice(t('No se pudo completar la conexión de notificaciones. Comprobá tu conexión e intentá nuevamente.'));
+    }
   };
   return <section className="mt-9" aria-labelledby="push-h">
     <h2 id="push-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Bell className="h-4 w-4" /> {t("Notificaciones del celular")}</h2>
