@@ -50,6 +50,59 @@ router.get("/music/library", async (req, res) => {
     res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
   }
 });
+// One audio file can be saved to several characters' libraries inside the
+// same authenticated ECHO universe/account. No new generation or storage copy.
+// This is NOT a cross-account DM delivery or a public sharing grant.
+const characterMusicSave = z.object({
+  trackId: z.string().uuid(),
+  characterId: z.string().min(1).max(128),
+}).strict();
+router.post("/music/library/save-to-character", async (req, res) => {
+  const parsed = characterMusicSave.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_CHARACTER_MUSIC_SAVE" }); return; }
+  const { trackId, characterId } = parsed.data;
+  try {
+    const result = await db.execute(sql`
+      INSERT INTO echo_music_character_saves (owner_id,track_id,character_id)
+      SELECT l.owner_id,l.id,${characterId}
+      FROM echo_music_library l
+      WHERE l.owner_id=${req.userId!} AND l.id=${trackId}
+        AND l.status='saved_audio' AND l.audio_path IS NOT NULL
+      ON CONFLICT (owner_id,track_id,character_id) DO NOTHING
+      RETURNING track_id
+    `);
+    if (!result.rows.length) {
+      const exists = await db.execute(sql`
+        SELECT 1 FROM echo_music_character_saves
+        WHERE owner_id=${req.userId!} AND track_id=${trackId} AND character_id=${characterId}
+      `);
+      if (!exists.rows.length) { res.status(404).json({ error: "MUSIC_NOT_IN_ACCOUNT_LIBRARY" }); return; }
+    }
+    res.json({ saved: true, reusedExistingAudio: true, creditsUsed: 0, characterId, trackId });
+  } catch (error) {
+    req.log.error({ err: error }, "Save music to character failed");
+    res.status(503).json({ error: "CHARACTER_MUSIC_SAVE_UNAVAILABLE" });
+  }
+});
+router.get("/music/library/character/:characterId", async (req, res) => {
+  const parsed = z.string().min(1).max(128).safeParse(req.params.characterId);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_CHARACTER_ID" }); return; }
+  try {
+    const result = await db.execute(sql`
+      SELECT l.id,l.title,l.prompt,l.duration_seconds AS "durationSeconds",
+        l.audio_path AS "audioPath",l.status,l.character_id AS "originalCharacterId",
+        s.character_id AS "characterId",s.saved_at AS "savedAt"
+      FROM echo_music_character_saves s
+      JOIN echo_music_library l ON l.owner_id=s.owner_id AND l.id=s.track_id
+      WHERE s.owner_id=${req.userId!} AND s.character_id=${parsed.data}
+      ORDER BY s.saved_at DESC LIMIT 100
+    `);
+    res.json({ items: result.rows });
+  } catch (error) {
+    req.log.error({ err: error }, "Character music library unavailable");
+    res.status(503).json({ error: "CHARACTER_MUSIC_LIBRARY_UNAVAILABLE" });
+  }
+});
 router.post("/music/library", async (req, res) => {
   const parsed = libraryItem.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_LIBRARY_ITEM" }); return; }
