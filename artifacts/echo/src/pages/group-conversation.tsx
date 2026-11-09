@@ -7,6 +7,7 @@ import { useSocial } from '@/store/social-store';
 import { useUser } from '@clerk/react';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { AttachmentView } from '@/components/echo/dm-attachment-view';
+import { MusicLibraryPicker } from '@/components/echo/music-library-picker';
 import { uploadAttachment, validateAttachments, formatDuration } from '@/lib/dm-attachments';
 import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
@@ -24,6 +25,9 @@ export default function GroupConversationPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [text, setText] = useState('');
+  const [showMusicLibrary, setShowMusicLibrary] = useState(false);
+  const [musicDraftStatus, setMusicDraftStatus] = useState('');
+  const [savingMusicDraft, setSavingMusicDraft] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GroupMessage[]>([]);
@@ -280,6 +284,31 @@ export default function GroupConversationPage() {
     {error && <p role="alert" className="px-4 text-sm text-destructive">{error}</p>}
     {!!pendingFiles.length && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2">{pendingFiles.map((file, index) => <span key={index} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-secondary px-2 py-1 text-xs"><span className="max-w-36 truncate">{file.name}</span><button type="button" aria-label="Quitar archivo" onClick={() => setPendingFiles(files => files.filter((_, i) => i !== index))}><X className="h-3 w-3" /></button></span>)}</div>}
     {recorder.status !== 'idle' && <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2 text-sm"><span>{recorder.status === 'requesting' ? 'Solicitando micrófono…' : `Grabando · ${formatDuration(recorder.elapsed)}`}</span><div className="flex gap-3"><button type="button" onClick={recorder.cancel} className="text-muted-foreground">Cancelar</button><button type="button" onClick={recorder.stop} className="font-semibold text-primary">Terminar</button></div></div>}
+    <div className="shrink-0 border-t border-border px-3 py-2">
+      <button type="button" onClick={() => { setShowMusicLibrary(value => !value); setMusicDraftStatus(''); }}
+        className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">
+        {showMusicLibrary ? 'Cerrar música' : '🎵 ECHO Music'}
+      </button>
+      {musicDraftStatus && <p role="status" className="mt-2 text-xs text-muted-foreground">{musicDraftStatus}</p>}
+      {showMusicLibrary && <div className="mt-2">
+        <MusicLibraryPicker onCancel={() => setShowMusicLibrary(false)} onSelect={async selection => {
+          if (!id || !group || savingMusicDraft) return;
+          setSavingMusicDraft(true); setMusicDraftStatus('');
+          try {
+            await customFetch('/api/music/share-reference', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ trackId: selection.id, surface: 'dm', targetId: id,
+                clipStartSeconds: selection.clipStartSeconds, clipDurationSeconds: selection.clipDurationSeconds }),
+              responseType: 'json',
+            });
+            setMusicDraftStatus('Canción preparada para el grupo. Aún no se envió ni se habilitó para sus integrantes.');
+            setShowMusicLibrary(false);
+          } catch {
+            setMusicDraftStatus('No se pudo preparar esta canción para el grupo.');
+          } finally { setSavingMusicDraft(false); }
+        }} />
+      </div>}
+    </div>
     <form onSubmit={send} className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Adjuntar archivos" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Paperclip className="h-5 w-5" /></button>
