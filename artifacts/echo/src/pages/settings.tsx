@@ -34,7 +34,7 @@ export default function SettingsPage() {
   return (
     <div>
       <TopBar title={t("settings")} onBack={back} />
-      <div className="px-4 pb-12 pt-5">\n        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">\n          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>\n          <a href="#echo-ai-style" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de IA" : "AI style"}</a>\n        </nav>
+      <div className="px-4 pb-12 pt-5">\n        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">\n          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>\n          <a href="#echo-ai-style" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de imágenes" : "Image style"}</a>\n        </nav>
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
