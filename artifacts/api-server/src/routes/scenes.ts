@@ -8,7 +8,7 @@ import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
 
 export const scenesRouter: IRouter = Router();
-scenesRouter.use("/scenes", requireAuth);
+scenesRouter.use(requireAuth);
 const id = z.string().min(1).max(120);
 const scope = z.object({ universeId: id.default("primary") });
 const create = scope.extend({
