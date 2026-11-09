@@ -168,7 +168,10 @@ export default function CharacterEditorPage() {
           </div>
         )}
 
-        {mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
+        {sharedPrimary ? <>
+          <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
+          <p className="mt-4 rounded-xl border border-border p-3 text-xs text-muted-foreground">{t('Esta cuenta usa la personalidad, memoria y referencias visuales del personaje principal. Podés editar aquí el perfil público, sin duplicar su identidad.')}</p>
+        </> : mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
           <BasicVoiceCatalogue selectedVoiceId={config.voice.basicVoiceId} onSelect={(basicVoiceId) => set((c) => ({ ...c, voice: { ...c.voice, basicVoiceId } }))} />
           <PremiumVoiceStudio characterId={account?.id} />
