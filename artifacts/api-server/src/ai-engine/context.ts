@@ -133,6 +133,13 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const dmTargetId = input.situation === 'dm'
     ? recipient!.id
     : input.situation === 'dm_reaction' && message ? message.senderId : undefined;
+  // Conversation continuity across aliases is available only inside the same
+  // correspondent's DM. It never joins the visible inboxes or public context.
+  const otherAliasIds = new Set(personAccounts.map(account => account.id).filter(id => id !== actor.id));
+  const aliasConversation = dmTargetId ? latest(state.messages.filter(m =>
+    !m.hiddenForIds?.includes(actor.id) &&
+    ((otherAliasIds.has(m.senderId) && m.recipientId === dmTargetId) ||
+     (otherAliasIds.has(m.recipientId) && m.senderId === dmTargetId))), 8) : [];
   const messages = dmTargetId ? latest(state.messages.filter(m =>
     !m.hiddenForIds?.includes(actor.id) &&
     ((m.senderId === actor.id && m.recipientId === dmTargetId) || (m.recipientId === actor.id && m.senderId === dmTargetId))), 10) : [];
@@ -245,7 +252,12 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     routine: c ? { ...c.routine, localNow: localTime(now, c.routine.timezone), interpretation: 'probabilistic_context_not_commands' } : null,
     social: c?.social ?? null,
     memory: c ? { permanent: c.memory.permanent, relationships: c.memory.relationships,
-      recent: chronological, recalled, historicalRecalled, olderVoiceNotes, recentSummary: c.memory.recentSummary } : null,
+      recent: chronological, recalled, historicalRecalled, olderVoiceNotes, recentSummary: c.memory.recentSummary,
+      aliasConversationRecall: aliasConversation.map(m => ({
+        from: identityOf(m.senderId), to: identityOf(m.recipientId),
+        text: m.text.slice(0, 600), createdAt: m.createdAt,
+      })),
+      aliasRecallRule: 'These are private recollections of the same person from another account with this correspondent. Do not assume the correspondent knows the accounts are linked. Never reveal the alias or quote private messages automatically.' } : null,
     currentState: c ? { ...c.currentState, companions: c.currentState.companions.map(identityOf), provenance: 'manual_or_routine_not_observed_autonomy' } : null,
     recentSocial: {
       posts: relevantPosts.map(postText),
