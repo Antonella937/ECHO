@@ -43,7 +43,22 @@ router.get("/music/voices/:characterId", async (req,res) => {
   if (!characterId.success) { res.status(400).json({error:"INVALID_CHARACTER_ID"}); return; }
   try {
     const rows = await db.execute(sql`SELECT mureka_vocal_id FROM echo_character_singing_voices WHERE owner_id=${req.userId!} AND character_id=${characterId.data} LIMIT 1`);
-    res.json({ configured: rows.rows.length > 0, vocalId: rows.rows[0]?.mureka_vocal_id ?? null });
+    const speech = await db.execute(sql`
+      SELECT s.provider, s.status FROM echo_voice_projects p
+      JOIN echo_voice_samples s ON s.id=p.selected_sample_id AND s.owner_id=p.owner_id
+      WHERE p.owner_id=${req.userId!} AND p.character_id=${characterId.data}
+        AND s.status='ready'
+      ORDER BY p.updated_at DESC LIMIT 1
+    `);
+    const speechReady = speech.rows.length > 0;
+    const singingReady = rows.rows.length > 0;
+    res.json({
+      configured: singingReady, vocalId: rows.rows[0]?.mureka_vocal_id ?? null,
+      speechReady, singingReady,
+      consistencyStatus: speechReady && singingReady ? 'both_configured_unverified' :
+        speechReady ? 'speech_only' : singingReady ? 'singing_only' : 'unconfigured',
+      sameTimbreVerified: false
+    });
   } catch { res.status(503).json({error:"VOICE_LOOKUP_UNAVAILABLE"}); }
 });
 router.post("/music/voices", async (req,res) => {
