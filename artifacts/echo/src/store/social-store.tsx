@@ -31,6 +31,7 @@ export interface SocialActions {
   setAppearance(appearance: Appearance): void;
   setImageStyle(style: ImageStyle): void;
   createAccount(input: AccountInput): string;
+  createLinkedAccount(sourceId: string, input: AccountInput): string;
   updateAccount(id: string, input: AccountInput, expected?: AccountInput): void;
   archiveAccount(id: string, archived: boolean): void;
   duplicateAccount(id: string): string;
@@ -175,6 +176,29 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           identity: data.identity ?? { provider: 'mock', referenceImages: [], seed: 0, appearance: '', styleNotes: '', updatedAt: new Date().toISOString() },
         };
         coordinator.current?.edit(s => ({ ...s, characters: [...s.characters, account] }));
+        return id;
+      },
+      createLinkedAccount(sourceId, input) {
+        const source = cur().characters.find(c => c.id === sourceId && !c.archived);
+        if (!source) throw Error('No encontramos el personaje original.');
+        const data = validateAccount(input, cur());
+        const id = uid('account');
+        const linked: Character = {
+          ...source,
+          ...data,
+          id,
+          personId: source.personId || source.id,
+          configuration: structuredClone(source.configuration),
+          identity: structuredClone(source.identity),
+          accountType: data.accountType ?? source.accountType ?? 'personal',
+          privateAccount: data.privateAccount ?? false,
+          verified: false,
+          archived: false,
+          displayMetrics: { followers: null, following: null },
+          accountIdentity: { description: '', voice: '', facts: '' },
+          providerRef: { provider: 'mock', externalId: null, status: 'not_connected', lastSyncAt: null },
+        };
+        coordinator.current?.edit(s => ({ ...s, characters: [...s.characters, linked] }));
         return id;
       },
       updateAccount(id, input, expected) {
