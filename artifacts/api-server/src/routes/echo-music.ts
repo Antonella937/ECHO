@@ -180,6 +180,8 @@ router.get("/music/status", (_req, res) => {
     providerConfigured: Boolean(process.env.FAL_KEY?.trim()),
     providerRequestsEnabled: false,
     paidCallsMade: 0,
+    configurationReady: Boolean(process.env.FAL_KEY?.trim()),
+    liveGenerationBlockedBy: ["atomic_music_credit_ledger", "durable_private_audio_ingestion", "verified_music_entitlement"],
     creditsSharedWithVoices: false,
     commercialMusicPlaybackSeparate: true,
     features: {
@@ -308,7 +310,7 @@ function composeMurekaRequest(draft: z.infer<typeof musicGenerationRequest>) {
     draft.mood && `Mood: ${draft.mood}`,
     draft.instruments.length && `Instruments: ${draft.instruments.join(", ")}`,
     draft.vocalMode === "instrumental" ? "Instrumental music, no vocals." : `Singing in ${draft.language}.`,
-  ].filter(Boolean).join("\\n");
+  ].filter(Boolean).join("\n");
   // Mureka's song endpoint accepts either lyrics or a prompt. Unlike Eleven
   // Music, it does not expose a requested-duration parameter.
   return draft.vocalMode === "singing" && draft.lyrics.trim()
