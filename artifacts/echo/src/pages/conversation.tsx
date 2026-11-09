@@ -1,6 +1,7 @@
 import { useConversationText } from '@/lib/conversation-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { MusicLibraryPicker } from '@/components/echo/music-library-picker';
+import { SharedMusicPlayer } from '@/components/echo/shared-music-player';
 import { DmAiPreferencesPanel } from '@/components/echo/dm-ai-preferences-panel';
 import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
@@ -433,7 +434,13 @@ export default function ConversationPage() {
                   clipStartSeconds: selection.clipStartSeconds, clipDurationSeconds: selection.clipDurationSeconds }),
                 responseType: 'json',
               });
-              setMusicDraftStatus('Canción preparada para este chat. Todavía no se envió: falta conectar el adjunto musical al mensaje.');
+              const published = await customFetch<{ items: Array<{ id: string }> }>('/api/music/published', { responseType: 'json' });
+              if (!published.items.some(item => item.id === selection.id)) {
+                setMusicDraftStatus('Publicá primero esta canción desde ECHO Music para enviarla.');
+                return;
+              }
+              actions.sendMessage(other.id, '', { musicTrackId: selection.id, musicTitle: selection.title });
+              setMusicDraftStatus('Canción enviada. No se gastaron créditos de generación.');
               setShowMusicLibrary(false);
             } catch {
               setMusicDraftStatus('No se pudo preparar la canción para este chat.');
@@ -484,6 +491,7 @@ function summarize(m: Message, t: (key: string) => string): string {
   if (m.text) return m.text;
   const a = m.attachments?.[0];
   if (a) return t(a.type === 'image' ? 'Foto' : a.type === 'video' ? 'Video' : 'Nota de voz');
+  if (m.musicTrackId) return '🎵 ' + (m.musicTitle || 'ECHO Music');
   if (m.postId) return t('Publicación compartida');
   if (m.storyId) return t('Historia');
   return t('Mensaje');
@@ -595,6 +603,11 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         {tweakPreview && <div className="rounded-xl bg-secondary p-3"><p className="mb-1 text-xs font-semibold">{t('Vista previa')}</p><p className="whitespace-pre-wrap text-sm">{tweakPreview}</p></div>}
         <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => { setTweakOpen(false); setTweakPreview(''); }} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t('Cancelar')}</button><button type="button" disabled={tweakBusy || !tweakInstruction.trim()} onClick={() => void generateTweak()} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">{t(tweakPreview ? 'Regenerar ajuste' : 'Generar ajuste')}</button>{tweakPreview && <button type="button" onClick={() => { if (onApplyTweak(tweakOriginal, tweakPreview)) { setTweakOpen(false); setTweakPreview(''); } }} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground">{t('Aplicar ajuste')}</button>}</div>
       </div>}
+      {m.musicTrackId && <div className="mb-2 rounded-xl border border-border bg-card p-3 text-foreground">
+        <p className="mb-2 text-xs font-semibold">🎵 {m.musicTitle || 'ECHO Music'}</p>
+        <SharedMusicPlayer trackId={m.musicTrackId} />
+        <MusicDmSaveButton trackId={m.musicTrackId} characterId={meId} />
+      </div>}
       {m.attachments?.length ? (
         <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
           {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
@@ -669,4 +682,24 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
       )}
     </li>
   );
+}
+
+function MusicDmSaveButton({ trackId, characterId }: { trackId: string; characterId: string }) {
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  return <div className="mt-2">
+    <button type="button" disabled={busy} className="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold"
+      onClick={async () => {
+        setBusy(true); setStatus('');
+        try {
+          await customFetch('/api/music/library/save-to-character', {
+            method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trackId, characterId }),
+          });
+          setStatus('Guardada en tu biblioteca.');
+        } catch { setStatus('No se pudo guardar esta canción.'); }
+        finally { setBusy(false); }
+      }}>Guardar en mi biblioteca</button>
+    {status && <p role="status" className="mt-1 text-xs">{status}</p>}
+  </div>;
 }
