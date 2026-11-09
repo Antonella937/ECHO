@@ -1,5 +1,5 @@
 import { useClerk, useUser } from '@clerk/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';\nimport { customFetch } from '@workspace/api-client-react';\nimport { getActiveUniverseId } from '@/store/persistence';
 import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
@@ -34,7 +34,7 @@ export default function SettingsPage() {
   return (
     <div>
       <TopBar title={t("settings")} onBack={back} />
-      <div className="px-4 pb-12 pt-5">\n        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">\n          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>\n          <a href="#echo-ai-style" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de imágenes" : "Image style"}</a>\n        </nav>
+      <div className="px-4 pb-12 pt-5">\n        <nav aria-label="AI settings shortcuts" className="mb-5 grid grid-cols-2 gap-2">\n          <a href="#echo-autonomy" className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center text-sm font-semibold">{language === "es" ? "Autonomía IA" : "AI autonomy"}</a>\n          <a href="#echo-ai-writing" className="rounded-xl border border-border p-3 text-center text-sm font-semibold">{language === "es" ? "Estilo de IA" : "AI style"}</a>\n        </nav>
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
@@ -97,7 +97,7 @@ export default function SettingsPage() {
           </div></details>
         </section>
 
-        <AppearanceSection />
+        <AiWritingStyleSection />\n\n        <AppearanceSection />
 
         <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
 
@@ -160,6 +160,52 @@ export default function SettingsPage() {
 
     </div>
   );
+}
+
+type AiStyleSettings = {style:'natural'|'narrative'|'mixed';responseLength:'short'|'balanced'|'detailed';responseTiming:'realistic'|'instant'};
+function AiWritingStyleSection() {
+  const {user} = useUser();
+  const lang = useLanguage();
+  const es = lang === 'es';
+  const universeId = user?.id ? getActiveUniverseId(user.id) : 'primary';
+  const [settings,setSettings] = useState<AiStyleSettings>({style:'natural',responseLength:'balanced',responseTiming:'realistic'});
+  const [saving,setSaving] = useState(false);
+  const [error,setError] = useState('');
+  useEffect(()=>{let mounted=true;
+    void customFetch<AiStyleSettings>(`/api/ai-style?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'})
+      .then(value=>{if(mounted)setSettings(value)}).catch(()=>{if(mounted)setError(es?'No se pudieron cargar las preferencias.':'Could not load preferences.')});
+    return()=>{mounted=false};
+  },[universeId]);
+  const save=async(next:AiStyleSettings)=>{
+    setSaving(true);setError('');
+    try{const result=await customFetch<AiStyleSettings>('/api/ai-style',{method:'PUT',responseType:'json',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,...next})});
+      setSettings(result);
+    }catch{setError(es?'No se pudo guardar el estilo.':'Could not save AI style.')}
+    finally{setSaving(false)}
+  };
+  return <section id="echo-ai-writing" className="mt-9 scroll-mt-20 space-y-3">
+    <h2 className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{es?'Estilo de conversación IA':'AI conversation style'}</h2>
+    <div className="space-y-4 rounded-2xl border border-border bg-card/60 p-4">
+      <p className="text-xs text-muted-foreground">{es?'Preferencia general para los DMs. Las preferencias específicas de cada conversación tienen prioridad.':'Default for DMs. Conversation-specific preferences take priority.'}</p>
+      <label className="block text-sm font-semibold">{es?'Modo de conversación':'Conversation mode'}
+        <select disabled={saving} value={settings.style} onChange={e=>void save({...settings,style:e.target.value as AiStyleSettings['style']})} className="mt-2 w-full rounded-xl border border-border bg-background p-3">
+          <option value="natural">Chat / Natural</option><option value="narrative">Roleplay / Narrativo</option><option value="mixed">{es?'Mixto / Híbrido':'Mixed / Hybrid'}</option>
+        </select>
+      </label>
+      <label className="block text-sm font-semibold">{es?'Extensión de respuestas':'Response length'}
+        <select disabled={saving} value={settings.responseLength} onChange={e=>void save({...settings,responseLength:e.target.value as AiStyleSettings['responseLength']})} className="mt-2 w-full rounded-xl border border-border bg-background p-3">
+          <option value="short">{es?'Breve':'Short'}</option><option value="balanced">{es?'Equilibrada':'Balanced'}</option><option value="detailed">{es?'Detallada':'Detailed'}</option>
+        </select>
+      </label>
+      <label className="block text-sm font-semibold">{es?'Velocidad de respuesta':'Response timing'}
+        <select disabled={saving} value={settings.responseTiming} onChange={e=>void save({...settings,responseTiming:e.target.value as AiStyleSettings['responseTiming']})} className="mt-2 w-full rounded-xl border border-border bg-background p-3">
+          <option value="realistic">{es?'Realista':'Realistic'}</option><option value="instant">{es?'Inmediata':'Instant'}</option>
+        </select>
+      </label>
+      {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
+    </div>
+  </section>;
 }
 
 function AppearanceSection() {
