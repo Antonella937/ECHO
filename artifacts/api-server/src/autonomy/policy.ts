@@ -180,17 +180,13 @@ export function chooseAutonomyOpportunity(input: {
   // Otherwise frequent DMs permanently suppress posts, likes and comments.
   const history = countRecentHistory(input.history, now).filter(event =>
     input.lane === "social" ? event.situation !== "dm" : true);
-  // User-authored posts, comments and stories must not exhaust the autonomous
-  // action budget. Keep their timestamps only for a short courtesy pause.
-  const recentSocial = recentActorActivity(state, character.id, now).filter(time =>
-    input.lane !== "social" || !state.messages.some(message =>
-      message.senderId === character.id && message.origin !== "autonomy" && asTime(message.createdAt) === time));
-  const lastManualSocialActivity = input.lane === "social" ? Math.max(0, ...recentSocial) : 0;
-  const autonomousHistory = input.lane === "social" ? history : history;
+  // Only autonomous executions determine autonomous cooldown and daily caps.
+  // Manual account management never postpones the character's own activity.
+  const recentSocial = input.lane === "social" ? [] : recentActorActivity(state, character.id, now);
   const latestActivity = Math.max(
     ...(input.lane === "social" ? [] : recentSocial),
     ...(input.lane === "social" ? [] : [asTime(config?.currentState?.lastActivityAt) ?? 0]),
-    ...autonomousHistory.map((event) => event.createdAt.getTime()),
+    ...history.map((event) => event.createdAt.getTime()),
     0,
   );
   // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
@@ -248,10 +244,6 @@ export function chooseAutonomyOpportunity(input: {
   // Social activity should have its own cadence, independent of DMs and
   // manually authored content. Never silently extend the configured interval.
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
-  if (input.lane === "social" && lastManualSocialActivity > 0 &&
-      now.getTime() - lastManualSocialActivity < 15 * 60_000) {
-    return { situation: null, reasonCode: "COOLDOWN", reason: "Recent manual activity: short courtesy pause.", localHour: local.hour, timezone };
-  }
   if (latestActivity > 0 && now.getTime() - latestActivity < cooldownMs) {
     return { situation: null, reasonCode: "COOLDOWN", reason: "Minimum cooldown has not elapsed.", localHour: local.hour, timezone };
   }
@@ -323,9 +315,9 @@ export function chooseAutonomyOpportunity(input: {
     const time = asTime(value);
     return time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS;
   };
-  const postCount = state.posts.filter((item) => item.authorId === character.id && recentDate(item.createdAt)).length;
-  const commentCount = state.comments.filter((item) => item.authorId === character.id && recentDate(item.createdAt)).length;
-  const dmCount = state.messages.filter((item) => item.senderId === character.id && recentDate(item.createdAt)).length;
+  const postCount = state.posts.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
+  const commentCount = state.comments.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
+  const dmCount = state.messages.filter((item) => item.senderId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency) }] : []),
@@ -385,7 +377,7 @@ export function chooseAutonomyOpportunity(input: {
       reason: "A recent, visible message has text context and has not been reacted to by this character.", localHour: local.hour, timezone };
   }
   if (selected.situation === "post") {
-    const storyCount = state.stories.filter(item => item.authorId === character.id && recentDate(item.createdAt)).length;
+    const storyCount = state.stories.filter(item => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
     const publishStory = storyCount < 1 && random() < 0.35;
     return { situation: "post", ...(publishStory ? { publishStory: true } : {}), reasonCode: "OPPORTUNITY_SELECTED", reason: "The current social pace permits considering a text post.", localHour: local.hour, timezone };
   }
