@@ -70,22 +70,32 @@ export async function pollMusicJob(ownerId: string, jobId: string, model: Mureka
   const row = found.rows[0] as {provider_request_id?: string;status?: string}|undefined;
   if (!row) throw new Error("MUSIC_JOB_NOT_FOUND");
   if (row.status !== "processing" || !row.provider_request_id) return { status: row.status };
-  const state = await checkMurekaSong(row.provider_request_id, model);
-  if (state !== "COMPLETED") return { status: state };
-  const result = await fetchMurekaSongResult(row.provider_request_id, model);
-  // Idempotent storage: once audio_path is set, retry the DB finalization only.
+  // Once the private file is stored, a retry must not depend on fal's
+  // temporary result URL still being available.
   const existing = await db.execute(sql`
-    SELECT audio_path FROM echo_music_generation_jobs
+    SELECT audio_path, duration_seconds, instrumental FROM echo_music_generation_jobs
     WHERE id=${jobId}::uuid AND owner_id=${ownerId} AND status='processing'
   `);
-  const previousKey = existing.rows[0]?.audio_path;
-  const storedKey = typeof previousKey === "string" && previousKey.startsWith("generated/")
-    ? previousKey
-    : (await ingestGeneratedMusic(result.audioUrl, ownerId, jobId)).storageKey;
+  const stored = existing.rows[0];
+  if (!stored) return { status: "NOT_PROCESSING", jobId };
+  const expectedModel = stored.instrumental === true ? MUREKA_INSTRUMENTAL_MODEL : MUREKA_SONG_MODEL;
+  if (model !== expectedModel) throw new Error("MUSIC_JOB_MODEL_MISMATCH");
+  const previousKey = stored.audio_path;
+  let storedKey: string;
+  let durationSeconds = typeof stored.duration_seconds === "number" ? stored.duration_seconds : 0;
+  if (typeof previousKey === "string" && previousKey.startsWith("generated/")) {
+    storedKey = previousKey;
+  } else {
+    const state = await checkMurekaSong(row.provider_request_id, model);
+    if (state !== "COMPLETED") return { status: state };
+    const result = await fetchMurekaSongResult(row.provider_request_id, model);
+    storedKey = (await ingestGeneratedMusic(result.audioUrl, ownerId, jobId)).storageKey;
+    durationSeconds = result.durationSeconds ?? 0;
+  }
   // Persist storage before DB finalization so a transient database failure can
   // be recovered without re-downloading/re-uploading on the next poll.
   await db.execute(sql`
-    UPDATE echo_music_generation_jobs SET audio_path=${storedKey},updated_at=now()
+    UPDATE echo_music_generation_jobs SET audio_path=${storedKey},duration_seconds=${durationSeconds},updated_at=now()
     WHERE id=${jobId}::uuid AND owner_id=${ownerId} AND status='processing'
   `);
   // One transaction: save a private library record and mark the job completed.
@@ -103,13 +113,13 @@ export async function pollMusicJob(ownerId: string, jobId: string, model: Mureka
         (owner_id,id,character_id,title,prompt,duration_seconds,status,audio_path)
       VALUES (${ownerId},${jobId},${String(job.character_id)},
         ${String(job.title || "Generated song")},${String(job.prompt || "")},
-        ${result.durationSeconds ?? 0},'saved_audio',${storedKey})
+        ${durationSeconds},'saved_audio',${storedKey})
       ON CONFLICT (owner_id,id) DO NOTHING
     `);
     await tx.execute(sql`
       UPDATE echo_music_generation_jobs
       SET status='completed', completed_at=now(), updated_at=now(),
-        duration_seconds=${result.durationSeconds ?? 0}
+        duration_seconds=${durationSeconds}
       WHERE id=${jobId}::uuid AND owner_id=${ownerId} AND status='processing'
     `);
     return true;
