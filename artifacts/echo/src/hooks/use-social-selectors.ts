@@ -46,7 +46,11 @@ export function useStoryGroups(): StoryGroup[] {
   const now = Date.now();
   return useMemo(() => {
     const groups: StoryGroup[] = [];
+    const followed = new Set(state.follows[me.id] ?? []);
     for (const c of state.characters) {
+      // The home story rail is a following feed, not a directory of all accounts.
+      // Private accounts additionally require an accepted follow (canViewStory).
+      if (c.id !== me.id && !followed.has(c.id)) continue;
       const stories = state.stories.filter((s) => s.authorId === c.id && isStoryActive(s, now) && canViewStory(s, me.id, state)).sort(byDateAsc);
       if (!stories.length) continue;
       const allSeen = c.id === me.id || stories.every((s) => s.seenBy.includes(me.id));
