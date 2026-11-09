@@ -207,12 +207,10 @@ export function chooseAutonomyOpportunity(input: {
   });
   // Incoming replies use a short independent delay, not the 6-hour posting cooldown.
   // A per-character daily ceiling still prevents unbounded conversations.
-  const replyDelayMs = 2 * 60_000;
-  const latestReplyAt = state.messages
-    .filter((message) => message.senderId === character.id && message.origin === "autonomy")
-    .reduce((latest, message) => Math.max(latest, asTime(message.createdAt) ?? 0), 0);
-  if (input.lane !== "social" && unanswered && now.getTime() - (asTime(unanswered.createdAt) ?? 0) >= replyDelayMs &&
-      now.getTime() - latestReplyAt >= replyDelayMs) {
+  // An incoming DM is a reply obligation, not spontaneous outreach. Do not
+  // impose a blanket two-minute delay or cooldown between conversational turns.
+  // Idempotency and the unanswered-message check prevent duplicate replies.
+  if (input.lane !== "social" && unanswered) {
     return { situation: "dm", recipientId: unanswered.senderId,
       reasonCode: "OPPORTUNITY_SELECTED",
       reason: "A recent incoming direct message is awaiting a reply.",
