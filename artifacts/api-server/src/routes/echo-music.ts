@@ -206,7 +206,12 @@ router.get("/music/usage", async (req, res) => {
 // Reservation is implemented as the Neon function echo_music_reserve_monthly.
 // It acquires a per-owner advisory transaction lock, checks monthly limits and
 // autonomous cooldown, and refuses calls without verified entitlement. Failed
-// jobs do not count toward monthly usage. Never accept entitlement from clients.
+// jobs do not count toward monthly usage. Provider charges, if any, must be
+// reconciled separately. Never accept entitlement from clients.
+// The Neon echo_music_finish_job function finalizes a job exactly once,
+// marking success only after a validated private audio path exists. Failed
+// jobs release the reserved monthly allowance, but this does not imply that
+// fal.ai reverses any charges already incurred.
 // This read-only endpoint lets the owner check a job without exposing other users.
 router.get("/music/generation/:id", async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.id);
