@@ -14,7 +14,8 @@ import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import type { MessageAttachment } from '@/domain/types';
 
 type Group = { id: string; name: string; avatar?: string | null; participantIds: string[] };
-type GroupMessage = { id: string; senderId: string; text: string; attachments?: MessageAttachment[]; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
+type MusicAttachment = { id: string; type: 'music'; trackId: string; title: string; durationSeconds: number };
+type GroupMessage = { id: string; senderId: string; text: string; attachments?: Array<MessageAttachment | MusicAttachment>; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
 
 export default function GroupConversationPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +29,7 @@ export default function GroupConversationPage() {
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
+  const [savingTrackId, setSavingTrackId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GroupMessage[]>([]);
@@ -274,7 +276,20 @@ export default function GroupConversationPage() {
         <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${m.senderId === me.id ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
           {m.senderId !== me.id && <p className="mb-1 text-xs font-semibold">{character(m.senderId)?.name ?? 'Participante'}</p>}
           {m.text && <p className="whitespace-pre-wrap break-words text-sm">{m.text}</p>}
-          {!!m.attachments?.length && <div className="mt-2 flex flex-col gap-2">{m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={m.senderId === me.id} />)}</div>}
+          {!!m.attachments?.length && <div className="mt-2 flex flex-col gap-2">{m.attachments.map(a => a.type === 'music' ? <div key={a.id} className="rounded-xl border border-border bg-card p-3 text-foreground">
+            <p className="mb-2 text-xs font-semibold">🎵 {a.title}</p>
+            <audio controls preload="none" className="w-full max-w-64" src={`/api/music/published/${encodeURIComponent(a.trackId)}/audio`} />
+            <button type="button" disabled={savingTrackId === a.trackId} className="mt-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold"
+              onClick={async () => { if (!id) return; setSavingTrackId(a.trackId); try {
+                await customFetch('/api/group-dms/' + encodeURIComponent(id) + '/music/' + encodeURIComponent(a.trackId) + '/save', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id }), responseType: 'json',
+                });
+                setMusicDraftStatus('Canción guardada en tu biblioteca.'); 
+              } catch { setError('No se pudo guardar esta canción.'); } finally { setSavingTrackId(null); } }}>
+              Guardar en mi biblioteca
+            </button>
+          </div> : <AttachmentView key={a.id} a={a} mine={m.senderId === me.id} />)}</div>}
           <button type="button" onClick={() => void togglePin(m)} className="mt-1 flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100"><Pin className="h-3 w-3" />{m.pinnedAt ? 'Desfijar' : 'Fijar'}</button>
           <p className={`mt-1 text-right text-[10px] ${m.senderId === me.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
@@ -295,13 +310,14 @@ export default function GroupConversationPage() {
           if (!id || !group || savingMusicDraft) return;
           setSavingMusicDraft(true); setMusicDraftStatus('');
           try {
-            await customFetch('/api/music/share-reference', {
+            await customFetch('/api/group-dms/' + encodeURIComponent(id) + '/music', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ trackId: selection.id, surface: 'dm', targetId: id,
-                clipStartSeconds: selection.clipStartSeconds, clipDurationSeconds: selection.clipDurationSeconds }),
+              body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, trackId: selection.id }),
               responseType: 'json',
             });
-            setMusicDraftStatus('Canción preparada para el grupo. Aún no se envió ni se habilitó para sus integrantes.');
+            const result = await customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/messages?${scope}`, { method: 'GET', responseType: 'json' });
+            setMessages(result.messages);
+            setMusicDraftStatus('Canción enviada al grupo. No se gastaron créditos.');
             setShowMusicLibrary(false);
           } catch {
             setMusicDraftStatus('No se pudo preparar esta canción para el grupo.');
