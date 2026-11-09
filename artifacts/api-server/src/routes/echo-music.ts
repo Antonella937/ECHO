@@ -6,6 +6,8 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
+import { reserveMusicJob, submitReservedMusicJob, pollMusicJob } from "../lib/musicJobOrchestrator";
+import { MUREKA_SONG_MODEL, MUREKA_INSTRUMENTAL_MODEL } from "../lib/murekaMusic";
 
 /**
  * ECHO Music add-on: offline preparation only.
@@ -679,9 +681,68 @@ router.get("/music/generate/preflight", async (req, res) => {
     res.status(503).json({ error: "MUSIC_PREFLIGHT_UNAVAILABLE", paidCallsMadeByThisCheck: 0 });
   }
 });
-router.post("/music/generate", (_req, res) => {
-  res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", provider: "fal_ai_mureka_v8",
-    charged: false, retryable: false, missing: ["verified_entitlement", "atomic_credits", "private_audio_storage"] });
+// Founder-only, one-time paid integration test. Disabled unless the operator
+// explicitly enables it in server configuration; never trusts client entitlements.
+router.post("/music/generate", async (req, res) => {
+  if (process.env.ECHO_MUSIC_PAID_TEST_ENABLED !== 'true') {
+    res.status(503).json({ error: 'ECHO_MUSIC_NOT_ACTIVATED', charged: false }); return;
+  }
+  const parsed = musicGenerationRequest.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({error:'INVALID_MUSIC_DRAFT'}); return; }
+  try {
+    const access = await db.execute(sql`
+      SELECT provider FROM echo_music_entitlements
+      WHERE owner_id=${req.userId!} AND status='active'
+        AND provider='founder_grant'
+    `);
+    if (!access.rows.length) { res.status(403).json({error:'FOUNDER_TEST_ONLY'}); return; }
+    const previous = await db.execute(sql`
+      SELECT COUNT(*)::integer AS count FROM echo_music_generation_jobs
+      WHERE owner_id=${req.userId!}
+    `);
+    if (Number(previous.rows[0]?.count ?? 0) > 0) {
+      res.status(409).json({error:'ONE_TIME_TEST_ALREADY_USED'}); return;
+    }
+    const draft = parsed.data;
+    const provider = composeMurekaRequest(draft);
+    const characterId = draft.characterId;
+    if (!characterId) { res.status(400).json({error:'CHARACTER_REQUIRED'}); return; }
+    const jobInput = {
+      ownerId: req.userId!, characterId, mode: 'manual' as const,
+      title: draft.title, verifiedEntitlement: true, prompt: provider.prompt,
+      lyrics: 'lyrics' in provider ? provider.lyrics : undefined,
+      instrumental: draft.vocalMode === 'instrumental',
+    };
+    const job = await reserveMusicJob(jobInput);
+    try {
+      await submitReservedMusicJob(jobInput, job.jobId);
+    } catch (error) {
+      req.log.error({err:error,jobId:job.jobId}, 'Music submission uncertain; manual reconciliation required');
+      res.status(502).json({error:'MUSIC_SUBMISSION_REQUIRES_RECONCILIATION',jobId:job.jobId});
+      return;
+    }
+    res.status(202).json({jobId:job.jobId,status:'processing',paidProviderRequestSubmitted:true});
+  } catch (error) {
+    req.log.error({err:error},'Founder music test failed');
+    res.status(503).json({error:'MUSIC_TEST_UNAVAILABLE'});
+  }
+});
+router.post("/music/generation/:id/sync", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) { res.status(400).json({error:'INVALID_GENERATION_ID'}); return; }
+  try {
+    const job = await db.execute(sql`
+      SELECT instrumental FROM echo_music_generation_jobs
+      WHERE id=${id.data}::uuid AND owner_id=${req.userId!} LIMIT 1
+    `);
+    if (!job.rows.length) { res.status(404).json({error:'MUSIC_JOB_NOT_FOUND'}); return; }
+    const model = job.rows[0].instrumental === true ? MUREKA_INSTRUMENTAL_MODEL : MUREKA_SONG_MODEL;
+    const result = await pollMusicJob(req.userId!, id.data, model);
+    res.json(result);
+  } catch (error) {
+    req.log.error({err:error},'Music sync failed');
+    res.status(503).json({error:'MUSIC_SYNC_UNAVAILABLE'});
+  }
 });
 
 export default router;
