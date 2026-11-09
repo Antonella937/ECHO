@@ -61,7 +61,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         activities: Array.isArray(analysis?.activities) ? analysis.activities.slice(0,6) : [],
       };
     });
-  let dmPreferences: DmConversationPreferences | undefined;
+  let dmPreferences: DmConversationPreferences | undefined;\n  let globalDmPreferences: DmConversationPreferences | undefined;\n  if (input.situation === "dm") {\n    try {\n      const global = await db.execute(sql`SELECT style, response_length, response_timing FROM echo_ai_style_preferences\n        WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? "primary"} LIMIT 1`);\n      if (global.rows[0]) globalDmPreferences = parseDmConversationPreferences({\n        style: global.rows[0].style, responseLength: global.rows[0].response_length,\n        responseTiming: global.rows[0].response_timing, autonomousInitiative: true,\n      });\n    } catch { /* Default DM writing style remains available. */ }\n  }
   if (input.situation === 'dm') {
     try {
       const stored = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences
@@ -72,5 +72,5 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     }
   }
   return previewDecision(dependencies.provider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences ?? globalDmPreferences);
 }
