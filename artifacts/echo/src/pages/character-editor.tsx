@@ -44,6 +44,7 @@ export default function CharacterEditorPage() {
   const [, navigate] = useLocation();
   const back = useBack();
   const account = isNew ? undefined : character(params.id!);
+  const sharedPrimary = account?.personId && account.personId !== account.id ? character(account.personId) : undefined;
 
   const [mode, setMode] = useState<Mode>(isNew ? 'quick' : 'advanced');
   const [linkedSourceId, setLinkedSourceId] = useState('');
@@ -206,6 +207,13 @@ export default function CharacterEditorPage() {
           )}
         </>}
 
+        {sharedPrimary && (
+          <div className="mt-5 rounded-2xl border border-border bg-card/40 p-4 text-sm">
+            <p className="font-semibold">{t('Cuenta vinculada a')} {sharedPrimary.name} (@{sharedPrimary.handle})</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t('La personalidad y los recuerdos pertenecen a la identidad principal. Las publicaciones, galerías y seguidores de esta cuenta son independientes.')}</p>
+            <Link href={`/characters/${sharedPrimary.id}/edit`} className="mt-3 inline-block text-sm font-semibold text-primary underline">{t('Editar identidad compartida')}</Link>
+          </div>
+        )}
         {account && (
           <button onClick={() => setProfileOpen(true)} className="tap mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border text-sm" data-testid="button-open-profile-controls">
             <BadgeCheck className="h-4 w-4" /> {t("Verificación y cifras visibles")}
