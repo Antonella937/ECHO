@@ -120,6 +120,14 @@ export default function EchoMusicPage() {
   const interfaceLanguage = useLanguage();
   const t = (label:string) => translateMusic(label, interfaceLanguage);
   const { me } = useSocial();
+  const [musicAccess, setMusicAccess] = useState<'loading' | 'active' | 'inactive' | 'error'>('loading');
+  useEffect(() => {
+    let mounted = true;
+    customFetch<{active:boolean}>('/api/music/entitlement', { responseType:'json' })
+      .then(data => { if(mounted) setMusicAccess(data.active ? 'active' : 'inactive'); })
+      .catch(() => { if(mounted) setMusicAccess('error'); });
+    return () => { mounted = false; };
+  }, []);
   const resolvePrivateAudio = useMediaResolver();
   const audioRef = useRef<HTMLAudioElement>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -384,6 +392,41 @@ export default function EchoMusicPage() {
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">{t("Ver prompt preparado")}</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
     <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+  </div>;
+  if (musicAccess !== 'active') return <div>
+    <TopBar title="ECHO Music" onBack={back} />
+    <main className="mx-auto max-w-xl px-5 py-10">
+      {musicAccess === 'loading' ? <p className="text-center text-muted-foreground">{interfaceLanguage === 'es' ? 'Comprobando tu suscripción…' : 'Checking your subscription…'}</p>
+      : musicAccess === 'error' ? <div className="rounded-2xl border border-border p-6 text-center">
+          <h2 className="text-lg font-bold">{interfaceLanguage === 'es' ? 'No pudimos comprobar tu acceso' : 'Could not verify your access'}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{interfaceLanguage === 'es' ? 'Probá nuevamente en unos minutos.' : 'Please try again shortly.'}</p>
+          <button className="mt-4 rounded-xl bg-primary px-5 py-3 text-primary-foreground" onClick={() => window.location.reload()}>{interfaceLanguage === 'es' ? 'Reintentar' : 'Retry'}</button>
+        </div>
+      : <section className="rounded-3xl border border-border bg-card p-7 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><Music2 className="h-8 w-8 text-primary" /></div>
+          <h1 className="text-3xl font-bold tracking-tight">ECHO Music</h1>
+          <p className="mt-3 text-muted-foreground">{interfaceLanguage === 'es'
+            ? 'Convertí tus ideas en canciones originales con inteligencia artificial. Creá música para tus personajes, guardala en tu biblioteca y compartila en ECHO.'
+            : 'Turn your ideas into original AI-generated songs. Create music for your characters, save it to your library and share it on ECHO.'}</p>
+          <div className="mt-6 rounded-2xl bg-secondary/60 p-5 text-left text-sm">
+            <p className="font-semibold">{interfaceLanguage === 'es' ? 'Incluye:' : 'Includes:'}</p>
+            <ul className="mt-3 list-inside list-disc space-y-2 text-muted-foreground">
+              <li>{interfaceLanguage === 'es' ? '10 canciones manuales por mes' : '10 manual songs per month'}</li>
+              <li>{interfaceLanguage === 'es' ? '1 canción autónoma por mes' : '1 autonomous song per month'}</li>
+              <li>{interfaceLanguage === 'es' ? 'Biblioteca privada y canciones compartidas' : 'Private library and shared songs'}</li>
+              <li>{interfaceLanguage === 'es' ? 'Música en publicaciones, historias y chats' : 'Music in posts, stories and chats'}</li>
+            </ul>
+          </div>
+          <p className="mt-6 text-3xl font-bold">US$9.99 <span className="text-sm font-normal text-muted-foreground">/ {interfaceLanguage === 'es' ? 'mes' : 'month'}</span></p>
+          <button type="button" onClick={() => { window.location.href = '/settings/subscriptions'; }}
+            className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground">
+            {interfaceLanguage === 'es' ? 'Ver suscripción a ECHO Music' : 'View ECHO Music subscription'}
+          </button>
+          <p className="mt-3 text-xs text-muted-foreground">{interfaceLanguage === 'es'
+            ? 'Los pagos de ECHO Music todavía no están habilitados. No se realizará ningún cobro.'
+            : 'ECHO Music payments are not enabled yet. No charge will be made.'}</p>
+        </section>}
+    </main>
   </div>;
   return <div><TopBar title="ECHO Music Studio" onBack={back} /><main className="mx-auto max-w-2xl space-y-5 px-4 pb-20 pt-5">
     <nav aria-label={t("Secciones de ECHO Music")} className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary/60 p-1">
