@@ -355,7 +355,8 @@ export default function EchoMusicPage() {
       saveDraft({ id: crypto.randomUUID(), title: title.trim(), prompt: result.request.prompt, characterId: me.id, createdAt: new Date().toISOString(), durationSeconds, status: 'draft' });
       setElapsed(0);
       setPlaying(false);
-      setPlayerOpen(true);
+      setPlayerOpen(false);
+      setGenerationStatus(interfaceLanguage === 'es' ? 'Prompt preparado sin cargos. Para crear audio real, usá Generar canción de prueba.' : 'Prompt prepared at no cost. To create real audio, use Generate test track.');
     } catch (err) {
       setPrepareError(err instanceof Error ? err.message : t("No se pudo preparar la canción."));
     } finally {
@@ -425,7 +426,7 @@ export default function EchoMusicPage() {
       <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 p-3 text-sm font-semibold"><Upload className="h-4 w-4" /> {t("Probar con un audio propio")}<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm" className="sr-only" onChange={event => { importAudio(event.target.files?.[0]); event.target.value = ''; }} /></label>
       {localAudioError && <p role="alert" className="text-sm text-red-200">{localAudioError}</p>}
       {audioUrl && !savedAudioPath && <p className="text-center text-xs text-white/60">{t("Audio local de prueba: no se guarda hasta que elijas guardarlo.")}</p>}
-      {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />{t("La canción está preparada, pero la generación de audio todavía no está activada. Cuando ElevenLabs devuelva un archivo, esta pantalla reproducirá el sonido real y la barra avanzará con él.")}</div>}
+      {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />{t("Esto es una vista previa del prompt, no una canción generada. Volvé al estudio y tocá «Generar canción de prueba» para solicitar audio real mediante Mureka.")}</div>}
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">{t("Ver prompt preparado")}</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
     <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
