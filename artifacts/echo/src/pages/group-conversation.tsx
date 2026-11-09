@@ -8,6 +8,7 @@ import { useUser } from '@clerk/react';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { AttachmentView } from '@/components/echo/dm-attachment-view';
 import { MusicLibraryPicker } from '@/components/echo/music-library-picker';
+import { SharedMusicPlayer } from '@/components/echo/shared-music-player';
 import { uploadAttachment, validateAttachments, formatDuration } from '@/lib/dm-attachments';
 import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
@@ -278,7 +279,7 @@ export default function GroupConversationPage() {
           {m.text && <p className="whitespace-pre-wrap break-words text-sm">{m.text}</p>}
           {!!m.attachments?.length && <div className="mt-2 flex flex-col gap-2">{m.attachments.map(a => a.type === 'music' ? <div key={a.id} className="rounded-xl border border-border bg-card p-3 text-foreground">
             <p className="mb-2 text-xs font-semibold">🎵 {a.title}</p>
-            <audio controls preload="none" className="w-full max-w-64" src={`/api/music/published/${encodeURIComponent(a.trackId)}/audio`} />
+            <SharedMusicPlayer trackId={a.trackId} />
             <button type="button" disabled={savingTrackId === a.trackId} className="mt-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold"
               onClick={async () => { if (!id) return; setSavingTrackId(a.trackId); try {
                 await customFetch('/api/group-dms/' + encodeURIComponent(id) + '/music/' + encodeURIComponent(a.trackId) + '/save', {
