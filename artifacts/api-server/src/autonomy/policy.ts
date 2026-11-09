@@ -316,11 +316,15 @@ export function chooseAutonomyOpportunity(input: {
     return time !== null && time <= now.getTime() && now.getTime() - time < DAY_MS;
   };
   const postCount = state.posts.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
+  const storyCount = state.stories.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
+  // A manually posted story does not consume the autonomous story allowance.
+  const anyStoryToday = state.stories.some((item) => item.authorId === character.id && recentDate(item.createdAt));
   const commentCount = state.comments.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const dmCount = state.messages.filter((item) => item.senderId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
-    ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency) }] : []),
+    ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency), publishStory: false }] : []),
+    ...(storyCount < 1 && !anyStoryToday ? [{ situation: "post" as const, weight: frequencyWeight(social?.storiesFrequency), publishStory: true }] : []),
     ...(comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
     ...(input.lane === "dm" && recipients.length && dmCount < 1
       ? [{ situation: "dm" as const, weight: frequencyWeight(social?.initiatesDMs) }]
@@ -377,9 +381,7 @@ export function chooseAutonomyOpportunity(input: {
       reason: "A recent, visible message has text context and has not been reacted to by this character.", localHour: local.hour, timezone };
   }
   if (selected.situation === "post") {
-    const storyCount = state.stories.filter(item => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
-    const publishStory = storyCount < 1 && random() < 0.35;
-    return { situation: "post", ...(publishStory ? { publishStory: true } : {}), reasonCode: "OPPORTUNITY_SELECTED", reason: "The current social pace permits considering a text post.", localHour: local.hour, timezone };
+    return { situation: "post", ...(selected.publishStory ? { publishStory: true } : {}), reasonCode: "OPPORTUNITY_SELECTED", reason: selected.publishStory ? "The character may publish a short text story." : "The character may publish a feed post.", localHour: local.hour, timezone };
   }
   return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "The selected opportunity no longer has a valid target.", localHour: local.hour, timezone };
 }
