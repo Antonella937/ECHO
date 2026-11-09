@@ -369,9 +369,14 @@ export async function runAutonomyLiveCycle(
             AND character_id IN (${character.id}, ${opportunity.recipientId})`);
         const sender = permissions.rows.find(row => row.character_id === character.id);
         const receiver = permissions.rows.find(row => row.character_id === opportunity.recipientId);
-        permitted = sender?.enabled === true && receiver?.enabled === true &&
+        // The universe's active owner identity is human-controlled, not an AI
+        // character. Its incoming messages do not require an AI DM permission
+        // record in the reverse direction. The AI sender still must opt in.
+        const recipientIsOwnerIdentity = opportunity.recipientId === state.currentCharacterId;
+        permitted = sender?.enabled === true &&
           Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
-          Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id);
+          (recipientIsOwnerIdentity || (receiver?.enabled === true &&
+            Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id)));
       } catch { permitted = false; }
       if (!permitted) {
         await dependencies.repository.complete(ownerId, runId, {
