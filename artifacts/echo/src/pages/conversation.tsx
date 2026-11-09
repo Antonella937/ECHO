@@ -277,7 +277,7 @@ export default function ConversationPage() {
             </div>
           </Link>
 
-          <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="ml-auto tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-dm-ai-settings"><MoreHorizontal className="h-5 w-5" /></button>
+          <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="ml-auto tap flex h-11 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-primary hover:bg-primary/20" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
