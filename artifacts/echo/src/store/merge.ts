@@ -48,6 +48,14 @@ export function mergeUniverse(
         return [...new Set([...left, ...right])].filter(id => old.has(id) ? ls.has(id) && rs.has(id) : ls.has(id) || rs.has(id));
       }
     }
+    // Highlights belong to separate public accounts. A stale snapshot from
+    // another active identity must not erase a different account's highlights.
+    // Explicit deletion is allowed only while editing that highlight's owner.
+    if (/^highlights\\.[^.]+$/.test(path) && object(b) && typeof b.authorId === 'string') {
+      const owner = b.authorId;
+      if (l === undefined && object(r) && owner !== local.currentCharacterId) return r;
+      if (r === undefined && object(l) && owner !== remote.currentCharacterId) return l;
+    }
     if (same(l, r)) return l;
     if (base && same(l, b)) return r;
     if (base && same(r, b)) return l;
