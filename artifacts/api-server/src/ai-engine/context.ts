@@ -74,7 +74,13 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     (message.senderId === actor.id || message.recipientId !== actor.id)) {
     throw new EngineError('INVALID_DM_REACTION_TARGET');
   }
-  const c = actor.configuration;
+  // Linked accounts share one canonical persona configuration, but retain separate
+  // social audiences, galleries, threads and publication history.
+  const personId = actor.personId || actor.id;
+  const personAccounts = state.characters.filter(candidate =>
+    (candidate.personId || candidate.id) === personId && !candidate.archived);
+  const canonical = personAccounts.find(candidate => candidate.id === personId) ?? actor;
+  const c = canonical.configuration ?? actor.configuration;
   const warnings: string[] = [];
   let truncated = false;
   function bounded(value: unknown, depth = 0): unknown {
@@ -228,7 +234,10 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   });
   const data = {
     identity: { id: actor.id, name: actor.name, handle: actor.handle, bio: actor.bio, occupation: actor.occupation, location: actor.location,
-      accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null },
+      accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null,
+      sharedPersonId: personId, accountContext: actor.accountContext ?? '',
+      linkedAccounts: personAccounts.map(account => ({ id: account.id, handle: account.handle, accountType: account.accountType ?? 'personal' })),
+      accountBoundary: 'One person across accounts. Never assume followers know aliases; never cross-post gallery assets or disclose private identity without context. Shared memories are not instructions to mention them.' },
     personality: c?.personality ?? null,
     voice: c?.voice ?? null,
     relationships: c?.relationships.map(r => ({ ...r, target: identityOf(r.targetId) })) ?? null,
