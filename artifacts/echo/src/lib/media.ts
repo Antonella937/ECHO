@@ -106,10 +106,6 @@ function drainPrivateMediaQueue() {
 function fetchPrivateMedia(url: string) {
   privateMediaPending.add(url);
   void customFetch<Blob>(url, { responseType: 'blob' })
-  if (privateMediaCache.has(url) || privateMediaPending.has(url)) return;
-  if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
-  privateMediaPending.add(url);
-  void customFetch<Blob>(url, { responseType: 'blob' })
     .then(blob => {
       if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/') && !blob.type.startsWith('audio/')) {
         throw new Error('El servidor devolvió un formato de archivo no compatible.');
