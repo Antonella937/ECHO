@@ -45,6 +45,7 @@ export default function NotificationsPage() {
   const [creatorPosts, setCreatorPosts] = useState<Array<{ id: string; ownerId: string; displayName: string; title: string; body: string; createdAt: string }>>([]);
   const [creatorRead, setCreatorRead] = useState<string[]>([]);
   const [serverRead, setServerRead] = useState<string[]>([]);
+  const [selectedFollowRequest, setSelectedFollowRequest] = useState<string | null>(null);
   const [officialSubscribed, setOfficialSubscribed] = useState(true);
   const [showSubscriptionIntro, setShowSubscriptionIntro] = useState(false);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
@@ -93,6 +94,11 @@ export default function NotificationsPage() {
 
   const open = (n: Group) => {
     n.ids.forEach((id) => { if (state.notifications.find((x) => x.id === id && !x.read)) actions.markNotificationRead(id); });
+    if (n.kind === 'follow' && n.excerpt === 'follow_request') {
+      // Open the actionable request here, never redirect to the requester's profile.
+      setSelectedFollowRequest(n.actorId);
+      return;
+    }
     if (n.kind === 'message' || n.kind === 'story_reply') navigate(`/messages/${n.actorId}`);
     else if (n.postId) navigate(`/p/${n.postId}${n.commentId ? `?c=${n.commentId}` : ''}`);
     else if (n.storyId && state.stories.some(s => s.id === n.storyId))
@@ -158,13 +164,13 @@ export default function NotificationsPage() {
           {unread.length > 0 && (
             <>
               <h2 className="px-4 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Nuevas")}</h2>
-              <ul>{unread.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} meId={me.id} respondFollowRequest={actions.respondFollowRequest} open={open} resolveMedia={resolveMedia} />)}</ul>
+              <ul>{unread.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} meId={me.id} respondFollowRequest={actions.respondFollowRequest} selectedFollowRequest={selectedFollowRequest} open={open} resolveMedia={resolveMedia} />)}</ul>
             </>
           )}
           {read.length > 0 && (
             <>
               <h2 className="px-4 pb-1 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Anteriores")}</h2>
-              <ul className="opacity-80">{read.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} meId={me.id} respondFollowRequest={actions.respondFollowRequest} open={open} resolveMedia={resolveMedia} />)}</ul>
+              <ul className="opacity-80">{read.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} meId={me.id} respondFollowRequest={actions.respondFollowRequest} selectedFollowRequest={selectedFollowRequest} open={open} resolveMedia={resolveMedia} />)}</ul>
             </>
           )}
         </div>
@@ -173,12 +179,13 @@ export default function NotificationsPage() {
   );
 }
 
-function NotificationRow({ n, character, state, meId, respondFollowRequest, open, resolveMedia }: {
+function NotificationRow({ n, character, state, meId, respondFollowRequest, selectedFollowRequest, open, resolveMedia }: {
   n: Group;
   character: ReturnType<typeof useSocial>['character'];
   state: ReturnType<typeof useSocial>['state'];
   meId: string;
   respondFollowRequest: (requesterId: string, accept: boolean) => void;
+  selectedFollowRequest: string | null;
   open: (n: Group) => void;
   resolveMedia: ReturnType<typeof useMediaResolver>;
 }) {
@@ -197,6 +204,7 @@ function NotificationRow({ n, character, state, meId, respondFollowRequest, open
     };
     const pendingFollowRequest = n.kind === 'follow' && (state.followRequests?.[meId] ?? []).includes(n.actorId);
     const followRequestNotice = n.kind === 'follow' && n.excerpt === 'follow_request';
+    const requestExpanded = pendingFollowRequest && selectedFollowRequest === n.actorId;
     const followRequestVerbs: Record<string, string> = { es: 'solicitó seguirte', en: 'requested to follow you', pt: 'solicitou seguir você', fr: 'a demandé à vous suivre', de: 'möchte dir folgen', it: 'ha chiesto di seguirti', ko: '팔로우를 요청했습니다', ja: 'フォローをリクエストしました', zh: '请求关注你' };
     const verb = followRequestNotice ? (followRequestVerbs[language] ?? followRequestVerbs.en) : n.kind === 'collaboration_invite' || n.kind === 'collaboration_accepted'
       ? (collaborationVerbs[language] ?? collaborationVerbs.en)[n.kind === 'collaboration_invite' ? 0 : 1]
@@ -223,7 +231,7 @@ function NotificationRow({ n, character, state, meId, respondFollowRequest, open
           {post && postMedia(post).length > 0 && post.media?.[0]?.type !== 'video' && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />}
           <span className={cn('h-2 w-2 shrink-0 rounded-full', n.read ? 'bg-transparent' : 'bg-primary')} aria-label={n.read ? undefined : t('Sin leer')} />
         </button>
-        {pendingFollowRequest && <div className="ml-[68px] mb-2 flex gap-2">
+        {pendingFollowRequest && <div className={cn("ml-[68px] mb-2 flex gap-2", requestExpanded && "rounded-xl border border-primary/50 bg-primary/5 p-2")} data-testid={`follow-request-actions-${n.actorId}`}>
           <button type="button" onClick={() => respondFollowRequest(n.actorId, true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{({ es: 'Aceptar', en: 'Accept', pt: 'Aceitar', fr: 'Accepter', de: 'Annehmen', it: 'Accetta', ko: '수락', ja: '承認', zh: '接受' } as Record<string,string>)[language] ?? 'Accept'}</button>
           <button type="button" onClick={() => respondFollowRequest(n.actorId, false)} className="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold">{({ es: 'Rechazar', en: 'Decline', pt: 'Recusar', fr: 'Refuser', de: 'Ablehnen', it: 'Rifiuta', ko: '거절', ja: '拒否', zh: '拒绝' } as Record<string,string>)[language] ?? 'Decline'}</button>
         </div>}
