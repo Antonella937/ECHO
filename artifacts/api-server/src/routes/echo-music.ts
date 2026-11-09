@@ -118,6 +118,50 @@ router.post("/music/library/:id/unpublish", async (req, res) => {
     res.json({ unpublished: true });
   } catch (error) { req.log.error({ err: error }, "Music unpublish failed"); res.status(503).json({ error: "MUSIC_UNPUBLISH_UNAVAILABLE" }); }
 });
+// A share reference is not a feed post, story, or DM by itself.
+// Surface creation must validate the destination and its permissions before
+// attaching this reference. The track remains private until explicitly shared.
+const musicShareRequest = z.object({
+  trackId: z.string().uuid(),
+  surface: z.enum(["feed", "story", "dm"]),
+  targetId: z.string().min(1).max(128),
+  clipStartSeconds: z.number().int().min(0).default(0),
+  clipDurationSeconds: z.number().int().min(1).max(60).nullable().default(null),
+}).strict();
+router.post("/music/share-reference", async (req, res) => {
+  const parsed = musicShareRequest.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_SHARE" }); return; }
+  const item = parsed.data;
+  try {
+    const [track] = await db.select().from(echoMusicLibraryTable).where(and(
+      eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, item.trackId)
+    )).limit(1);
+    if (!track || track.status !== "saved_audio" || !track.audioPath) {
+      res.status(404).json({ error: "SHAREABLE_MUSIC_NOT_FOUND" }); return;
+    }
+    if (item.clipStartSeconds >= track.durationSeconds ||
+      (item.clipDurationSeconds !== null && item.clipStartSeconds + item.clipDurationSeconds > track.durationSeconds)) {
+      res.status(400).json({ error: "MUSIC_CLIP_OUT_OF_RANGE" }); return;
+    }
+    // This is a private owner-scoped draft reference, not permission to send
+    // or publish. A later surface endpoint must validate target ownership.
+    const result = await db.execute(sql`
+      INSERT INTO echo_music_shares
+        (owner_id,track_id,surface,target_id,clip_start_seconds,clip_duration_seconds)
+      VALUES (${req.userId!},${item.trackId},${item.surface},${item.targetId},
+        ${item.clipStartSeconds},${item.clipDurationSeconds})
+      ON CONFLICT (owner_id,track_id,surface,target_id)
+      DO UPDATE SET clip_start_seconds=EXCLUDED.clip_start_seconds,
+        clip_duration_seconds=EXCLUDED.clip_duration_seconds
+      RETURNING id,track_id AS "trackId",surface,target_id AS "targetId",
+        clip_start_seconds AS "clipStartSeconds",clip_duration_seconds AS "clipDurationSeconds"
+    `);
+    res.json({ reference: result.rows[0], published: false, sent: false, creditsUsed: 0 });
+  } catch (error) {
+    req.log.error({ err: error }, "Music share reference failed");
+    res.status(503).json({ error: "MUSIC_SHARE_REFERENCE_UNAVAILABLE" });
+  }
+});
 router.get("/music/published", async (req, res) => {
   try {
     const items = await db.select({
