@@ -179,13 +179,12 @@ export function chooseAutonomyOpportunity(input: {
   // Social posting and conversational DM replies have independent budgets.
   // Otherwise frequent DMs permanently suppress posts, likes and comments.
   const history = countRecentHistory(input.history, now).filter(event =>
-    input.lane === "social" ? event.situation !== "dm" : true);
+    input.lane === "social" ? event.situation !== "dm" : event.situation === "dm");
   // Only autonomous executions determine autonomous cooldown and daily caps.
   // Manual account management never postpones the character's own activity.
-  const recentSocial = input.lane === "social" ? [] : recentActorActivity(state, character.id, now);
+  const recentSocial: number[] = [];
   const latestActivity = Math.max(
-    ...(input.lane === "social" ? [] : recentSocial),
-    ...(input.lane === "social" ? [] : [asTime(config?.currentState?.lastActivityAt) ?? 0]),
+    ...recentSocial,
     ...history.map((event) => event.createdAt.getTime()),
     0,
   );
@@ -249,7 +248,7 @@ export function chooseAutonomyOpportunity(input: {
   }
   // Executed autonomous actions are already in history; do not count them twice
   // merely because their resulting posts/messages also exist in the state.
-  if ((input.lane === "social" ? history.length : recentSocial.length + history.length) >= (input.maxActionsPerDay ?? 2)) {
+  if (history.length >= (input.maxActionsPerDay ?? 2)) {
     return { situation: null, reasonCode: "DAILY_CAP", reason: "Character daily action cap reached.", localHour: local.hour, timezone };
   }
 
@@ -270,7 +269,6 @@ export function chooseAutonomyOpportunity(input: {
   if (social?.allowSilence) opportunityChance *= 0.82;
   if (local.hour < 6 || local.hour >= 23) opportunityChance *= 0.28;
   if (activeRoutine && !/free|leisure|social|salir|tiempo libre/i.test(String(activeRoutine.activity))) opportunityChance *= 0.6;
-  if (input.lane !== "social" && recentSocial.length > 0) opportunityChance *= 0.55;
   opportunityChance = Math.max(0.04, Math.min(0.65, opportunityChance));
 
   if (random() >= opportunityChance) {
