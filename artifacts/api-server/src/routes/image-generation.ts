@@ -208,6 +208,14 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     }
     res.json({ status: 'generated', objectPath: result.objectPath, estimatedCostUsd: result.billedUsd, costReconciled: false, jobId: result.jobId, chargedPhotoCredits: cost });
   } catch (error) {
+    const code = error instanceof Error ? error.message : '';
+    if (code === 'FAL_IMAGE_CONTENT_POLICY_REFERENCES' || code === 'FAL_IMAGE_CONTENT_POLICY_PROMPT') {
+      req.log.warn({ reason: code }, 'Image request rejected by provider policy');
+      res.status(422).json({ error: 'IMAGE_CONTENT_POLICY_REJECTED',
+        rejectedInput: code.endsWith('REFERENCES') ? 'references' : 'prompt',
+        chargedPhotoCredits: 0, retrySameRequest: false });
+      return;
+    }
     req.log.error({ err: error }, 'Image generation failed');
     res.status(503).json({ error: 'IMAGE_GENERATION_UNAVAILABLE' });
   }
