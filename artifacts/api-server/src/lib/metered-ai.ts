@@ -45,7 +45,7 @@ export class MeteredTextProvider implements TextProvider {
       const result = await this.inner.complete(input);
       const details = providerDetails(result);
       await settleAiUsage(reservation, {
-        ...details, succeeded: true, provider: this.inner.name,
+        ...details, succeeded: true, provider: details.model?.includes("/") || details.model?.endsWith(":free") ? "openrouter" : this.inner.name,
       });
       return result;
     } catch (error) {
