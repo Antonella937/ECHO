@@ -3,13 +3,13 @@ import { PreviewCharacterDecisionBody, type CharacterDecisionInput, type SocialS
 import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { previewForOwner } from "../ai-engine/service";
-import { FreeModelProvider } from "../ai-engine/free-models";
+import { GeminiDmProvider } from "../ai-engine/gemini";
 import { EngineError, type TextProvider } from "../ai-engine/contracts";
 import { VisionError, type VisionContext } from "../vision/contracts";
 import { visionService } from "../vision/service";
 import { MeteredTextProvider } from "../lib/metered-ai";
 
-const provider = new FreeModelProvider();
+const provider = new GeminiDmProvider();
 
 function warnRequest(req: Request, code: string, message: string): void {
   const log = (req as Request & {
