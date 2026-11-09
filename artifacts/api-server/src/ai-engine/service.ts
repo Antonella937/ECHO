@@ -2,7 +2,7 @@ import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionI
 import { EngineError, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
 import type { VisionContext } from '../vision/contracts';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { clerkClient } from '@clerk/express';
@@ -20,6 +20,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   if (!snapshot.state) throw new EngineError('UNIVERSE_NOT_FOUND', 404);
   const parsed = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
   if (!parsed.success) throw new EngineError('INVALID_STORED_UNIVERSE', 422);
+  const actor = parsed.data.state.characters.find(c => c.id === input.characterId);
+  const personId = actor?.personId || actor?.id || input.characterId;
+  const linkedAccountIds = parsed.data.state.characters
+    .filter(c => (c.personId || c.id) === personId)
+    .map(c => c.id);
   const historical = process.env.ECHO_MEMORY_ARCHIVE_ENABLED === 'true'
     ? await db.select({ memoryId: echoMemoryArchiveTable.memoryId, sourceId: echoMemoryArchiveTable.sourceId,
       kind: echoMemoryArchiveTable.kind, targetId: echoMemoryArchiveTable.targetId,
@@ -27,7 +32,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       .from(echoMemoryArchiveTable).where(and(
         eq(echoMemoryArchiveTable.ownerId, ownerId),
         eq(echoMemoryArchiveTable.universeId, input.universeId ?? 'primary'),
-        eq(echoMemoryArchiveTable.characterId, input.characterId),
+        inArray(echoMemoryArchiveTable.characterId, linkedAccountIds),
       )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(150)
     : [];
   const vision = dependencies.vision
