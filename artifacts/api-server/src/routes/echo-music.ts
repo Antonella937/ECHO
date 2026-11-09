@@ -483,9 +483,18 @@ router.get("/music/generation/:id/audio", async (req, res) => {
     if (!res.headersSent) res.status(503).json({ error: "GENERATED_AUDIO_UNAVAILABLE" });
   }
 });
-router.get("/music/status", (_req, res) => {
+router.get("/music/status", async (req, res) => {
+  let paidTestEnabled = false;
+  if (process.env.ECHO_MUSIC_PAID_TEST_ENABLED === 'true') {
+    try {
+      const founder = await db.execute(sql`SELECT 1 FROM echo_music_entitlements
+        WHERE owner_id=${req.userId!} AND status='active' AND provider='founder_grant' LIMIT 1`);
+      paidTestEnabled = founder.rows.length > 0;
+    } catch (error) { req.log.warn({err:error}, 'Music test eligibility unavailable'); }
+  }
   res.json({
     addon: "echo_music",
+    paidTestEnabled,
     addonRequired: true,
     activated: false,
     generationEnabled: false,
