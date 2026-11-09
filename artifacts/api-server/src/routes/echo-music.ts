@@ -175,9 +175,9 @@ router.get("/music/status", (_req, res) => {
     addonRequired: true,
     activated: false,
     generationEnabled: false,
-    provider: "unselected",
-    model: null,
-    providerConfigured: false,
+    provider: "fal_ai_mureka_v8",
+    model: "mureka/v8/generate/song",
+    providerConfigured: Boolean(process.env.FAL_KEY?.trim()),
     providerRequestsEnabled: false,
     paidCallsMade: 0,
     creditsSharedWithVoices: false,
@@ -297,29 +297,23 @@ router.get("/music/clips/search", (_req, res) => {
   });
 });
 
-// Official Eleven Music API: POST https://api.elevenlabs.io/v1/music
-// Keep all billable calls disabled until subscription, usage limits, storage,
-// and explicit activation are reviewed. Voice API credentials are server-only.
+// Mureka V8 through fal.ai. Server-side adapter: credentials never leave Render.
+// Paid generation remains disabled until an atomic credit ledger and durable
+// private storage are connected. Preview performs no provider request.
 const musicGenerationRequest = musicDraft.extend({
   durationSeconds: z.number().int().min(3).max(300).default(120),
 }).strict();
-function composeElevenMusicRequest(draft: z.infer<typeof musicGenerationRequest>) {
-  const prompt = [
-    draft.description,
-    draft.genre && `Genre: ${draft.genre}`,
+function composeMurekaRequest(draft: z.infer<typeof musicGenerationRequest>) {
+  const style = [draft.description, draft.genre && `Genre: ${draft.genre}`,
     draft.mood && `Mood: ${draft.mood}`,
     draft.instruments.length && `Instruments: ${draft.instruments.join(", ")}`,
-    draft.vocalMode === "instrumental"
-      ? "Instrumental only, no singing or spoken words."
-      : `Sung vocals in language ${draft.language}.`,
-    draft.vocalMode === "singing" && draft.lyrics && `Use these original lyrics:\n${draft.lyrics}`,
-  ].filter(Boolean).join("\n");
-  return {
-    model_id: "music_v2_5" as const,
-    prompt: prompt.slice(0, 4100),
-    music_length_ms: draft.durationSeconds * 1000,
-    force_instrumental: draft.vocalMode === "instrumental",
-  };
+    draft.vocalMode === "instrumental" ? "Instrumental music, no vocals." : `Singing in ${draft.language}.`,
+  ].filter(Boolean).join("\\n");
+  // Mureka's song endpoint accepts either lyrics or a prompt. Unlike Eleven
+  // Music, it does not expose a requested-duration parameter.
+  return draft.vocalMode === "singing" && draft.lyrics.trim()
+    ? { lyrics: draft.lyrics.slice(0, 5000), prompt: style.slice(0, 1024) }
+    : { prompt: style.slice(0, 2000) };
 }
 router.post("/music/generate/preview", (req, res) => {
   const parsed = musicGenerationRequest.safeParse(req.body);
@@ -328,18 +322,18 @@ router.post("/music/generate/preview", (req, res) => {
     return;
   }
   res.json({
-    provider: "elevenlabs_music",
-    status: "dry_run",
-    activated: false,
-    charged: false,
-    request: composeElevenMusicRequest(parsed.data),
-    endpoint: "POST /v1/music",
-    note: "Request preview only. No ElevenLabs API call was made.",
+    provider: "fal_ai_mureka_v8", model: "mureka/v8/generate/song",
+    status: "dry_run", activated: false, charged: false,
+    credentialsConfigured: Boolean(process.env.FAL_KEY?.trim()),
+    request: composeMurekaRequest(parsed.data),
+    endpoint: "mureka/v8/generate/song",
+    durationIsEstimate: true,
+    note: "Preview only. No fal.ai API call or credit debit was made.",
   });
 });
-
 router.post("/music/generate", (_req, res) => {
-  res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", provider: "elevenlabs_music", charged: false, retryable: false });
+  res.status(503).json({ error: "ECHO_MUSIC_NOT_ACTIVATED", provider: "fal_ai_mureka_v8",
+    charged: false, retryable: false, missing: ["verified_entitlement", "atomic_credits", "private_audio_storage"] });
 });
 
 export default router;
