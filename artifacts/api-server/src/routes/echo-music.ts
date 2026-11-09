@@ -322,11 +322,11 @@ router.post("/music/generate/preview", (req, res) => {
     return;
   }
   res.json({
-    provider: "fal_ai_mureka_v8", model: "mureka/v8/generate/song",
+    provider: "fal_ai_mureka_v8", model: parsed.data.vocalMode === "instrumental" ? "mureka/v8/generate/instrumental" : "mureka/v8/generate/song",
     status: "dry_run", activated: false, charged: false,
     credentialsConfigured: Boolean(process.env.FAL_KEY?.trim()),
-    request: composeMurekaRequest(parsed.data),
-    endpoint: "mureka/v8/generate/song",
+    request: parsed.data.vocalMode === "instrumental" ? { prompt: [parsed.data.description, parsed.data.genre, parsed.data.mood, parsed.data.instruments.join(", ")].filter(Boolean).join("; ").slice(0, 2000) } : composeMurekaRequest(parsed.data),
+    endpoint: parsed.data.vocalMode === "instrumental" ? "mureka/v8/generate/instrumental" : "mureka/v8/generate/song",
     durationIsEstimate: true,
     note: "Preview only. No fal.ai API call or credit debit was made.",
   });
