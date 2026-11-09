@@ -64,7 +64,7 @@ const musicEnglish: Record<string,string> = {
   "Todavía no hay canciones compartidas.": "No shared tracks yet.",
   "Cargando…": "Loading…",
   "Eliminar un registro no borra todavía el archivo privado del almacenamiento.": "Deleting a library entry does not yet delete its private stored file.",
-  "Configurá una canción original para Eleven Music. La vista previa se prepara en ECHO sin enviar datos a ElevenLabs ni consumir créditos.": "Set up an original song for Eleven Music. ECHO prepares the preview without sending data to ElevenLabs or using credits.",
+  "Configurá una canción original para ECHO Music. La vista previa prepara tu solicitud sin generar audio ni consumir créditos.": "Set up an original song for Eleven Music. ECHO prepares the preview without sending data to ElevenLabs or using credits.",
   "Título": "Title",
   "Nombre de tu canción": "Your song title",
   "Describí tu canción": "Describe your song",
@@ -389,8 +389,9 @@ export default function EchoMusicPage() {
     </section> : <>
     <div className="rounded-2xl border border-border bg-card/60 p-5">
       <div className="flex items-center gap-2 text-lg font-semibold"><Music2 className="h-5 w-5 text-primary" /> Create your sound</div>
-      <p className="mt-2 text-xs text-muted-foreground">{t("Configurá una canción original para Eleven Music. La vista previa se prepara en ECHO sin enviar datos a ElevenLabs ni consumir créditos.")}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{t("Configurá una canción original para ECHO Music. La vista previa prepara tu solicitud sin generar audio ni consumir créditos.")}</p>
     </div>
+    <div className="rounded-2xl border border-border bg-card/60 p-4 text-xs text-muted-foreground" data-testid="echo-music-allowances"><p className="font-semibold text-foreground">{t("ECHO Music · plan previsto")}</p><p className="mt-1">{t("USD 9.99/mes · 10 canciones manuales + 1 canción espontánea de tus personajes al mes.")}</p><p className="mt-2">{t("Los personajes podrán componer según sus conversaciones y relaciones, con límite de una generación autónoma cada 7 días y saldo independiente. Las canciones guardadas se podrán reutilizar sin pagar otra generación.")}</p><p className="mt-2">{t("La generación automática y las compras aún no están activadas. Este estudio sigue preparando borradores sin cargos.")}</p></div>
     <form className="space-y-4" onSubmit={event => { event.preventDefault(); prepare(); }}>
       <label className="block space-y-1 text-sm font-medium">{t("Título")}<input className={field} value={title} maxLength={120} required onChange={e=>setTitle(e.target.value)} placeholder={t("Nombre de tu canción")} /></label>
       <label className="block space-y-1 text-sm font-medium">{t("Describí tu canción")}<textarea className={field} value={description} maxLength={2000} required minLength={3} rows={4} onChange={e=>setDescription(e.target.value)} placeholder={t("Una canción de rock alternativo con batería potente...")} /></label>
