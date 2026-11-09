@@ -219,8 +219,12 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         coordinator.current?.edit(s => {
           const target = s.currentCharacterId;
           const pending = s.followRequests?.[target] ?? [];
-          if (!pending.includes(requesterId)) return s;
-          return { ...s, followRequests: { ...s.followRequests, [target]: pending.filter(id => id !== requesterId) }, ...(accept ? { follows: { ...s.follows, [requesterId]: Array.from(new Set([...(s.follows[requesterId] ?? []), target])) } } : {}) };
+          // Older persisted universes may contain a follow-request notification but
+          // no followRequests map. Recover only from a real notification addressed
+          // to this identity; never approve an arbitrary requester.
+          const hasRequestNotice = s.notifications.some(n => n.recipientId === target && n.actorId === requesterId && n.kind === 'follow' && n.excerpt === 'follow_request');
+          if (!pending.includes(requesterId) && !hasRequestNotice) return s;
+          return { ...s, followRequests: { ...s.followRequests, [target]: pending.filter(id => id !== requesterId) }, notifications: s.notifications.filter(n => !(n.recipientId === target && n.actorId === requesterId && n.kind === 'follow' && n.excerpt === 'follow_request')), ...(accept ? { follows: { ...s.follows, [requesterId]: Array.from(new Set([...(s.follows[requesterId] ?? []), target])) } } : {}) };
         });
       },
       setPrivateAccount(accountId, value) {
