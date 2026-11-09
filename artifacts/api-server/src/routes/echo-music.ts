@@ -651,6 +651,7 @@ router.get("/music/clips/search", (_req, res) => {
 // private storage are connected. Preview performs no provider request.
 const musicGenerationRequest = musicDraft.extend({
   durationSeconds: z.number().int().min(3).max(300).default(120),
+  requireConfiguredVoice: z.boolean().default(false),
 }).strict();
 function composeMurekaRequest(draft: z.infer<typeof musicGenerationRequest>) {
   const style = [draft.description, draft.genre && `Genre: ${draft.genre}`,
@@ -745,6 +746,9 @@ router.post("/music/generate", async (req, res) => {
       WHERE owner_id=${req.userId!} AND character_id=${characterId} LIMIT 1
     `) : null;
     const savedVocalId = singingVoice?.rows[0]?.mureka_vocal_id;
+    if (draft.vocalMode === 'singing' && draft.requireConfiguredVoice && typeof savedVocalId !== 'string') {
+      res.status(409).json({error:'CHARACTER_SINGING_VOICE_NOT_CONFIGURED',charged:false}); return;
+    }
     const jobInput = {
       ownerId: req.userId!, characterId, mode: 'manual' as const,
       vocalId: typeof savedVocalId === 'string' ? savedVocalId : undefined,
