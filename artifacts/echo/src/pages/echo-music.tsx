@@ -265,10 +265,34 @@ export default function EchoMusicPage() {
   }
   const audioUrl = resolvedSavedAudio || localAudioUrl;
   const filteredLibrary = library.filter(item => item.status === libraryFilter).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  function openLibraryItem(item: MusicDraftRecord) {
-    audioRef.current?.pause(); setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds);
+  async function openLibraryItem(item: MusicDraftRecord) {
+    if (loadingSharedId) return;
+    audioRef.current?.pause();
+    setLibraryError('');
+    setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds);
+    setElapsed(0); setActualDuration(0); setClipStart(0);
+    // Generated music uses an authenticated server stream, not a legacy
+    // /objects/uploads path. Fetch with Clerk auth before opening the player.
+    if (item.status === 'saved_audio' && item.audioPath?.startsWith('generated/')) {
+      setLoadingSharedId(item.id);
+      try {
+        const blob = await customFetch<Blob>(
+          '/api/music/generation/' + encodeURIComponent(item.id) + '/audio',
+          { responseType: 'blob' },
+        );
+        if (!blob.type.startsWith('audio/')) throw new Error('INVALID_GENERATED_AUDIO');
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
+        setSavedAudioPath(null); setLocalAudioUrl(url); setSelectedAudioFile(null);
+        setPlayerOpen(true);
+      } catch {
+        setLibraryError(t("No se pudo cargar el audio compartido."));
+      } finally { setLoadingSharedId(null); }
+      return;
+    }
     setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null);
-    setElapsed(0); setActualDuration(0); setClipStart(0); setPlayerOpen(true);
+    setPlayerOpen(true);
   }
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
