@@ -107,15 +107,6 @@ export function AutonomySettingsSection() {
               aria-label={`${t("Autonomía social para")} ${character.displayName}`}
               data-testid={`switch-autonomy-character-${character.characterId}`}
             />
-            <button
-              type="button"
-              disabled={(dryRun.isPending && simulatingCharacterId === character.characterId) || query.isLoading}
-              onClick={() => runPreview(character.characterId)}
-              className="h-9 shrink-0 rounded-xl border border-border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
-              data-testid={`button-autonomy-dry-run-${character.characterId}`}
-            >
-              {t(dryRun.isPending && simulatingCharacterId === character.characterId ? 'Simulando…' : 'Simular')}
-            </button>
           </div>
         ))}
         </div></details>
