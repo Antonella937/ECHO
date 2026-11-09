@@ -17,7 +17,6 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
   const t = useSceneSettingsText();
   const [prefs, setPrefs] = useState<Preferences>(defaults);
   const [status, setStatus] = useState('');
-  const [inherited, setInherited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dmEnabled, setDmEnabled] = useState(false);
   const [allowedPeers, setAllowedPeers] = useState<string[]>([]);
@@ -26,8 +25,8 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
     if (!open || !user?.id) return;
     let active = true;
     setStatus('');
-    customFetch<{ preferences: Preferences; inherited?: boolean }>(`/api/dm/conversation-preferences?${new URLSearchParams({universeId, characterId})}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
-      .then(result => { if (active) { setPrefs({ ...defaults, ...result.preferences }); setInherited(result.inherited === true); } })
+    customFetch<{ preferences: Preferences }>(`/api/dm/conversation-preferences?${new URLSearchParams({universeId, characterId})}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
+      .then(result => { if (active) { setPrefs({ ...defaults, ...result.preferences }); } })
       .catch(() => { if (active) setStatus(t('failed')); });
     customFetch<{ enabled: boolean; allowedPeerIds: string[] }>(`/api/dm/character-permissions?${new URLSearchParams({universeId, characterId})}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
       .then(result => { if (active) { setDmEnabled(result.enabled); setAllowedPeers(result.allowedPeerIds); } })
@@ -44,7 +43,6 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
       customFetch('/api/dm/conversation-preferences', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, preferences: prefs }) }),
       customFetch('/api/dm/character-permissions', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, enabled: dmEnabled, allowedPeerIds: allowedPeers }) }),
     ]);
-    if (results[0].status === 'fulfilled') setInherited(false);
     const succeeded = results.every(result => result.status === 'fulfilled');
     setStatus(succeeded ? t('savedOnline') : t('failed'));
     setSaving(false);
@@ -54,7 +52,6 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
       <div className="mb-5 flex items-center justify-between gap-2"><button type="button" onClick={onClose} aria-label="Volver a la conversación" className="flex items-center gap-2 rounded-full p-2 hover:bg-secondary"><ArrowLeft className="h-5 w-5" /><span className="text-sm">Volver</span></button><h2 className="text-lg font-semibold">{t('aiSettings')}</h2><button type="button" onClick={onClose} aria-label={t('close')} className="rounded-full p-2 hover:bg-secondary"><X className="h-5 w-5" /></button></div>
       
       <details open className="mb-3 rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{t('conversation')}</summary><div className="pt-3">
-      {inherited && <p className="mb-3 text-xs text-muted-foreground">Se están usando los ajustes generales de IA. Guardá para personalizar esta conversación.</p>}
       <label className="mb-1 block text-sm font-semibold">{t('style')}</label>
       <select value={prefs.style} onChange={e => update('style', e.target.value as Style)} className="mb-4 w-full rounded-xl border border-border bg-background p-3">
         <option value="natural">{t('natural')}</option><option value="narrative">{t('narrative')}</option><option value="mixed">{t('mixed')}</option>
