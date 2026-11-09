@@ -321,7 +321,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           />
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex flex-col items-center gap-2 px-6 text-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),14px)+156px)] z-10 flex max-h-[38dvh] flex-col items-center gap-3 overflow-y-auto px-6 text-center">
           {liveStory.musicClip && <div className="pointer-events-auto w-full max-w-xs"><MusicClipPlayer key={liveStory.id} clip={liveStory.musicClip} compact /></div>}
           {liveStory.music && !liveStory.musicClip && (
             <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 py-1.5 text-xs backdrop-blur" title={t("Solo metadatos: no se reproduce audio")} data-testid={`text-story-music-${story.id}`}>
@@ -331,7 +331,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             </span>
           )}
           {story.caption && (
-            <p className="font-display text-lg font-light leading-snug text-foreground/95"><SocialText text={story.caption} onNavigate={onClose} /></p>
+            <p className="max-w-full break-words font-display text-base font-light leading-relaxed text-foreground/95 sm:text-lg"><SocialText text={story.caption} onNavigate={onClose} /></p>
           )}
           {mentioned.length > 0 && (
             <div className="flex flex-wrap justify-center gap-1.5">
@@ -404,8 +404,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 aria-label={t("Responder a la historia")}
               />
               {active && <button type="button" onClick={() => actions.toggleStoryLike(story.id)} aria-label={hasLiked ? t('Quitar me gusta') : t('Me gusta')} aria-pressed={hasLiked} title={hasLiked ? t('Quitar me gusta') : t('Me gusta')} className={cn('tap grid h-12 w-12 shrink-0 place-items-center rounded-full', hasLiked ? 'text-red-500' : 'text-foreground')} data-testid="button-story-like"><Heart className="h-7 w-7" fill={hasLiked ? 'currentColor' : 'none'} strokeWidth={1.8} /></button>}
-              {active && <button type="button" onClick={() => setShowShare(true)} aria-label={t("Compartir historia")} title={t("Compartir historia")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full" data-testid="button-story-share"><Send className="h-6 w-6" strokeWidth={1.8}/></button>}
-              <button
+              {active && !reply.trim() && <button type="button" onClick={() => setShowShare(true)} aria-label={t("Compartir historia")} title={t("Compartir historia")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full" data-testid="button-story-share"><Send className="h-6 w-6" strokeWidth={1.8}/></button>}
+              {reply.trim() && <button
                 type="submit"
                 disabled={!reply.trim()}
                 aria-label={t("Enviar respuesta")}
@@ -413,7 +413,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 data-testid="button-story-reply-send"
               >
                 <Send className="h-6 w-6" strokeWidth={1.6} />
-              </button>
+              </button>}
             </form>
             </div>
           )}
