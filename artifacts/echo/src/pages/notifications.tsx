@@ -94,7 +94,7 @@ export default function NotificationsPage() {
 
   const open = (n: Group) => {
     n.ids.forEach((id) => { if (state.notifications.find((x) => x.id === id && !x.read)) actions.markNotificationRead(id); });
-    if (n.kind === 'follow' && n.excerpt === 'follow_request') {
+    if (n.kind === 'follow' && (n.excerpt === 'follow_request' || (state.followRequests?.[me.id] ?? []).includes(n.actorId))) {
       // Open the actionable request here, never redirect to the requester's profile.
       setSelectedFollowRequest(n.actorId);
       return;
@@ -202,7 +202,7 @@ function NotificationRow({ n, character, state, meId, respondFollowRequest, sele
       ja: ['投稿への共同制作に招待しました', '共同制作への招待を承認しました'],
       zh: ['邀请你共同创作帖子', '接受了你的共同创作邀请'],
     };
-    const pendingFollowRequest = n.kind === 'follow' && (state.followRequests?.[meId] ?? []).includes(n.actorId);
+    const pendingFollowRequest = n.kind === 'follow' && ((state.followRequests?.[meId] ?? []).includes(n.actorId) || (n.excerpt === 'follow_request' && state.notifications.some(item => item.recipientId === meId && item.actorId === n.actorId && item.kind === 'follow' && item.excerpt === 'follow_request')));
     const followRequestNotice = n.kind === 'follow' && n.excerpt === 'follow_request';
     const requestExpanded = pendingFollowRequest && selectedFollowRequest === n.actorId;
     const followRequestVerbs: Record<string, string> = { es: 'solicitó seguirte', en: 'requested to follow you', pt: 'solicitou seguir você', fr: 'a demandé à vous suivre', de: 'möchte dir folgen', it: 'ha chiesto di seguirti', ko: '팔로우를 요청했습니다', ja: 'フォローをリクエストしました', zh: '请求关注你' };
