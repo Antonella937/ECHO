@@ -45,11 +45,18 @@ export function MusicLibraryPicker({ onSelect, onCancel, storyClip = false, char
     setLoading(true);
     setError('');
     setSelected(null);
-    void customFetch<{ items: LibraryTrack[] }>('/api/music/library', { responseType: 'json' })
-      .then(result => {
+    void Promise.all([
+      customFetch<{ items: LibraryTrack[] }>('/api/music/library', { responseType: 'json' }),
+      characterId
+        ? customFetch<{ items: LibraryTrack[] }>('/api/music/library/character/' + encodeURIComponent(characterId), { responseType: 'json' })
+        : Promise.resolve({ items: [] as LibraryTrack[] }),
+    ]).then(([owned, saved]) => {
         if (!active) return;
-        setTracks(result.items.filter(item => item.status === 'saved_audio' && !!item.audioPath &&
-          (!characterId || item.characterId === characterId)));
+        const available = characterId
+          ? [...owned.items.filter(item => item.characterId === characterId), ...saved.items]
+          : owned.items;
+        setTracks([...new Map(available.filter(item => item.status === 'saved_audio' && !!item.audioPath)
+          .map(item => [item.id, item])).values()]);
       })
       .catch(() => { if (active) setError('No se pudo cargar Mi biblioteca.'); })
       .finally(() => { if (active) setLoading(false); });
