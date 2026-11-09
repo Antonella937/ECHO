@@ -57,6 +57,12 @@ const musicEnglish: Record<string,string> = {
   "Descargar": "Download",
   "Guardar voz": "Save voice",
   "Voz cantada vinculada": "Singing voice linked",
+  "Vincular voz existente": "Link existing voice",
+  "ID de voz de Mureka": "Mureka voice ID",
+  "Guardar vínculo": "Save voice link",
+  "Solo ingresá un ID de voz de Mureka que hayas creado y tengas derecho a utilizar. Esto no clona voces ni consume créditos.": "Only enter a Mureka voice ID you created and have permission to use. This does not clone voices or use credits.",
+  "Confirmo que tengo permiso para utilizar esta voz": "I confirm I have permission to use this voice",
+  "No se pudo vincular la voz": "Could not link the voice",
   "Sin voz cantada configurada": "No singing voice configured",
   "Proteger identidad vocal": "Protect vocal identity",
   "Evita generar canciones cantadas con una voz diferente a la del personaje.": "Prevents generating sung tracks with a different voice from the character.",
@@ -364,6 +370,20 @@ export default function EchoMusicPage() {
   const [vocalMode, setVocalMode] = useState<'instrumental' | 'singing'>('instrumental');
   const [singingVoiceId, setSingingVoiceId] = useState<string | null>(null);
   const [protectSingingVoice, setProtectSingingVoice] = useState(true);
+  const [voiceLinkId, setVoiceLinkId] = useState('');
+  const [voiceLinkConsent, setVoiceLinkConsent] = useState(false);
+  const [voiceLinkBusy, setVoiceLinkBusy] = useState(false);
+  const [voiceLinkError, setVoiceLinkError] = useState('');
+  async function linkExistingSingingVoice() {
+    if (!me?.id || !voiceLinkConsent || !/^[a-zA-Z0-9_-]{1,128}$/.test(voiceLinkId) || voiceLinkBusy) return;
+    setVoiceLinkBusy(true); setVoiceLinkError('');
+    try {
+      await customFetch('/api/music/voices', {method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify({characterId:me.id,vocalId:voiceLinkId,consentConfirmed:true})});
+      setSingingVoiceId(voiceLinkId); setVoiceLinkId(''); setVoiceLinkConsent(false);
+    } catch (error) { setVoiceLinkError(error instanceof Error ? error.message : t('No se pudo vincular la voz')); }
+    finally {setVoiceLinkBusy(false);}
+  }
   useEffect(() => {
     let active = true;
     if (!me?.id) return;
@@ -573,6 +593,14 @@ export default function EchoMusicPage() {
         <p className="font-semibold">{singingVoiceId ? t("Voz cantada vinculada") : t("Sin voz cantada configurada")}</p>
         <label className="flex items-center gap-2"><input type="checkbox" checked={protectSingingVoice} onChange={event => setProtectSingingVoice(event.target.checked)}/>{t("Proteger identidad vocal")}</label>
         <p className="text-xs text-muted-foreground">{t("Evita generar canciones cantadas con una voz diferente a la del personaje.")}</p>
+        <details className="rounded-lg border border-border p-2">
+          <summary className="cursor-pointer text-xs font-semibold">{t("Vincular voz existente")}</summary>
+          <p className="mt-2 text-xs text-muted-foreground">{t("Solo ingresá un ID de voz de Mureka que hayas creado y tengas derecho a utilizar. Esto no clona voces ni consume créditos.")}</p>
+          <input className={field} aria-label={t("ID de voz de Mureka")} placeholder={t("ID de voz de Mureka")} value={voiceLinkId} onChange={event=>setVoiceLinkId(event.target.value)} maxLength={128}/>
+          <label className="mt-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={voiceLinkConsent} onChange={event=>setVoiceLinkConsent(event.target.checked)}/>{t("Confirmo que tengo permiso para utilizar esta voz")}</label>
+          {voiceLinkError && <p role="alert" className="text-xs text-destructive">{voiceLinkError}</p>}
+          <button type="button" className="mt-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50" disabled={!voiceLinkConsent || !/^[a-zA-Z0-9_-]{1,128}$/.test(voiceLinkId) || voiceLinkBusy} onClick={()=>void linkExistingSingingVoice()}>{t("Guardar vínculo")}</button>
+        </details>
       </div>}
       {vocalMode==='singing' && <label className="block space-y-1 text-sm">{t("Letra original")}<textarea className={field} value={lyrics} maxLength={5000} rows={5} onChange={e=>setLyrics(e.target.value)} placeholder={t("Escribí tu letra acá...")} /></label>}
       <button type="submit" disabled={preparing} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 font-semibold text-primary-foreground"><WandSparkles className="h-4 w-4"/> {preparing ? t("Preparando…") : t("Preparar canción · gratis")}</button>
