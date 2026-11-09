@@ -26,12 +26,36 @@ const musicDraft = z.object({
   characterId: z.string().min(1).max(128).optional(),
 }).strict();
 
+const singingVoiceRegistration = z.object({
+  characterId: z.string().min(1).max(128),
+  vocalId: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+  consentConfirmed: z.literal(true),
+}).strict();
 const router: IRouter = Router();
 router.use("/music", requireAuth, (_req, res, next) => {
   res.setHeader("Cache-Control", "private, no-store");
   next();
 });
 
+// Registration only links an already-created Mureka vocal identity; no paid calls.
+router.get("/music/voices/:characterId", async (req,res) => {
+  const characterId = z.string().min(1).max(128).safeParse(req.params.characterId);
+  if (!characterId.success) { res.status(400).json({error:"INVALID_CHARACTER_ID"}); return; }
+  try {
+    const rows = await db.execute(sql`SELECT mureka_vocal_id FROM echo_character_singing_voices WHERE owner_id=${req.userId!} AND character_id=${characterId.data} LIMIT 1`);
+    res.json({ configured: rows.rows.length > 0, vocalId: rows.rows[0]?.mureka_vocal_id ?? null });
+  } catch { res.status(503).json({error:"VOICE_LOOKUP_UNAVAILABLE"}); }
+});
+router.post("/music/voices", async (req,res) => {
+  const parsed = singingVoiceRegistration.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({error:"INVALID_VOCAL_ID_OR_CONSENT"}); return; }
+  try {
+    await db.execute(sql`INSERT INTO echo_character_singing_voices (owner_id,character_id,mureka_vocal_id)
+      VALUES (${req.userId!},${parsed.data.characterId},${parsed.data.vocalId})
+      ON CONFLICT (owner_id,character_id) DO UPDATE SET mureka_vocal_id=EXCLUDED.mureka_vocal_id,updated_at=now()`);
+    res.json({configured:true,characterId:parsed.data.characterId});
+  } catch { res.status(503).json({error:"VOICE_SAVE_UNAVAILABLE"}); }
+});
 const libraryItem = z.object({
   id: z.string().uuid(),
   characterId: z.string().min(1).max(128),
