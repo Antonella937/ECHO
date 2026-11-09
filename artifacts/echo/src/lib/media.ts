@@ -86,7 +86,26 @@ export function retryPrivateMedia(ref: string, source?: MediaSource): void {
   loadPrivateMedia(url);
 }
 
-function loadPrivateMedia(url: string) {
+// Bound simultaneous private-media reads so the feed cannot starve universe sync
+// or overload the Render/Supabase proxy on mobile connections.
+const MAX_CONCURRENT_PRIVATE_MEDIA = 4;
+let activePrivateMediaReads = 0;
+const privateMediaQueue: string[] = [];
+const privateMediaQueued = new Set<string>();
+
+function drainPrivateMediaQueue() {
+  while (activePrivateMediaReads < MAX_CONCURRENT_PRIVATE_MEDIA && privateMediaQueue.length) {
+    const url = privateMediaQueue.shift()!;
+    privateMediaQueued.delete(url);
+    if (privateMediaCache.has(url) || privateMediaPending.has(url)) continue;
+    activePrivateMediaReads++;
+    fetchPrivateMedia(url);
+  }
+}
+
+function fetchPrivateMedia(url: string) {
+  privateMediaPending.add(url);
+  void customFetch<Blob>(url, { responseType: 'blob' })
   if (privateMediaCache.has(url) || privateMediaPending.has(url)) return;
   if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
   privateMediaPending.add(url);
@@ -120,7 +139,18 @@ function loadPrivateMedia(url: string) {
       privateMediaListeners.forEach(notify => notify());
       console.warn('No se pudo mostrar un archivo privado de ECHO.', error);
     })
-    .finally(() => privateMediaPending.delete(url));
+    .finally(() => {
+      privateMediaPending.delete(url);
+      activePrivateMediaReads--;
+      drainPrivateMediaQueue();
+    });
+}
+function loadPrivateMedia(url: string) {
+  if (privateMediaCache.has(url) || privateMediaPending.has(url) || privateMediaQueued.has(url)) return;
+  if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
+  privateMediaQueued.add(url);
+  privateMediaQueue.push(url);
+  drainPrivateMediaQueue();
 }
 export function useMediaResolver() {
   const scope = useContext(MediaScopeContext);
