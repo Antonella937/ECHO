@@ -209,6 +209,14 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     res.json({ status: 'generated', objectPath: result.objectPath, estimatedCostUsd: result.billedUsd, costReconciled: false, jobId: result.jobId, chargedPhotoCredits: cost });
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
+    if (code === 'IMAGE_LAUNCH_ACCOUNT_LIMIT_REACHED') {
+      res.status(429).json({ error: 'IMAGE_BETA_ATTEMPT_LIMIT_REACHED', retrySameRequest: false, chargedPhotoCredits: 0 });
+      return;
+    }
+    if (code === 'IMAGE_MONTHLY_BUDGET_EXHAUSTED_OR_DISABLED') {
+      res.status(429).json({ error: 'IMAGE_MONTHLY_BUDGET_EXHAUSTED', retrySameRequest: false, chargedPhotoCredits: 0 });
+      return;
+    }
     if (code === 'FAL_IMAGE_CONTENT_POLICY_REFERENCES' || code === 'FAL_IMAGE_CONTENT_POLICY_PROMPT') {
       req.log.warn({ reason: code }, 'Image request rejected by provider policy');
       res.status(422).json({ error: 'IMAGE_CONTENT_POLICY_REJECTED',
