@@ -1,6 +1,6 @@
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from 'react';
-import { Bell, Volume2 } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { getSoundPreferences, saveSoundPreferences, playMessageSound, unlockMessageAudio, type SoundPreferences } from '@/lib/message-sounds';
 
 export function MessageSoundSettings() {
@@ -26,10 +26,6 @@ export function MessageSoundSettings() {
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={prefs[key]} onChange={e => update(key, e.target.checked)} />
           </label>
         ))}
-        <button type="button" onClick={() => { unlockMessageAudio(); playMessageSound('incoming'); }} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold">
-          <Volume2 className="h-4 w-4" /> {t("Probar sonido")}
-        </button>
-        <button type="button" onClick={() => { unlockMessageAudio(); playMessageSound('group'); }} className="mt-3 ml-2 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold"><Volume2 className="h-4 w-4" /> {t('Probar sonido de grupos')}</button>
         <p className="mt-3 text-xs text-muted-foreground">{t("Los sonidos funcionan mientras ECHO está abierto y el navegador permite audio. Las notificaciones push en segundo plano requieren una implementación aparte.")}</p>
       </div>
     </section>
