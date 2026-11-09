@@ -22,7 +22,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { dispatchAutonomousVoice, getVoiceOwnerControls, resolveAutonomousVoiceId } from "./voice-adapter";
 
-const provider = new GeminiDmProvider();
+
 const repository: LiveAutonomyRepository = {
   read: readUniverse,
   readControls: readOwnerControls,
@@ -41,7 +41,7 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
   const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}`).digest("hex");
   const idempotencyKey = `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
-    repository, provider: new MeteredTextProvider(ownerId, "autonomy", provider),
+    repository, provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
     liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED, lane: "dm",
   });
 }
@@ -66,7 +66,7 @@ export function startAutonomyBackgroundWorker() {
           try {
             const outcome = await runAutonomyLiveCycle(ownerId, { universeId: input.universeId, characterId: input.characterId, idempotencyKey: input.idempotencyKey }, {
           repository,
-          provider: new MeteredTextProvider(ownerId, "autonomy", provider),
+          provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
           now,
           lane: input.lane,
