@@ -71,6 +71,16 @@ router.post("/music/voices", async (req,res) => {
     res.json({configured:true,characterId:parsed.data.characterId});
   } catch { res.status(503).json({error:"VOICE_SAVE_UNAVAILABLE"}); }
 });
+// Removing a link never deletes a provider voice or an existing song.
+router.delete("/music/voices/:characterId", async (req,res) => {
+  const parsed = z.string().min(1).max(128).safeParse(req.params.characterId);
+  if (!parsed.success) { res.status(400).json({error:"INVALID_CHARACTER_ID"}); return; }
+  try {
+    await db.execute(sql`DELETE FROM echo_character_singing_voices
+      WHERE owner_id=${req.userId!} AND character_id=${parsed.data}`);
+    res.json({configured:false,characterId:parsed.data});
+  } catch { res.status(503).json({error:"VOICE_UNLINK_UNAVAILABLE"}); }
+});
 const libraryItem = z.object({
   id: z.string().uuid(),
   characterId: z.string().min(1).max(128),
