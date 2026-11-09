@@ -47,12 +47,16 @@ export default function NotificationsPage() {
   const [serverRead, setServerRead] = useState<string[]>([]);
   const [selectedFollowRequest, setSelectedFollowRequest] = useState<string | null>(null);
   const [officialSubscribed, setOfficialSubscribed] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
   const [showSubscriptionIntro, setShowSubscriptionIntro] = useState(false);
   const [officialUpdates, setOfficialUpdates] = useState<Array<{ id: string; title: string; body: string; createdAt: string }>>([]);
   const [officialRead, setOfficialRead] = useState<string[]>([]);
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
+    void customFetch<{ lifetimeAccess?: string | null; billingExempt?: boolean }>('/api/account/entitlements', { responseType: 'json' })
+      .then(data => { if (active) setIsOwner(data.billingExempt === true && data.lifetimeAccess === 'owner_lifetime'); })
+      .catch(() => { if (active) setIsOwner(false); });
     const key = 'echo-official-read:' + user.id;
     const introKey = 'echo-official-subscription-intro:' + user.id;
     setShowSubscriptionIntro(localStorage.getItem(introKey) !== '1');
@@ -119,7 +123,7 @@ export default function NotificationsPage() {
           </button>
         }
       />
-      {showSubscriptionIntro && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+      {showSubscriptionIntro && !isOwner && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
         <div><p className="text-sm font-semibold">📣 ECHO · {officialText.title}</p><p className="text-xs text-muted-foreground">{officialText.detail}</p></div>
         <button type="button" aria-pressed={officialSubscribed} onClick={() => {
           const next = !officialSubscribed;
@@ -143,7 +147,7 @@ export default function NotificationsPage() {
             <span className="text-xs text-muted-foreground">{timeAgo(item.createdAt)}</span>
           </button>)}</div>
       </section>}
-      {officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
+      {!isOwner && officialSubscribed && officialUpdates.length > 0 && <section className="px-4 pt-4" aria-label={officialText.title}>
         <h2 className="mb-2 text-sm font-semibold text-foreground">📣 {officialText.title}</h2>
         <div className="space-y-2">{officialUpdates.slice(0, 10).map(item => <details key={item.id} onToggle={e => { if (e.currentTarget.open) markOfficialRead(item.id); }} className="rounded-xl border border-border bg-card p-3">
           <summary className="cursor-pointer text-sm font-semibold text-foreground">{!officialRead.includes(item.id) && !serverRead.includes(item.id) && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary" aria-label={t("Sin leer")}/>}{item.title}<span className="ml-2 text-xs font-normal text-muted-foreground">{new Date(item.createdAt).toLocaleDateString(language)}</span></summary>
@@ -157,7 +161,7 @@ export default function NotificationsPage() {
           <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</p>
         </details>)}</div>
       </section>}
-      {list.length === 0 && officialUpdates.length === 0 && creatorPosts.length === 0 && !(creatorDm.enabled && creatorDm.items.some(item => item.unread)) ? (
+      {list.length === 0 && (isOwner || officialUpdates.length === 0) && creatorPosts.length === 0 && !(creatorDm.enabled && creatorDm.items.some(item => item.unread)) ? (
         <EmptyState title={t("Todo en calma")} body={t("Cuando alguien comente, responda o te escriba, aparecerá aquí.")} />
       ) : (
         <div className="px-1 pt-3">
