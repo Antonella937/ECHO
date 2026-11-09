@@ -203,6 +203,30 @@ router.get("/music/usage", async (req, res) => {
     res.status(503).json({ error: "MUSIC_USAGE_UNAVAILABLE" });
   }
 });
+// Reservation is implemented as the Neon function echo_music_reserve_monthly.
+// It acquires a per-owner advisory transaction lock, checks monthly limits and
+// autonomous cooldown, and refuses calls without verified entitlement. Failed
+// jobs do not count toward monthly usage. Never accept entitlement from clients.
+// This read-only endpoint lets the owner check a job without exposing other users.
+router.get("/music/generation/:id", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "INVALID_GENERATION_ID" }); return; }
+  try {
+    const result = await db.execute(sql`
+      SELECT id, character_id AS "characterId", mode, status,
+        created_at AS "createdAt", completed_at AS "completedAt",
+        error_code AS "errorCode"
+      FROM echo_music_generation_jobs
+      WHERE id = ${id.data}::uuid AND owner_id = ${req.userId!}
+      LIMIT 1
+    `);
+    if (!result.rows.length) { res.status(404).json({ error: "GENERATION_NOT_FOUND" }); return; }
+    res.json({ job: result.rows[0] });
+  } catch (error) {
+    req.log.error({ err: error }, "Music generation status read failed");
+    res.status(503).json({ error: "MUSIC_GENERATION_STATUS_UNAVAILABLE" });
+  }
+});
 router.get("/music/status", (_req, res) => {
   res.json({
     addon: "echo_music",
