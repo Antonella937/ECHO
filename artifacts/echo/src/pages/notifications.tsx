@@ -158,13 +158,13 @@ export default function NotificationsPage() {
           {unread.length > 0 && (
             <>
               <h2 className="px-4 pb-1 pt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Nuevas")}</h2>
-              <ul>{unread.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} open={open} resolveMedia={resolveMedia} />)}</ul>
+              <ul>{unread.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} meId={me.id} respondFollowRequest={actions.respondFollowRequest} open={open} resolveMedia={resolveMedia} />)}</ul>
             </>
           )}
           {read.length > 0 && (
             <>
               <h2 className="px-4 pb-1 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Anteriores")}</h2>
-              <ul className="opacity-80">{read.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} open={open} resolveMedia={resolveMedia} />)}</ul>
+              <ul className="opacity-80">{read.map((n) => <NotificationRow key={n.id} n={n} character={character} state={state} meId={me.id} respondFollowRequest={actions.respondFollowRequest} open={open} resolveMedia={resolveMedia} />)}</ul>
             </>
           )}
         </div>
@@ -173,10 +173,12 @@ export default function NotificationsPage() {
   );
 }
 
-function NotificationRow({ n, character, state, open, resolveMedia }: {
+function NotificationRow({ n, character, state, meId, respondFollowRequest, open, resolveMedia }: {
   n: Group;
   character: ReturnType<typeof useSocial>['character'];
   state: ReturnType<typeof useSocial>['state'];
+  meId: string;
+  respondFollowRequest: (requesterId: string, accept: boolean) => void;
   open: (n: Group) => void;
   resolveMedia: ReturnType<typeof useMediaResolver>;
 }) {
@@ -193,7 +195,10 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
       ja: ['投稿への共同制作に招待しました', '共同制作への招待を承認しました'],
       zh: ['邀请你共同创作帖子', '接受了你的共同创作邀请'],
     };
-    const verb = n.kind === 'collaboration_invite' || n.kind === 'collaboration_accepted'
+    const pendingFollowRequest = n.kind === 'follow' && (state.followRequests?.[meId] ?? []).includes(n.actorId);
+    const followRequestNotice = n.kind === 'follow' && n.excerpt === 'follow_request';
+    const followRequestVerbs: Record<string, string> = { es: 'solicitó seguirte', en: 'requested to follow you', pt: 'solicitou seguir você', fr: 'a demandé à vous suivre', de: 'möchte dir folgen', it: 'ha chiesto di seguirti', ko: '팔로우를 요청했습니다', ja: 'フォローをリクエストしました', zh: '请求关注你' };
+    const verb = followRequestNotice ? (followRequestVerbs[language] ?? followRequestVerbs.en) : n.kind === 'collaboration_invite' || n.kind === 'collaboration_accepted'
       ? (collaborationVerbs[language] ?? collaborationVerbs.en)[n.kind === 'collaboration_invite' ? 0 : 1]
       : t(VERB[n.kind]);
     const localizeExcerpt = useLocalizedNotificationExcerpt();
@@ -212,12 +217,16 @@ function NotificationRow({ n, character, state, open, resolveMedia }: {
             <span className="font-semibold">{actor.handle}</span><VerifiedBadge account={actor} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" />
             {others.length > 0 && <span className="text-foreground/85" data-testid={`text-notification-group-${n.id}`}>{others.length === 1 ? `${t(" y ")}${others[0]!.handle}` : `${t(" y ")}${others.length}${t(" más")}`}</span>}
             {others.length === 0 && n.count > 1 && <span className="text-muted-foreground"> ({n.count})</span>} <span className="text-foreground/85">{verb}</span>
-            {n.excerpt && <span className="text-muted-foreground">: {localizeExcerpt(n.excerpt)}</span>}
+            {n.excerpt && !followRequestNotice && <span className="text-muted-foreground">: {localizeExcerpt(n.excerpt)}</span>}
             <span className="ml-1.5 text-xs text-muted-foreground/80">{timeAgo(n.createdAt)}</span>
           </span>
           {post && postMedia(post).length > 0 && post.media?.[0]?.type !== 'video' && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />}
           <span className={cn('h-2 w-2 shrink-0 rounded-full', n.read ? 'bg-transparent' : 'bg-primary')} aria-label={n.read ? undefined : t('Sin leer')} />
         </button>
+        {pendingFollowRequest && <div className="ml-[68px] mb-2 flex gap-2">
+          <button type="button" onClick={() => respondFollowRequest(n.actorId, true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{({ es: 'Aceptar', en: 'Accept', pt: 'Aceitar', fr: 'Accepter', de: 'Annehmen', it: 'Accetta', ko: '수락', ja: '承認', zh: '接受' } as Record<string,string>)[language] ?? 'Accept'}</button>
+          <button type="button" onClick={() => respondFollowRequest(n.actorId, false)} className="rounded-lg bg-secondary px-4 py-2 text-xs font-semibold">{({ es: 'Rechazar', en: 'Decline', pt: 'Recusar', fr: 'Refuser', de: 'Ablehnen', it: 'Rifiuta', ko: '거절', ja: '拒否', zh: '拒绝' } as Record<string,string>)[language] ?? 'Decline'}</button>
+        </div>}
       </li>
     );
 }
