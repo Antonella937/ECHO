@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { executeAutonomyDecision } from "./executor";
@@ -30,6 +31,20 @@ const repository: LiveAutonomyRepository = {
   complete: completeDryRun,
   executeDecision: executeAutonomyDecision,
 };
+
+/** Event-driven fast path for an incoming DM. Never scans unrelated characters. */
+export async function triggerImmediateDmReply(ownerId: string, universeId: string, characterId: string, messageId: string): Promise<void> {
+  if (!AUTONOMY_LIVE_EXECUTION_ENABLED) return;
+  const preference = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences
+    WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND character_id = ${characterId} LIMIT 1`);
+  if ((preference.rows[0]?.preferences as { responseTiming?: string } | undefined)?.responseTiming !== "instant") return;
+  const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}`).digest("hex");
+  const idempotencyKey = `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
+  await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
+    repository, provider: new MeteredTextProvider(ownerId, "autonomy", provider),
+    liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED, lane: "dm",
+  });
+}
 
 export function startAutonomyBackgroundWorker() {
   let lastSocialSlotAttempted = -1;
