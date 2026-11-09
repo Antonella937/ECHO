@@ -48,13 +48,11 @@ export function mergeUniverse(
         return [...new Set([...left, ...right])].filter(id => old.has(id) ? ls.has(id) && rs.has(id) : ls.has(id) || rs.has(id));
       }
     }
-    // Server-backed highlights must survive stale local recovery snapshots.
-    // A missing entry in a snapshot is not sufficient proof of an intentional
-    // deletion; otherwise a second account can wipe unrelated highlights.
-    if (/^highlights\.[^.]+$/.test(path) && object(b) && typeof b.authorId === 'string') {
-      if (l === undefined && object(r)) return r;
-      if (r === undefined && object(l)) return l;
-    }
+    // A locally missing highlight must never hide a server-backed collection.
+    // This also covers old recovery bases that already contained the highlight:
+    // the generic three-way "remote unchanged" branch would otherwise prefer
+    // the stale local deletion forever.
+    if (/^highlights\.[^.]+$/.test(path) && l === undefined && object(r)) return r;
     if (same(l, r)) return l;
     if (base && same(l, b)) return r;
     if (base && same(r, b)) return l;
