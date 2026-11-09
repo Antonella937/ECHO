@@ -32,7 +32,29 @@ export interface IdentityReference {
   updatedAt: ISODate;
 }
 
+/** A single AI person can own multiple independent social accounts. 
+ * Existing characters without personId are their own person (backwards compatible).
+ * Account-specific posts, follows, privacy and handles remain keyed by Character.id.
+ */
+export type PersonId = string;
+
+export function personIdFor(character: Pick<Character, 'id' | 'personId'>): PersonId {
+  return character.personId || character.id;
+}
+
+export function accountsForPerson(characters: Character[], account: Character): Character[] {
+  const personId = personIdFor(account);
+  return characters.filter((candidate) => personIdFor(candidate) === personId);
+}
+
 export interface Character {
+  /** Shared AI identity key across personal, professional or alternate accounts.
+   * For a legacy single-account character, defaults to id.
+   * Set this to the original character's personId/id when adding another account.
+   */
+  personId?: PersonId;
+  /** Optional presentation/context guidance for this particular account, not a second persona. */
+  accountContext?: string;
   configuration?: import('@workspace/api-client-react').CharacterConfiguration;
   id: CharacterId;
   handle: string;
