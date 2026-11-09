@@ -20,7 +20,7 @@ export function MessageSoundSettings() {
       </h2>
       <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
         <p className="mb-3 text-xs text-muted-foreground">{t("Tonos suaves estilo iPhone, exclusivos de ECHO.")}</p>
-        {([{ key: 'incoming', label: 'Mensajes recibidos' }, { key: 'outgoing', label: 'Mensajes enviados' }, { key: 'notification', label: 'Notificaciones' }] as const).map(({ key, label }) => (
+        {([{ key: 'incoming', label: 'Mensajes recibidos' }, { key: 'outgoing', label: 'Mensajes enviados' }, { key: 'group', label: 'Mensajes de grupos' }, { key: 'notification', label: 'Notificaciones' }] as const).map(({ key, label }) => (
           <label key={key} className="flex min-h-12 items-center justify-between gap-3 border-b border-border/50 text-sm last:border-0">
             <span>{t(label)}</span>
             <input type="checkbox" className="h-5 w-5 accent-primary" checked={prefs[key]} onChange={e => update(key, e.target.checked)} />
@@ -29,6 +29,7 @@ export function MessageSoundSettings() {
         <button type="button" onClick={() => { unlockMessageAudio(); playMessageSound('incoming'); }} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold">
           <Volume2 className="h-4 w-4" /> {t("Probar sonido")}
         </button>
+        <button type="button" onClick={() => { unlockMessageAudio(); playMessageSound('group'); }} className="mt-3 ml-2 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold"><Volume2 className="h-4 w-4" /> {t('Probar sonido de grupos')}</button>
         <p className="mt-3 text-xs text-muted-foreground">{t("Los sonidos funcionan mientras ECHO está abierto y el navegador permite audio. Las notificaciones push en segundo plano requieren una implementación aparte.")}</p>
       </div>
     </section>
