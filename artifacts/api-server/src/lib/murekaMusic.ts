@@ -3,6 +3,11 @@
  * Queue submissions can incur charges even when later processing fails.
  */
 export const MUREKA_SONG_MODEL = "mureka/v8/generate/song";
+export const MUREKA_INSTRUMENTAL_MODEL = "mureka/v8/generate/instrumental";
+export type MurekaModel = typeof MUREKA_SONG_MODEL | typeof MUREKA_INSTRUMENTAL_MODEL;
+function assertModel(model: MurekaModel): void {
+  if (model !== MUREKA_SONG_MODEL && model !== MUREKA_INSTRUMENTAL_MODEL) throw new Error("MUREKA_MODEL_NOT_ALLOWED");
+}
 export type MurekaSongInput = { prompt: string; lyrics?: string; enable_safety_checker: true };
 export type MurekaSongResult = {
   songId: string | null;
@@ -49,8 +54,10 @@ export function parseMurekaSongResult(data: unknown): MurekaSongResult {
   };
 }
 /** Billable: requires a reserved generation job before calling. */
-export async function submitMurekaSong(input: MurekaSongInput): Promise<string> {
-  const response = await fetch(`https://queue.fal.run/${MUREKA_SONG_MODEL}`, {
+export async function submitMurekaSong(input: MurekaSongInput, model: MurekaModel = MUREKA_SONG_MODEL): Promise<string> {
+  assertModel(model);
+  if (model === MUREKA_INSTRUMENTAL_MODEL && input.lyrics) throw new Error("MUREKA_INSTRUMENTAL_LYRICS_NOT_ALLOWED");
+  const response = await fetch(`https://queue.fal.run/${model}`, {
     method: "POST", headers: falHeaders(), body: JSON.stringify(input),
     signal: AbortSignal.timeout(20000),
   });
@@ -60,9 +67,10 @@ export async function submitMurekaSong(input: MurekaSongInput): Promise<string> 
   return data.request_id;
 }
 /** Poll only an already persisted request ID. */
-export async function checkMurekaSong(requestId: string): Promise<"IN_QUEUE" | "IN_PROGRESS" | "COMPLETED"> {
+export async function checkMurekaSong(requestId: string, model: MurekaModel = MUREKA_SONG_MODEL): Promise<"IN_QUEUE" | "IN_PROGRESS" | "COMPLETED"> {
+  assertModel(model);
   if (!/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)) throw new Error("MUREKA_REQUEST_ID_INVALID");
-  const response = await fetch(`https://queue.fal.run/${MUREKA_SONG_MODEL}/requests/${requestId}/status`, {
+  const response = await fetch(`https://queue.fal.run/${model}/requests/${requestId}/status`, {
     headers: falHeaders(), signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new Error(`MUREKA_STATUS_HTTP_${response.status}`);
@@ -72,9 +80,10 @@ export async function checkMurekaSong(requestId: string): Promise<"IN_QUEUE" | "
   }
   return data.status;
 }
-export async function fetchMurekaSongResult(requestId: string): Promise<MurekaSongResult> {
+export async function fetchMurekaSongResult(requestId: string, model: MurekaModel = MUREKA_SONG_MODEL): Promise<MurekaSongResult> {
+  assertModel(model);
   if (!/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)) throw new Error("MUREKA_REQUEST_ID_INVALID");
-  const response = await fetch(`https://queue.fal.run/${MUREKA_SONG_MODEL}/requests/${requestId}`, {
+  const response = await fetch(`https://queue.fal.run/${model}/requests/${requestId}`, {
     headers: falHeaders(), signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) throw new Error(`MUREKA_RESULT_HTTP_${response.status}`);
