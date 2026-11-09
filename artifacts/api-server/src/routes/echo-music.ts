@@ -91,6 +91,17 @@ router.delete("/music/library/:id", async (req, res) => {
   const parsed = z.string().uuid().safeParse(req.params.id);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
   try {
+    // Generated tracks are backed by immutable paid jobs and private objects.
+    // Deleting only the library row would orphan a paid generation and audio.
+    // A dedicated transactional deletion flow is required for these tracks.
+    const generated = await db.execute(sql`
+      SELECT id FROM echo_music_generation_jobs
+      WHERE id=${parsed.data}::uuid AND owner_id=${req.userId!}
+      LIMIT 1
+    `);
+    if (generated.rows.length) {
+      res.status(409).json({ error: "GENERATED_TRACK_DELETION_NOT_SUPPORTED" }); return;
+    }
     await db.delete(echoMusicLibraryTable).where(and(
       eq(echoMusicLibraryTable.ownerId, req.userId!), eq(echoMusicLibraryTable.id, parsed.data)));
     res.json({ deleted: true, audioFileDeleted: false });
