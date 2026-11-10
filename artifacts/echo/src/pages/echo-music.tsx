@@ -418,9 +418,36 @@ export default function EchoMusicPage() {
   const [voiceSampleUploadError,setVoiceSampleUploadError] = useState('');
   const [voiceSamplePreflightBusy,setVoiceSamplePreflightBusy] = useState(false);
   const [voiceSamplePreflightStatus,setVoiceSamplePreflightStatus] = useState('');
+  const [voiceCloneJobId,setVoiceCloneJobId] = useState('');
+  const [voiceCloneJobStatus,setVoiceCloneJobStatus] = useState('');
+  const [voiceCloneJobBusy,setVoiceCloneJobBusy] = useState(false);
+  async function prepareVoiceCloneJob() {
+    if (!me?.id || !voiceSample || !voiceSampleStorageKey || !voiceCloneConsent || voiceCloneJobBusy) return;
+    setVoiceCloneJobBusy(true);setVoiceCloneJobStatus('');
+    try {
+      const result=await customFetch<{jobId:string;status:string;estimatedCostUsd:number}>('/api/music/voices/clone/jobs',{
+        method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify({characterId:me.id,storageKey:voiceSampleStorageKey,
+          durationSeconds:voiceSample.duration,consentConfirmed:true})
+      });
+      setVoiceCloneJobId(result.jobId);
+      setVoiceCloneJobStatus(t('Trabajo de clonación preparado, sin cargo.') + ' · USD ' + result.estimatedCostUsd.toFixed(2));
+    } catch(error) {setVoiceCloneJobStatus(error instanceof Error?error.message:'VOICE_CLONE_JOB_PREPARATION_UNAVAILABLE');}
+    finally {setVoiceCloneJobBusy(false);}
+  }
+  async function refreshVoiceCloneJob() {
+    if (!voiceCloneJobId || voiceCloneJobBusy) return;
+    setVoiceCloneJobBusy(true);
+    try {
+      const result=await customFetch<{job:{status:string;provider_vocal_id?:string|null}}>('/api/music/voices/clone/jobs/'+encodeURIComponent(voiceCloneJobId),{responseType:'json'});
+      setVoiceCloneJobStatus(t('Estado de clonación')+': '+result.job.status);
+      if (result.job.status==='completed' && result.job.provider_vocal_id) setSingingVoiceId(result.job.provider_vocal_id);
+    } catch(error) {setVoiceCloneJobStatus(error instanceof Error?error.message:'VOICE_CLONE_JOB_LOOKUP_UNAVAILABLE');}
+    finally {setVoiceCloneJobBusy(false);}
+  }
   async function verifyStoredVocalSample() {
     if (!me?.id || !voiceSample || !voiceCloneConsent || !voiceSampleStorageKey || voiceSamplePreflightBusy) return;
-    setVoiceSamplePreflightBusy(true);setVoiceSamplePreflightStatus('');
+    setVoiceSamplePreflightBusy(true);setVoiceSamplePreflightStatus('');setVoiceCloneJobId('');setVoiceCloneJobStatus('');
     try {
       const result=await customFetch<{status:string;estimatedCloneCostUsd:number}>('/api/music/voices/clone/sample/preflight',{
         method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
@@ -721,7 +748,10 @@ export default function EchoMusicPage() {
           <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceSampleUploadBusy} onClick={() => void stageVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSampleUploadBusy ? '…' : t("Guardar muestra privada (sin generar)")}</button>
           {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>
           {voiceSampleStorageKey && <button type="button" disabled={voiceSamplePreflightBusy || !voiceCloneConsent} onClick={() => void verifyStoredVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSamplePreflightBusy ? '…' : t("Verificar muestra privada")}</button>}
-          {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>}
+          {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>
+          {voiceSampleStorageKey && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void prepareVoiceCloneJob()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneJobBusy?'…':t("Preparar clonación (sin cargo)")}</button>}
+          {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void refreshVoiceCloneJob()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Consultar estado")}</button>}
+          {voiceCloneJobStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneJobStatus}</p>}
           {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>
         </details>
         <p className="text-xs text-muted-foreground">{t("Desde una canción de mi biblioteca")}: {t("Mi biblioteca")} → {t("Guardar voz")}</p>
