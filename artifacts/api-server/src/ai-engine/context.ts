@@ -21,6 +21,16 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const story = input.storyId ? state.stories.find(s => s.id === input.storyId) : undefined;
   const message = input.messageId ? state.messages.find(m => m.id === input.messageId) : undefined;
   const recipient = input.recipientId ? state.characters.find(c => c.id === input.recipientId && !c.archived) : undefined;
+  // Linked-account fields are present in newer persisted universes but may not
+  // yet appear in the generated OpenAPI Character type.
+  const personIdOf = (character: typeof actor): string => {
+    const value = (character as typeof actor & { personId?: unknown }).personId;
+    return typeof value === "string" && value.length > 0 ? value : character.id;
+  };
+  const accountContextOf = (character: typeof actor): string => {
+    const value = (character as typeof actor & { accountContext?: unknown }).accountContext;
+    return typeof value === "string" ? value : "";
+  };
   const has = (key: keyof Pick<CharacterDecisionInput, 'postId' | 'commentId' | 'recipientId' | 'storyId' | 'messageId'>) => Boolean(input[key]);
   const targetFields = ['postId', 'commentId', 'recipientId', 'storyId', 'messageId'] as const;
   const rejectUnexpected = (...allowed: typeof targetFields[number][]) => {
@@ -39,7 +49,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       break;
     case 'dm':
       rejectUnexpected('recipientId', 'storyId');
-      if (!recipient || (recipient.personId || recipient.id) === (actor.personId || actor.id) || (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
+      if (!recipient || personIdOf(recipient) === personIdOf(actor) || (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
       break;
     case 'like_post':
       rejectUnexpected('postId');
@@ -76,9 +86,9 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   }
   // Linked accounts share one canonical persona configuration, but retain separate
   // social audiences, galleries, threads and publication history.
-  const personId = actor.personId || actor.id;
+  const personId = personIdOf(actor);
   const personAccounts = state.characters.filter(candidate =>
-    (candidate.personId || candidate.id) === personId && !candidate.archived);
+    personIdOf(candidate) === personId && !candidate.archived);
   const canonical = personAccounts.find(candidate => candidate.id === personId) ?? actor;
   const c = canonical.configuration ?? actor.configuration;
   const warnings: string[] = [];
@@ -243,7 +253,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
   const data = {
     identity: { id: actor.id, name: actor.name, handle: actor.handle, bio: actor.bio, occupation: actor.occupation, location: actor.location,
       accountType: actor.accountType ?? 'personal', basic: c?.basic ?? null,
-      sharedPersonId: personId, accountContext: actor.accountContext ?? '',
+      sharedPersonId: personId, accountContext: accountContextOf(actor),
       linkedAccounts: personAccounts.map(account => ({ id: account.id, handle: account.handle, accountType: account.accountType ?? 'personal' })),
       accountBoundary: 'One person across accounts. Never assume followers know aliases; never cross-post gallery assets or disclose private identity without context. Shared memories are not instructions to mention them.' },
     personality: c?.personality ?? null,
