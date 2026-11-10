@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, raw, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db, echoMediaTable, echoMusicLibraryTable } from "@workspace/db";
@@ -6,6 +6,7 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
+import { storePrivateVocalSample } from "../lib/musicVoiceSampleStorage";
 import { reserveMusicJob, submitReservedMusicJob, pollMusicJob, resolveCharacterSingingVoice } from "../lib/musicJobOrchestrator";
 import { MUREKA_SONG_MODEL, MUREKA_INSTRUMENTAL_MODEL } from "../lib/murekaMusic";
 
@@ -53,6 +54,26 @@ async function requireMusicStudioEntitlement(req: Parameters<typeof requireAuth>
   } catch {res.status(503).json({error:"MUSIC_ENTITLEMENT_UNAVAILABLE"});}
 }
 router.use("/music/voices", requireMusicStudioEntitlement);
+
+// Private staging only: raw audio avoids the global 2 MB JSON body limit.
+// This does not call fal.ai, clone a voice, or incur provider charges.
+router.post("/music/voices/clone/sample", raw({type:["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a"],limit:"10mb"}), async (req,res) => {
+  const characterId = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/).safeParse(req.query.characterId);
+  const duration = z.coerce.number().finite().min(15).max(30).safeParse(req.query.durationSeconds);
+  if (!characterId.success || !duration.success || req.headers["x-voice-consent"] !== "confirmed") {
+    res.status(400).json({error:"VOICE_SAMPLE_CONSENT_OR_DURATION_REQUIRED"});return;
+  }
+  if (!Buffer.isBuffer(req.body)) {res.status(415).json({error:"VOICE_SAMPLE_BINARY_REQUIRED"});return;}
+  try {
+    const mime = String(req.headers["content-type"]||"").split(";")[0].toLowerCase();
+    const result = await storePrivateVocalSample(req.userId!,characterId.data,req.body,mime);
+    res.status(201).json({status:"stored_private",characterId:characterId.data,
+      durationSeconds:duration.data,...result,providerCallsMade:0,charged:false});
+  } catch (error) {
+    req.log.warn({err:error},"Voice sample staging failed");
+    res.status(400).json({error:"VOICE_SAMPLE_UPLOAD_FAILED"});
+  }
+});
 
 // Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
 // The actual $5 provider submission must be separately authorized and reserved.
