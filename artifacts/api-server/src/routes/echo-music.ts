@@ -8,6 +8,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
 import { storePrivateVocalSample, fetchOwnedPrivateVocalSample } from "../lib/musicVoiceSampleStorage";
+import { submitConfirmedVoiceClone, syncVoiceCloneJob } from "../lib/musicVoiceCloneOrchestrator";
 import { reserveMusicJob, submitReservedMusicJob, pollMusicJob, resolveCharacterSingingVoice } from "../lib/musicJobOrchestrator";
 import { MUREKA_SONG_MODEL, MUREKA_INSTRUMENTAL_MODEL } from "../lib/murekaMusic";
 
@@ -138,6 +139,33 @@ router.get("/music/voices/clone/jobs/:id", async(req,res) => {
     res.json({job:result.rows[0]});
   } catch(error) {req.log.warn({err:error},"Voice clone job lookup failed");
     res.status(503).json({error:"VOICE_CLONE_JOB_LOOKUP_UNAVAILABLE"});}
+});
+
+// Explicit paid confirmation. Disabled by default until billing controls and
+// the provider integration are verified. No automatic retries.
+const cloneConfirm=z.object({chargeConfirmed:z.literal(true),consentConfirmed:z.literal(true)}).strict();
+router.post("/music/voices/clone/jobs/:id/confirm", async(req,res) => {
+  const id=z.string().uuid().safeParse(req.params.id);
+  if(!id.success || !cloneConfirm.safeParse(req.body).success) {
+    res.status(400).json({error:"VOICE_CLONE_EXPLICIT_CONFIRMATION_REQUIRED"});return;
+  }
+  if(process.env.ECHO_MUSIC_VOICE_CLONE_ENABLED!=="true") {
+    res.status(503).json({error:"VOICE_CLONE_SPENDING_DISABLED",charged:false});return;
+  }
+  try {
+    const result=await submitConfirmedVoiceClone(req.userId!,id.data);
+    res.json(result);
+  } catch(error) {
+    req.log.error({err:error},"Voice clone submission failed");
+    res.status(503).json({error:"VOICE_CLONE_SUBMISSION_REQUIRES_REVIEW"});
+  }
+});
+router.post("/music/voices/clone/jobs/:id/sync", async(req,res) => {
+  const id=z.string().uuid().safeParse(req.params.id);
+  if(!id.success){res.status(400).json({error:"VOICE_CLONE_JOB_ID_INVALID"});return;}
+  try {res.json(await syncVoiceCloneJob(req.userId!,id.data));}
+  catch(error){req.log.error({err:error},"Voice clone sync failed");
+    res.status(503).json({error:"VOICE_CLONE_SYNC_UNAVAILABLE"});}
 });
 
 // Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
