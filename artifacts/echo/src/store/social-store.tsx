@@ -60,6 +60,7 @@ export interface SocialActions {
   markNotificationRead(id: string): void;
   markAllNotificationsRead(): void;
   switchIdentity(id: CharacterId): void;
+  setPrimaryIdentity(id: CharacterId): void;
   retrySync(): Promise<void>;
   refreshAfterApproval(): Promise<void>;
   resetAll(): Promise<void>;
@@ -457,6 +458,9 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       markAllNotificationsRead() {
         dispatch({ type: 'notifications.readAll', recipientId: myId() });
+      },
+      setPrimaryIdentity(id) {
+        if (cur().characters.some(c => c.id === id && !c.archived)) dispatch({ type: 'identity.primary-set', characterId: id });
       },
       switchIdentity(id) {
         if (cur().characters.some((character) => character.id === id && !character.archived)) {
