@@ -282,6 +282,18 @@ router.post("/music/voices/clone/quote", async (req,res) => {
 });
 
 // Registration only links an already-created Mureka vocal identity; no paid calls.
+router.get("/music/voices/comparison", async (req, res) => {
+  const parsed = voiceComparisonKey.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_VOICE_COMPARISON" }); return; }
+  try {
+    const result = await db.execute(sql`SELECT singing_track_id AS "singingTrackId", speech_sample_id AS "speechSampleId",
+      assessment, notes, updated_at AS "updatedAt" FROM echo_music_voice_comparisons
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+      AND character_id=${parsed.data.characterId} LIMIT 1`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ comparison: result.rows[0] ?? null });
+  } catch (error) { req.log.error({ err: error }, "Voice comparison lookup failed"); res.status(503).json({ error: "VOICE_COMPARISON_UNAVAILABLE" }); }
+});
 router.get("/music/voices/:characterId", async (req,res) => {
   const characterId = z.string().min(1).max(128).safeParse(req.params.characterId);
   if (!characterId.success) { res.status(400).json({error:"INVALID_CHARACTER_ID"}); return; }
@@ -753,18 +765,6 @@ const voiceComparisonInput = voiceComparisonKey.extend({
   notes: z.string().max(500).default(""),
 }).strict();
 // Comparisons are personal listening notes, never a biometric identity claim.
-router.get("/music/voices/comparison", async (req, res) => {
-  const parsed = voiceComparisonKey.safeParse(req.query);
-  if (!parsed.success) { res.status(400).json({ error: "INVALID_VOICE_COMPARISON" }); return; }
-  try {
-    const result = await db.execute(sql`SELECT singing_track_id AS "singingTrackId", speech_sample_id AS "speechSampleId",
-      assessment, notes, updated_at AS "updatedAt" FROM echo_music_voice_comparisons
-      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
-      AND character_id=${parsed.data.characterId} LIMIT 1`);
-    res.setHeader("Cache-Control", "private, no-store");
-    res.json({ comparison: result.rows[0] ?? null });
-  } catch (error) { req.log.error({ err: error }, "Voice comparison lookup failed"); res.status(503).json({ error: "VOICE_COMPARISON_UNAVAILABLE" }); }
-});
 router.put("/music/voices/comparison", async (req, res) => {
   const parsed = voiceComparisonInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_VOICE_COMPARISON" }); return; }
