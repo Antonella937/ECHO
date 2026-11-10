@@ -49,17 +49,19 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
   return db.transaction(async (tx) => {
     // Only the target universe's creator plan is needed before taking the lock.
     // Avoid downloading every universe's full JSON state twice per save.
-    const [initialCurrent] = await tx.select({ state: echoUniversesTable.state })
-      .from(echoUniversesTable)
-      .where(and(
-        eq(echoUniversesTable.ownerId, ownerId),
-        eq(echoUniversesTable.universeId, universeId),
-      )).limit(1);
+    // Read only the existing plan from JSONB; the complete state is loaded
+    // later only if required for the target universe's save hooks.
+    const [initialCurrent] = await tx.select({
+      plan: sql<string | null>`${echoUniversesTable.state}->'creatorSetup'->>'plan'`,
+    }).from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId, ownerId),
+      eq(echoUniversesTable.universeId, universeId),
+    )).limit(1);
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
-    const existingPlan = initialCurrent?.state?.creatorSetup as { plan?: unknown } | undefined;
+    const existingPlan = initialCurrent?.plan;
     const entitlements = await lockEntitlement(
       tx, ownerId,
-      asPlan(existingPlan?.plan ?? creatorSetup?.plan),
+      asPlan(existingPlan ?? creatorSetup?.plan),
     );
     // Read again after taking the owner entitlement lock so concurrent creates
     // cannot both make a decision from the same stale universe count.
