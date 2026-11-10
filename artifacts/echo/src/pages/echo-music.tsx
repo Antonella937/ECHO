@@ -449,10 +449,15 @@ export default function EchoMusicPage() {
   }
   async function linkExistingSingingVoice() {
     if (!me?.id || !voiceLinkConsent || !/^[a-zA-Z0-9_-]{1,128}$/.test(voiceLinkId) || voiceLinkBusy) return;
+    // A character's established singer is not silently replaced.
+    const replacing = Boolean(singingVoiceId && singingVoiceId !== voiceLinkId);
+    if (replacing && !window.confirm(interfaceLanguage === 'es'
+      ? 'Este personaje ya tiene una voz cantada. ¿Querés reemplazarla para las próximas canciones? Las canciones anteriores no cambiarán.'
+      : 'This character already has a singing voice. Replace it for future songs? Existing songs will not change.')) return;
     setVoiceLinkBusy(true); setVoiceLinkError('');
     try {
       await customFetch('/api/music/voices', {method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
-        body:JSON.stringify({characterId:me.id,vocalId:voiceLinkId,consentConfirmed:true})});
+        body:JSON.stringify({characterId:me.id,vocalId:voiceLinkId,consentConfirmed:true,replaceExisting:replacing})});
       setSingingVoiceId(voiceLinkId); setVoiceConsistency(voiceConsistency==='speech_only'?'both_configured_unverified':'singing_only'); setVoiceLinkId(''); setVoiceLinkConsent(false);
     } catch (error) { setVoiceLinkError(error instanceof Error ? error.message : t('No se pudo vincular la voz')); }
     finally {setVoiceLinkBusy(false);}
