@@ -248,7 +248,7 @@ router.get("/group-dms/:groupId/autonomy", async (req, res) => {
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
   const result = await db.execute(sql`SELECT autonomy_enabled, autonomy_interval_minutes FROM echo_group_conversations
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
-    AND participant_ids ? ${actorId} LIMIT 1`);
+    AND (participant_ids ? ${actorId} OR scene_observer_enabled=true) LIMIT 1`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ enabled: result.rows[0].autonomy_enabled, intervalMinutes: result.rows[0].autonomy_interval_minutes });
 });
@@ -261,7 +261,7 @@ router.patch("/group-dms/:groupId/autonomy", async (req, res) => {
   const result = await db.execute(sql`UPDATE echo_group_conversations
     SET autonomy_enabled = ${enabled}, autonomy_interval_minutes = ${intervalMinutes}, updated_at = now()
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
-    AND participant_ids ? ${actorId} RETURNING autonomy_enabled, autonomy_interval_minutes`);
+    AND (participant_ids ? ${actorId} OR scene_observer_enabled=true) RETURNING autonomy_enabled, autonomy_interval_minutes`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ enabled: result.rows[0].autonomy_enabled, intervalMinutes: result.rows[0].autonomy_interval_minutes });
 });
@@ -357,7 +357,7 @@ router.get("/group-dms/:groupId/preferences", async (req, res) => {
   const result = await db.execute(sql`SELECT p.muted, p.archived FROM echo_group_conversations g
     LEFT JOIN echo_group_member_preferences p ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
     WHERE g.owner_id = ${req.userId!} AND g.universe_id = ${universeId} AND g.id = ${String(req.params.groupId)}
-      AND g.participant_ids ? ${actorId} LIMIT 1`);
+      AND (g.participant_ids ? ${actorId} OR g.scene_observer_enabled=true) LIMIT 1`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ muted: result.rows[0].muted === true, archived: result.rows[0].archived === true });
 });
