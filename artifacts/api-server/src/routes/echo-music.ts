@@ -37,6 +37,22 @@ router.use("/music", requireAuth, (_req, res, next) => {
   next();
 });
 
+// Subscription is enforced server-side for private studio voice mutations.
+// A hidden UI is not an authorization boundary. Existing founder grants work
+// through the same active entitlement check; no public checkout is enabled.
+async function requireMusicStudioEntitlement(req: Parameters<typeof requireAuth>[0], res: Parameters<typeof requireAuth>[1], next: Parameters<typeof requireAuth>[2]) {
+  try {
+    const rows = await db.execute(sql`SELECT status, current_period_end AS "periodEnd"
+      FROM echo_music_entitlements WHERE owner_id=${req.userId!} LIMIT 1`);
+    const entry = rows.rows[0] as {status?:string;periodEnd?:Date|string|null}|undefined;
+    const active = !!entry && ['active','trialing'].includes(entry.status || '')
+      && (!entry.periodEnd || new Date(entry.periodEnd).getTime() > Date.now());
+    if (!active) {res.status(403).json({error:"ECHO_MUSIC_SUBSCRIPTION_REQUIRED",checkoutAvailable:false});return;}
+    next();
+  } catch {res.status(503).json({error:"MUSIC_ENTITLEMENT_UNAVAILABLE"});}
+}
+router.use("/music/voices", requireMusicStudioEntitlement);
+
 // Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
 // The actual $5 provider submission must be separately authorized and reserved.
 const voiceCloneQuoteSchema = z.object({
