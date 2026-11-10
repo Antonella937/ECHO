@@ -32,3 +32,22 @@ export const VIDEO_PRIVATE_STORAGE_LIMITS = Object.freeze({
   visibility: "private" as const,
   providerCallsEnabled: false,
 });
+
+/** Server-only private read. Callers MUST verify the job owner in Neon first. */
+export async function fetchOwnedPrivateVideoAsset(
+  storageKey: string, ownerId: string, jobId: string, range?: string,
+): Promise<Response> {
+  if (!validatePrivateVideoAssetKey(storageKey, ownerId, jobId)) throw new Error("VIDEO_ASSET_KEY_FORBIDDEN");
+  const config = videoStorageConfig();
+  if (!config) throw new Error("VIDEO_STORAGE_NOT_CONFIGURED");
+  const endpoint = new URL(`/storage/v1/object/authenticated/${encodeURIComponent(config.bucket)}/${storageKey}`, config.url);
+  const headers: Record<string,string> = {
+    Authorization: `Bearer ${config.serviceKey}`, apikey: config.serviceKey,
+  };
+  if (range && /^bytes=\d*-\d*$/.test(range)) headers.Range = range;
+  const response = await fetch(endpoint, { headers, redirect:"error", signal:AbortSignal.timeout(45_000) });
+  if (!response.ok && response.status !== 206) throw new Error("VIDEO_STORAGE_FETCH_FAILED");
+  const mime = (response.headers.get("content-type") || "").split(";")[0].toLowerCase();
+  if (!VIDEO_MIME.includes(mime as VideoMime)) throw new Error("VIDEO_STORAGE_MIME_INVALID");
+  return response;
+}
