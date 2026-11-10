@@ -152,7 +152,7 @@ const musicEnglish: Record<string,string> = {
 };
 function translateMusic(label:string, lang:string):string { return lang === 'es' ? label : (musicEnglish[label] ?? label); }
 
-type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string; publishedAt?: string | null; coverPath?: string | null };
+type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string; publishedAt?: string | null; coverPath?: string | null; artistName?: string | null };
 const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
 
 /** Locally trims an owned track to a mono 16 kHz PCM WAV.
@@ -239,11 +239,17 @@ export default function EchoMusicPage() {
   const [shuffleTracks, setShuffleTracks] = useState(false);
   const [repeatTrack, setRepeatTrack] = useState(false);
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
-  const coverUrl = coverFor(library.find(item => item.id === selectedTrackId));
+  const selectedTrack = library.find(item => item.id === selectedTrackId);
+  const coverUrl = coverFor(selectedTrack);
+  const currentArtist = selectedTrack?.artistName || me.name;
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
   const [librarySearch, setLibrarySearch] = useState('');
   const [trackMenuId, setTrackMenuId] = useState<string | null>(null);
+  const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+  const [editTrackTitle, setEditTrackTitle] = useState('');
+  const [editArtistName, setEditArtistName] = useState('');
+  const [savingTrackMetadata, setSavingTrackMetadata] = useState(false);
   const [coverUploadingId, setCoverUploadingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishedTracks, setPublishedTracks] = useState<Array<{ id: string; characterId: string; title: string; durationSeconds: number }>>([]);
@@ -441,6 +447,37 @@ export default function EchoMusicPage() {
       setLibraryError(t("No se pudo descargar la canción."));
     } finally {
       setDownloadingId(null);
+    }
+  }
+  function startEditingTrack(item: MusicDraftRecord) {
+    setTrackMenuId(null);
+    setEditingTrackId(item.id);
+    setEditTrackTitle(item.title);
+    setEditArtistName(item.artistName || me.name);
+  }
+  async function saveTrackMetadata() {
+    if (!editingTrackId || savingTrackMetadata) return;
+    const nextTitle = editTrackTitle.trim();
+    const nextArtist = editArtistName.trim();
+    if (!nextTitle || !nextArtist || nextTitle.length > 120 || nextArtist.length > 120) return;
+    setSavingTrackMetadata(true);
+    setLibraryError('');
+    try {
+      await customFetch('/api/music/library/' + encodeURIComponent(editingTrackId) + '/metadata', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, responseType: 'json',
+        body: JSON.stringify({ title: nextTitle, artistName: nextArtist }),
+      });
+      setLibrary(current => {
+        const updated = current.map(item => item.id === editingTrackId ? { ...item, title: nextTitle, artistName: nextArtist } : item);
+        localStorage.setItem(libraryKey(me.id), JSON.stringify(updated));
+        return updated;
+      });
+      if (selectedTrackId === editingTrackId) setTitle(nextTitle);
+      setEditingTrackId(null);
+    } catch (error) {
+      setLibraryError(error instanceof Error ? error.message : 'MUSIC_METADATA_UPDATE_FAILED');
+    } finally {
+      setSavingTrackMetadata(false);
     }
   }
   async function uploadTrackCover(item: MusicDraftRecord, file?: File) {
@@ -772,7 +809,7 @@ export default function EchoMusicPage() {
       <button type="button" onClick={() => setPlayerOptionsOpen(true)} aria-label={interfaceLanguage === 'es' ? 'Más opciones' : 'More options'} className="grid h-11 w-11 place-items-center"><MoreHorizontal className="h-6 w-6" /></button>
     </header>
     <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-end gap-7 pb-12 pt-12">
-      <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
+      <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{currentArtist} · ECHO Music</p></div>
       <div>
         <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label={t("Progreso de la canción")} className="w-full accent-white disabled:opacity-40" />
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
@@ -871,7 +908,7 @@ export default function EchoMusicPage() {
       {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 border-b border-border/60 py-3">
         <button type="button" onClick={() => void openLibraryItem(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverFor(item) ? <img src={coverFor(item)} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p></div>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{item.artistName || me.name} · {item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p></div>
         </button>
         <button type="button" onClick={() => setTrackMenuId(item.id)} aria-label={interfaceLanguage === 'es' ? 'Opciones de ' + item.title : 'Options for ' + item.title} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><MoreHorizontal className="h-6 w-6" /></button>
       </article>)}</div>}
@@ -883,9 +920,10 @@ export default function EchoMusicPage() {
         return <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70" onClick={() => setTrackMenuId(null)}>
           <section role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Opciones de canción' : 'Track options'} onClick={event => event.stopPropagation()} className="w-full max-w-xl overflow-hidden rounded-t-3xl border border-border bg-[#252327] pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-2xl">
             <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-white/30" />
-            <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary">{coverFor(item) ? <img src={coverFor(item)} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{formatTime(item.durationSeconds)}</p></div><button type="button" onClick={() => setTrackMenuId(null)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'} className="grid h-10 w-10 place-items-center"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary">{coverFor(item) ? <img src={coverFor(item)} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{item.artistName || me.name} · {formatTime(item.durationSeconds)}</p></div><button type="button" onClick={() => setTrackMenuId(null)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'} className="grid h-10 w-10 place-items-center"><X className="h-5 w-5" /></button></div>
             <div className="max-h-[65dvh] overflow-y-auto">
               <label className="flex cursor-pointer items-center gap-4 px-5 py-4 text-sm font-medium"><Upload className="h-5 w-5" /><span>{coverUploadingId === item.id ? (interfaceLanguage === 'es' ? 'Subiendo portada…' : 'Uploading artwork…') : (interfaceLanguage === 'es' ? 'Importar portada' : 'Upload cover art')}</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!!coverUploadingId} className="sr-only" onChange={event => { void uploadTrackCover(item, event.target.files?.[0]); event.target.value = ''; }} /></label>
+              {menuAction(interfaceLanguage === 'es' ? 'Editar título y artista' : 'Edit title and artist', <Music2 className="h-5 w-5" />, () => startEditingTrack(item))}
               {menuAction(interfaceLanguage === 'es' ? 'Abrir reproductor' : 'Open player', <Play className="h-5 w-5" />, () => void openLibraryItem(item))}
               {generated && menuAction(t("Guardar voz"), <Mic2 className="h-5 w-5" />, () => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20, item.durationSeconds)); setVoiceCloneConsent(false); setVoiceCloneQuote(''); setStudioTab('create'); })}
               {generated && menuAction(downloadingId === item.id ? t("Descargando…") : t("Descargar"), <Download className="h-5 w-5" />, () => void downloadLibraryTrack(item), !!downloadingId)}
@@ -895,6 +933,16 @@ export default function EchoMusicPage() {
           </section>
         </div>;
       })()}
+      {editingTrackId && <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/75" onClick={() => !savingTrackMetadata && setEditingTrackId(null)}>
+        <form onSubmit={event => { event.preventDefault(); void saveTrackMetadata(); }} onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Editar créditos de la canción' : 'Edit song credits'} className="w-full max-w-xl space-y-5 rounded-t-3xl border border-border bg-[#252327] px-5 pb-[calc(env(safe-area-inset-bottom,0px)+24px)] pt-5">
+          <div className="flex items-center justify-between"><h2 className="font-semibold">{interfaceLanguage === 'es' ? 'Editar canción' : 'Edit song'}</h2><button type="button" disabled={savingTrackMetadata} onClick={() => setEditingTrackId(null)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'}><X className="h-5 w-5" /></button></div>
+          <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Título' : 'Title'}</span><input required maxLength={120} value={editTrackTitle} onChange={event => setEditTrackTitle(event.target.value)} className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
+          <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Artista' : 'Artist'}</span><input required maxLength={120} value={editArtistName} onChange={event => setEditArtistName(event.target.value)} placeholder="Pretty Violence" className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
+          {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
+          <p className="text-xs text-muted-foreground">{interfaceLanguage === 'es' ? 'Solo cambia los créditos visibles. El audio y su propietario permanecen iguales.' : 'Only visible credits change. Audio and ownership remain unchanged.'}</p>
+          <button type="submit" disabled={savingTrackMetadata || !editTrackTitle.trim() || !editArtistName.trim()} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-40">{savingTrackMetadata ? (interfaceLanguage === 'es' ? 'Guardando…' : 'Saving…') : (interfaceLanguage === 'es' ? 'Guardar cambios' : 'Save changes')}</button>
+        </form>
+      </div>}
       <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-base font-semibold">{t("Canciones compartidas en ECHO")}</h2><p className="text-xs text-muted-foreground">{t("Solo se escuchan las canciones que sus propietarios publicaron expresamente.")}</p>{publishedTracks.length === 0 ? <p className="text-sm text-muted-foreground">{t("Todavía no hay canciones compartidas.")}</p> : publishedTracks.map(item => <button key={item.id} type="button" disabled={!!loadingSharedId} onClick={() => void playSharedTrack(item)} className="flex w-full items-center gap-3 rounded-xl bg-secondary p-3 text-left"><Play className="h-5 w-5 text-primary"/><span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span><span className="text-xs text-muted-foreground">{loadingSharedId === item.id ? t("Cargando…") : formatTime(item.durationSeconds)}</span></button>)}</section>
       <p className="text-xs text-muted-foreground">{t("Eliminar un registro no borra todavía el archivo privado del almacenamiento.")}</p>
     </section> : <>
