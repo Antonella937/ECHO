@@ -18,9 +18,9 @@ const schema = { type: "object", additionalProperties: false, required: ["text"]
 /** Explicit one-group execution, never called from the HTTP read endpoints.
  * Generation is metered; the database claim prevents concurrent duplicate generation.
  */
-export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string) {
+export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false) {
   const now = new Date();
-  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now);
+  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode);
   if (!choice.speakerId) return { status: "skipped", reason: choice.reason };
   const speakerId = choice.speakerId;
   const claimId = randomUUID();
@@ -29,7 +29,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
       AND autonomy_enabled = true
       AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
-      AND (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute')
+      AND (CASE WHEN ${sceneMode} THEN (scene_turn_mode <> 'manual' AND scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
     RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed`);
   if (!claimed.rows.length) return { status: "skipped", reason: "CLAIM_UNAVAILABLE" };
   try {
@@ -39,7 +39,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
       ORDER BY created_at DESC LIMIT 16`);
     const latest = messages.rows[0];
-    if (!latest || !String(latest.body ?? "").trim() || new Date(String(latest.created_at)).getTime() > now.getTime() - 120000) {
+    if (!sceneMode && (!latest || !String(latest.body ?? "").trim() || new Date(String(latest.created_at)).getTime() > now.getTime() - 120000)) {
       return { status: "skipped", reason: "CONVERSATION_NOT_READY" };
     }
     const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
