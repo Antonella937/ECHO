@@ -107,12 +107,13 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const isMine = group.author.id === me.id;
   const liveStory = state.stories.find((s) => s.id === story.id) ?? story;
   const editingMetrics = editingMetricsId === story.id;
-  const storyImage = resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id });
+  const storyMediaSource = { sourceUniverseId: universeId, sourceCharacterId: story.authorId, sourceType: 'story' as const, sourceContentId: story.id };
+  const storyImage = resolveMedia(story.image, storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
   const imageUnavailable = Boolean(story.image) && (!storyImage || failedStoryImage === story.id);
   const retryStoryImage = () => {
     setFailedStoryImage(null);
-    retryPrivateMedia(story.image, { sourceUniverseId: universeId, sourceCharacterId: story.authorId, sourceType: 'story', sourceContentId: story.id });
+    retryPrivateMedia(story.image, storyMediaSource);
   };
 
   useEffect(() => {
