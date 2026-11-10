@@ -26,7 +26,7 @@ export function canAttemptHyunPrivateSketch(input: PrivateSketchScope): boolean 
     && input.explicitlyEnabled
     && input.channel === HYUN_PRIVATE_SKETCH_LIMITS.channel
     && normalize(input.senderHandle) === "hyunnn"
-    && normalize(input.recipientHandle) === "nela";
+    && normalize(input.recipientHandle) === "antonella.paez";
 }
 
 /**
