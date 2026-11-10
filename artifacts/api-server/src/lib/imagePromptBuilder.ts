@@ -1,12 +1,22 @@
 import type { ImageGenerationStyle } from './imageGenerationProvider';
 
 export const imageStyleInstructions: Record<ImageGenerationStyle, string> = {
-  natural: 'Natural candid photorealism, realistic skin texture, pores, natural imperfections, believable lighting.',
+  natural: 'Natural candid photorealism, subtle authentic skin texture and fine pores, even believable skin rendering, soft natural tonal transitions and believable lighting.',
   phone: 'Photorealistic smartphone snapshot, spontaneous framing, realistic flash or ambient light, subtle digital noise.',
   analog: 'Photorealistic 35mm film photography, fine film grain, organic colors, authentic analog exposure.',
   editorial: 'Photorealistic editorial fashion photography, professional but believable lighting, realistic skin and anatomy.',
   cinematic: 'Photorealistic cinematic still, dramatic naturalistic light, deep shadows, realistic proportions.',
 };
+
+/** Preserve real distinguishing features without hallucinating skin damage. */
+export const skinFidelityInstructions = [
+  'Render human skin with subtle realistic pores, soft tonal variation and natural photographic detail, without over-sharpening, excessive contrast or exaggerated texture.',
+  'Preserve only freckles, moles, birthmarks, scars, acne or other skin marks actually visible in the references or explicitly specified in the character identity or scene.',
+  'Do not invent or amplify dark speckles, blotches, rashes, bruises, lesions, inflamed patches, acne, dirt or mottled discoloration on the face, neck, chest or body.',
+  'Do not interpret photographic realism or natural skin texture as a request for blemishes or skin damage.',
+  'Keep skin tones and facial features consistent across the face, neck and body, with physically plausible lighting and shadows.',
+  'Do not erase genuine identifying freckles, birthmarks, scars, skin texture or other documented traits; avoid plastic smoothing, beauty filters and airbrushing.',
+].join(' ');
 
 /** Reference photos establish anatomy and identity, never a mandatory outfit. */
 export const identityVsStylingInstruction = [
@@ -40,6 +50,7 @@ export function buildCharacterImagePrompt(input: {
     'Create a believable real photograph, not an illustration, doll, render or beauty-filtered image.',
     imageStyleInstructions[input.style],
     identityVsStylingInstruction,
+    skinFidelityInstructions,
     `Character: ${input.name.slice(0, 160)}.`,
     ...descriptions,
     `Scene: ${scene}.`,
@@ -74,6 +85,7 @@ export function buildMultiCharacterImagePrompt(input: {
     `The photograph must contain ${input.characters.length} distinct named people. Preserve each individual identity.`,
     'Do not merge, swap, average, or transfer faces, natural hair characteristics, tattoos, body features or other traits between people.',
     identityVsStylingInstruction,
+    skinFidelityInstructions,
     ...identities,
     `Scene: ${scene}.`,
     'Natural anatomy, authentic skin texture and lighting; no beauty-filtered or plastic faces.',
