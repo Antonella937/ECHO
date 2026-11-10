@@ -15,7 +15,9 @@ import {
 import { runAutonomyLiveCycle, type LiveAutonomyRepository } from "./service";
 import { logger } from "../lib/logger";
 import { runAutonomyWorkerTick, startAutonomyWorker } from "./worker";
-import { readUniverse } from "../lib/universeRepository";
+import { readUniverse, writeUniverse } from "../lib/universeRepository";
+import { SaveUniverseBody } from "@workspace/api-zod";
+import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
 import { runGroupAutonomyOnce } from "./group-executor";
 import { runCollaborationAutonomyOnce } from "./collaboration-executor";
 import { db } from "@workspace/db";
@@ -31,6 +33,47 @@ const repository: LiveAutonomyRepository = {
   complete: completeDryRun,
   executeDecision: executeAutonomyDecision,
 };
+
+/**
+ * Passive story views are separate from AI-generated social actions.
+ * A character can see a followed account's story without liking or replying.
+ * No model call, notification or social-action quota is consumed.
+ */
+async function runPassiveStoryViews() {
+  const targets = await listLiveOptInTargets();
+  const now = Date.now();
+  for (const target of targets) {
+    if (!target.socialEnabled) continue;
+    // Not every character checks stories every half hour.
+    if (Math.random() >= 0.38) continue;
+    try {
+      const snapshot = await readUniverse(target.ownerId, target.universeId);
+      if (!snapshot.state) continue;
+      const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+      if (!parsed.success) continue;
+      const state = parsed.data;
+      const character = state.characters.find(c => c.id === target.characterId && !c.archived);
+      if (!character) continue;
+      const followed = new Set(state.follows[character.id] ?? []);
+      const candidates = state.stories.filter(story => {
+        const created = new Date(story.createdAt).getTime();
+        return created <= now && created > now - 24 * 60 * 60_000 &&
+          story.authorId !== character.id && followed.has(story.authorId) &&
+          !story.seenBy.includes(character.id) &&
+          canCharacterViewCloseFriendsStory(state, story, character.id);
+      });
+      if (!candidates.length) continue;
+      const selected = candidates[Math.floor(Math.random() * candidates.length)];
+      const updated = { ...state, stories: state.stories.map(story =>
+        story.id === selected.id ? { ...story, seenBy: [...story.seenBy, character.id] } : story,
+      ) };
+      // CAS: a concurrent user interaction wins rather than being overwritten.
+      await writeUniverse(target.ownerId, updated, snapshot.revision, target.universeId);
+    } catch (error) {
+      logger.warn({ code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }, "Passive story view skipped");
+    }
+  }
+}
 
 /** Event-driven fast path for an incoming DM. Never scans unrelated characters. */
 export async function triggerImmediateDmReply(ownerId: string, universeId: string, characterId: string, messageId: string): Promise<void> {
@@ -85,6 +128,10 @@ export function startAutonomyBackgroundWorker() {
           }
         },
       });
+      if (result.status === "completed" && socialSlot !== lastSocialSlotAttempted) {
+        await runPassiveStoryViews().catch(error =>
+          logger.warn({ code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }, "Passive story view scan failed"));
+      }
       if (result.status === "completed" && socialSlot !== lastGroupSlotAttempted) {
         lastGroupSlotAttempted = socialSlot;
         try {
