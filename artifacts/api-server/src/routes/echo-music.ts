@@ -30,6 +30,7 @@ const singingVoiceRegistration = z.object({
   characterId: z.string().min(1).max(128),
   vocalId: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
   consentConfirmed: z.literal(true),
+  replaceExisting: z.boolean().default(false),
 }).strict();
 const router: IRouter = Router();
 router.use("/music", requireAuth, (_req, res, next) => {
@@ -136,10 +137,23 @@ router.post("/music/voices", async (req,res) => {
   const parsed = singingVoiceRegistration.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({error:"INVALID_VOCAL_ID_OR_CONSENT"}); return; }
   try {
+    // Do not silently replace a character's established singing identity.
+    // Explicit replacement is a separate user decision, not a side effect
+    // of selecting a new voice or importing a previously generated ID.
+    const saved = await db.execute(sql`SELECT mureka_vocal_id FROM echo_character_singing_voices
+      WHERE owner_id=${req.userId!} AND character_id=${parsed.data.characterId} LIMIT 1`);
+    const current = saved.rows[0]?.mureka_vocal_id;
+    if (typeof current === "string" && current !== parsed.data.vocalId && !parsed.data.replaceExisting) {
+      res.status(409).json({error:"CHARACTER_SINGING_VOICE_ALREADY_CONFIGURED",
+        requiresExplicitReplacement:true,characterId:parsed.data.characterId});return;
+    }
     await db.execute(sql`INSERT INTO echo_character_singing_voices (owner_id,character_id,mureka_vocal_id)
       VALUES (${req.userId!},${parsed.data.characterId},${parsed.data.vocalId})
-      ON CONFLICT (owner_id,character_id) DO UPDATE SET mureka_vocal_id=EXCLUDED.mureka_vocal_id,updated_at=now()`);
-    res.json({configured:true,characterId:parsed.data.characterId});
+      ON CONFLICT (owner_id,character_id) DO UPDATE SET
+        mureka_vocal_id=EXCLUDED.mureka_vocal_id,updated_at=now()
+      WHERE echo_character_singing_voices.mureka_vocal_id=EXCLUDED.mureka_vocal_id
+        OR ${parsed.data.replaceExisting}`);
+    res.json({configured:true,characterId:parsed.data.characterId,voiceIdentityLocked:true});
   } catch { res.status(503).json({error:"VOICE_SAVE_UNAVAILABLE"}); }
 });
 // Removing a link never deletes a provider voice or an existing song.
