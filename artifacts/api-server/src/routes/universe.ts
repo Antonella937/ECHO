@@ -101,6 +101,37 @@ router.get("/universe/characters/page", async (req, res): Promise<void> => {
     revision: envelope.revision });
 });
 
+// Transitional paginated feed projection. Full-state writes remain authoritative.
+// Sort deterministically to avoid unstable pages for equal timestamps.
+router.get("/universe/posts/page", async (req, res): Promise<void> => {
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  const authorId = typeof req.query.authorId === "string" ? req.query.authorId : null;
+  const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
+  const offset = typeof req.query.offset === "string" ? Number(req.query.offset) : 0;
+  if (!universeId || universeId.length > 100 ||
+      (authorId !== null && (!authorId || authorId.length > 100)) ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 50 ||
+      !Number.isSafeInteger(offset) || offset < 0 || offset > 1000000) {
+    res.status(400).json({ error: "INVALID_PAGE_QUERY" }); return;
+  }
+  const envelope = await readUniverse(req.userId!, universeId);
+  const parsed = SaveUniverseBody.shape.state.safeParse(envelope.state);
+  if (!parsed.success) {
+    res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return;
+  }
+  if (authorId && !parsed.data.characters.some(character => character.id === authorId && !character.archived)) {
+    res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
+  }
+  const posts = parsed.data.posts
+    .filter(post => authorId === null || post.authorId === authorId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+  const page = posts.slice(offset, offset + limit);
+  res.setHeader("Cache-Control", "private, no-store");
+  res.json({ posts: page, total: posts.length,
+    nextOffset: offset + page.length < posts.length ? offset + page.length : null,
+    revision: envelope.revision });
+});
+
 // Private historical lookup, never exposed across owners or universes.
 router.get("/universe/memory-archive", async (req, res): Promise<void> => {
   if (process.env.ECHO_MEMORY_ARCHIVE_ENABLED !== "true") {
