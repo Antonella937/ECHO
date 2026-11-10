@@ -25,6 +25,7 @@ const Input = z.object({
   universeId: z.string().min(1).max(120).default('primary'),
   characterId: z.string().min(1).max(120),
   prompt: z.string().trim().min(3).max(2000),
+  selectedCharacterIds: z.array(z.string().min(1).max(120)).max(3).refine(ids => new Set(ids).size === ids.length).optional(),
 }).strict();
 const GenerateInput = Input.extend({
   imageTransferAcknowledgement: z.literal('image-transfer-preview-v1'),
@@ -45,10 +46,13 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
     if (!character || state.currentCharacterId !== character.id) {
       res.status(403).json({ error: 'ACTIVE_CHARACTER_REQUIRED' }); return;
     }
+    if (input.data.selectedCharacterIds?.includes(character.id)) {
+      res.status(400).json({ error: 'ACTIVE_CHARACTER_MUST_NOT_BE_DUPLICATED' }); return;
+    }
     const identity = character.identity ?? {};
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const scene = prepareImageScene(input.data.prompt, character, characters, selected);
+    const scene = prepareImageScene(input.data.prompt, character, characters, selected, input.data.selectedCharacterIds);
     const references = scene.referencePaths;
     // Only count reference objects registered to the authenticated owner.
     // Actual bytes will be fetched server-side when paid generation is enabled.
@@ -185,7 +189,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const identity = character.identity ?? {};
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const scene = prepareImageScene(input.data.prompt, character, characters, selected);
+    const scene = prepareImageScene(input.data.prompt, character, characters, selected, input.data.selectedCharacterIds);
     const referencePaths = scene.referencePaths;
     const preparedPrompt = scene.preparedPrompt;
     const creditOperation = randomUUID();
