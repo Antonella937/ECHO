@@ -21,7 +21,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { customFetch } from '@workspace/api-client-react';
 
-const DURATION = 10000;
+const DEFAULT_STORY_DURATION_MS = 10000;
 
 interface ViewerCtx {
   openStories(authorId: string, onlyAuthor?: boolean): void;
@@ -107,6 +107,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const isMine = group.author.id === me.id;
   const liveStory = state.stories.find((s) => s.id === story.id) ?? story;
   const editingMetrics = editingMetricsId === story.id;
+  // A music story stays open for the full selected clip (15 or 30 seconds).
+  // Stories without a valid music clip retain their standard duration.
+  const storyDurationMs = liveStory.musicClip && (liveStory.musicClip.clipSeconds === 15 || liveStory.musicClip.clipSeconds === 30)
+    ? liveStory.musicClip.clipSeconds * 1000 : DEFAULT_STORY_DURATION_MS;
   const storyMediaSource = { sourceUniverseId: universeId, sourceCharacterId: story.authorId, sourceType: 'story' as const, sourceContentId: story.id };
   const storyImage = resolveMedia(story.image, storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
@@ -267,7 +271,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 <div
                   key={`${group.author.id}-${s.id}`}
                   className="story-progress h-full w-full bg-foreground"
-                  style={{ animationDuration: `${DURATION}ms`, animationPlayState: isPaused ? 'paused' : 'running' }}
+                  style={{ animationDuration: `${storyDurationMs}ms`, animationPlayState: isPaused ? 'paused' : 'running' }}
                   onAnimationEnd={next}
                 />
               )}
