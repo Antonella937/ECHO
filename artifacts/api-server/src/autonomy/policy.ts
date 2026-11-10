@@ -124,7 +124,9 @@ function availableTargets(state: SocialState, character: Character) {
   const following = new Set(state.follows[character.id] ?? []);
   return state.characters.filter(candidate =>
     candidate.id !== character.id && !candidate.archived &&
-    (following.has(candidate.id) || hasDmThread(state, character.id, candidate.id)));
+    (following.has(candidate.id) || hasDmThread(state, character.id, candidate.id)) &&
+    (character.configuration?.relationships?.some(relation => relation.targetId === candidate.id) ||
+      hasDmThread(state, character.id, candidate.id)));
 }
 
 function commentTarget(state: SocialState, character: Character, now: Date) {
@@ -226,6 +228,8 @@ export function chooseAutonomyOpportunity(input: {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = [...state.stories].reverse().find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
+      (character.configuration?.relationships?.some(relation => relation.targetId === story.authorId) ||
+        hasDmThread(state, character.id, story.authorId)) &&
       canCharacterViewCloseFriendsStory(state, story, character.id) &&
       (asTime(story.createdAt) ?? 0) > now.getTime() - DAY_MS &&
       (asTime(story.createdAt) ?? 0) <= now.getTime() &&
