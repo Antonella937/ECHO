@@ -233,6 +233,7 @@ export default function EchoMusicPage() {
     setPlayerOpen(true);
   }
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [playerOptionsOpen, setPlayerOptionsOpen] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [shuffleTracks, setShuffleTracks] = useState(false);
   const [repeatTrack, setRepeatTrack] = useState(false);
@@ -735,20 +736,17 @@ export default function EchoMusicPage() {
       if (result.status === 'COMPLETED') window.location.reload();
     } catch (error) { setGenerationStatus(error instanceof Error ? error.message : 'Could not update generation'); }
   }
-  if (musicAccess === 'active' && playerOpen) return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#100d12] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+36px)] pt-[calc(env(safe-area-inset-top,0px)+22px)] text-white">
+  if (musicAccess === 'active' && playerOpen) return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#100d12] px-6 pb-[calc(env(safe-area-inset-bottom,0px)+42px)] pt-[calc(env(safe-area-inset-top,0px)+22px)] text-white">
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      {coverUrl && <div className="absolute -inset-16 bg-cover bg-center opacity-55 blur-[65px] scale-125" style={{ backgroundImage: `url("${coverUrl}")` }} />}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#100d12]/55 via-[#100d12]/75 to-[#100d12]/95" />
+      {coverUrl && <div className="absolute inset-0 bg-cover bg-center opacity-75 scale-105" style={{ backgroundImage: `url("${coverUrl}")` }} />}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#100d12]/35 via-[#100d12]/60 to-[#100d12]/95" />
     </div>
     <header className="relative z-10 flex items-center justify-between">
       <button type="button" onClick={() => { audioRef.current?.pause(); setPlaying(false); setPlayerOpen(false); }} aria-label={t("Volver al estudio")} className="grid h-11 w-11 place-items-center"><ChevronDown className="h-7 w-7" /></button>
       <span className="text-center text-sm font-semibold">ECHO Music · {audioUrl ? t("Reproduciendo") : t("Preparada")}</span>
-      <span className="w-11" />
+      <button type="button" onClick={() => setPlayerOptionsOpen(true)} aria-label={interfaceLanguage === 'es' ? 'Más opciones' : 'More options'} className="grid h-11 w-11 place-items-center"><MoreHorizontal className="h-6 w-6" /></button>
     </header>
-    <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-6 py-6">
-      <div className="mx-auto flex aspect-square w-full max-w-[340px] items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-[0_25px_80px_rgba(0,0,0,0.55)]">
-        {coverUrl ? <img src={coverUrl} alt={`${t("Portada de ")}${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
-      </div>
+    <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-end gap-7 pb-12 pt-12">
       <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
       <div>
         <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label={t("Progreso de la canción")} className="w-full accent-white disabled:opacity-40" />
@@ -761,6 +759,12 @@ export default function EchoMusicPage() {
           <button type="button" onClick={() => setRepeatTrack(value => !value)} aria-label={interfaceLanguage === 'es' ? 'Repetir canción' : 'Repeat track'} aria-pressed={repeatTrack} className={repeatTrack ? 'text-[#e3a0b6]' : 'text-white/65'}><Repeat2 className="h-5 w-5" /></button>
         </div>
       </div>
+    </div>
+    {playerOptionsOpen && <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70" onClick={() => setPlayerOptionsOpen(false)}>
+      <section role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Opciones del reproductor' : 'Player options'} onClick={event => event.stopPropagation()} className="w-full max-w-xl rounded-t-3xl border border-white/15 bg-[#252126] px-5 pb-[calc(env(safe-area-inset-bottom,0px)+24px)] pt-3 shadow-2xl">
+        <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-white/30" />
+        <div className="mb-4 flex items-center justify-between"><p className="truncate text-base font-semibold">{title}</p><button type="button" onClick={() => setPlayerOptionsOpen(false)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'} className="grid h-10 w-10 place-items-center"><X className="h-5 w-5" /></button></div>
+        <div className="max-h-[65dvh] space-y-4 overflow-y-auto pb-2">
       {selectedAudioFile && !savedAudioPath && <button type="button" disabled={savingAudio} onClick={() => void saveCurrentAudio()} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{savingAudio ? t("Guardando en almacenamiento privado…") : t("Guardar este audio en ECHO")}</button>}
       {savedAudioPath && <p className="text-center text-xs text-white/70">{t("Audio guardado en almacenamiento privado. Aparece en tu biblioteca de este dispositivo.")}</p>}
       <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 p-3 text-sm font-semibold"><Upload className="h-4 w-4" /> {t("Probar con un audio propio")}<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm" className="sr-only" onChange={event => { importAudio(event.target.files?.[0]); event.target.value = ''; }} /></label>
@@ -775,6 +779,9 @@ export default function EchoMusicPage() {
         <button type="button" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = clipStart; audioRef.current.dataset.clipPreview = 'true'; } setElapsed(clipStart); void audioRef.current?.play().catch(() => setPlaying(false)); }} className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold">{t("Escuchar fragmento")}</button>
       </section>}</div></details>
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">{t("Ver prompt preparado")}</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
+        </div>
+      </section>
+    </div>
     </div>
     <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); if (repeatTrack && audioRef.current) { audioRef.current.currentTime = 0; void audioRef.current.play().catch(() => setPlaying(false)); } else if (playableTracks.length > 1 && selectedTrackId) skipTrack(1); }} />
   </div>;
