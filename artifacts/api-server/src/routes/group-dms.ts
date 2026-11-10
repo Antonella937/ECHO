@@ -39,7 +39,7 @@ router.get("/group-dms", async (req, res) => {
     FROM echo_group_conversations g LEFT JOIN echo_group_member_preferences p
       ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
     WHERE g.owner_id = ${req.userId!} AND g.universe_id = ${universeId}
-    AND g.participant_ids ? ${actorId} ORDER BY g.updated_at DESC LIMIT 100`);
+    AND (g.participant_ids ? ${actorId} OR g.scene_observer_enabled=true) ORDER BY g.updated_at DESC LIMIT 100`);
   res.json({ groups: result.rows.map(row => serializeGroup(row as Record<string, unknown>)) });
 });
 router.post("/group-dms", async (req, res) => {
@@ -66,7 +66,7 @@ router.get("/group-dms/:groupId/messages", async (req, res) => {
   const groupId = String(req.params.groupId);
   const group = await db.execute(sql`SELECT id FROM echo_group_conversations
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}
-    AND participant_ids ? ${actorId} LIMIT 1`);
+    AND (participant_ids ? ${actorId} OR scene_observer_enabled=true) LIMIT 1`);
   if (!group.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   const messages = await db.execute(sql`SELECT id, group_id AS "groupId", sender_id AS "senderId",
     body AS text, attachments, read_by AS "readBy", quote_message_id AS "quoteMessageId", pinned_at AS "pinnedAt", pinned_by AS "pinnedBy",
@@ -279,7 +279,7 @@ router.get("/group-dms/:groupId/scene", async (req, res) => {
   const result = await db.execute(sql`SELECT scene_context AS "context", scene_turn_mode AS "turnMode",
     scene_response_speed AS "responseSpeed", scene_observer_enabled AS "observerEnabled"
     FROM echo_group_conversations WHERE owner_id=${req.userId!} AND universe_id=${universeId}
-    AND id=${String(req.params.groupId)} AND participant_ids ? ${actorId} LIMIT 1`);
+    AND id=${String(req.params.groupId)} AND (participant_ids ? ${actorId} OR scene_observer_enabled=true) LIMIT 1`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json(result.rows[0]);
 });
@@ -292,7 +292,7 @@ router.patch("/group-dms/:groupId/scene", async (req, res) => {
     SET scene_context=${context}, scene_turn_mode=${turnMode}, scene_response_speed=${responseSpeed},
       scene_observer_enabled=${observerEnabled}, updated_at=now()
     WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${String(req.params.groupId)}
-    AND participant_ids ? ${actorId}
+    AND (participant_ids ? ${actorId} OR scene_observer_enabled=true)
     RETURNING scene_context AS "context", scene_turn_mode AS "turnMode",
       scene_response_speed AS "responseSpeed", scene_observer_enabled AS "observerEnabled"`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
@@ -306,7 +306,7 @@ router.post("/group-dms/:groupId/scene/next", async (req, res) => {
   const groupId = String(req.params.groupId);
   const allowed = await db.execute(sql`SELECT id FROM echo_group_conversations
     WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
-      AND participant_ids ? ${actorId} AND scene_observer_enabled=true AND autonomy_enabled=true LIMIT 1`);
+      AND scene_observer_enabled=true AND autonomy_enabled=true LIMIT 1`);
   if (!allowed.rows.length) { res.status(403).json({ error: "SCENE_NOT_ENABLED" }); return; }
   try {
     const result = await runGroupAutonomyOnce(req.userId!, universeId, groupId, true);
