@@ -4,7 +4,7 @@ import { customFetch } from '@workspace/api-client-react';
 import type { MusicClip } from '@/domain/types';
 
 /** Streams authorized library clips without exposing private storage URLs. */
-export function MusicClipPlayer({ clip, compact = false, autoPlay = false, source }: { clip: MusicClip; compact?: boolean; autoPlay?: boolean; source?: { universeId: string; surface: 'post' | 'story'; contentId: string; viewerUniverseId?: string; viewerCharacterId?: string } }) {
+export function MusicClipPlayer({ clip, compact = false, autoPlay = false, source, libraryPreview = false }: { clip: MusicClip; compact?: boolean; autoPlay?: boolean; libraryPreview?: boolean; source?: { universeId: string; surface: 'post' | 'story'; contentId: string; viewerUniverseId?: string; viewerCharacterId?: string } }) {
   const audio = useRef<HTMLAudioElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const [src, setSrc] = useState('');
@@ -15,7 +15,7 @@ export function MusicClipPlayer({ clip, compact = false, autoPlay = false, sourc
     let url = '';
     setSrc(''); setPlaying(false); setError('');
     const params = source ? new URLSearchParams(Object.entries(source).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : null;
-    const endpoint = source ? '/api/music/clip/' + encodeURIComponent(clip.trackId) + '/audio?' + params!.toString() : '/api/music/published/' + encodeURIComponent(clip.trackId) + '/audio';
+    const endpoint = source ? '/api/music/clip/' + encodeURIComponent(clip.trackId) + '/audio?' + params!.toString() : libraryPreview ? '/api/music/generation/' + encodeURIComponent(clip.trackId) + '/audio' : '/api/music/published/' + encodeURIComponent(clip.trackId) + '/audio';
     void customFetch<Blob>(endpoint, { responseType: 'blob' })
       .then(blob => {
         if (!active) return;
@@ -24,7 +24,7 @@ export function MusicClipPlayer({ clip, compact = false, autoPlay = false, sourc
         setSrc(url);
       }).catch(() => { if (active) setError('Audio no disponible'); });
     return () => { active = false; audio.current?.pause(); if (url) URL.revokeObjectURL(url); };
-  }, [clip.trackId, source?.universeId, source?.surface, source?.contentId, source?.viewerUniverseId, source?.viewerCharacterId]);
+  }, [clip.trackId, libraryPreview, source?.universeId, source?.surface, source?.contentId, source?.viewerUniverseId, source?.viewerCharacterId]);
   useEffect(() => {
     if (!audio.current || !src) return;
     audio.current.pause();
