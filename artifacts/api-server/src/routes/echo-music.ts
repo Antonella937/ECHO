@@ -6,7 +6,7 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
-import { storePrivateVocalSample } from "../lib/musicVoiceSampleStorage";
+import { storePrivateVocalSample, fetchOwnedPrivateVocalSample } from "../lib/musicVoiceSampleStorage";
 import { reserveMusicJob, submitReservedMusicJob, pollMusicJob, resolveCharacterSingingVoice } from "../lib/musicJobOrchestrator";
 import { MUREKA_SONG_MODEL, MUREKA_INSTRUMENTAL_MODEL } from "../lib/murekaMusic";
 
@@ -72,6 +72,30 @@ router.post("/music/voices/clone/sample", raw({type:["audio/mpeg","audio/mp3","a
   } catch (error) {
     req.log.warn({err:error},"Voice sample staging failed");
     res.status(400).json({error:"VOICE_SAMPLE_UPLOAD_FAILED"});
+  }
+});
+
+// Preflight a privately staged sample before any billable clone is allowed.
+// The server reads it back, checks owner/character, and validates the bytes.
+// It never sends the sample to fal.ai or reserves a paid request.
+const voiceSamplePreflight = z.object({
+  characterId:z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+  storageKey:z.string().min(1).max(512),
+  durationSeconds:z.number().finite().min(15).max(30),
+  consentConfirmed:z.literal(true),
+}).strict();
+router.post("/music/voices/clone/sample/preflight", async (req,res) => {
+  const parsed=voiceSamplePreflight.safeParse(req.body);
+  if (!parsed.success) {res.status(400).json({error:"VOICE_SAMPLE_PREFLIGHT_INVALID"});return;}
+  try {
+    const sample=await fetchOwnedPrivateVocalSample(req.userId!,parsed.data.characterId,parsed.data.storageKey);
+    res.json({status:"ready_for_confirmation",characterId:parsed.data.characterId,
+      storageKey:parsed.data.storageKey,bytes:sample.bytes.length,mimeType:sample.mimeType,
+      durationSeconds:parsed.data.durationSeconds,estimatedCloneCostUsd:5,
+      requiresExplicitChargeConfirmation:true,charged:false,providerCallsMade:0});
+  } catch(error) {
+    req.log.warn({err:error},"Voice sample preflight failed");
+    res.status(400).json({error:"VOICE_SAMPLE_PREFLIGHT_FAILED"});
   }
 });
 
