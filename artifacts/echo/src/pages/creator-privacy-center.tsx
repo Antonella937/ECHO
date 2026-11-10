@@ -118,7 +118,7 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
               ? <button type="button" className="epc-text-control" onClick={() => void sharingQuery.refetch()} data-testid="button-retry-sharing">{t("Reintentar")}</button>
               : sharing === undefined ? <span className="epc-state-pill">{t("Cargando…")}</span>
               : <button type="button" className={`epc-toggle ${sharing ? 'is-on' : ''}`} role="switch" aria-checked={sharing}
-                  aria-label={sharing ? t('Desactivar compartir') : t('Activar compartir (bloqueado)')}
+                  aria-label={sharing ? t('Desactivar compartir') : t('Compartir universo')}
                   disabled={disableSharing.isPending}
                   onClick={() => disableSharing.mutate(!sharing)} data-testid="toggle-universe-sharing"><i /></button>}
           </div>
