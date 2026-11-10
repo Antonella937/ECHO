@@ -864,9 +864,9 @@ export default function EchoMusicPage() {
           <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceCloneQuoteBusy} onClick={() => void previewVoiceClone('upload')} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneQuoteBusy ? '…' : t("Consultar costo sin generar")}</button>
           {voiceCloneQuote && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneQuote}</p>}
           <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceSampleUploadBusy} onClick={() => void stageVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSampleUploadBusy ? '…' : t("Guardar muestra privada (sin generar)")}</button>
-          {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>
+          {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>}
           {voiceSampleStorageKey && <button type="button" disabled={voiceSamplePreflightBusy || !voiceCloneConsent} onClick={() => void verifyStoredVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSamplePreflightBusy ? '…' : t("Verificar muestra privada")}</button>}
-          {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>
+          {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>}
           {voiceSampleStorageKey && <button type="button" disabled={separationBusy || !voiceCloneConsent} onClick={()=>void prepareVocalSeparationJob()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{separationBusy?'…':t("Preparar separación vocal (sin cargo)")}</button>}
           {separationJobId && !/processing|completed|submitting|uncertain/i.test(separationStatus) && <button type="button" disabled={separationBusy} onClick={()=>void confirmVocalSeparation()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Autorizar separación vocal (cargo adicional)")}</button>}
           {separationJobId && <button type="button" disabled={separationBusy} onClick={()=>void syncVocalSeparationResult()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Recuperar voz aislada")}</button>}
@@ -876,7 +876,7 @@ export default function EchoMusicPage() {
           {voiceCloneJobId && !/processing|completed|submitting|uncertain/i.test(voiceCloneJobStatus) && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void confirmVoiceCloneCharge()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Confirmar clonación (aprox. USD 5)")}</button>}
           {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void syncVoiceCloneResult()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Sincronizar resultado")}</button>
           {voiceCloneJobStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneJobStatus}</p>}
-          {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>
+          {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>}
         </details>
         <p className="text-xs text-muted-foreground">{t("Desde una canción de mi biblioteca")}: {t("Mi biblioteca")} → {t("Guardar voz")}</p>
         <details className="rounded-lg border border-border p-2">
