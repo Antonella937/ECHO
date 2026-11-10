@@ -46,7 +46,9 @@ test("worker uses stable keys, handles target failures, and releases lease", asy
   const firstKeys = keys.slice();
   keys.length = 0;
   await run();
-  assert.deepEqual(keys, firstKeys);
+  // Failed targets are backed off for 15 minutes, so a second scan at the
+  // same timestamp deliberately omits both of Dante's failed lanes.
+  assert.deepEqual(keys, firstKeys.filter((_, index) => index !== 2 && index !== 5));
   assert.equal(new Set(firstKeys).size, 6);
   assert.deepEqual(released, ["offline-token", "offline-token"]);
 });
