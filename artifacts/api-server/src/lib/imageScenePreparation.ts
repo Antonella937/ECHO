@@ -23,6 +23,7 @@ export function prepareImageScene(
   available: SceneCharacter[],
   style: keyof typeof imageStyleInstructions,
   selectedCharacterIds?: string[],
+  selectedReferencePaths?: Record<string, string>,
 ) {
   // Explicit selection is authoritative; never silently substitute another character.
   const people = selectedCharacterIds?.length
@@ -35,9 +36,15 @@ export function prepareImageScene(
   if (people.length > 4 || new Set(people.map(person => person.id)).size !== people.length) {
     throw Error('INVALID_IMAGE_SCENE_CHARACTER_COUNT');
   }
-  const perPerson = people.map(person => [
-    ...new Set([person.avatar, ...(Array.isArray(person.identity?.referenceImages) ? person.identity.referenceImages : [])].filter(isPrivatePath)),
-  ]);
+  const perPerson = people.map(person => {
+    const refs = [...new Set([person.avatar, ...(Array.isArray(person.identity?.referenceImages) ? person.identity.referenceImages : [])].filter(isPrivatePath))];
+    const preferred = selectedReferencePaths?.[person.id];
+    if (preferred && !refs.includes(preferred)) throw Error('IMAGE_REFERENCE_NOT_OWNED_BY_CHARACTER');
+    return preferred ? [preferred, ...refs.filter(ref => ref !== preferred)] : refs;
+  });
+  if (selectedReferencePaths && Object.keys(selectedReferencePaths).some(id => !people.some(person => person.id === id))) {
+    throw Error('IMAGE_REFERENCE_CHARACTER_NOT_IN_SCENE');
+  }
   const referencePaths: string[] = [];
   const referenceAssignments: string[] = [];
   const add = (path: string, name: string) => {
