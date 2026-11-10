@@ -6,12 +6,12 @@ import { defaultCharacterConfig } from "../../echo/src/domain/character-core";
 import { applyVerifiedAttractionEvent, type VerifiedAttractionEvent } from "../src/lib/relationshipAttraction";
 
 const now = new Date("2026-11-05T12:00:00Z");
-function fixture(attraction: number | null = 40) {
+function fixture(attraction: number | null = 40, preset: "friend" | "crush" = "crush") {
   const seed = createSeedState();
   const actor = seed.characters.find(c => c.id === "mar")!;
   actor.configuration = defaultCharacterConfig(actor);
   actor.configuration.relationships.push({
-    id: "attraction-test", targetId: "nela", preset: "friend", customLabel: "",
+    id: "attraction-test", targetId: "nela", preset, customLabel: "",
     description: "", closeness: 40, trust: 50, attraction, tension: 20,
     boundaries: "", notes: "",
   } as typeof actor.configuration.relationships[number]);
@@ -47,4 +47,13 @@ test("unverified, reused, future or disabled evidence cannot alter attraction", 
   assert.equal(applyVerifiedAttractionEvent(state, event("mutual_flirting_confirmed"), { consumedSourceIds: ["event-1"] }, now).applied, false);
   assert.equal(applyVerifiedAttractionEvent(state, { ...event("mutual_flirting_confirmed"), occurredAt: new Date("2026-11-06") }, { consumedSourceIds: [] }, now).applied, false);
   assert.equal(applyVerifiedAttractionEvent(fixture(null), event("mutual_flirting_confirmed"), { consumedSourceIds: [] }, now).reason, "ATTRACTION_DISABLED");
+});
+
+test("configured friends cannot acquire romantic attraction from events", () => {
+  for (const kind of ["mutual_flirting_confirmed", "romantic_interest_confirmed"] as const) {
+    const result = applyVerifiedAttractionEvent(fixture(40, "friend"), event(kind), { consumedSourceIds: [] }, now);
+    assert.equal(result.applied, false);
+    assert.equal(result.reason, "PLATONIC_RELATIONSHIP");
+    assert.equal(relation(result.state).attraction, 40);
+  }
 });
