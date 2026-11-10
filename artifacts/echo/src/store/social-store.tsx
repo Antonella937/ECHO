@@ -45,6 +45,8 @@ export interface SocialActions {
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
+  setCommunityCommentsEnabled(accountId: string, enabled: boolean): void;
+  addCommunityComment(postId: string, handle: string, text: string): void;
   respondCollaboration(postId: string, accept: boolean): void;
   votePoll(postId: string, optionId: string): void;
   createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; collaborationInvites?: string[]; poll?: import('@/domain/types').Post['poll']; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
@@ -295,6 +297,19 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
             origin: 'user',
           },
         });
+      },
+      setCommunityCommentsEnabled(accountId, enabled) {
+        if (accountId !== myId()) throw new Error('Solo podés configurar tu cuenta activa.');
+        coordinator.current?.edit(state => ({ ...state, characters: state.characters.map(c => c.id === accountId ? { ...c, communityCommentsEnabled: enabled } : c) }));
+      },
+      addCommunityComment(postId, handle, text) {
+        const post = cur().posts.find(p => p.id === postId);
+        if (!post || post.authorId !== myId()) throw new Error('Solo podés agregar comentarios a tus publicaciones.');
+        const account = cur().characters.find(c => c.id === post.authorId);
+        if (!account?.communityCommentsEnabled || post.commentsEnabled === false) throw new Error('Activá primero los comentarios de comunidad.');
+        const safeHandle = handle.trim().replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '').slice(0, 32);
+        if (safeHandle.length < 3 || !text.trim() || text.length > 500) throw new Error('Ingresá un usuario válido y un comentario de hasta 500 caracteres.');
+        coordinator.current?.edit(state => ({ ...state, comments: [...state.comments, { id: uid('community'), postId, authorId: post.authorId, guestHandle: safeHandle, text: text.trim(), createdAt: new Date().toISOString(), parentId: null, replyToAuthorId: null, likes: [], origin: 'user' as const }] }));
       },
       toggleCommentLike(commentId) {
         const c = cur().comments.find((x) => x.id === commentId);
