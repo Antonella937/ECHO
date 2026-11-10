@@ -730,6 +730,49 @@ router.get("/music/clip/:id/audio", async (req, res) => {
   } catch (error) { req.log.error({ err: error }, "Music clip stream failed"); if (!res.headersSent) res.status(503).json({ error: "MUSIC_CLIP_UNAVAILABLE" }); }
 });
 
+// Owner-only playback for comparing a character's singing reference with speech.
+// This endpoint never publishes the track or exposes its private storage key.
+router.get("/music/library/:id/audio", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
+  try {
+    const [track] = await db.select().from(echoMusicLibraryTable).where(and(
+      eq(echoMusicLibraryTable.id, id.data), eq(echoMusicLibraryTable.ownerId, req.userId!))).limit(1);
+    if (!track?.audioPath || track.status !== "saved_audio") { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+    if (track.audioPath.startsWith("generated/")) {
+      const generated = await db.execute(sql`SELECT id FROM echo_music_generation_jobs
+        WHERE id=${track.id}::uuid AND owner_id=${req.userId!}
+          AND status='completed' AND audio_path=${track.audioPath} LIMIT 1`);
+      if (!generated.rows.length) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+      const upstream = await fetchPrivateGeneratedMusic(track.audioPath, req.headers.range);
+      res.status(upstream.status);
+      for (const header of ["content-type", "content-length", "content-range", "accept-ranges"]) {
+        const value = upstream.headers.get(header);
+        if (value) res.setHeader(header, value);
+      }
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      if (!upstream.body) { res.end(); return; }
+      const { Readable } = await import("node:stream");
+      const stream = Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream);
+      stream.on("error", error => { req.log.warn({ err: error }, "Private music preview interrupted"); if (!res.headersSent) res.status(502).end(); else res.destroy(error); });
+      stream.pipe(res);
+      return;
+    }
+    const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+      .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, track.audioPath))).limit(1);
+    if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+    const storage = new ObjectStorageService();
+    const file = await storage.getObjectEntityFile(media.objectPath);
+    const response = await storage.downloadObject(file, 0, req.headers.range);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(response.status);
+    if (response.body) pipeMedia(response.body, res, error => req.log.warn({ err: error }, "Private music preview interrupted"));
+    else res.end();
+  } catch (error) { req.log.error({ err: error }, "Private music preview failed"); if (!res.headersSent) res.status(503).json({ error: "MUSIC_PREVIEW_UNAVAILABLE" }); }
+});
+
 router.get("/music/published/:id/audio", async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.id);
   if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
