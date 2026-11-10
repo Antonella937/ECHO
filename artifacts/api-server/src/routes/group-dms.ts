@@ -206,6 +206,31 @@ router.post("/group-dms/:groupId/leave", async (req, res) => {
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ left: true });
 });
+// Only the group creator may permanently delete a conversation for every participant.
+// Leaving is separate and does not erase shared history.
+router.delete("/group-dms/:groupId", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_GROUP" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  try {
+    const groupId = String(req.params.groupId);
+    const result = await db.transaction(async tx => {
+      const existing = await tx.execute(sql`SELECT id FROM echo_group_conversations
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
+          AND created_by=${actorId} FOR UPDATE`);
+      if (!existing.rows.length) return false;
+      await tx.execute(sql`DELETE FROM echo_group_member_preferences
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND group_id=${groupId}`);
+      await tx.execute(sql`DELETE FROM echo_group_conversations
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
+          AND created_by=${actorId}`);
+      return true;
+    });
+    if (!result) { res.status(403).json({ error: "ONLY_GROUP_CREATOR_CAN_DELETE" }); return; }
+    res.json({ deleted: true });
+  } catch { res.status(503).json({ error: "GROUP_DELETE_FAILED" }); }
+});
 const addMembersBody = scope.extend({ participantIds: z.array(id).min(1).max(31) });
 router.post("/group-dms/:groupId/participants", async (req, res) => {
   const parsed = addMembersBody.safeParse(req.body);
