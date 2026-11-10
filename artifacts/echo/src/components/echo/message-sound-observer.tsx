@@ -18,9 +18,12 @@ export function MessageSoundObserver() {
   useEffect(() => {
     const onInteraction = () => unlockMessageAudio();
     window.addEventListener('pointerdown', onInteraction, { passive: true });
+    // iOS Safari/PWA may unlock WebAudio on touchend rather than pointerdown.
+    window.addEventListener('touchend', onInteraction, { passive: true });
     window.addEventListener('keydown', onInteraction);
     return () => {
       window.removeEventListener('pointerdown', onInteraction);
+      window.removeEventListener('touchend', onInteraction);
       window.removeEventListener('keydown', onInteraction);
     };
   }, []);
@@ -32,8 +35,9 @@ export function MessageSoundObserver() {
     if (!old || old.universe !== universe || old.identity !== identity) return;
     const newMessages = state.messages.filter(m => !old.ids.has(m.id) && m.recipientId === identity && m.senderId !== identity);
     const newNotices = state.notifications.filter(n => !old.notificationIds.has(n.id) && n.recipientId === identity);
+    // Avoid two overlapping chimes when the same incoming DM also creates a notice.
     if (newMessages.length) playMessageSound('incoming');
-    if (newNotices.length) playMessageSound('notification');
+    else if (newNotices.length) playMessageSound('notification');
     const prefs = ownerId ? readPushPreferences(ownerId) : null;
     if (!prefs?.enabled || !('Notification' in window) || Notification.permission !== 'granted' || document.visibilityState === 'visible') return;
     const show = (category: PushCategory, title: string, body: string, tag: string) => {
