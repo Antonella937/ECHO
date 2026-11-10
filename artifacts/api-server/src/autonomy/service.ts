@@ -451,7 +451,7 @@ export async function runAutonomyLiveCycle(
         [...state.messages].reverse().filter(message =>
           (message.senderId === character.id && message.recipientId === "nela") ||
           (message.senderId === "nela" && message.recipientId === character.id)
-        ).slice(0, 8).some(message => /\\b(sketch(?:es)?|drawing|draw(?:ing)?|artwork|illustrat(?:ion|e)|pencil|paint(?:ing)?)\\b/i.test(message.text)) &&
+        ).slice(0, 8).some(message => /\b(sketch(?:es)?|drawing|draw(?:ing)?|artwork|illustrat(?:ion|e)|pencil|paint(?:ing)?)\b/i.test(message.text)) &&
         (dependencies.random?.() ?? Math.random()) < 0.08) {
       try {
         const fresh = await dependencies.repository.read(ownerId, universeId);
