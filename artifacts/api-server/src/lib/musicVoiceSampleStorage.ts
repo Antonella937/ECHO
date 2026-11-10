@@ -14,15 +14,17 @@ export function validateVocalSampleBytes(bytes: Buffer, mime: string): void {
   if (!bytes.length || bytes.length >= MAX_BYTES) throw new Error("VOICE_SAMPLE_SIZE_INVALID");
   const mp3 = mime === "audio/mpeg" || mime === "audio/mp3";
   const m4a = mime === "audio/mp4" || mime === "audio/x-m4a";
-  if (!mp3 && !m4a) throw new Error("VOICE_SAMPLE_TYPE_INVALID");
+  const wav = mime === "audio/wav" || mime === "audio/x-wav";
+  if (!mp3 && !m4a && !wav) throw new Error("VOICE_SAMPLE_TYPE_INVALID");
   if (mp3 && !(bytes.subarray(0,3).toString("ascii")==="ID3" || (bytes[0]===0xff && (bytes[1]&0xe0)===0xe0))) throw new Error("VOICE_SAMPLE_HEADER_INVALID");
   if (m4a && bytes.subarray(4,8).toString("ascii")!=="ftyp") throw new Error("VOICE_SAMPLE_HEADER_INVALID");
+  if (wav && !(bytes.subarray(0,4).toString("ascii")==="RIFF" && bytes.subarray(8,12).toString("ascii")==="WAVE")) throw new Error("VOICE_SAMPLE_HEADER_INVALID");
 }
 export async function storePrivateVocalSample(ownerId:string, characterId:string, bytes:Buffer, mime:string) {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(ownerId) || !/^[a-zA-Z0-9_-]{1,128}$/.test(characterId)) throw new Error("VOICE_SAMPLE_OWNER_INVALID");
   validateVocalSampleBytes(bytes,mime);
   const {base,key,bucket}=config();
-  const extension = mime === "audio/mpeg" || mime === "audio/mp3" ? "mp3" : "m4a";
+  const extension = mime === "audio/mpeg" || mime === "audio/mp3" ? "mp3" : mime === "audio/wav" || mime === "audio/x-wav" ? "wav" : "m4a";
   const storageKey = `voice-samples/${ownerId}/${characterId}/${randomUUID()}.${extension}`;
   const endpoint = new URL(`/storage/v1/object/${encodeURIComponent(bucket)}/${storageKey}`,base);
   const response = await fetch(endpoint,{method:"POST",headers:{Authorization:`Bearer ${key}`,apikey:key,"Content-Type":mime,"x-upsert":"false"},body:bytes,signal:AbortSignal.timeout(45000)});
@@ -31,7 +33,7 @@ export async function storePrivateVocalSample(ownerId:string, characterId:string
 }
 export async function fetchOwnedPrivateVocalSample(ownerId:string,characterId:string,storageKey:string):Promise<{bytes:Buffer;mimeType:string}> {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(ownerId) || !/^[a-zA-Z0-9_-]{1,128}$/.test(characterId)) throw new Error("VOICE_SAMPLE_OWNER_INVALID");
-  if (!storageKey.startsWith(`voice-samples/${ownerId}/${characterId}/`) || !/^voice-samples\/[a-zA-Z0-9_-]{1,128}\/[a-zA-Z0-9_-]{1,128}\/[a-f0-9-]{36}\.(mp3|m4a)$/.test(storageKey)) throw new Error("VOICE_SAMPLE_ACCESS_DENIED");
+  if (!storageKey.startsWith(`voice-samples/${ownerId}/${characterId}/`) || !/^voice-samples\/[a-zA-Z0-9_-]{1,128}\/[a-zA-Z0-9_-]{1,128}\/[a-f0-9-]{36}\.(mp3|m4a|wav)$/.test(storageKey)) throw new Error("VOICE_SAMPLE_ACCESS_DENIED");
   const {base,key,bucket}=config();
   const endpoint = new URL(`/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${storageKey}`,base);
   const response = await fetch(endpoint,{headers:{Authorization:`Bearer ${key}`,apikey:key},signal:AbortSignal.timeout(30000)});
@@ -39,7 +41,7 @@ export async function fetchOwnedPrivateVocalSample(ownerId:string,characterId:st
   const declared=Number(response.headers.get("content-length")||0);
   if (declared>=MAX_BYTES) throw new Error("VOICE_SAMPLE_SIZE_INVALID");
   const bytes=Buffer.from(await response.arrayBuffer());
-  const mimeType=storageKey.endsWith(".mp3")?"audio/mpeg":"audio/mp4";
+  const mimeType=storageKey.endsWith(".mp3")?"audio/mpeg":storageKey.endsWith(".wav")?"audio/wav":"audio/mp4";
   validateVocalSampleBytes(bytes,mimeType);
   return {bytes,mimeType};
 }
