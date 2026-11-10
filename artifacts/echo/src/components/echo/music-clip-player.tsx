@@ -3,8 +3,8 @@ import { Music2, Pause, Play } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import type { MusicClip } from '@/domain/types';
 
-/** Loads only explicitly published tracks; never exposes private storage URLs. */
-export function MusicClipPlayer({ clip, compact = false, autoPlay = false }: { clip: MusicClip; compact?: boolean; autoPlay?: boolean }) {
+/** Streams authorized library clips without exposing private storage URLs. */
+export function MusicClipPlayer({ clip, compact = false, autoPlay = false, source }: { clip: MusicClip; compact?: boolean; autoPlay?: boolean; source?: { universeId: string; surface: 'post' | 'story'; contentId: string; viewerUniverseId?: string; viewerCharacterId?: string } }) {
   const audio = useRef<HTMLAudioElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const [src, setSrc] = useState('');
@@ -14,7 +14,9 @@ export function MusicClipPlayer({ clip, compact = false, autoPlay = false }: { c
     let active = true;
     let url = '';
     setSrc(''); setPlaying(false); setError('');
-    void customFetch<Blob>('/api/music/published/' + encodeURIComponent(clip.trackId) + '/audio', { responseType: 'blob' })
+    const params = source ? new URLSearchParams(Object.entries(source).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : null;
+    const endpoint = source ? '/api/music/clip/' + encodeURIComponent(clip.trackId) + '/audio?' + params!.toString() : '/api/music/published/' + encodeURIComponent(clip.trackId) + '/audio';
+    void customFetch<Blob>(endpoint, { responseType: 'blob' })
       .then(blob => {
         if (!active) return;
         if (!blob.type.startsWith('audio/')) throw new Error('Formato de audio no compatible');
@@ -22,7 +24,7 @@ export function MusicClipPlayer({ clip, compact = false, autoPlay = false }: { c
         setSrc(url);
       }).catch(() => { if (active) setError('Audio no disponible'); });
     return () => { active = false; audio.current?.pause(); if (url) URL.revokeObjectURL(url); };
-  }, [clip.trackId]);
+  }, [clip.trackId, source?.universeId, source?.surface, source?.contentId, source?.viewerUniverseId, source?.viewerCharacterId]);
   useEffect(() => {
     if (!audio.current || !src) return;
     audio.current.pause();
