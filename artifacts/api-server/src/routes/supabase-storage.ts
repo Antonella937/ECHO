@@ -210,7 +210,11 @@ export function createSupabaseStorageRouter(): IRouter {
       }
       if (!response.body) { res.end(); return; }
       const { Readable } = await import("node:stream");
-      Readable.fromWeb(response.body as import("node:stream/web").ReadableStream).pipe(res);
+      // The upstream AbortSignal may fire after headers are sent. A bare pipe()
+      // emits an unhandled Readable error and crashes the entire Node process.
+      const { pipeMedia } = await import("../lib/pipeMedia");
+      pipeMedia(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), res,
+        error => req.log.warn({ err: error }, "Private Supabase media stream interrupted"));
     } catch { if (!res.headersSent) res.status(503).end(); }
   });
   return router;
