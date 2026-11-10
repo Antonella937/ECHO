@@ -68,6 +68,41 @@ export async function loadUniverse(universeId = 'primary'): Promise<UniverseEnve
   });
 }
 
+/** Lightweight profile projection for large universes. Does not include character memories. */
+export interface CharacterPageItem {
+  id: string;
+  personId: string;
+  handle: string;
+  name: string;
+  occupation: string;
+  bio: string;
+  avatar: string;
+  accountType: string;
+  verified: boolean;
+  privateAccount: boolean;
+  displayMetrics: { followers?: number | null; following?: number | null } | null;
+}
+export interface CharacterPage {
+  characters: CharacterPageItem[];
+  total: number;
+  nextOffset: number | null;
+  revision: number;
+}
+
+/** Fetch a bounded page. Existing full-state synchronization remains unchanged. */
+export async function loadCharacterPage(
+  universeId = 'primary',
+  offset = 0,
+  limit = 24,
+): Promise<CharacterPage> {
+  if (!Number.isSafeInteger(offset) || offset < 0 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
+    throw new Error('Invalid character page');
+  return customFetch<CharacterPage>(`/api/universe/characters/page?${new URLSearchParams({
+    universeId, offset: String(offset), limit: String(limit),
+  })}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
+}
+
 /** Fetch just the server revision, without transferring the entire social state. */
 export async function loadUniverseRevision(universeId = 'primary'): Promise<number> {
   const result = await customFetch<{ revision: number }>(`/api/universe/revision?${new URLSearchParams({ universeId })}`, {
