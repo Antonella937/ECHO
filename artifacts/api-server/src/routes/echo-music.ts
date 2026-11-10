@@ -296,11 +296,12 @@ router.get("/music/voices/:characterId", async (req,res) => {
     `);
     const speechReady = speech.rows.length > 0;
     const singingReady = rows.rows.length > 0;
-    const manual = await db.execute(sql`SELECT assessment, notes, updated_at AS "updatedAt"
+    const manual = await db.execute(sql`SELECT assessment, notes, singing_vocal_id AS "singingVocalId", updated_at AS "updatedAt"
       FROM echo_music_voice_comparisons
       WHERE owner_id=${req.userId!} AND character_id=${characterId.data}
       ORDER BY updated_at DESC LIMIT 1`);
-    const assessment = speechReady && singingReady ? manual.rows[0]?.assessment : null;
+    const assessment = speechReady && singingReady && manual.rows[0]?.singingVocalId === rows.rows[0]?.mureka_vocal_id
+      ? manual.rows[0]?.assessment : null;
     res.setHeader("Cache-Control", "private, no-store");
     res.json({
       configured: singingReady, vocalId: rows.rows[0]?.mureka_vocal_id ?? null,
@@ -779,13 +780,15 @@ router.put("/music/voices/comparison", async (req, res) => {
         AND p.character_id=${data.characterId} AND p.selected_sample_id=s.id AND s.status='ready' LIMIT 1`);
       if (!sample.rows.length) { res.status(404).json({ error: "SPEECH_REFERENCE_NOT_FOUND" }); return; }
     }
+    const linkedVoice = await db.execute(sql`SELECT mureka_vocal_id FROM echo_character_singing_voices
+      WHERE owner_id=${req.userId!} AND character_id=${data.characterId} LIMIT 1`);
     await db.execute(sql`INSERT INTO echo_music_voice_comparisons
-      (owner_id, universe_id, character_id, singing_track_id, speech_sample_id, assessment, notes)
+      (owner_id, universe_id, character_id, singing_track_id, speech_sample_id, singing_vocal_id, assessment, notes)
       VALUES (${req.userId!},${data.universeId},${data.characterId},${data.singingTrackId}::uuid,
-        ${data.speechSampleId}::uuid,${data.assessment},${data.notes})
+        ${data.speechSampleId}::uuid,${linkedVoice.rows[0]?.mureka_vocal_id ?? null},${data.assessment},${data.notes})
       ON CONFLICT (owner_id, universe_id, character_id) DO UPDATE SET
         singing_track_id=EXCLUDED.singing_track_id, speech_sample_id=EXCLUDED.speech_sample_id,
-        assessment=EXCLUDED.assessment, notes=EXCLUDED.notes, updated_at=now()`);
+        singing_vocal_id=EXCLUDED.singing_vocal_id, assessment=EXCLUDED.assessment, notes=EXCLUDED.notes, updated_at=now()`);
     res.setHeader("Cache-Control", "private, no-store");
     res.json({ saved: true, assessment: data.assessment });
   } catch (error) { req.log.error({ err: error }, "Voice comparison save failed"); res.status(503).json({ error: "VOICE_COMPARISON_SAVE_UNAVAILABLE" }); }
