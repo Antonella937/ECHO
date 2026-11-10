@@ -23,6 +23,7 @@ import { runCollaborationAutonomyOnce } from "./collaboration-executor";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { dispatchAutonomousVoice, getVoiceOwnerControls, resolveAutonomousVoiceId } from "./voice-adapter";
+import { dispatchHyunPrivateSketch } from "./hyun-private-sketch-delivery";
 
 
 const repository: LiveAutonomyRepository = {
@@ -86,6 +87,7 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
     repository, provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
     liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED, lane: "dm",
+    sketchDelivery: dispatchHyunPrivateSketch,
     voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
       ...controls, dispatch: dispatchAutonomousVoice, resolveVoiceId: resolveAutonomousVoiceId,
     } : undefined).catch(() => undefined),
@@ -114,6 +116,7 @@ export function startAutonomyBackgroundWorker() {
           repository,
           provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
           liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
+          sketchDelivery: dispatchHyunPrivateSketch,
           now,
           lane: input.lane,
           voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
