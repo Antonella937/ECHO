@@ -13,10 +13,10 @@ export default function EchoVideoPage() {
   const [mode, setMode] = useState<'standard'|'advanced_silent'|'advanced_audio'>('standard');
   const [duration, setDuration] = useState<5|10>(5);
   const [aspect, setAspect] = useState<'9:16'|'16:9'|'1:1'>('9:16');
-  const [gifs, setGifs] = useState<Array<{id:string;status:string;durationSeconds:number;width:number;fps:number}>>([]);
+  const [gifs, setGifs] = useState<Array<{id:string;status:string;durationSeconds:number;width:number;fps:number;hasPrivateAsset:boolean}>>([]);
   useEffect(()=>{
     let active=true;
-    void customFetch<{items:Array<{id:string;status:string;durationSeconds:number;width:number;fps:number}>}>('/api/video/gifs',{responseType:'json'})
+    void customFetch<{items:Array<{id:string;status:string;durationSeconds:number;width:number;fps:number;hasPrivateAsset:boolean}>}>('/api/video/gifs',{responseType:'json'})
       .then(data=>{if(active)setGifs(data.items);}).catch(()=>{});
     return ()=>{active=false;};
   },[]);
@@ -87,7 +87,7 @@ export default function EchoVideoPage() {
     </section>
     <section className="space-y-2 rounded-2xl border border-border bg-card/60 p-4">
       <h2 className="text-sm font-semibold">{es?'Mis GIF':'My GIFs'}</h2>
-      {gifs.length===0?<p className="text-xs text-muted-foreground">{es?'Todavía no hay GIF generados.':'No generated GIFs yet.'}</p>:gifs.map(gif=><div key={gif.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>GIF · {gif.durationSeconds}s · {gif.width}px · {gif.fps} FPS</span><span>{gif.status}</span></div>)}
+      {gifs.length===0?<p className="text-xs text-muted-foreground">{es?'Todavía no hay GIF generados.':'No generated GIFs yet.'}</p>:gifs.map(gif=><div key={gif.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>GIF · {gif.durationSeconds}s · {gif.width}px · {gif.fps} FPS</span><span className="flex items-center gap-2"><span>{gif.status}</span>{gif.status==='succeeded'&&gif.hasPrivateAsset&&<button type="button" className="rounded-lg border border-border p-2" aria-label={es?'Descargar GIF privado':'Download private GIF'} onClick={async()=>{try{const blob=await customFetch<Blob>('/api/video/gifs/'+encodeURIComponent(gif.id)+'/asset',{responseType:'blob'});if(blob.type!=='image/gif')throw Error('Invalid GIF');const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='echo-gif-'+gif.id+'.gif';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch{setGifMessage(es?'No se pudo descargar el GIF.':'Could not download GIF.');}}}><Download className="h-4 w-4"/></button>}</span></div>)}
     </section>
     <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Preparación de GIF':'GIF preparation'}>
       <h2 className="text-sm font-semibold">{es?'Convertir video a GIF':'Convert video to GIF'}</h2>
