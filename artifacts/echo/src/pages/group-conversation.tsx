@@ -14,7 +14,7 @@ import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import type { MessageAttachment } from '@/domain/types';
 
-type Group = { id: string; name: string; avatar?: string | null; participantIds: string[] };
+type Group = { id: string; name: string; avatar?: string | null; createdBy: string; participantIds: string[] };
 type MusicAttachment = { id: string; type: 'music'; trackId: string; title: string; durationSeconds: number };
 type GroupMessage = { id: string; senderId: string; text: string; attachments?: Array<MessageAttachment | MusicAttachment>; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
 
@@ -244,6 +244,19 @@ export default function GroupConversationPage() {
     } catch { setError('No se pudo cambiar el nombre del grupo.'); }
     finally { setSavingSettings(false); }
   };
+  const deleteGroup = async () => {
+    if (!group || group.createdBy !== me.id || savingSettings || !window.confirm(
+      '¿Eliminar este grupo definitivamente? Se borrarán los mensajes para todos los participantes. Esta acción no se puede deshacer.'
+    )) return;
+    setSavingSettings(true);
+    try {
+      await customFetch(`/api/group-dms/${encodeURIComponent(group.id)}?${new URLSearchParams({
+        universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id,
+      })}`, { method: 'DELETE', responseType: 'json' });
+      navigate('/messages');
+    } catch { setError('No se pudo eliminar el grupo.'); }
+    finally { setSavingSettings(false); }
+  };
   const leave = async () => {
     if (!group || savingSettings || !window.confirm('¿Querés salir de este grupo?')) return;
     setSavingSettings(true);
@@ -335,7 +348,9 @@ export default function GroupConversationPage() {
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={archived} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ archived: e.target.checked })} /> Archivar este grupo</label>
         <p className="mt-2 text-xs text-muted-foreground">Estas preferencias son individuales. Archivar no elimina los mensajes.</p>
       </div>
-      <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>
+      {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>}
+      {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">Eliminar grupo definitivamente</button>}
+      {!group?.participantIds.includes(me.id) && <p className="mt-3 text-xs text-muted-foreground">Estás viendo este grupo como espectadora. No sos participante.</p>}
     </div>}
     {sceneObserverEnabled && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
       <div className="flex flex-wrap items-center gap-2">
