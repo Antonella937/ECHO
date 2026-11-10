@@ -37,6 +37,42 @@ router.use("/music", requireAuth, (_req, res, next) => {
   next();
 });
 
+// Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
+// The actual $5 provider submission must be separately authorized and reserved.
+const voiceCloneQuoteSchema = z.object({
+  characterId: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+  source: z.enum(["upload", "library"]),
+  durationSeconds: z.number().finite().min(15).max(30),
+  fileSizeBytes: z.number().int().positive().max(10 * 1024 * 1024 - 1).optional(),
+  fileName: z.string().max(255).optional(),
+  libraryTrackId: z.string().uuid().optional(),
+  consentConfirmed: z.literal(true),
+}).strict().superRefine((data, ctx) => {
+  if (data.source === "upload" && (!data.fileName || !/\\.(mp3|m4a)$/i.test(data.fileName) || !data.fileSizeBytes))
+    ctx.addIssue({code:z.ZodIssueCode.custom,message:"INVALID_VOICE_SAMPLE"});
+  if (data.source === "library" && !data.libraryTrackId)
+    ctx.addIssue({code:z.ZodIssueCode.custom,message:"MUSIC_TRACK_REQUIRED"});
+});
+router.post("/music/voices/clone/quote", async (req,res) => {
+  const parsed = voiceCloneQuoteSchema.safeParse(req.body);
+  if (!parsed.success) {res.status(400).json({error:"INVALID_VOICE_CLONE_REFERENCE"});return;}
+  try {
+    if (parsed.data.source === "library") {
+      const found = await db.execute(sql`SELECT id FROM echo_music_library
+        WHERE owner_id=${req.userId!} AND id=${parsed.data.libraryTrackId!}::uuid
+          AND character_id=${parsed.data.characterId} AND status='saved_audio'
+          AND audio_path LIKE 'generated/%' LIMIT 1`);
+      if (!found.rows.length) {res.status(404).json({error:"MUSIC_TRACK_NOT_FOUND"});return;}
+    }
+    res.json({status:"preview_only",source:parsed.data.source,characterId:parsed.data.characterId,
+      provider:"fal_ai_mureka_voice_clone",model:"mureka/api/voice/clone",
+      estimatedCostUsd:5,paidCallsMade:0,charged:false,cloneCreated:false,
+      requiresExplicitPaymentConfirmation:true,
+      requiresVocalOnlyAudio:true,
+      note:"No audio uploaded, vocal extraction performed, or clone submitted."});
+  } catch {res.status(503).json({error:"VOICE_CLONE_QUOTE_UNAVAILABLE"});}
+});
+
 // Registration only links an already-created Mureka vocal identity; no paid calls.
 router.get("/music/voices/:characterId", async (req,res) => {
   const characterId = z.string().min(1).max(128).safeParse(req.params.characterId);
