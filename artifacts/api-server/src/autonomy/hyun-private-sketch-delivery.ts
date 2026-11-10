@@ -33,6 +33,12 @@ export async function dispatchHyunPrivateSketch(input: {
   if (!parsed.data.messages.some(m => m.id === input.messageId &&
     m.senderId === sender.id && m.recipientId === recipient.id &&
     m.origin === "autonomy" && !m.attachments?.some(a => a.type === "image"))) return "skipped";
+  // Fail closed until a persistent, per-message attempt ledger is wired in.
+  // This prevents repeated autonomous requests from spending against the image budget.
+  const [attempt] = await db.execute(sql`SELECT 1 FROM echo_hyun_private_sketch_attempts
+    WHERE owner_id = ${input.ownerId} AND universe_id = ${input.universeId}
+      AND message_id = ${input.messageId} LIMIT 1`).then(result => result.rows).catch(() => []);
+  if (!attempt) return "skipped";
   // The provider is never called before the atomic budget reservation.
   const generated = await generateCharacterImage({
     ownerId: input.ownerId, universeId: input.universeId,
