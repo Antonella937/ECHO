@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { Film, LockKeyhole, WandSparkles } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
@@ -13,6 +13,15 @@ export default function EchoVideoPage() {
   const [mode, setMode] = useState<'standard'|'advanced_silent'|'advanced_audio'>('standard');
   const [duration, setDuration] = useState<5|10>(5);
   const [aspect, setAspect] = useState<'9:16'|'16:9'|'1:1'>('9:16');
+  const [library, setLibrary] = useState<Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string}>>([]);
+  const [libraryUnavailable, setLibraryUnavailable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void customFetch<{items:Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string}>;setupRequired?:boolean}>('/api/video/library', {responseType:'json'})
+      .then(data => { if (active) {setLibrary(data.items);setLibraryUnavailable(Boolean(data.setupRequired));} })
+      .catch(() => { if (active) setLibraryUnavailable(true); });
+    return () => {active=false;};
+  }, []);
   const [preflight, setPreflight] = useState<{estimatedCredits:number}|null>(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState(false);
@@ -37,6 +46,13 @@ export default function EchoVideoPage() {
     </button>
     {preflight && <p role="status" className="rounded-xl border border-border bg-card p-3 text-sm">{es?'Preparación correcta. Costo estimado:':'Preparation successful. Estimated cost:'} {preflight.estimatedCredits} {es?'créditos. Sin cobros ni llamadas al proveedor.':'credits. No charges or provider calls.'}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{es?'No se pudo comprobar la preparación.':'Could not check the draft.'}</p>}
+    <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Biblioteca de videos':'Video library'}>
+      <h2 className="text-sm font-semibold">{es?'Mi biblioteca de videos y GIF':'My video & GIF library'}</h2>
+      {libraryUnavailable ? <p className="text-xs text-muted-foreground">{es?'La biblioteca estará disponible cuando se inicialice el almacenamiento.':'Library will be available after storage setup.'}</p>
+        : library.length === 0 ? <p className="text-xs text-muted-foreground">{es?'Todavía no generaste videos. Aparecerán acá cuando se active el servicio.':'No generated videos yet. They will appear here when generation is enabled.'}</p>
+        : <div className="space-y-2">{library.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>{item.mode} · {item.durationSeconds}s</span><span className="text-muted-foreground">{item.status}</span></div>)}</div>}
+      <p className="text-xs text-muted-foreground">{es?'La conversión a GIF y la descarga estarán disponibles después de conectar el procesamiento privado.':'GIF conversion and downloads will be available after private processing is connected.'}</p>
+    </section>
     <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/>{es?'La generación real sigue desactivada.':'Real generation remains disabled.'}</p>
   </main></div>;
 }
