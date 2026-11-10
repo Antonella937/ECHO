@@ -23,6 +23,9 @@ export async function dispatchHyunPrivateSketch(input: {
     return typeof record?.handle === "string" ? record.handle :
       typeof record?.username === "string" ? record.username : "";
   };
+  // The recipient must be the currently selected human-controlled identity.
+  // A matching handle alone must never authorize a paid delivery to another AI.
+  if (recipient?.id !== parsed.data.currentCharacterId) return "skipped";
   if (!sender || !recipient || !canAttemptHyunPrivateSketch({
     ownerId: input.ownerId, senderHandle: handle(sender),
     recipientHandle: handle(recipient), channel: "dm", explicitlyEnabled: true,
@@ -44,7 +47,7 @@ export async function dispatchHyunPrivateSketch(input: {
     const message = validated.data.messages.find(m => m.id === input.messageId &&
       m.senderId === sender.id && m.recipientId === recipient.id &&
       m.origin === "autonomy" && !m.attachments?.some(a => a.type === "image"));
-    if (!message) return "skipped";
+    if (!message || validated.data.currentCharacterId !== recipient.id) return "skipped";
     const state = { ...validated.data, messages: validated.data.messages.map(m =>
       m.id === message.id ? { ...m, attachments: [...(m.attachments ?? []), {
         id: `hyun-sketch-${message.id}`, type: "image" as const,
