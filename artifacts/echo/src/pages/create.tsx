@@ -48,6 +48,7 @@ export default function CreatePage() {
   const [mediaSource, setMediaSource] = useState<'upload' | 'ai'>('upload');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiCoStars, setAiCoStars] = useState<string[]>([]);
+  const [aiReferenceChoices, setAiReferenceChoices] = useState<Record<string, string>>({});
   const [aiPreview, setAiPreview] = useState(false);
   const [aiPrepared, setAiPrepared] = useState<{ preparedPrompt: string; referenceCount: number; style: string } | null>(null);
   const [aiPreparing, setAiPreparing] = useState(false);
@@ -170,7 +171,7 @@ export default function CreatePage() {
     try {
       const result = await customFetch<{ preparedPrompt: string; referenceCount?: number; style: string; generationEnabled: boolean }>(aiEditSource ? '/api/ai-engine/images/prepare-edit' : '/api/ai-engine/images/prepare', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(!aiEditSource && aiCoStars.length ? { selectedCharacterIds: aiCoStars } : {}), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(!aiEditSource && aiCoStars.length ? { selectedCharacterIds: aiCoStars } : {}), ...(!aiEditSource && Object.keys(aiReferenceChoices).length ? { selectedReferencePaths: aiReferenceChoices } : {}), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (result.generationEnabled) throw new Error(t('La preparación no debe generar imágenes.'));
       setAiPrepared({ preparedPrompt: result.preparedPrompt, referenceCount: result.referenceCount ?? (aiEditSource ? 1 : 0), style: result.style });
@@ -316,13 +317,30 @@ export default function CreatePage() {
                 const chosen = aiCoStars.includes(character.id);
                 return <button key={character.id} type="button" aria-pressed={chosen}
                   disabled={!chosen && aiCoStars.length >= 3}
-                  onClick={() => { setAiCoStars(current => chosen ? current.filter(id => id !== character.id) : current.length < 3 ? [...current, character.id] : current); setAiPrepared(null); setAiPreview(false); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
+                  onClick={() => { setAiCoStars(current => chosen ? current.filter(id => id !== character.id) : current.length < 3 ? [...current, character.id] : current); if (chosen) setAiReferenceChoices(previous => { const next = { ...previous }; delete next[character.id]; return next; }); setAiPrepared(null); setAiPreview(false); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
                   className={cn('rounded-lg border px-3 py-2 text-xs disabled:opacity-40', chosen ? 'border-primary bg-primary/10 text-primary' : 'border-border')}>
                   {chosen ? '✓ ' : '+ '}{character.name}
                 </button>;
               })}
             </div>
             <p className="text-xs text-muted-foreground">{1 + aiCoStars.length}/4 {t('personajes seleccionados')}</p>
+            {[me, ...imageCoStarOptions.filter(character => aiCoStars.includes(character.id))].map(character => {
+              const choices = [...new Set([character.avatar, ...(character.identity?.referenceImages ?? [])].filter((path): path is string => typeof path === 'string' && /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(path)))];
+              if (!choices.length) return <p key={character.id} className="text-xs text-muted-foreground">{character.name}: {t('Sin referencias visuales guardadas')}</p>;
+              return <label key={character.id} className="block text-xs text-muted-foreground">
+                {character.name} · {t('Referencia principal')}
+                <select className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-xs"
+                  value={aiReferenceChoices[character.id] ?? ''} onChange={e => {
+                    const value = e.target.value;
+                    setAiReferenceChoices(previous => { const next = { ...previous }; if (value) next[character.id] = value; else delete next[character.id]; return next; });
+                    setAiPrepared(null); setAiPreview(false); setAiGeneratedPath(null); setAiTransferAcknowledged(false);
+                  }}>
+                  <option value="">{t('Automática')}</option>
+                  {choices.map((path, index) => <option key={path} value={path}>{index === 0 ? t('Foto de perfil') : `${t('Referencia')} ${index}`}</option>)}
+                </select>
+              </label>;
+            })}
+
           </div>}
           <textarea aria-label={t("Descripción de imagen IA")} value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
             rows={4} maxLength={2000} placeholder={`${t('Ej.:')} ${me.name} ${t('sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.')}`}
