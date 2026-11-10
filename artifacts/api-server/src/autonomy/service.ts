@@ -378,10 +378,15 @@ export async function runAutonomyLiveCycle(
         // character. Its incoming messages do not require an AI DM permission
         // record in the reverse direction. The AI sender still must opt in.
         const recipientIsOwnerIdentity = opportunity.recipientId === state.currentCharacterId;
+        // The owner's manually controlled identity is not an autonomous peer.
+        // DM opt-in authorizes replies to the owner without a separate AI-to-AI
+        // allowlist entry. AI-to-AI conversations still require mutual opt-in.
         permitted = sender?.enabled === true &&
-          Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
-          (recipientIsOwnerIdentity || (receiver?.enabled === true &&
-            Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id)));
+          (recipientIsOwnerIdentity || (
+            Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
+            receiver?.enabled === true &&
+            Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id)
+          ));
       } catch { permitted = false; }
       if (!permitted) {
         await dependencies.repository.complete(ownerId, runId, {
