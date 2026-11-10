@@ -293,7 +293,9 @@ export function chooseAutonomyOpportunity(input: {
         relevantAuthor(parent.authorId) &&
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
-  const targetStory = [...state.stories].sort((a, b) => Number(a.seenBy.includes(character.id)) - Number(b.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+  // A story the character already viewed is more relevant for a later
+  // reaction than an unseen story. Never react twice to the same story.
+  const targetStory = [...state.stories].sort((a, b) => Number(b.seenBy.includes(character.id)) - Number(a.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
