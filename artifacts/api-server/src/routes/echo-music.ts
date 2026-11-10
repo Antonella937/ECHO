@@ -296,11 +296,22 @@ router.get("/music/voices/:characterId", async (req,res) => {
     `);
     const speechReady = speech.rows.length > 0;
     const singingReady = rows.rows.length > 0;
+    const manual = await db.execute(sql`SELECT assessment, notes, updated_at AS "updatedAt"
+      FROM echo_music_voice_comparisons
+      WHERE owner_id=${req.userId!} AND character_id=${characterId.data}
+      ORDER BY updated_at DESC LIMIT 1`);
+    const assessment = speechReady && singingReady ? manual.rows[0]?.assessment : null;
+    res.setHeader("Cache-Control", "private, no-store");
     res.json({
       configured: singingReady, vocalId: rows.rows[0]?.mureka_vocal_id ?? null,
       speechReady, singingReady,
-      consistencyStatus: speechReady && singingReady ? 'both_configured_unverified' :
-        speechReady ? 'speech_only' : singingReady ? 'singing_only' : 'unconfigured',
+      consistencyStatus: speechReady && singingReady
+        ? assessment === 'similar' ? 'both_configured_manual_match'
+          : assessment === 'different' ? 'both_configured_manual_mismatch'
+          : 'both_configured_unverified'
+        : speechReady ? 'speech_only' : singingReady ? 'singing_only' : 'unconfigured',
+      manualAssessment: assessment ?? null,
+      manualAssessmentUpdatedAt: assessment ? manual.rows[0]?.updatedAt : null,
       sameTimbreVerified: false
     });
   } catch { res.status(503).json({error:"VOICE_LOOKUP_UNAVAILABLE"}); }
