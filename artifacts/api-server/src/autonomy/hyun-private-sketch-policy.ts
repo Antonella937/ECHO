@@ -68,3 +68,29 @@ export function assertHyunPrivateSketchEligible(
   if (!canAttemptHyunPrivateSketch(scope)) throw Error("PRIVATE_SKETCH_SCOPE_DENIED");
   if (!privateSketchWithinLimits(monthlyAttempts, dailyAttempts)) throw Error("PRIVATE_SKETCH_QUOTA_EXHAUSTED");
 }
+
+
+/**
+ * Only an occasional, unsolicited outgoing DM can be considered for a sketch.
+ * The caller must still reserve the monthly/daily quota atomically before
+ * making a paid request; this function intentionally performs no I/O.
+ */
+export function shouldOfferHyunPrivateSketch(input: {
+  scope: PrivateSketchScope;
+  isUnsolicited: boolean;
+  alreadyHasImage: boolean;
+  monthlyAttempts: number;
+  dailyAttempts: number;
+  random: number;
+}): boolean {
+  if (!input.isUnsolicited || input.alreadyHasImage ||
+      !Number.isFinite(input.random) || input.random < 0 || input.random >= 1) return false;
+  return canAttemptHyunPrivateSketch(input.scope) &&
+    privateSketchWithinLimits(input.monthlyAttempts, input.dailyAttempts) &&
+    input.random < 0.08;
+}
+
+/** Never use a user's chat message as permission for billable autonomous media. */
+export function privateSketchRequiresExplicitOwnerOptIn(value: unknown): boolean {
+  return value === true;
+}
