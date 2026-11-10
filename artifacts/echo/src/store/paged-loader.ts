@@ -33,6 +33,7 @@ export async function loadConsistentPages<K extends PageKind>(options: {
     throw new Error('Invalid page bounds');
   }
   if (kind === 'messages' && !options.threadId) throw new Error('threadId is required');
+  if (signal?.aborted) throw new Error('Page loading cancelled');
   let revision: number | undefined;
   let offset = 0;
   let total = 0;
@@ -61,7 +62,10 @@ export async function loadConsistentPages<K extends PageKind>(options: {
     revision = response.revision;
     total = response.total;
     const pageItems = response.entries;
-    if (!Array.isArray(pageItems) || pageItems.length > limit) throw new Error('Invalid paginated response');
+    if (!Array.isArray(pageItems) || pageItems.length > limit ||
+        !Number.isSafeInteger(response.total) || response.total < 0 ||
+        !Number.isSafeInteger(response.revision) || response.revision < 0)
+      throw new Error('Invalid paginated response');
     items.push(...pageItems);
     if (response.nextOffset === null) break;
     if (!Number.isSafeInteger(response.nextOffset) || response.nextOffset <= offset || pageItems.length === 0)
