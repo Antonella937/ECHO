@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { db, echoImageBudgetMonthsTable, echoImageGenerationJobsTable } from '@workspace/db';
 
 export const MICRO_USD_PER_DOLLAR = 100_000_000;
@@ -20,6 +20,8 @@ export const toMicroUsd = (usd: number) => {
 export async function reserveImageBudget(input: {
   ownerId: string; universeId: string; characterId: string;
   provider: string; model: string; maximumUsd: number;
+  /** Reserved only for Hyun's private, owner-opted-in DM sketches. */
+  purpose?: 'hyun_private_sketch';
 }) {
   const monthKey = monthKeyUtc();
   const reserve = toMicroUsd(input.maximumUsd);
@@ -40,10 +42,32 @@ export async function reserveImageBudget(input: {
         eq(echoImageGenerationJobsTable.monthKey, monthKey)))
       .limit(IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER);
     if (existing.length >= IMAGE_LAUNCH_MAX_ATTEMPTS_PER_OWNER) throw Error('IMAGE_LAUNCH_ACCOUNT_LIMIT_REACHED');
+    if (input.purpose === 'hyun_private_sketch') {
+      // The global monthly budget row was locked by the UPDATE above.
+      // Every competing image reservation therefore serializes here.
+      const sketchProvider = `${input.provider}:hyun-private-sketch`;
+      const [monthlySketches] = await tx.select({ count: sql<number>`count(*)` })
+        .from(echoImageGenerationJobsTable).where(and(
+          eq(echoImageGenerationJobsTable.ownerId, input.ownerId),
+          eq(echoImageGenerationJobsTable.universeId, input.universeId),
+          eq(echoImageGenerationJobsTable.provider, sketchProvider),
+          eq(echoImageGenerationJobsTable.monthKey, monthKey),
+        ));
+      const [dailySketches] = await tx.select({ count: sql<number>`count(*)` })
+        .from(echoImageGenerationJobsTable).where(and(
+          eq(echoImageGenerationJobsTable.ownerId, input.ownerId),
+          eq(echoImageGenerationJobsTable.universeId, input.universeId),
+          eq(echoImageGenerationJobsTable.provider, sketchProvider),
+          gte(echoImageGenerationJobsTable.createdAt, new Date(Date.now() - 24 * 60 * 60_000)),
+        ));
+      if (Number(monthlySketches?.count ?? 0) >= 3 || Number(dailySketches?.count ?? 0) >= 1) {
+        throw Error('HYUN_PRIVATE_SKETCH_QUOTA_EXHAUSTED');
+      }
+    }
     const id = randomUUID();
     await tx.insert(echoImageGenerationJobsTable).values({
       id, ownerId: input.ownerId, universeId: input.universeId, characterId: input.characterId,
-      monthKey, status: 'reserved', reservedMicroUsd: reserve, provider: input.provider, model: input.model,
+      monthKey, status: 'reserved', reservedMicroUsd: reserve, provider: input.purpose === 'hyun_private_sketch' ? `${input.provider}:hyun-private-sketch` : input.provider, model: input.model,
     });
     return { id, monthKey, reservedMicroUsd: reserve };
   });
