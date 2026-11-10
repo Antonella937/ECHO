@@ -76,6 +76,7 @@ const musicEnglish: Record<string,string> = {
   "Preparar voz de Nela": "Prepare Nela voice",
   "Subir muestra vocal": "Upload vocal sample",
   "Desde una canción de mi biblioteca": "From a song in my library",
+  "Consultar costo sin generar": "Check price without generating",
   "Desde un archivo de audio": "From an audio file",
   "Elegí cómo preparar la voz permanente": "Choose how to prepare the permanent voice",
   "La canción debe contener una voz clara y autorizada; el fragmento todavía no se extrae ni se envía al proveedor.": "The track must contain a clear, authorized vocal; the clip is not yet extracted or sent to the provider.",
@@ -389,8 +390,29 @@ export default function EchoMusicPage() {
   const [singingVoiceId, setSingingVoiceId] = useState<string | null>(null);
   const [voiceConsistency, setVoiceConsistency] = useState('unconfigured');
   const [protectSingingVoice, setProtectSingingVoice] = useState(true);
-  const [voiceSample, setVoiceSample] = useState<{name:string;duration:number}|null>(null);
+  const [voiceSample, setVoiceSample] = useState<{name:string;duration:number;size:number}|null>(null);
   const [voiceSampleError, setVoiceSampleError] = useState('');
+  const [voiceCloneConsent, setVoiceCloneConsent] = useState(false);
+  const [voiceCloneQuote, setVoiceCloneQuote] = useState<string>('');
+  const [voiceCloneQuoteBusy, setVoiceCloneQuoteBusy] = useState(false);
+  async function previewVoiceClone(source: 'upload' | 'library') {
+    if (!me?.id || !voiceCloneConsent || voiceCloneQuoteBusy) return;
+    if (source === 'upload' && !voiceSample) return;
+    if (source === 'library' && !voiceSource) return;
+    setVoiceCloneQuoteBusy(true); setVoiceCloneQuote('');
+    try {
+      const result = await customFetch<{estimatedCostUsd:number;status:string}>('/api/music/voices/clone/quote', {
+        method:'POST', headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify(source === 'upload'
+          ? {characterId:me.id,source,durationSeconds:voiceSample!.duration,
+              fileName:voiceSample!.name,fileSizeBytes:voiceSample!.size,consentConfirmed:true}
+          : {characterId:voiceSource!.characterId,source,durationSeconds:voiceLength,
+              libraryTrackId:voiceSource!.id,consentConfirmed:true})
+      });
+      setVoiceCloneQuote(result.status === 'preview_only' ? 'USD ' + result.estimatedCostUsd.toFixed(2) + ' · ' + t('La muestra está preparada. La clonación no se ejecutará sin confirmar el costo.') : 'INVALID_QUOTE');
+    } catch (error) {setVoiceCloneQuote(error instanceof Error ? error.message : 'QUOTE_UNAVAILABLE');}
+    finally {setVoiceCloneQuoteBusy(false);}
+  }
   async function prepareVocalSample(file?: File) {
     setVoiceSample(null); setVoiceSampleError('');
     if (!file) return;
@@ -407,7 +429,7 @@ export default function EchoMusicPage() {
       if (!Number.isFinite(duration) || duration < 15 || duration > 30) {
         setVoiceSampleError(t('Duración incompatible: usá entre 15 y 30 segundos.')); return;
       }
-      setVoiceSample({name:file.name,duration});
+      setVoiceSample({name:file.name,duration,size:file.size});
     } catch { setVoiceSampleError(t('Archivo incompatible o demasiado grande.')); }
     finally { URL.revokeObjectURL(url); }
   }
@@ -656,6 +678,9 @@ export default function EchoMusicPage() {
           <input type="file" accept=".mp3,.m4a,audio/mpeg,audio/mp4" className="mt-2 block w-full text-xs" onChange={event => {void prepareVocalSample(event.target.files?.[0]);}} />
           {voiceSampleError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleError}</p>}
           {voiceSample && <div className="mt-2 space-y-1 text-xs"><p className="font-semibold">{t("Muestra vocal lista")}: {voiceSample.name} ({Math.round(voiceSample.duration)}s)</p><p className="text-muted-foreground">{t("La muestra está preparada. La clonación no se ejecutará sin confirmar el costo.")}</p></div>}
+          <label className="mt-2 flex items-start gap-2 text-xs"><input type="checkbox" checked={voiceCloneConsent} onChange={event => {setVoiceCloneConsent(event.target.checked);setVoiceCloneQuote('');}}/>{t("Confirmo que tengo permiso para utilizar esta voz y crear una identidad vocal reutilizable")}</label>
+          <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceCloneQuoteBusy} onClick={() => void previewVoiceClone('upload')} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneQuoteBusy ? '…' : t("Consultar costo sin generar")}</button>
+          {voiceCloneQuote && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneQuote}</p>}
         </details>
         <p className="text-xs text-muted-foreground">{t("Desde una canción de mi biblioteca")}: {t("Mi biblioteca")} → {t("Guardar voz")}</p>
         <details className="rounded-lg border border-border p-2">
