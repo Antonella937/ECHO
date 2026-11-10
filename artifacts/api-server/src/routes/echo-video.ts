@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ECHO_VIDEO_POLICY } from "../lib/entitlements";
 
@@ -55,6 +56,33 @@ router.post("/video/preflight", (req, res) => {
     charged: false,
     providerCallsMade: 0,
   });
+});
+
+/** Read-only owner-scoped generation history; never expose another owner's assets. */
+router.get("/video/library", async (req, res) => {
+  try {
+    const result = await pool.query<{
+      id: string; status: string; mode: string; duration_seconds: number;
+      credits: number; created_at: Date; result_asset_key: string | null;
+    }>(`SELECT id::text, status, mode, duration_seconds, credits, created_at, result_asset_key
+        FROM echo_video_generation_jobs WHERE owner_id=$1
+        ORDER BY created_at DESC LIMIT 50`, [req.userId!]);
+    res.json({ items: result.rows.map(row => ({
+      id: row.id, status: row.status, mode: row.mode,
+      durationSeconds: row.duration_seconds, estimatedCredits: row.credits,
+      createdAt: row.created_at, hasPrivateAsset: Boolean(row.result_asset_key),
+    })), storagePrivate: true, generationEnabled: false });
+  } catch (error) {
+    req.log.warn({ err: error }, "Video library not initialized");
+    res.json({ items: [], storagePrivate: true, generationEnabled: false,
+      setupRequired: true });
+  }
+});
+
+/** GIF conversion is intentionally unavailable until a safe private media pipeline exists. */
+router.post("/video/convert-gif", (_req, res) => {
+  res.status(503).json({ error: "VIDEO_GIF_CONVERSION_NOT_ENABLED",
+    charged: false, providerCallsMade: 0 });
 });
 
 router.post("/video/generate", (_req, res) => {
