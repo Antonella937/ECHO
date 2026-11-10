@@ -26,10 +26,10 @@ export default function EchoVideoPage() {
   const [gifFps, setGifFps] = useState<10|12|15>(12);
   const [gifMessage, setGifMessage] = useState('');
   const [gifChecking, setGifChecking] = useState(false);
-  const [readiness, setReadiness] = useState<{privateStorageConfigured:boolean;bucketVerified:boolean}|null>(null);
+  const [readiness, setReadiness] = useState<{privateStorageConfigured:boolean;bucketVerified:boolean;bucketPrivate:boolean;databaseMigrationVerified:boolean}|null>(null);
   useEffect(() => {
     let active = true;
-    void customFetch<{privateStorageConfigured:boolean;bucketVerified:boolean}>('/api/video/readiness', {responseType:'json'})
+    void customFetch<{privateStorageConfigured:boolean;bucketVerified:boolean;bucketPrivate:boolean;databaseMigrationVerified:boolean}>('/api/video/readiness', {responseType:'json'})
       .then(value => { if(active) setReadiness(value); }).catch(() => {});
     return () => {active=false;};
   }, []);
@@ -69,10 +69,15 @@ export default function EchoVideoPage() {
     <div className="rounded-2xl border border-border bg-card/60 p-4 text-xs text-muted-foreground">
       <p className="font-semibold text-foreground">{es?'Almacenamiento privado':'Private storage'}</p>
       <p className="mt-2">{readiness === null ? (es?'Comprobando configuración…':'Checking configuration…')
-        : readiness.privateStorageConfigured
-          ? (es?'Credenciales configuradas; falta verificar el bucket y habilitar el procesamiento.':'Credentials configured; bucket verification and processing are still pending.')
-          : (es?'Falta configurar el almacenamiento privado de video.':'Private video storage still needs configuration.')}</p>
+        : !readiness.privateStorageConfigured
+          ? (es?'Falta configurar el almacenamiento privado de video.':'Private video storage still needs configuration.')
+          : !readiness.bucketVerified
+            ? (es?'Credenciales detectadas, pero no se pudo verificar el bucket.':'Credentials detected, but bucket verification failed.')
+            : !readiness.bucketPrivate
+              ? (es?'Atención: el bucket es público. No se habilitarán archivos privados.':'Warning: the bucket is public. Private assets cannot be enabled.')
+              : (es?'Bucket privado verificado.':'Private bucket verified.')}}</p>
     </div>
+    {readiness && <p className="text-xs text-muted-foreground">{readiness.databaseMigrationVerified ? (es?'Base de datos Video/GIF verificada.':'Video/GIF database verified.') : (es?'No se pudo verificar la base de datos Video/GIF.':'Could not verify Video/GIF database.')}</p>}
     <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Biblioteca de videos':'Video library'}>
       <h2 className="text-sm font-semibold">{es?'Mi biblioteca de videos y GIF':'My video & GIF library'}</h2>
       {libraryUnavailable ? <p className="text-xs text-muted-foreground">{es?'La biblioteca estará disponible cuando se inicialice el almacenamiento.':'Library will be available after storage setup.'}</p>
