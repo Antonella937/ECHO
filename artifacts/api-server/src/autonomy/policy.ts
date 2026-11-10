@@ -129,7 +129,21 @@ function availableTargets(state: SocialState, character: Character) {
       hasDmThread(state, character.id, candidate.id)));
 }
 
-function commentTarget(state: SocialState, character: Character, now: Date) {
+/**
+ * The currently selected identity is the human-operated account in this universe.
+ * Favor it without bypassing follow, relationship, privacy or anti-repeat checks.
+ * A rotating share preserves character-to-character interactions.
+ */
+function prioritizeHumanAccount<T>(items: T[], state: SocialState, getId: (item: T) => string, random: () => number): T[] {
+  const humanId = state.currentCharacterId;
+  if (!humanId || !state.characters.some(c => c.id === humanId && !c.archived)) return items;
+  const preferred = items.filter(item => getId(item) === humanId);
+  const others = items.filter(item => getId(item) !== humanId);
+  if (!preferred.length || !others.length) return items;
+  return random() < 0.75 ? [...preferred, ...others] : [...others, ...preferred];
+}
+
+function commentTarget(state: SocialState, character: Character, now: Date, random: () => number) {
   const following = new Set(state.follows[character.id] ?? []);
   const posts = [...state.posts]
     .filter(post => post.authorId !== character.id &&
@@ -137,7 +151,7 @@ function commentTarget(state: SocialState, character: Character, now: Date) {
       (asTime(post.createdAt) ?? 0) <= now.getTime() &&
       now.getTime() - (asTime(post.createdAt) ?? 0) < 30 * DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
-  for (const post of posts) {
+  for (const post of prioritizeHumanAccount(posts, state, post => post.authorId, random)) {
     const reply = [...state.comments]
       .filter(item => item.postId === post.id && item.authorId !== character.id && item.parentId === null &&
         !state.comments.some(child => child.parentId === item.id && child.authorId === character.id))
@@ -228,7 +242,7 @@ export function chooseAutonomyOpportunity(input: {
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
       random() < dmChance) {
     const following = new Set(state.follows[character.id] ?? []);
-    const candidate = [...state.stories].reverse().find(story =>
+    const candidate = prioritizeHumanAccount([...state.stories].reverse(), state, story => story.authorId, random).find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
       (character.configuration?.relationships?.some(relation => relation.targetId === story.authorId) ||
         hasDmThread(state, character.id, story.authorId)) &&
@@ -259,7 +273,8 @@ export function chooseAutonomyOpportunity(input: {
       const recipients = availableTargets(state, character).filter(candidate =>
         !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
       if (recipients.length) {
-        const recipient = recipients[Math.floor(random() * recipients.length)];
+        const prioritized = prioritizeHumanAccount(recipients, state, recipient => recipient.id, random);
+        const recipient = prioritized[0];
         return { situation: "dm", recipientId: recipient.id,
           reasonCode: "OPPORTUNITY_SELECTED",
           reason: "An occasional spontaneous message to an established contact.",
@@ -307,7 +322,7 @@ export function chooseAutonomyOpportunity(input: {
     return { situation: null, reasonCode: "SILENCE_SELECTED", reason: "Current activity and configured social pace favor doing nothing.", localHour: local.hour, timezone };
   }
 
-  const comment = commentTarget(state, character, now);
+  const comment = commentTarget(state, character, now, random);
   const recipients = availableTargets(state, character);
   const following = new Set(state.follows[character.id] ?? []);
   const relevantAuthor = (authorId: string) => authorId !== character.id && following.has(authorId);
@@ -317,10 +332,10 @@ export function chooseAutonomyOpportunity(input: {
     const time = asTime(value);
     return time !== null && time <= now.getTime() && now.getTime() - time < 30 * DAY_MS;
   };
-  const targetPost = [...state.posts].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+  const targetPost = prioritizeHumanAccount([...state.posts].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, post => post.authorId, random)
     .find(post => recent30d(post.createdAt) && relevantAuthor(post.authorId) &&
       !post.likes.includes(character.id) && !recentTargetUsed("like_post", post.id));
-  const targetComment = [...state.comments].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+  const targetComment = prioritizeHumanAccount([...state.comments].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, item => state.posts.find(post => post.id === item.postId)?.authorId ?? '', random)
     .find(item => {
       const parent = state.posts.find(post => post.id === item.postId);
       return !!parent && item.authorId !== character.id && !!item.text?.trim() && recent30d(item.createdAt) &&
@@ -329,7 +344,7 @@ export function chooseAutonomyOpportunity(input: {
     });
   // A story the character already viewed is more relevant for a later
   // reaction than an unseen story. Never react twice to the same story.
-  const targetStory = [...state.stories].sort((a, b) => Number(b.seenBy.includes(character.id)) - Number(a.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
+  const targetStory = prioritizeHumanAccount([...state.stories].sort((a, b) => Number(b.seenBy.includes(character.id)) - Number(a.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, story => story.authorId, random)
     .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
