@@ -86,6 +86,9 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
     repository, provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
     liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED, lane: "dm",
+    voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
+      ...controls, dispatch: dispatchAutonomousVoice, resolveVoiceId: resolveAutonomousVoiceId,
+    } : undefined).catch(() => undefined),
   });
 }
 
