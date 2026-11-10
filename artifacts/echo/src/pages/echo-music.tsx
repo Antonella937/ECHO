@@ -874,7 +874,7 @@ export default function EchoMusicPage() {
           {voiceSampleStorageKey && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void prepareVoiceCloneJob()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneJobBusy?'…':t("Preparar clonación (sin cargo)")}</button>}
           {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void refreshVoiceCloneJob()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Consultar estado")}</button>}
           {voiceCloneJobId && !/processing|completed|submitting|uncertain/i.test(voiceCloneJobStatus) && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void confirmVoiceCloneCharge()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Confirmar clonación (aprox. USD 5)")}</button>}
-          {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void syncVoiceCloneResult()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Sincronizar resultado")}</button>
+          {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void syncVoiceCloneResult()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Sincronizar resultado")}</button>}
           {voiceCloneJobStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneJobStatus}</p>}
           {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>}
         </details>
