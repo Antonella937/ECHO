@@ -1,5 +1,6 @@
+import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
@@ -26,6 +27,7 @@ export default function ScenesPage() {
   const [canon,setCanon] = useState<'main'|'alternate'>('main');
   const [participants,setParticipants] = useState<string[]>([]);
   const [message,setMessage] = useState('');
+  const sceneMessageRef = useRef<HTMLInputElement>(null);
   const [nextSpeaker,setNextSpeaker] = useState('');
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
@@ -211,7 +213,7 @@ export default function ScenesPage() {
           className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           ✦ {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
-      </div><div className="max-h-96 space-y-3 overflow-y-auto">{events.map(ev=><article key={ev.eventId} className="rounded-xl bg-secondary p-3 text-sm"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="flex min-w-0 gap-2"><input value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-xl border border-border bg-background p-3"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
+      </div><div className="max-h-96 space-y-3 overflow-y-auto">{events.map(ev=><article key={ev.eventId} className="rounded-xl bg-secondary p-3 text-sm"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="flex min-w-0 flex-wrap gap-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><input ref={sceneMessageRef} value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-xl border border-border bg-background p-3"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
     {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
   </main>;
 }
