@@ -59,7 +59,7 @@ router.use("/music/voices", requireMusicStudioEntitlement);
 
 // Private staging only: raw audio avoids the global 2 MB JSON body limit.
 // This does not call fal.ai, clone a voice, or incur provider charges.
-router.post("/music/voices/clone/sample", raw({type:["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a"],limit:"10mb"}), async (req,res) => {
+router.post("/music/voices/clone/sample", raw({type:["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/wav","audio/x-wav"],limit:"10mb"}), async (req,res) => {
   const characterId = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/).safeParse(req.query.characterId);
   const duration = z.coerce.number().finite().min(15).max(30).safeParse(req.query.durationSeconds);
   if (!characterId.success || !duration.success || req.headers["x-voice-consent"] !== "confirmed") {
