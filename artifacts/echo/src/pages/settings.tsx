@@ -1,6 +1,6 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2 } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
@@ -64,6 +64,11 @@ export default function SettingsPage() {
           <Link href="/music" className="mt-3 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-echo-music-studio">
             <span className="flex items-center gap-3"><Music2 className="h-5 w-5 text-primary" /> ECHO Music Studio</span>
             <span className="text-xs text-muted-foreground">{st("Crear canciones ›")}</span>
+          </Link>
+
+          <Link href="/video" className="mt-3 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-echo-video-studio">
+            <span className="flex items-center gap-3"><Film className="h-5 w-5 text-primary" /> ECHO Video Studio</span>
+            <span className="text-xs text-muted-foreground">{language === 'es' ? 'Crear videos y GIF ›' : 'Create videos & GIFs ›'}</span>
           </Link>
 
           <UniverseSelector />
