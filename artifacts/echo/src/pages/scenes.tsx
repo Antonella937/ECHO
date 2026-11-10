@@ -127,6 +127,18 @@ export default function ScenesPage() {
     }
     if(target)await generateReply(target);
   };
+  const deleteScene = async () => {
+    if (!active || busy || !window.confirm(es
+      ? '¿Eliminar esta escena definitivamente? Se borrarán también sus mensajes y recuerdos. Esta acción no se puede deshacer.'
+      : 'Permanently delete this scene? Its messages and memories will also be erased. This cannot be undone.')) return;
+    setBusy(true); setError('');
+    try {
+      await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}?${new URLSearchParams({universeId})}`, { method:'DELETE', responseType:'json' });
+      setScenes(previous => previous.filter(scene => scene.sceneId !== active.sceneId));
+      setSelected(null); setEvents([]); setPresence({});
+    } catch { setError(es ? 'No se pudo eliminar la escena.' : 'Could not delete scene.'); }
+    finally { setBusy(false); }
+  };
   const updateStatus = async (status:'active'|'paused'|'finished')=>{
     if(!active)return;setBusy(true);setError('');
     try{await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/status`,{
@@ -187,6 +199,7 @@ export default function ScenesPage() {
             {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('paused')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Pausar':'Pause'}</button>}
             {active.status==='paused'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('active')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Reanudar':'Resume'}</button>}
             {active.status!=='finished'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('finished')} className="rounded-xl border border-border px-3 py-2 text-sm">{es?'Finalizar':'Finish'}</button>}
+            <button type="button" disabled={busy} onClick={()=>void deleteScene()} className="rounded-xl border border-destructive px-3 py-2 text-sm text-destructive disabled:opacity-50">{es?'Eliminar escena definitivamente':'Delete scene permanently'}</button>
           </div>
         </div>
       </details><div className="flex flex-wrap gap-2">
