@@ -148,7 +148,7 @@ router.get("/universe/posts/page", async (req, res): Promise<void> => {
   }
   const posts = parsed.data.posts
     .filter(post => authorId === null || post.authorId === authorId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id.localeCompare(a.id));
   const page = posts.slice(offset, offset + limit);
   res.setHeader("Cache-Control", "private, no-store");
   res.json({ posts: page, total: posts.length,
@@ -186,7 +186,7 @@ router.get("/universe/messages/page", async (req, res): Promise<void> => {
     res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return;
   }
   const messages = parsed.data.messages.filter(message => message.threadId === threadId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id.localeCompare(a.id));
   const page = messages.slice(offset, offset + limit);
   res.setHeader("Cache-Control", "private, no-store");
   res.json({ messages: page, total: messages.length,
