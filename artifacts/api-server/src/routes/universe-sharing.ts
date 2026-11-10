@@ -213,7 +213,7 @@ export function createUniverseSharingRouter(
             ...(original.configuration as Record<string, unknown>),
             relationships: [],
             memory: { permanent: [], relationships: [], recent: [], recentLimit: 50, recentSummary: "" },
-            currentState: { ...(original.configuration as Record<string, Record<string, unknown>>).currentState, summary: "", updatedAt: null },
+            currentState: { location: "", activity: "", mood: "", companions: [], lastActivityAt: null, nextEvent: "", source: "manual", updatedAt: new Date().toISOString() },
           },
         } : {}),
         accountType: "personal", verified: false, archived: false,
