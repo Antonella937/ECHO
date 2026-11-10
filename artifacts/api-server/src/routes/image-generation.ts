@@ -26,6 +26,7 @@ const Input = z.object({
   characterId: z.string().min(1).max(120),
   prompt: z.string().trim().min(3).max(2000),
   selectedCharacterIds: z.array(z.string().min(1).max(120)).max(3).refine(ids => new Set(ids).size === ids.length).optional(),
+  selectedReferencePaths: z.record(z.string().min(1).max(120), z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i)).optional(),
 }).strict();
 const GenerateInput = Input.extend({
   imageTransferAcknowledgement: z.literal('image-transfer-preview-v1'),
@@ -52,7 +53,7 @@ router.post('/ai-engine/images/prepare', requireAuth, async (req, res) => {
     const identity = character.identity ?? {};
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const scene = prepareImageScene(input.data.prompt, character, characters, selected, input.data.selectedCharacterIds);
+    const scene = prepareImageScene(input.data.prompt, character, characters, selected, input.data.selectedCharacterIds, input.data.selectedReferencePaths);
     const references = scene.referencePaths;
     // Only count reference objects registered to the authenticated owner.
     // Actual bytes will be fetched server-side when paid generation is enabled.
@@ -189,7 +190,7 @@ router.post('/ai-engine/images/generate', requireAuth, async (req, res) => {
     const identity = character.identity ?? {};
     const selected = typeof state.imageStyle === 'string' && state.imageStyle in imageStyleInstructions
       ? state.imageStyle as keyof typeof imageStyleInstructions : 'natural';
-    const scene = prepareImageScene(input.data.prompt, character, characters, selected, input.data.selectedCharacterIds);
+    const scene = prepareImageScene(input.data.prompt, character, characters, selected, input.data.selectedCharacterIds, input.data.selectedReferencePaths);
     const referencePaths = scene.referencePaths;
     const preparedPrompt = scene.preparedPrompt;
     const creditOperation = randomUUID();
