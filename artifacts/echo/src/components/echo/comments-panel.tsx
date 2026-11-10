@@ -121,6 +121,7 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
   const [communityOpen, setCommunityOpen] = useState(false);
   const [guestHandle, setGuestHandle] = useState('');
   const [guestText, setGuestText] = useState('');
+  const [communityFrequency, setCommunityFrequency] = useState('normal');
   const post = state.posts.find((p) => p.id === postId);
   const ref = useRef<HTMLInputElement>(null);
   const target = replyTo ? character(replyTo.authorId) : undefined;
@@ -161,6 +162,14 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
       {post?.authorId === me.id && <div className="mb-3 rounded-xl border border-border p-3 text-sm">
         <label className="flex items-center justify-between gap-3"><span>Comentarios de comunidad ficticia</span><input type="checkbox" checked={!!me.communityCommentsEnabled} onChange={e => actions.setCommunityCommentsEnabled(me.id, e.target.checked)} /></label>
         {me.communityCommentsEnabled && <div className="mt-3 space-y-2">
+          <label className="block text-xs text-muted-foreground" htmlFor="community-frequency">Cantidad por tanda</label>
+          <select id="community-frequency" className="w-full rounded-lg border border-input bg-background p-2" value={communityFrequency} onChange={e => setCommunityFrequency(e.target.value)}>
+            <option value="occasional">Ocasional · 1–2</option>
+            <option value="normal">Normal · 3–4</option>
+            <option value="high">Alta · 5–6</option>
+          </select>
+          <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-muted-foreground" disabled title="Pendiente de conectar al generador de IA">Generar comentarios con IA · próximamente</button>
+          <p className="text-xs text-muted-foreground">Sin generación automática: cada tanda requerirá tocar el botón y nunca superará seis comentarios.</p>
           <button type="button" className="text-primary" onClick={() => setCommunityOpen(!communityOpen)}>{communityOpen ? 'Cerrar' : '+ Agregar comentario manual'}</button>
           {communityOpen && <form className="space-y-2" onSubmit={e => { e.preventDefault(); try { actions.addCommunityComment(postId, guestHandle, guestText); setGuestText(''); setError(null); } catch (err) { setError((err as Error).message); } }}>
             <input className="w-full rounded-lg border border-input bg-background p-2" value={guestHandle} onChange={e => setGuestHandle(e.target.value)} placeholder="@deadstatic.fans" maxLength={33} aria-label="Usuario ficticio" />
