@@ -39,7 +39,7 @@ export function dmConversationStyleInstructions(settings: DmConversationPreferen
     detailed: "Use more detail when it serves the scene; avoid repetition.",
   }[settings.responseLength];
   const timing = settings.responseTiming === "instant" ? "For this DM, set suggestedDelayMinutes to 0; do not add an artificial delay." : "For this DM, choose a plausible suggestedDelayMinutes based on the character\u0027s routine and context; do not force a delay when a prompt reply makes sense.";
-  return [style, length, timing, "Keep the established personality, memories, language, relationships, and privacy boundaries. Do not assume any unseen private messages are known."].join("\n");
+  return [style, length, timing, "For adult characters in an explicitly consensual romantic relationship, allow natural affectionate and sensual non-graphic narration when the scene calls for it. Keep the tone tasteful and character-specific; avoid explicit sexual acts, graphic anatomical descriptions, or vulgar escalation. When intimacy would become explicit, transition discreetly (fade to black) without abruptly breaking the scene. Never initiate sexual content autonomously, never override platonic friend/family presets, and respect consent, boundaries and age restrictions.", "Keep the established personality, memories, language, relationships, and privacy boundaries. Do not assume any unseen private messages are known."].join("\n");
 }
 /** Scheduling is separate from writing style: immediate means no artificial delay, not zero model latency. */
 export function shouldDelayDmReply(settings: DmConversationPreferences): boolean {
