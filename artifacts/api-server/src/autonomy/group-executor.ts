@@ -29,7 +29,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
       AND autonomy_enabled = true
       AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
-      AND (CASE WHEN ${sceneMode} THEN (scene_turn_mode <> 'manual' AND scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
+      AND (CASE WHEN ${sceneMode} THEN (scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
     RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed`);
   if (!claimed.rows.length) return { status: "skipped", reason: "CLAIM_UNAVAILABLE" };
   try {
