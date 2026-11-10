@@ -61,6 +61,21 @@ export async function previewDecision(provider: TextProvider, state: SocialState
       if (decision.text !== null) reject('NONE_TEXT_NOT_NULL');
       if (decision.reaction !== null) reject('UNEXPECTED_REACTION');
     }
+    // Autonomous and immediate DMs share this validation path. A platonic preset
+    // cannot be overridden by flirtatious conversation history or model output.
+    if (input.situation === 'dm' && input.recipientId && decision.action === 'draft') {
+      const actor = state.characters.find(c => c.id === input.characterId);
+      const recipient = state.characters.find(c => c.id === input.recipientId);
+      const personId = (c: typeof actor) => c && typeof (c as typeof c & { personId?: string }).personId === 'string'
+        ? (c as typeof c & { personId?: string }).personId : c?.id;
+      const canonical = state.characters.find(c => c.id === personId(actor)) ?? actor;
+      const relationship = (canonical?.configuration?.relationships ?? actor?.configuration?.relationships ?? [])
+        .find(r => r.targetId === input.recipientId || r.targetId === personId(recipient));
+      if (relationship && ['friend', 'close_friend', 'family'].includes(relationship.preset)) {
+        const romantic = /\\b(?:my queen|my king|my love|my darling|my baby|my princess|my boyfriend|my girlfriend|kiss(?:es|ing)? you|wake you (?:up )?with kisses|in love with you|want to kiss you|mi reina|mi rey|mi amor|mi princesa|mi novio|mi novia|te (?:despierto|despertar[eé]) con besos|quiero besarte|estoy enamorad[oa] de ti|te amo|besarte)\\b/i;
+        if (romantic.test(decision.text ?? '')) reject('UNSAFE_OR_INCONSISTENT_DECISION' as DecisionRejectionDiagnostic);
+      }
+    }
     if (decision.action === 'draft') {
       if (!textSituation) reject('ACTION_NOT_ALLOWED_FOR_SITUATION');
       if (decision.reaction !== null) reject('UNEXPECTED_REACTION');
