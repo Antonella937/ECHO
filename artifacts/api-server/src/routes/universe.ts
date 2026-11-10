@@ -77,6 +77,18 @@ router.get("/universe/characters/page", async (req, res): Promise<void> => {
     res.status(400).json({ error: "INVALID_PAGINATION" }); return;
   }
   const envelope = await readUniverse(req.userId!, universeId);
+  // A page from an older revision must never be silently appended to a newer feed.
+  const requestedRevision = req.query.revision;
+  if (requestedRevision !== undefined) {
+    const revision = typeof requestedRevision === "string" ? Number(requestedRevision) : NaN;
+    if (!Number.isSafeInteger(revision) || revision < 0) {
+      res.status(400).json({ error: "INVALID_REVISION" }); return;
+    }
+    if (revision !== envelope.revision) {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.status(409).json({ error: "STALE_PAGE", revision: envelope.revision }); return;
+    }
+  }
   const state = SaveUniverseBody.shape.state.safeParse(envelope.state);
   if (!state.success) {
     res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return;
@@ -115,6 +127,18 @@ router.get("/universe/posts/page", async (req, res): Promise<void> => {
     res.status(400).json({ error: "INVALID_PAGE_QUERY" }); return;
   }
   const envelope = await readUniverse(req.userId!, universeId);
+  // A page from an older revision must never be silently appended to a newer feed.
+  const requestedRevision = req.query.revision;
+  if (requestedRevision !== undefined) {
+    const revision = typeof requestedRevision === "string" ? Number(requestedRevision) : NaN;
+    if (!Number.isSafeInteger(revision) || revision < 0) {
+      res.status(400).json({ error: "INVALID_REVISION" }); return;
+    }
+    if (revision !== envelope.revision) {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.status(409).json({ error: "STALE_PAGE", revision: envelope.revision }); return;
+    }
+  }
   const parsed = SaveUniverseBody.shape.state.safeParse(envelope.state);
   if (!parsed.success) {
     res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return;
@@ -145,6 +169,18 @@ router.get("/universe/messages/page", async (req, res): Promise<void> => {
     res.status(400).json({ error: "INVALID_MESSAGE_PAGE" }); return;
   }
   const envelope = await readUniverse(req.userId!, universeId);
+  // A page from an older revision must never be silently appended to a newer feed.
+  const requestedRevision = req.query.revision;
+  if (requestedRevision !== undefined) {
+    const revision = typeof requestedRevision === "string" ? Number(requestedRevision) : NaN;
+    if (!Number.isSafeInteger(revision) || revision < 0) {
+      res.status(400).json({ error: "INVALID_REVISION" }); return;
+    }
+    if (revision !== envelope.revision) {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.status(409).json({ error: "STALE_PAGE", revision: envelope.revision }); return;
+    }
+  }
   const parsed = SaveUniverseBody.shape.state.safeParse(envelope.state);
   if (!parsed.success) {
     res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return;
