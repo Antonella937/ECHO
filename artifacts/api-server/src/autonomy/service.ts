@@ -262,6 +262,11 @@ export async function runAutonomyLiveCycle(
     now?: Date;
     random?: () => number;
     lane?: "dm" | "social";
+    /** Separate, disabled-by-default private sketch adapter; never used for other media. */
+    sketchDelivery?: (input: {
+      ownerId: string; universeId: string; characterId: string;
+      recipientId: string; messageId: string; subject: string;
+    }) => Promise<"attached" | "skipped">;
     /** Optional production adapter. Never invoked unless owner voice opt-in and budgets are supplied. */
     voiceDelivery?: {
       ownerEnabled: boolean;
@@ -426,6 +431,33 @@ export async function runAutonomyLiveCycle(
       opportunity, decision: preview.decision, contextHash: preview.contextAudit.contextHash,
       model: preview.model, liveEnabled, now,
     });
+    // Optional private sketch: only an unsolicited Hyun -> Nela DM, never a reply.
+    // The delivery adapter revalidates identity, recipient, message ownership and
+    // the persisted image budget before any provider request.
+    if (outcome.status === "executed" && opportunity.situation === "dm" &&
+        preview.decision.action === "draft" && dependencies.sketchDelivery &&
+        opportunity.reason !== "A recent incoming direct message is awaiting a reply." &&
+        (dependencies.random?.() ?? Math.random()) < 0.08) {
+      try {
+        const fresh = await dependencies.repository.read(ownerId, universeId);
+        const parsed = SaveUniverseBody.safeParse({ state: fresh.state, expectedRevision: fresh.revision });
+        const outgoing = parsed.success ? [...parsed.data.state.messages].reverse().find(message =>
+          message.senderId === character.id && message.recipientId === opportunity.recipientId &&
+          message.origin === "autonomy" && message.text === preview.decision.text?.trim() &&
+          !message.attachments?.some(a => a.type === "image")) : undefined;
+        if (outgoing && opportunity.recipientId) {
+          await dependencies.sketchDelivery({
+            ownerId, universeId, characterId: character.id,
+            recipientId: opportunity.recipientId, messageId: outgoing.id,
+            subject: "an abstract study of light, shadow and the city",
+          });
+        }
+      } catch (error) {
+        console.warn("Optional private sketch skipped", {
+          reason: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN",
+        });
+      }
+    }
     // Production voice hook: only after the text message has been committed. The
     // adapter is deliberately absent until private TTS, consent and budgets exist.
     // Voice failures must never roll back or duplicate an AI text reply.
