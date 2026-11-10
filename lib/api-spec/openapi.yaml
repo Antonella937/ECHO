@@ -1125,6 +1125,7 @@ components:
       properties:
         taggedAccountIds: { type: array, maxItems: 50, uniqueItems: true, items: { type: string } }
         commentsEnabled: { type: boolean }
+        musicClip: { $ref: "#/components/schemas/MusicClip" }
         pinned: { type: boolean }
         pinOrder: { type: integer, minimum: 0, maximum: 2, description: "Manual order of pinned posts within their author identity. Absent for legacy or unpinned posts." }
         editedAt: { type: string, format: date-time }
@@ -1163,6 +1164,14 @@ components:
         replyToAuthorId: { type: [string, "null"] }
         likes: { type: array, items: { type: string } }
         origin: { type: string }
+    MusicClip:
+      type: object
+      required: [trackId, title, startSeconds, clipSeconds]
+      properties:
+        trackId: { type: string, format: uuid }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        startSeconds: { type: number, minimum: 0 }
+        clipSeconds: { type: integer, enum: [15, 30] }
     Story:
       type: object
       required: [id, authorId, image, caption, createdAt, seenBy, origin]
@@ -1177,6 +1186,7 @@ components:
         likes: { type: array, uniqueItems: true, maxItems: 500, items: { type: string } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         music: { $ref: "#/components/schemas/StoryMusic" }
+        musicClip: { $ref: "#/components/schemas/MusicClip" }
         id: { type: string }
         authorId: { type: string }
         image: { type: string }
