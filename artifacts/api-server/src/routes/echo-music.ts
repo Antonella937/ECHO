@@ -168,6 +168,42 @@ router.post("/music/voices/clone/jobs/:id/sync", async(req,res) => {
     res.status(503).json({error:"VOICE_CLONE_SYNC_UNAVAILABLE"});}
 });
 
+// Prepare a vocal-isolation job. This is separate from the $5 voice clone.
+// The source must be the user's own previously staged private audio.
+router.post("/music/voices/separation/jobs",async(req,res)=>{
+ const parsed=voiceSamplePreflight.safeParse(req.body);
+ if(!parsed.success){res.status(400).json({error:"VOCAL_SEPARATION_INPUT_INVALID"});return;}
+ try{
+   const sample=await fetchOwnedPrivateVocalSample(req.userId!,parsed.data.characterId,parsed.data.storageKey);
+   const id=randomUUID();
+   const result=await db.execute(sql`
+     INSERT INTO echo_music_vocal_separation_jobs(id,owner_id,character_id,sample_storage_key,duration_seconds)
+     VALUES(${id}::uuid,${req.userId!},${parsed.data.characterId},${parsed.data.storageKey},${parsed.data.durationSeconds})
+     ON CONFLICT(owner_id,character_id)
+       WHERE status IN ('awaiting_confirmation','submitting','processing','submission_uncertain')
+     DO NOTHING RETURNING id
+   `);
+   if(!result.rows.length){res.status(409).json({error:"VOCAL_SEPARATION_ALREADY_ACTIVE"});return;}
+   res.status(201).json({jobId:id,status:"awaiting_confirmation",sourceBytes:sample.bytes.length,
+     model:"fal-ai/demucs",requiresPaidConfirmation:true,charged:false});
+ }catch(error){req.log.warn({err:error},"Vocal separation preparation failed");
+   res.status(503).json({error:"VOCAL_SEPARATION_PREPARATION_FAILED"});}
+});
+router.get("/music/voices/separation/jobs/:id",async(req,res)=>{
+ const id=z.string().uuid().safeParse(req.params.id);
+ if(!id.success){res.status(400).json({error:"VOCAL_SEPARATION_JOB_ID_INVALID"});return;}
+ try{
+   const result=await db.execute(sql`
+     SELECT id,character_id,status,isolated_storage_key,created_at,completed_at
+     FROM echo_music_vocal_separation_jobs
+     WHERE id=${id.data}::uuid AND owner_id=${req.userId!} LIMIT 1
+   `);
+   if(!result.rows.length){res.status(404).json({error:"VOCAL_SEPARATION_JOB_NOT_FOUND"});return;}
+   res.setHeader("Cache-Control","no-store");res.json({job:result.rows[0]});
+ }catch(error){req.log.warn({err:error},"Vocal separation status failed");
+   res.status(503).json({error:"VOCAL_SEPARATION_STATUS_UNAVAILABLE"});}
+});
+
 // Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
 // The actual $5 provider submission must be separately authorized and reserved.
 const voiceCloneQuoteSchema = z.object({
