@@ -57,6 +57,31 @@ scenesRouter.post("/scenes", async (req, res) => {
     res.status(201).json({ sceneId, title, premise, canon, participantIds, status: "active" });
   } catch { res.status(503).json({ error: "SCENE_CREATE_FAILED" }); }
 });
+// Deleting a scene is distinct from marking a character absent or leaving the narrative.
+// Events cascade; presence and summaries are removed explicitly in the same transaction.
+scenesRouter.delete("/scenes/:sceneId", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE" }); return; }
+  const { universeId } = parsed.data;
+  try {
+    if (!await availableCharacters(req.userId!, universeId)) { res.status(403).json({ error: "UNIVERSE_NOT_ACCESSIBLE" }); return; }
+    const deleted = await db.transaction(async tx => {
+      const existing = await tx.execute(sql`SELECT scene_id FROM echo_scenes
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND scene_id=${sceneId.data} FOR UPDATE`);
+      if (!existing.rows.length) return false;
+      await tx.execute(sql`DELETE FROM echo_scene_presence
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND scene_id=${sceneId.data}`);
+      await tx.execute(sql`DELETE FROM echo_scene_memory
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND scene_id=${sceneId.data}`);
+      await tx.execute(sql`DELETE FROM echo_scenes
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND scene_id=${sceneId.data}`);
+      return true;
+    });
+    if (!deleted) { res.status(404).json({ error: "SCENE_NOT_FOUND" }); return; }
+    res.json({ deleted: true });
+  } catch { res.status(503).json({ error: "SCENE_DELETE_FAILED" }); }
+});
 scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
   const parsed = scope.safeParse(req.query);
   const sceneId = id.safeParse(req.params.sceneId);
