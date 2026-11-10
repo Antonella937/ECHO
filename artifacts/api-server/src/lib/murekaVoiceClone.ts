@@ -6,8 +6,8 @@
  * Provider schema: https://fal.ai/models/mureka/api/voice/clone/api
  */
 export const MUREKA_VOICE_CLONE_MODEL = "mureka/api/voice/clone" as const;
-// fal queue status and result URLs use the owner/app namespace.
-const QUEUE_APP = MUREKA_VOICE_CLONE_MODEL.split("/").slice(0, 2).join("/");
+// Queue status/result must address the full model path, including /voice/clone.
+const QUEUE_APP = MUREKA_VOICE_CLONE_MODEL;
 const REQUEST_ID = /^[a-zA-Z0-9_-]{8,128}$/;
 const VOCAL_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 const AUDIO_DATA_URI = /^data:audio\/(?:mpeg|mp3|mp4|x-m4a);base64,([a-zA-Z0-9+/]+={0,2})$/;
