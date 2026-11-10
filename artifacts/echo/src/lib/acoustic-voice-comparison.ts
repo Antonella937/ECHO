@@ -26,7 +26,7 @@ function features(samples: Float32Array, rate: number): Features {
       const omega = 2 * Math.PI * frequency / rate;
       const coeff = 2 * Math.cos(omega);
       let q0 = 0, q1 = 0, q2 = 0;
-      for (let i = 0; i < windowSize; i += 2) {
+      for (let i = 0; i < windowSize; i++) {
         const window = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (windowSize - 1));
         q0 = frame[i] * window + coeff * q1 - q2;
         q2 = q1; q1 = q0;
