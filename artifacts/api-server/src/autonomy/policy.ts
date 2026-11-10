@@ -244,6 +244,34 @@ export function chooseAutonomyOpportunity(input: {
         localHour: local.hour, timezone };
     }
   }
+  // Ordinary spontaneous outreach is separate from story replies. Previously the
+  // DM lane could only reply to an incoming message or a recent story, leaving
+  // characters silent whenever nobody posted a story. Keep this inexpensive:
+  // select locally before calling a model, honor relationships, daily caps and
+  // cooldowns, and avoid outreach during sleeping hours.
+  if (input.lane === "dm" && !unanswered &&
+      history.length < (input.maxActionsPerDay ?? 2) &&
+      (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
+      local.hour >= 8 && local.hour < 23) {
+    const outreachChance = input.dmFrequency === "frequently" ? 0.035 :
+      input.dmFrequency === "rarely" ? 0.003 : 0.012;
+    if (random() < outreachChance) {
+      const recipients = availableTargets(state, character).filter(candidate =>
+        !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
+      if (recipients.length) {
+        const recipient = recipients[Math.floor(random() * recipients.length)];
+        return { situation: "dm", recipientId: recipient.id,
+          reasonCode: "OPPORTUNITY_SELECTED",
+          reason: "An occasional spontaneous message to an established contact.",
+          localHour: local.hour, timezone };
+      }
+    }
+  }
+  if (input.lane === "dm") {
+    return { situation: null, reasonCode: "SILENCE_SELECTED",
+      reason: "No incoming DM or eligible spontaneous outreach at this check.",
+      localHour: local.hour, timezone };
+  }
   // Social activity should have its own cadence, independent of DMs and
   // manually authored content. Never silently extend the configured interval.
   const cooldownMs = (input.minCooldownMinutes ?? 360) * 60_000;
