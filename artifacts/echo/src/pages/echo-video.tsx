@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
-import { Film, LockKeyhole, WandSparkles } from 'lucide-react';
+import { Film, LockKeyhole, WandSparkles, Download } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { useLanguage } from '@/lib/i18n';
 
@@ -26,11 +26,11 @@ export default function EchoVideoPage() {
       .then(value => { if(active) setReadiness(value); }).catch(() => {});
     return () => {active=false;};
   }, []);
-  const [library, setLibrary] = useState<Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string}>>([]);
+  const [library, setLibrary] = useState<Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string;hasPrivateAsset:boolean}>>([]);
   const [libraryUnavailable, setLibraryUnavailable] = useState(false);
   useEffect(() => {
     let active = true;
-    void customFetch<{items:Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string}>;setupRequired?:boolean}>('/api/video/library', {responseType:'json'})
+    void customFetch<{items:Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string;hasPrivateAsset:boolean}>;setupRequired?:boolean}>('/api/video/library', {responseType:'json'})
       .then(data => { if (active) {setLibrary(data.items);setLibraryUnavailable(Boolean(data.setupRequired));} })
       .catch(() => { if (active) setLibraryUnavailable(true); });
     return () => {active=false;};
@@ -70,7 +70,7 @@ export default function EchoVideoPage() {
       <h2 className="text-sm font-semibold">{es?'Mi biblioteca de videos y GIF':'My video & GIF library'}</h2>
       {libraryUnavailable ? <p className="text-xs text-muted-foreground">{es?'La biblioteca estará disponible cuando se inicialice el almacenamiento.':'Library will be available after storage setup.'}</p>
         : library.length === 0 ? <p className="text-xs text-muted-foreground">{es?'Todavía no generaste videos. Aparecerán acá cuando se active el servicio.':'No generated videos yet. They will appear here when generation is enabled.'}</p>
-        : <div className="space-y-2">{library.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>{item.mode} · {item.durationSeconds}s</span><span className="text-muted-foreground">{item.status}</span></div>)}</div>}
+        : <div className="space-y-2">{library.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>{item.mode} · {item.durationSeconds}s</span><span className="flex items-center gap-2"><span className="text-muted-foreground">{item.status}</span>{item.hasPrivateAsset && <button type="button" aria-label={es?'Descargar archivo privado':'Download private file'} className="rounded-lg border border-border p-2" onClick={async()=>{try{const blob=await customFetch<Blob>('/api/video/library/'+encodeURIComponent(item.id)+'/asset',{responseType:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='echo-video-'+item.id+(blob.type==='image/gif'?'.gif':blob.type==='video/webm'?'.webm':'.mp4');a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch{setError(true);}}}><Download className="h-4 w-4"/></button>}</span></div>)}</div>}
       <p className="text-xs text-muted-foreground">{es?'La conversión a GIF y la descarga estarán disponibles después de conectar el procesamiento privado.':'GIF conversion and downloads will be available after private processing is connected.'}</p>
     </section>
     <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Preparación de GIF':'GIF preparation'}>
