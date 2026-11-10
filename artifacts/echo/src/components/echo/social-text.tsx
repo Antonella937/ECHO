@@ -8,7 +8,7 @@ const TOKEN = /(@[a-zA-Z0-9_][a-zA-Z0-9_.]{0,29}|#[\p{L}\p{N}_]{1,80})/gu;
  * Supports ***bold italic***, **bold**, *italic*, __underline__, and <u>underline</u>.
  * User text is never inserted as HTML. */
 function formatInline(source: string, renderPlain: (text: string, key: string) => ReactNode, prefix = 'f'): ReactNode[] {
-  const pattern = /(\\*\\*\\*[\\s\\S]+?\\*\\*\\*|\\*\\*[\\s\\S]+?\\*\\*|\\*[\\s\\S]+?\\*|__[\\s\\S]+?__|<u>[\\s\\S]+?<\\/u>)/g;
+  const pattern = /(\*\*\*[\s\S]+?\*\*\*|\*\*[\s\S]+?\*\*|\*[\s\S]+?\*|__[\s\S]+?__|<u>[\s\S]+?<\/u>)/g;
   const output: ReactNode[] = [];
   let last = 0;
   for (const match of source.matchAll(pattern)) {
