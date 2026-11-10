@@ -356,9 +356,9 @@ router.get("/music/library", async (req, res) => {
     const items = await db.select().from(echoMusicLibraryTable)
       .where(eq(echoMusicLibraryTable.ownerId, req.userId!))
       .orderBy(desc(echoMusicLibraryTable.createdAt)).limit(100);
-    const covers = await db.execute(sql`SELECT id, cover_path AS "coverPath" FROM echo_music_library WHERE owner_id=${req.userId!}`);
-    const coverMap = new Map(covers.rows.map(row => [String(row.id), row.coverPath]));
-    res.json({ items: items.map(item => ({ ...item, coverPath: coverMap.get(item.id) ?? null })) });
+    const metadata = await db.execute(sql`SELECT id, cover_path AS "coverPath", artist_name AS "artistName" FROM echo_music_library WHERE owner_id=${req.userId!}`);
+    const metadataMap = new Map(metadata.rows.map(row => [String(row.id), { coverPath: row.coverPath, artistName: row.artistName }]));
+    res.json({ items: items.map(item => ({ ...item, coverPath: metadataMap.get(item.id)?.coverPath ?? null, artistName: metadataMap.get(item.id)?.artistName ?? null })) });
   } catch (error) {
     req.log.error({ err: error }, "Music library read failed");
     res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
@@ -388,6 +388,27 @@ router.patch("/music/library/:id/cover", async (req, res) => {
     if (!result.rows.length) { res.status(404).json({ error: "MUSIC_TRACK_NOT_FOUND" }); return; }
     res.json({ item: result.rows[0] });
   } catch (error) { req.log.error({ err: error }, "Music cover update failed"); res.status(503).json({ error: "MUSIC_COVER_UNAVAILABLE" }); }
+});
+// Editable display credits are distinct from the owner and source character.
+// This endpoint cannot overwrite paid audio or transfer its ownership.
+router.patch("/music/library/:id/metadata", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  const body = z.object({
+    title: z.string().trim().min(1).max(120),
+    artistName: z.string().trim().max(120).nullable(),
+  }).strict().safeParse(req.body);
+  if (!id.success || !body.success) { res.status(400).json({ error: "INVALID_MUSIC_METADATA" }); return; }
+  try {
+    const result = await db.execute(sql`
+      UPDATE echo_music_library SET title=${body.data.title},artist_name=${body.data.artistName || null}
+      WHERE owner_id=${req.userId!} AND id=${id.data}::uuid
+      RETURNING id,title,artist_name AS "artistName"`);
+    if (!result.rows.length) { res.status(404).json({ error: "MUSIC_TRACK_NOT_FOUND" }); return; }
+    res.json({ item: result.rows[0] });
+  } catch (error) {
+    req.log.error({ err: error }, "Music metadata update failed");
+    res.status(503).json({ error: "MUSIC_METADATA_UNAVAILABLE" });
+  }
 });
 router.post("/music/library/save-to-character", async (req, res) => {
   const parsed = characterMusicSave.safeParse(req.body);
@@ -626,7 +647,9 @@ router.get("/music/published", async (req, res) => {
       publishedAt: echoMusicLibraryTable.publishedAt,
     }).from(echoMusicLibraryTable).where(isNotNull(echoMusicLibraryTable.publishedAt))
       .orderBy(desc(echoMusicLibraryTable.publishedAt)).limit(100);
-    res.json({ items });
+    const credits = await db.execute(sql`SELECT id,artist_name AS "artistName",cover_path AS "coverPath" FROM echo_music_library WHERE published_at IS NOT NULL`);
+    const byId = new Map(credits.rows.map(row => [String(row.id), { artistName: row.artistName, coverPath: row.coverPath }]));
+    res.json({ items: items.map(item => ({ ...item, artistName: byId.get(item.id)?.artistName ?? null, coverPath: byId.get(item.id)?.coverPath ?? null })) });
   } catch (error) { req.log.error({ err: error }, "Published music listing failed"); res.status(503).json({ error: "MUSIC_CATALOG_UNAVAILABLE" }); }
 });
 router.get("/music/published/:id/audio", async (req, res) => {
