@@ -63,26 +63,39 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
     );
     // Read again after taking the owner entitlement lock so concurrent creates
     // cannot both make a decision from the same stale universe count.
-    const existingRows = await tx.select().from(echoUniversesTable)
-      .where(eq(echoUniversesTable.ownerId, ownerId));
-    const current = existingRows.find(row => row.universeId === universeId);
-    if (current?.archivedAt || current?.deletedAt) throw new Error("UNIVERSE_UNAVAILABLE");
+    // Capacity checks need counts, not every universe's entire social JSON.
+    // Keep the owner entitlement lock above: concurrent writes must serialize.
+    const existingRows = await tx.select({
+      universeId: echoUniversesTable.universeId,
+      archivedAt: echoUniversesTable.archivedAt,
+      deletedAt: echoUniversesTable.deletedAt,
+      characterCount: sql<number>`CASE WHEN jsonb_typeof(${echoUniversesTable.state}->'characters') = 'array'
+        THEN jsonb_array_length(${echoUniversesTable.state}->'characters') ELSE 0 END`,
+    }).from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, ownerId));
+    const currentMeta = existingRows.find(row => row.universeId === universeId);
+    if (currentMeta?.archivedAt || currentMeta?.deletedAt) throw new Error("UNIVERSE_UNAVAILABLE");
     const retainedRows = existingRows.filter(row => !row.deletedAt);
     const caps = creatorCapacity(ownerId, membershipPlan, entitlements.addonCharacters, entitlements.addonUniverses);
-    const isNewUniverse = !current;
+    const isNewUniverse = !currentMeta;
     if (isNewUniverse && (expectedRevision !== 0 || retainedRows.length >= caps.maxUniverses))
       throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
 
-    const previousCharacters = retainedRows.reduce((total, row) => {
-      const value = row.state.characters;
-      return total + (Array.isArray(value) ? value.length : 0);
-    }, 0);
+    const previousCharacters = retainedRows.reduce((total, row) => total + Number(row.characterCount), 0);
     const candidateCharacters = Array.isArray(state.characters) ? state.characters.length : 0;
-    const nextCharacters = previousCharacters - (current && Array.isArray(current.state.characters) ? current.state.characters.length : 0) + candidateCharacters;
+    const nextCharacters = previousCharacters - (currentMeta && !currentMeta.deletedAt ? Number(currentMeta.characterCount) : 0) + candidateCharacters;
     // Existing over-cap accounts can still edit/delete; only growth is blocked.
     if (nextCharacters > caps.maxCharacters && nextCharacters > previousCharacters)
       throw new StructuralLimitError("CHARACTER_LIMIT_REACHED");
 
+    // The previous full state is needed only for this universe's deletion and
+    // memory-diff hooks, not for every universe owned by this user.
+    const [current] = currentMeta
+      ? await tx.select({ state: echoUniversesTable.state })
+        .from(echoUniversesTable).where(and(
+          eq(echoUniversesTable.ownerId, ownerId),
+          eq(echoUniversesTable.universeId, universeId),
+        )).limit(1)
+      : [];
     const canonicalState = creatorSetup
       ? { ...state, creatorSetup: { ...creatorSetup, plan: entitlements.plan } }
       : state;
