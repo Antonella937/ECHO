@@ -1,5 +1,6 @@
 import { usePostInteractionsText } from '@/lib/post-interactions-translations';
 import { VerifiedBadge } from './verified-badge';
+import { customFetch } from '@workspace/api-client-react';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
 import { Heart, X } from 'lucide-react';
@@ -115,16 +116,36 @@ function CommentRow({ comment, onReply, small, highlight }: { comment: Comment; 
 
 export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { postId: string; replyTo: Comment | null; onClearReply(): void; autoFocus?: boolean }) {
   const t = usePostInteractionsText();
-  const { me, character, actions, state } = useSocial();
+  const { me, character, actions, state, universeId } = useSocial();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [communityOpen, setCommunityOpen] = useState(false);
   const [guestHandle, setGuestHandle] = useState('');
   const [guestText, setGuestText] = useState('');
   const [communityFrequency, setCommunityFrequency] = useState('normal');
+  const [generatingCommunity, setGeneratingCommunity] = useState(false);
+  const [generatedBatches, setGeneratedBatches] = useState(0);
   const post = state.posts.find((p) => p.id === postId);
   const ref = useRef<HTMLInputElement>(null);
   const target = replyTo ? character(replyTo.authorId) : undefined;
+
+  const generateCommunity = async () => {
+    if (generatingCommunity || !me.communityCommentsEnabled || post?.authorId !== me.id) return;
+    setGeneratingCommunity(true);
+    setError(null);
+    try {
+      const range: Record<string, [number, number]> = { occasional: [1, 2], normal: [3, 4], high: [5, 6] };
+      const [min, max] = range[communityFrequency] ?? range.normal;
+      const count = min + Math.floor(Math.random() * (max - min + 1));
+      const result = await customFetch<{ comments: Array<{ handle: string; text: string }> }>('/api/community-comments/draft', {
+        method: 'POST', responseType: 'json', body: JSON.stringify({ universeId, postId, count }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      for (const item of (result.comments ?? []).slice(0, 6)) actions.addCommunityComment(postId, item.handle, item.text);
+      setGeneratedBatches(v => v + 1);
+    } catch (err) { setError((err as Error).message || 'No se pudieron generar comentarios.'); }
+    finally { setGeneratingCommunity(false); }
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -168,8 +189,8 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
             <option value="normal">Normal · 3–4</option>
             <option value="high">Alta · 5–6</option>
           </select>
-          <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-muted-foreground" disabled title="Pendiente de conectar al generador de IA">Generar comentarios con IA · próximamente</button>
-          <p className="text-xs text-muted-foreground">Sin generación automática: cada tanda requerirá tocar el botón y nunca superará seis comentarios.</p>
+          <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-primary disabled:opacity-50" disabled={generatingCommunity} onClick={() => void generateCommunity()}>{generatingCommunity ? "Generando…" : generatedBatches ? "Generar más comentarios con IA" : "Generar comentarios con IA"}</button>
+          <p className="text-xs text-muted-foreground">Solo se generan al tocar el botón (máximo seis por tanda). Las publicaciones antiguas no se modifican automáticamente.</p>
           <button type="button" className="text-primary" onClick={() => setCommunityOpen(!communityOpen)}>{communityOpen ? 'Cerrar' : '+ Agregar comentario manual'}</button>
           {communityOpen && <form className="space-y-2" onSubmit={e => { e.preventDefault(); try { actions.addCommunityComment(postId, guestHandle, guestText); setGuestText(''); setError(null); } catch (err) { setError((err as Error).message); } }}>
             <input className="w-full rounded-lg border border-input bg-background p-2" value={guestHandle} onChange={e => setGuestHandle(e.target.value)} placeholder="@deadstatic.fans" maxLength={33} aria-label="Usuario ficticio" />
