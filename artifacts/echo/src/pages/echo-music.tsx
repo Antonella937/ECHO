@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
 
-import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3, Download } from 'lucide-react';
+import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3, Download, SkipBack, SkipForward, Shuffle, Repeat2 } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
@@ -233,6 +233,9 @@ export default function EchoMusicPage() {
     setPlayerOpen(true);
   }
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [shuffleTracks, setShuffleTracks] = useState(false);
+  const [repeatTrack, setRepeatTrack] = useState(false);
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
@@ -439,6 +442,7 @@ export default function EchoMusicPage() {
     if (loadingSharedId) return;
     audioRef.current?.pause();
     setLibraryError('');
+    setSelectedTrackId(item.id);
     setTitle(item.title); setPreview(item.prompt); setDurationSeconds(item.durationSeconds);
     setElapsed(0); setActualDuration(0); setClipStart(0);
     // Generated music uses an authenticated server stream, not a legacy
@@ -463,6 +467,15 @@ export default function EchoMusicPage() {
     }
     setSavedAudioPath(item.audioPath ?? null); setLocalAudioUrl(null); setSelectedAudioFile(null);
     setPlayerOpen(true);
+  }
+  const playableTracks = library.filter(item => item.status === 'saved_audio' && !!item.audioPath);
+  function skipTrack(direction: -1 | 1) {
+    if (playableTracks.length < 2) return;
+    const current = playableTracks.findIndex(item => item.id === selectedTrackId);
+    const nextIndex = shuffleTracks
+      ? (current + 1 + Math.floor(Math.random() * (playableTracks.length - 1))) % playableTracks.length
+      : (current + direction + playableTracks.length) % playableTracks.length;
+    void openLibraryItem(playableTracks[nextIndex]);
   }
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -739,7 +752,13 @@ export default function EchoMusicPage() {
       <div>
         <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label={t("Progreso de la canción")} className="w-full accent-white disabled:opacity-40" />
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
-        <div className="mt-5 flex justify-center"><button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? t("Pausar") : t("Reproducir")} className="grid h-20 w-20 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-9 w-9 fill-current" /> : <Play className="ml-1 h-9 w-9 fill-current" />}</button></div>
+        <div className="mt-6 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => setShuffleTracks(value => !value)} aria-label={interfaceLanguage === 'es' ? 'Aleatorio' : 'Shuffle'} aria-pressed={shuffleTracks} className={shuffleTracks ? 'text-[#e3a0b6]' : 'text-white/65'}><Shuffle className="h-5 w-5" /></button>
+          <button type="button" disabled={playableTracks.length < 2} onClick={() => skipTrack(-1)} aria-label={interfaceLanguage === 'es' ? 'Canción anterior' : 'Previous track'} className="disabled:opacity-30"><SkipBack className="h-7 w-7 fill-current" /></button>
+          <button type="button" disabled={!audioUrl} onClick={() => { const audio = audioRef.current; if (!audio) return; if (audio.paused) void audio.play().catch(() => setPlaying(false)); else audio.pause(); }} aria-label={playing ? t("Pausar") : t("Reproducir")} className="grid h-16 w-16 place-items-center rounded-full bg-white text-black disabled:opacity-40">{playing ? <Pause className="h-8 w-8 fill-current" /> : <Play className="ml-1 h-8 w-8 fill-current" />}</button>
+          <button type="button" disabled={playableTracks.length < 2} onClick={() => skipTrack(1)} aria-label={interfaceLanguage === 'es' ? 'Siguiente canción' : 'Next track'} className="disabled:opacity-30"><SkipForward className="h-7 w-7 fill-current" /></button>
+          <button type="button" onClick={() => setRepeatTrack(value => !value)} aria-label={interfaceLanguage === 'es' ? 'Repetir canción' : 'Repeat track'} aria-pressed={repeatTrack} className={repeatTrack ? 'text-[#e3a0b6]' : 'text-white/65'}><Repeat2 className="h-5 w-5" /></button>
+        </div>
       </div>
       {selectedAudioFile && !savedAudioPath && <button type="button" disabled={savingAudio} onClick={() => void saveCurrentAudio()} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{savingAudio ? t("Guardando en almacenamiento privado…") : t("Guardar este audio en ECHO")}</button>}
       {savedAudioPath && <p className="text-center text-xs text-white/70">{t("Audio guardado en almacenamiento privado. Aparece en tu biblioteca de este dispositivo.")}</p>}
@@ -756,7 +775,7 @@ export default function EchoMusicPage() {
       </section>}</div></details>
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">{t("Ver prompt preparado")}</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
-    <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+    <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); if (repeatTrack && audioRef.current) { audioRef.current.currentTime = 0; void audioRef.current.play().catch(() => setPlaying(false)); } else if (playableTracks.length > 1 && selectedTrackId) skipTrack(1); }} />
   </div>;
   if (musicAccess !== 'active') return <div>
     <TopBar title="ECHO Music" onBack={back} />
@@ -822,9 +841,9 @@ export default function EchoMusicPage() {
           <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? t("Escuchar canción") : t("Ver borrador")}</p></div>
         </button>
-        <div className="flex flex-wrap items-center gap-2 pl-[68px]">
-        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20,item.durationSeconds)); setVoiceCloneConsent(false);setVoiceCloneQuote(''); }} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{t("Guardar voz")}</button>}
-        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" disabled={!!downloadingId} onClick={() => void downloadLibraryTrack(item)} className="flex items-center gap-1 rounded-lg border border-border px-2 py-2 text-xs font-semibold" aria-label={t("Descargar") + ' ' + item.title}><Download className="h-4 w-4" />{downloadingId === item.id ? t("Descargando…") : t("Descargar")}</button>}
+        <div className="grid grid-cols-3 gap-2">
+        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20,item.durationSeconds)); setVoiceCloneConsent(false);setVoiceCloneQuote(''); }} className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-border px-1 py-2 text-center text-[11px] font-semibold leading-tight">{t("Guardar voz")}</button>}
+        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" disabled={!!downloadingId} onClick={() => void downloadLibraryTrack(item)} className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-border px-1 py-2 text-center text-[11px] font-semibold leading-tight" aria-label={t("Descargar") + ' ' + item.title}><Download className="h-4 w-4" />{downloadingId === item.id ? t("Descargando…") : t("Descargar")}</button>}
         {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir")}</button>}
         {!item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>}
         </div>
