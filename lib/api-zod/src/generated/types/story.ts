@@ -10,6 +10,7 @@ import type { StoryDisplayMetrics } from './storyDisplayMetrics';
 import type { StoryMusic } from './storyMusic';
 
 export interface Story {
+  musicClip?: { trackId: string; title: string; startSeconds: number; clipSeconds: 15 | 30 };
   displayMetrics?: StoryDisplayMetrics;
   /** @maxItems 50 */
   mentionedAccountIds?: string[];
