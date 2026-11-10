@@ -94,12 +94,14 @@ export async function loadCharacterPage(
   universeId = 'primary',
   offset = 0,
   limit = 24,
+  revision?: number,
 ): Promise<CharacterPage> {
   if (!Number.isSafeInteger(offset) || offset < 0 ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
     throw new Error('Invalid character page');
   return customFetch<CharacterPage>(`/api/universe/characters/page?${new URLSearchParams({
     universeId, offset: String(offset), limit: String(limit),
+    ...(revision === undefined ? {} : { revision: String(revision) }),
   })}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
 }
 
@@ -113,15 +115,17 @@ export interface PostPage {
 export async function loadPostPage(options: {
   universeId?: string;
   authorId?: string;
+  revision?: number;
   offset?: number;
   limit?: number;
 } = {}): Promise<PostPage> {
-  const { universeId = 'primary', authorId, offset = 0, limit = 20 } = options;
+  const { universeId = 'primary', authorId, revision, offset = 0, limit = 20 } = options;
   if (!Number.isSafeInteger(offset) || offset < 0 ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
     throw new Error('Invalid post page');
   const params = new URLSearchParams({ universeId, offset: String(offset), limit: String(limit) });
   if (authorId) params.set('authorId', authorId);
+  if (revision !== undefined) params.set('revision', String(revision));
   return customFetch<PostPage>(`/api/universe/posts/page?${params}`, {
     method: 'GET', responseType: 'json', cache: 'no-store',
   });
@@ -137,14 +141,16 @@ export interface MessagePage {
 export async function loadMessagePage(options: {
   threadId: string;
   universeId?: string;
+  revision?: number;
   offset?: number;
   limit?: number;
 }): Promise<MessagePage> {
-  const { threadId, universeId = 'primary', offset = 0, limit = 30 } = options;
+  const { threadId, universeId = 'primary', revision, offset = 0, limit = 30 } = options;
   if (!threadId || !Number.isSafeInteger(offset) || offset < 0 ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
     throw new Error('Invalid message page');
   const params = new URLSearchParams({ threadId, universeId, offset: String(offset), limit: String(limit) });
+  if (revision !== undefined) params.set('revision', String(revision));
   return customFetch<MessagePage>(`/api/universe/messages/page?${params}`, {
     method: 'GET', responseType: 'json', cache: 'no-store',
   });
