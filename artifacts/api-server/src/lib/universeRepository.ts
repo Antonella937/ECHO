@@ -198,7 +198,10 @@ export async function creatorEntitlements(ownerId: string) {
   const [saved] = await db.select().from(echoCreatorEntitlementsTable)
     .where(eq(echoCreatorEntitlementsTable.ownerId, ownerId)).limit(1);
   if (saved) return lifetimeAccessForOwner(ownerId) ? { ...saved, plan: "creator" as const } : saved;
-  const [primary] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+  // Entitlement fallback needs the legacy plan only, not the universe JSON.
+  const [primary] = await db.select({
+    plan: sql<string | null>`${echoUniversesTable.state}->'creatorSetup'->>'plan'`,
+  }).from(echoUniversesTable)
     .where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, "primary"))).limit(1);
   if (!primary) return {
     ownerId, plan: lifetimeAccessForOwner(ownerId) ? "creator" as const : "free" as const, addonCharacters: 0, addonUniverses: 0,
@@ -206,6 +209,5 @@ export async function creatorEntitlements(ownerId: string) {
     categoryWeights: DEFAULT_AI_CATEGORY_WEIGHTS,
     createdAt: new Date(0), updatedAt: new Date(0),
   } satisfies EchoCreatorEntitlement;
-  const setup = primary?.state?.creatorSetup as { plan?: unknown } | undefined;
-  return db.transaction(tx => lockEntitlement(tx, ownerId, asPlan(setup?.plan)));
+  return db.transaction(tx => lockEntitlement(tx, ownerId, asPlan(primary.plan)));
 }
