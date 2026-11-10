@@ -459,6 +459,7 @@ export async function runAutonomyLiveCycle(
         const outgoing = parsed.success ? [...parsed.data.state.messages].reverse().find(message =>
           message.senderId === character.id && message.recipientId === opportunity.recipientId &&
           message.origin === "autonomy" && message.text === preview.decision.text?.trim() &&
+          new Date(message.createdAt).getTime() >= now.getTime() - 120_000 &&
           !message.attachments?.some(a => a.type === "image")) : undefined;
         if (outgoing && opportunity.recipientId) {
           await dependencies.sketchDelivery({
