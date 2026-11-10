@@ -40,15 +40,19 @@ export async function loadConsistentPages<K extends PageKind>(options: {
   while (items.length < maxItems) {
     if (signal?.aborted) throw new Error('Page loading cancelled');
     const limit = Math.min(pageSize, maxItems - items.length);
-    let response: Awaited<ReturnType<typeof loadCharacterPage>> | Awaited<ReturnType<typeof loadPostPage>> | Awaited<ReturnType<typeof loadMessagePage>>;
+    let response: { revision: number; total: number; nextOffset: number | null; entries: unknown[] };
     try {
-      response = kind === 'characters'
-        ? await loadCharacterPage(universeId, offset, limit, revision)
-        : kind === 'posts'
-          ? await loadPostPage({ universeId, authorId: options.authorId, offset, limit, revision })
-          : await loadMessagePage({ universeId, threadId: options.threadId!, offset, limit, revision });
+      if (kind === 'characters') {
+        const page = await loadCharacterPage(universeId, offset, limit, revision);
+        response = { revision: page.revision, total: page.total, nextOffset: page.nextOffset, entries: page.characters };
+      } else if (kind === 'posts') {
+        const page = await loadPostPage({ universeId, authorId: options.authorId, offset, limit, revision });
+        response = { revision: page.revision, total: page.total, nextOffset: page.nextOffset, entries: page.posts };
+      } else {
+        const page = await loadMessagePage({ universeId, threadId: options.threadId!, offset, limit, revision });
+        response = { revision: page.revision, total: page.total, nextOffset: page.nextOffset, entries: page.messages };
+      }
     } catch (error) {
-      // 409 is a stale snapshot, not a generic network failure.
       if (error instanceof ApiError && error.status === 409) throw new StalePageSnapshot();
       throw error;
     }
@@ -56,7 +60,7 @@ export async function loadConsistentPages<K extends PageKind>(options: {
     if (revision !== undefined && response.revision !== revision) throw new StalePageSnapshot();
     revision = response.revision;
     total = response.total;
-    const pageItems = kind === 'characters' ? response.characters : kind === 'posts' ? response.posts : response.messages;
+    const pageItems = response.entries;
     if (!Array.isArray(pageItems) || pageItems.length > limit) throw new Error('Invalid paginated response');
     items.push(...pageItems);
     if (response.nextOffset === null) break;
