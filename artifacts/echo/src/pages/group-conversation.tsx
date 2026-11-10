@@ -1,3 +1,4 @@
+import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLanguage } from '@/lib/i18n';
@@ -32,6 +33,7 @@ export default function GroupConversationPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [text, setText] = useState('');
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
@@ -424,11 +426,11 @@ export default function GroupConversationPage() {
         }} />
       </div>}
     </div>
-    <form onSubmit={send} className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
+    <form onSubmit={send} className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Adjuntar archivos" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Paperclip className="h-5 w-5" /></button>
       <button type="button" onClick={() => void recorder.start()} disabled={recorder.status !== 'idle' || sending || pendingFiles.length >= 5} aria-label="Grabar nota de voz" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-50"><Mic className="h-5 w-5" /></button>
-      <textarea value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="max-h-36 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-2xl bg-secondary px-4 py-3 outline-none whitespace-pre-wrap" aria-label="Mensaje al grupo" />
+      <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="max-h-36 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-2xl bg-secondary px-4 py-3 outline-none whitespace-pre-wrap" aria-label="Mensaje al grupo" />
       <button disabled={(!text.trim() && !pendingFiles.length) || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
     </form>
   </div>;
