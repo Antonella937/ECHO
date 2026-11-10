@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useLanguage } from '@/lib/i18n';
+const groupLabels: Record<string, Record<string,string>> = {"en":{"Salir del grupo":"Leave group","Eliminar grupo definitivamente":"Permanently delete group","Salir del modo espectadora":"Exit spectator mode","Estás viendo este grupo como espectadora. No sos participante.":"You're viewing this group as a spectator. You're not a participant."},"pt":{"Salir del grupo":"Sair do grupo","Eliminar grupo definitivamente":"Excluir grupo permanentemente","Salir del modo espectadora":"Sair do modo espectador","Estás viendo este grupo como espectadora. No sos participante.":"Você está vendo este grupo como espectadora. Não é participante."},"fr":{"Salir del grupo":"Quitter le groupe","Eliminar grupo definitivamente":"Supprimer définitivement le groupe","Salir del modo espectadora":"Quitter le mode spectateur","Estás viendo este grupo como espectadora. No sos participante.":"Vous regardez ce groupe en spectatrice. Vous ne participez pas."},"de":{"Salir del grupo":"Gruppe verlassen","Eliminar grupo definitivamente":"Gruppe endgültig löschen","Salir del modo espectadora":"Zuschauermodus verlassen","Estás viendo este grupo como espectadora. No sos participante.":"Du siehst diese Gruppe als Zuschauerin und bist kein Mitglied."},"it":{"Salir del grupo":"Esci dal gruppo","Eliminar grupo definitivamente":"Elimina definitivamente il gruppo","Salir del modo espectadora":"Esci dalla modalità spettatore","Estás viendo este grupo como espectadora. No sos participante.":"Stai osservando questo gruppo senza partecipare."},"ko":{"Salir del grupo":"그룹 나가기","Eliminar grupo definitivamente":"그룹 영구 삭제","Salir del modo espectadora":"관전자 모드 나가기","Estás viendo este grupo como espectadora. No sos participante.":"이 그룹을 관전 중이며 참여자가 아닙니다."},"ja":{"Salir del grupo":"グループを退出","Eliminar grupo definitivamente":"グループを完全に削除","Salir del modo espectadora":"観戦モードを終了","Estás viendo este grupo como espectadora. No sos participante.":"このグループを観覧中です。参加者ではありません。"},"zh":{"Salir del grupo":"退出群组","Eliminar grupo definitivamente":"永久删除群组","Salir del modo espectadora":"退出旁观模式","Estás viendo este grupo como espectadora. No sos participante.":"你正在旁观此群组，并非参与者。"}};
 import { useLocation, useParams } from 'wouter';
 import { ChevronLeft, Send, Users, MoreHorizontal, Search, Pin, Paperclip, X, Mic, Square } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
@@ -19,6 +21,8 @@ type MusicAttachment = { id: string; type: 'music'; trackId: string; title: stri
 type GroupMessage = { id: string; senderId: string; text: string; attachments?: Array<MessageAttachment | MusicAttachment>; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
 
 export default function GroupConversationPage() {
+  const language = useLanguage();
+  const gl = (label:string) => language === 'es' ? label : (groupLabels[language]?.[label] ?? groupLabels.en[label] ?? label);
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const { me, character, state } = useSocial();
@@ -348,9 +352,9 @@ export default function GroupConversationPage() {
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={archived} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ archived: e.target.checked })} /> Archivar este grupo</label>
         <p className="mt-2 text-xs text-muted-foreground">Estas preferencias son individuales. Archivar no elimina los mensajes.</p>
       </div>
-      {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>}
-      {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">Eliminar grupo definitivamente</button>}
-      {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">Estás viendo este grupo como espectadora. No sos participante.</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">Salir del modo espectadora</button></div>}
+      {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">{gl("Salir del grupo")}</button>}
+      {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
+      {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">{gl("Estás viendo este grupo como espectadora. No sos participante.")}</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">{gl("Salir del modo espectadora")}</button></div>}
     </div>}
     {sceneObserverEnabled && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
       <div className="flex flex-wrap items-center gap-2">
