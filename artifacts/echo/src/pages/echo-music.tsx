@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
 
-import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3, Download, SkipBack, SkipForward, Shuffle, Repeat2 } from 'lucide-react';
+import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Library, Trash2, Disc3, Download, SkipBack, SkipForward, Shuffle, Repeat2, MoreHorizontal, X, Mic2, Share2, Lock } from 'lucide-react';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
@@ -240,6 +240,7 @@ export default function EchoMusicPage() {
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
   const [librarySearch, setLibrarySearch] = useState('');
+  const [trackMenuId, setTrackMenuId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishedTracks, setPublishedTracks] = useState<Array<{ id: string; characterId: string; title: string; durationSeconds: number }>>([]);
   const [loadingSharedId, setLoadingSharedId] = useState<string | null>(null);
@@ -836,18 +837,32 @@ export default function EchoMusicPage() {
         <button type="button" onClick={() => setLibraryFilter('draft')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'draft' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Borradores")}</button>
       </div>
       {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
-      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex flex-col gap-2 border-b border-border/60 py-3">
-        <button type="button" onClick={() => openLibraryItem(item)} className="flex w-full min-w-0 items-center gap-3 text-left">
-          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? t("Escuchar canción") : t("Ver borrador")}</p></div>
+      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 border-b border-border/60 py-3">
+        <button type="button" onClick={() => void openLibraryItem(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p></div>
         </button>
-        <div className="grid grid-cols-3 gap-2">
-        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20,item.durationSeconds)); setVoiceCloneConsent(false);setVoiceCloneQuote(''); }} className="flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-border px-1 py-2 text-center text-[11px] font-semibold leading-tight">{t("Guardar voz")}</button>}
-        {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" disabled={!!downloadingId} onClick={() => void downloadLibraryTrack(item)} className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-border px-1 py-2 text-center text-[11px] font-semibold leading-tight" aria-label={t("Descargar") + ' ' + item.title}><Download className="h-4 w-4" />{downloadingId === item.id ? t("Descargando…") : t("Descargar")}</button>}
-        {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir")}</button>}
-        {!item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => deleteDraft(item.id)} aria-label={`Eliminar ${item.title} de la biblioteca`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><Trash2 className="h-4 w-4" /></button>}
-        </div>
+        <button type="button" onClick={() => setTrackMenuId(item.id)} aria-label={interfaceLanguage === 'es' ? 'Opciones de ' + item.title : 'Options for ' + item.title} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><MoreHorizontal className="h-6 w-6" /></button>
       </article>)}</div>}
+      {trackMenuId && (() => {
+        const item = library.find(track => track.id === trackMenuId);
+        if (!item) return null;
+        const generated = item.status === 'saved_audio' && !!item.audioPath?.startsWith('generated/');
+        const menuAction = (label: string, icon: React.ReactNode, action: () => void, disabled = false) => <button type="button" disabled={disabled} onClick={() => { setTrackMenuId(null); action(); }} className="flex w-full items-center gap-4 px-5 py-4 text-left text-sm font-medium disabled:opacity-40">{icon}<span>{label}</span></button>;
+        return <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70" onClick={() => setTrackMenuId(null)}>
+          <section role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Opciones de canción' : 'Track options'} onClick={event => event.stopPropagation()} className="w-full max-w-xl overflow-hidden rounded-t-3xl border border-border bg-[#252327] pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-2xl">
+            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-white/30" />
+            <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{formatTime(item.durationSeconds)}</p></div><button type="button" onClick={() => setTrackMenuId(null)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'} className="grid h-10 w-10 place-items-center"><X className="h-5 w-5" /></button></div>
+            <div className="max-h-[65dvh] overflow-y-auto">
+              {menuAction(interfaceLanguage === 'es' ? 'Abrir reproductor' : 'Open player', <Play className="h-5 w-5" />, () => void openLibraryItem(item))}
+              {generated && menuAction(t("Guardar voz"), <Mic2 className="h-5 w-5" />, () => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20, item.durationSeconds)); setVoiceCloneConsent(false); setVoiceCloneQuote(''); setStudioTab('create'); })}
+              {generated && menuAction(downloadingId === item.id ? t("Descargando…") : t("Descargar"), <Download className="h-5 w-5" />, () => void downloadLibraryTrack(item), !!downloadingId)}
+              {item.status === 'saved_audio' && menuAction(publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir"), item.publishedAt ? <Lock className="h-5 w-5" /> : <Share2 className="h-5 w-5" />, () => void togglePublish(item), !!publishingId)}
+              {!generated && menuAction(interfaceLanguage === 'es' ? 'Eliminar de la biblioteca' : 'Remove from library', <Trash2 className="h-5 w-5" />, () => deleteDraft(item.id))}
+            </div>
+          </section>
+        </div>;
+      })()}
       <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4"><h2 className="text-base font-semibold">{t("Canciones compartidas en ECHO")}</h2><p className="text-xs text-muted-foreground">{t("Solo se escuchan las canciones que sus propietarios publicaron expresamente.")}</p>{publishedTracks.length === 0 ? <p className="text-sm text-muted-foreground">{t("Todavía no hay canciones compartidas.")}</p> : publishedTracks.map(item => <button key={item.id} type="button" disabled={!!loadingSharedId} onClick={() => void playSharedTrack(item)} className="flex w-full items-center gap-3 rounded-xl bg-secondary p-3 text-left"><Play className="h-5 w-5 text-primary"/><span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span><span className="text-xs text-muted-foreground">{loadingSharedId === item.id ? t("Cargando…") : formatTime(item.durationSeconds)}</span></button>)}</section>
       <p className="text-xs text-muted-foreground">{t("Eliminar un registro no borra todavía el archivo privado del almacenamiento.")}</p>
     </section> : <>
