@@ -3,7 +3,7 @@ import { z } from "zod";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ECHO_VIDEO_POLICY } from "../lib/entitlements";
-import { videoStorageConfig, VIDEO_PRIVATE_STORAGE_LIMITS } from "../lib/videoPrivateStorage";
+import { videoStorageConfig, VIDEO_PRIVATE_STORAGE_LIMITS, fetchOwnedPrivateVideoAsset } from "../lib/videoPrivateStorage";
 
 /** Video/GIF staging only. No provider requests, payment or balance mutations. */
 const router: IRouter = Router();
@@ -131,6 +131,38 @@ router.post("/video/gif/preflight", async (req, res) => {
   } catch (error) {
     req.log.warn({err:error},"GIF preparation unavailable");
     res.status(503).json({error:"GIF_PREPARATION_UNAVAILABLE"});
+  }
+});
+
+/** Stream a completed private asset only after a server-side owner check. */
+router.get("/video/library/:jobId/asset", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.jobId);
+  if (!id.success) {res.status(400).json({error:"VIDEO_JOB_ID_INVALID"});return;}
+  try {
+    const result = await pool.query<{status:string;result_asset_key:string|null}>(
+      `SELECT status,result_asset_key FROM echo_video_generation_jobs
+       WHERE id=$1::uuid AND owner_id=$2 LIMIT 1`, [id.data,req.userId!]);
+    const job = result.rows[0];
+    if (!job) {res.status(404).json({error:"VIDEO_NOT_FOUND"});return;}
+    if (job.status !== "succeeded" || !job.result_asset_key) {
+      res.status(409).json({error:"VIDEO_NOT_READY"});return;
+    }
+    const upstream = await fetchOwnedPrivateVideoAsset(job.result_asset_key,req.userId!,id.data,
+      typeof req.headers.range === "string" ? req.headers.range : undefined);
+    res.status(upstream.status);
+    for (const header of ["content-type","content-length","content-range","accept-ranges"]) {
+      const value = upstream.headers.get(header);
+      if (value) res.setHeader(header,value);
+    }
+    res.setHeader("Cache-Control","private, no-store");
+    res.setHeader("X-Content-Type-Options","nosniff");
+    if (!upstream.body) {res.status(502).end();return;}
+    const { Readable } = await import("node:stream");
+    Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream).pipe(res);
+  } catch (error) {
+    req.log.warn({err:error},"Private video asset unavailable");
+    if (!res.headersSent) res.status(503).json({error:"VIDEO_PRIVATE_ASSET_UNAVAILABLE"});
+    else res.end();
   }
 });
 
