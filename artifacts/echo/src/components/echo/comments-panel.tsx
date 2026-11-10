@@ -81,25 +81,23 @@ function CommentRow({ comment, onReply, small, highlight }: { comment: Comment; 
   const { character, me, actions } = useSocial();
   const author = character(comment.authorId);
   const replyTo = comment.replyToAuthorId ? character(comment.replyToAuthorId) : undefined;
-  if (!author) return null;
+  if (!author && !comment.guestHandle) return null;
   const liked = comment.likes.includes(me.id);
   return (
     <div className={cn('flex gap-3 rounded-2xl transition-colors', highlight && 'bg-accent/50 -mx-2 p-2')} data-testid={`comment-${comment.id}`}>
-      <Link href={`/profile/${author.id}`} className="shrink-0" data-testid={`link-comment-author-${comment.id}`}>
-        <CharacterAvatar character={author} size={small ? 28 : 34} />
-      </Link>
+      {comment.guestHandle ? <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-xs">♡</div> : author && <Link href={`/profile/${author.id}`} className="shrink-0" data-testid={`link-comment-author-${comment.id}`}><CharacterAvatar character={author} size={small ? 28 : 34} /></Link>}
       <div className="min-w-0 flex-1">
         <p className="text-[14px] leading-snug">
-          <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold">{author.handle}<VerifiedBadge account={author} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" /></Link>
+          {comment.guestHandle ? <span className="mr-1.5 font-semibold">@{comment.guestHandle}</span> : author && <Link href={`/profile/${author.id}`} className="mr-1.5 font-semibold">{author.handle}<VerifiedBadge account={author} className="ml-0.5 h-3.5 w-3.5 align-[-2px]" /></Link>}
           {replyTo && <span className="mr-1 text-primary">@{replyTo.handle}</span>}
           <span className="text-foreground/90"><SocialText text={comment.text} /></span>
         </p>
         <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground">
           <span>{timeAgo(comment.createdAt)}</span>
           {comment.likes.length > 0 && <span>{comment.likes.length} {t("Me gusta")}</span>}
-          <button onClick={() => onReply(comment)} className="-my-3 h-11 font-semibold hover:text-foreground" data-testid={`button-reply-${comment.id}`}>
+          {!comment.guestHandle && <button onClick={() => onReply(comment)} className="-my-3 h-11 font-semibold hover:text-foreground" data-testid={`button-reply-${comment.id}`}>
             Responder
-          </button>
+          </button>}
         </div>
       </div>
       <button
@@ -120,6 +118,9 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
   const { me, character, actions, state } = useSocial();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const [guestHandle, setGuestHandle] = useState('');
+  const [guestText, setGuestText] = useState('');
   const post = state.posts.find((p) => p.id === postId);
   const ref = useRef<HTMLInputElement>(null);
   const target = replyTo ? character(replyTo.authorId) : undefined;
@@ -157,6 +158,17 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
           </button>
         </div>
       )}
+      {post?.authorId === me.id && <div className="mb-3 rounded-xl border border-border p-3 text-sm">
+        <label className="flex items-center justify-between gap-3"><span>Comentarios de comunidad ficticia</span><input type="checkbox" checked={!!me.communityCommentsEnabled} onChange={e => actions.setCommunityCommentsEnabled(me.id, e.target.checked)} /></label>
+        {me.communityCommentsEnabled && <div className="mt-3 space-y-2">
+          <button type="button" className="text-primary" onClick={() => setCommunityOpen(!communityOpen)}>{communityOpen ? 'Cerrar' : '+ Agregar comentario manual'}</button>
+          {communityOpen && <form className="space-y-2" onSubmit={e => { e.preventDefault(); try { actions.addCommunityComment(postId, guestHandle, guestText); setGuestText(''); setError(null); } catch (err) { setError((err as Error).message); } }}>
+            <input className="w-full rounded-lg border border-input bg-background p-2" value={guestHandle} onChange={e => setGuestHandle(e.target.value)} placeholder="@deadstatic.fans" maxLength={33} aria-label="Usuario ficticio" />
+            <textarea className="w-full rounded-lg border border-input bg-background p-2" value={guestText} onChange={e => setGuestText(e.target.value)} placeholder="Comentario de fan" maxLength={500} aria-label="Comentario ficticio" />
+            <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" type="submit">Agregar comentario</button>
+          </form>}
+        </div>}
+      </div>}
       <form onSubmit={submit} className="flex items-center gap-3 pb-1">
         <CharacterAvatar character={me} size={34} />
         <input
