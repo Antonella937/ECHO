@@ -73,3 +73,22 @@ export async function storeCompletedPrivateVideoAsset(
   if (!response.ok) throw new Error("VIDEO_PRIVATE_UPLOAD_FAILED");
   return {storageKey,size:bytes.length,mimeType:mime};
 }
+
+/** Verify the bucket exists and is private. Read-only; never creates buckets. */
+export async function inspectVideoPrivateBucket(): Promise<{
+  configured:boolean; verified:boolean; privateBucket:boolean;
+}> {
+  const config=videoStorageConfig();
+  if(!config) return {configured:false,verified:false,privateBucket:false};
+  try {
+    const endpoint=new URL(`/storage/v1/bucket/${encodeURIComponent(config.bucket)}`,config.url);
+    const response=await fetch(endpoint,{
+      headers:{Authorization:`Bearer ${config.serviceKey}`,apikey:config.serviceKey},
+      redirect:"error",signal:AbortSignal.timeout(8_000),
+    });
+    if(!response.ok) return {configured:true,verified:false,privateBucket:false};
+    const data:unknown=await response.json();
+    if(!data || typeof data!=="object" || !("public" in data)) return {configured:true,verified:false,privateBucket:false};
+    return {configured:true,verified:true,privateBucket:(data as {public:unknown}).public===false};
+  }catch{return {configured:true,verified:false,privateBucket:false};}
+}
