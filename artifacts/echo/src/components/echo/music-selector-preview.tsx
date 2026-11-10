@@ -23,7 +23,7 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
       className="mt-3 flex h-11 w-full items-center gap-2 rounded-xl border border-border bg-secondary px-3 text-left text-sm">
       <Music2 className="h-4 w-4 text-primary" /> {showLibrary ? 'Cerrar Mi biblioteca' : selectedTrack ? 'Cambiar canción de Mi biblioteca' : 'Elegir de Mi biblioteca'}
     </button>
-    {showLibrary && <div className="mt-3"><MusicLibraryPicker storyClip onCancel={() => setShowLibrary(false)} onSelect={selection => {
+    {showLibrary && <div className="mt-3"><MusicLibraryPicker onCancel={() => setShowLibrary(false)} onSelect={selection => {
       const clipSeconds: 15 | 30 = selection.clipDurationSeconds === 30 ? 30 : 15;
       onTrackChange?.({ id: selection.id, title: selection.title, characterId: selection.characterId,
         durationSeconds: selection.durationSeconds, startSeconds: selection.clipStartSeconds, clipSeconds });
