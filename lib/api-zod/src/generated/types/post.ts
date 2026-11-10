@@ -9,6 +9,7 @@ import type { PostDisplayMetrics } from './postDisplayMetrics';
 import type { PostMedia } from './postMedia';
 
 export interface Post {
+  musicClip?: { trackId: string; title: string; startSeconds: number; clipSeconds: 15 | 30 };
   /** @maxItems 50 */
   taggedAccountIds?: string[];
   commentsEnabled?: boolean;
