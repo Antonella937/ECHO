@@ -468,7 +468,7 @@ export async function runAutonomyLiveCycle(
           await dependencies.sketchDelivery({
             ownerId, universeId, characterId: character.id,
             recipientId: opportunity.recipientId, messageId: outgoing.id,
-            subject: "an unfinished original graphite sketch of urban architecture, shadows and light",
+            subject: `A visually faithful original unfinished graphite sketch matching Hyunjin's own DM description: ${(preview.decision.text ?? "").slice(0, 900)}. If the message describes blurred figures, dreamlike memories, silhouettes or ghosts, depict those subjects rather than unrelated buildings. Do not invent a different primary subject.`,
           });
         }
       } catch (error) {
