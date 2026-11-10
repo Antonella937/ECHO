@@ -41,6 +41,7 @@ export class FreeModelProvider implements TextProvider {
   readonly name = 'openrouter';
   private catalog?: { models: FreeModel[]; until: number };
   private readonly cooldown = new Map<string, number>();
+  private globalCooldownUntil = 0;
   constructor(private readonly dependencies: {
     discover?: () => Promise<FreeModel[]>;
     create?: (model: FreeModel, timeoutMs: number) => TextProvider;
@@ -49,6 +50,13 @@ export class FreeModelProvider implements TextProvider {
 
   async complete(input: Parameters<TextProvider['complete']>[0]) {
     const now = this.dependencies.now ?? Date.now;
+    // If all free models were just exhausted, fail fast instead of issuing another
+    // expensive fallback chain for every character on the next worker tick.
+    if (now() < this.globalCooldownUntil) {
+      const failure = new EngineError('FREE_MODELS_EXHAUSTED_OR_COOLDOWN', 429);
+      failure.retryAfterMs = this.globalCooldownUntil - now();
+      throw failure;
+    }
     const deadline = now() + 100000;
     if (!this.catalog || this.catalog.until <= now()) {
       this.catalog = { models: await (this.dependencies.discover ?? discoverFreeModels)(), until: now() + 300000 };
@@ -81,6 +89,7 @@ export class FreeModelProvider implements TextProvider {
         if (!models.some(m => m.id === completion.model)) throw new ProviderFailure('UNVERIFIED_FREE_RESPONSE_MODEL', 502, false, 0, usage);
         input.validate?.(completion.text);
         attempts.push({ model: model.id, outcome: 'success', code: null, usage });
+        this.globalCooldownUntil = 0;
         return { ...completion, attempts };
       } catch (error) {
         if (error instanceof ProviderFailure) usage = error.usage;
@@ -96,6 +105,9 @@ export class FreeModelProvider implements TextProvider {
     const failure = new EngineError('FREE_MODELS_EXHAUSTED_OR_COOLDOWN',
       attempts.length > 0 && attempts.every(a => a.code === 'OPENROUTER_RATE_LIMITED' || a.code === 'MODEL_COOLDOWN') ? 429 : 503);
     if (retryTimes.length) failure.retryAfterMs = Math.min(...retryTimes);
+    // The catalog may include models not yet tried; a short shared backoff
+    // protects the free tier without turning temporary errors into long outages.
+    this.globalCooldownUntil = now() + Math.max(30_000, Math.min(120_000, failure.retryAfterMs ?? 60_000));
     failure.attempts = attempts;
     throw failure;
   }
