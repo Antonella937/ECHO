@@ -325,7 +325,7 @@ export default function CreatePage() {
             </div>
             <p className="text-xs text-muted-foreground">{1 + aiCoStars.length}/4 {t('personajes seleccionados')}</p>
             {[me, ...imageCoStarOptions.filter(character => aiCoStars.includes(character.id))].map(character => {
-              const choices = [...new Set([character.avatar, ...(character.identity?.referenceImages ?? [])].filter((path): path is string => typeof path === 'string' && /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(path)))];
+              const choices = [...new Set([character.avatar, ...(character.identity?.referenceImages ?? [])].filter((path): path is string => typeof path === 'string' && /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(path)))];
               if (!choices.length) return <p key={character.id} className="text-xs text-muted-foreground">{character.name}: {t('Sin referencias visuales guardadas')}</p>;
               return <label key={character.id} className="block text-xs text-muted-foreground">
                 {character.name} · {t('Referencia principal')}
