@@ -152,7 +152,7 @@ const musicEnglish: Record<string,string> = {
 };
 function translateMusic(label:string, lang:string):string { return lang === 'es' ? label : (musicEnglish[label] ?? label); }
 
-type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string; publishedAt?: string | null };
+type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string; publishedAt?: string | null; coverPath?: string | null };
 const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
 
 /** Locally trims an owned track to a mono 16 kHz PCM WAV.
@@ -210,7 +210,9 @@ export default function EchoMusicPage() {
   const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null);
   const [savedAudioPath, setSavedAudioPath] = useState<string | null>(null);
   const resolvedSavedAudio = savedAudioPath ? resolvePrivateAudio(savedAudioPath) : '';
-  const coverUrl = me.avatar ? resolvePrivateAudio(me.avatar, { sourceType: 'avatar', sourceContentId: me.id, sourceCharacterId: me.id }) : '';
+  const avatarCoverUrl = me.avatar ? resolvePrivateAudio(me.avatar, { sourceType: 'avatar', sourceContentId: me.id, sourceCharacterId: me.id }) : '';
+  const coverFor = (item?: MusicDraftRecord) => item?.coverPath ? resolvePrivateAudio(item.coverPath) : avatarCoverUrl;
+  const coverUrl = coverFor(library.find(item => item.id === selectedTrackId));
   useEffect(() => () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); }, []);
   function importAudio(file: File | undefined) {
     if (!file) return;
@@ -242,6 +244,7 @@ export default function EchoMusicPage() {
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
   const [librarySearch, setLibrarySearch] = useState('');
   const [trackMenuId, setTrackMenuId] = useState<string | null>(null);
+  const [coverUploadingId, setCoverUploadingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishedTracks, setPublishedTracks] = useState<Array<{ id: string; characterId: string; title: string; durationSeconds: number }>>([]);
   const [loadingSharedId, setLoadingSharedId] = useState<string | null>(null);
@@ -439,6 +442,28 @@ export default function EchoMusicPage() {
     } finally {
       setDownloadingId(null);
     }
+  }
+  async function uploadTrackCover(item: MusicDraftRecord, file?: File) {
+    if (!file || coverUploadingId) return;
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+      setLibraryError(interfaceLanguage === 'es' ? 'Elegí una imagen JPG, PNG o WebP de hasta 10 MB.' : 'Choose a JPG, PNG or WebP image up to 10 MB.'); return;
+    }
+    setCoverUploadingId(item.id); setLibraryError('');
+    try {
+      const uploaded = await uploadPrivateFile(file);
+      if (uploaded.type !== 'image') throw new Error('INVALID_COVER_IMAGE');
+      await customFetch('/api/music/library/' + encodeURIComponent(item.id) + '/cover', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coverPath: uploaded.url }), responseType: 'json',
+      });
+      setLibrary(current => {
+        const next = current.map(track => track.id === item.id ? { ...track, coverPath: uploaded.url } : track);
+        localStorage.setItem(libraryKey(me.id), JSON.stringify(next));
+        return next;
+      });
+      setTrackMenuId(null);
+    } catch (error) { setLibraryError(error instanceof Error ? error.message : 'COVER_UPLOAD_FAILED'); }
+    finally { setCoverUploadingId(null); }
   }
   async function openLibraryItem(item: MusicDraftRecord) {
     if (loadingSharedId) return;
@@ -845,7 +870,7 @@ export default function EchoMusicPage() {
       {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
       {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 border-b border-border/60 py-3">
         <button type="button" onClick={() => void openLibraryItem(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverFor(item) ? <img src={coverFor(item)} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p></div>
         </button>
         <button type="button" onClick={() => setTrackMenuId(item.id)} aria-label={interfaceLanguage === 'es' ? 'Opciones de ' + item.title : 'Options for ' + item.title} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><MoreHorizontal className="h-6 w-6" /></button>
@@ -858,8 +883,9 @@ export default function EchoMusicPage() {
         return <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70" onClick={() => setTrackMenuId(null)}>
           <section role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Opciones de canción' : 'Track options'} onClick={event => event.stopPropagation()} className="w-full max-w-xl overflow-hidden rounded-t-3xl border border-border bg-[#252327] pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-2xl">
             <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-white/30" />
-            <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{formatTime(item.durationSeconds)}</p></div><button type="button" onClick={() => setTrackMenuId(null)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'} className="grid h-10 w-10 place-items-center"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary">{coverFor(item) ? <img src={coverFor(item)} alt="" className="h-full w-full object-cover" /> : <Music2 className="h-7 w-7 text-primary" />}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{formatTime(item.durationSeconds)}</p></div><button type="button" onClick={() => setTrackMenuId(null)} aria-label={interfaceLanguage === 'es' ? 'Cerrar' : 'Close'} className="grid h-10 w-10 place-items-center"><X className="h-5 w-5" /></button></div>
             <div className="max-h-[65dvh] overflow-y-auto">
+              <label className="flex cursor-pointer items-center gap-4 px-5 py-4 text-sm font-medium"><Upload className="h-5 w-5" /><span>{coverUploadingId === item.id ? (interfaceLanguage === 'es' ? 'Subiendo portada…' : 'Uploading artwork…') : (interfaceLanguage === 'es' ? 'Importar portada' : 'Upload cover art')}</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!!coverUploadingId} className="sr-only" onChange={event => { void uploadTrackCover(item, event.target.files?.[0]); event.target.value = ''; }} /></label>
               {menuAction(interfaceLanguage === 'es' ? 'Abrir reproductor' : 'Open player', <Play className="h-5 w-5" />, () => void openLibraryItem(item))}
               {generated && menuAction(t("Guardar voz"), <Mic2 className="h-5 w-5" />, () => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20, item.durationSeconds)); setVoiceCloneConsent(false); setVoiceCloneQuote(''); setStudioTab('create'); })}
               {generated && menuAction(downloadingId === item.id ? t("Descargando…") : t("Descargar"), <Download className="h-5 w-5" />, () => void downloadLibraryTrack(item), !!downloadingId)}
