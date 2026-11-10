@@ -212,7 +212,6 @@ export default function EchoMusicPage() {
   const resolvedSavedAudio = savedAudioPath ? resolvePrivateAudio(savedAudioPath) : '';
   const avatarCoverUrl = me.avatar ? resolvePrivateAudio(me.avatar, { sourceType: 'avatar', sourceContentId: me.id, sourceCharacterId: me.id }) : '';
   const coverFor = (item?: MusicDraftRecord) => item?.coverPath ? resolvePrivateAudio(item.coverPath) : avatarCoverUrl;
-  const coverUrl = coverFor(library.find(item => item.id === selectedTrackId));
   useEffect(() => () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); }, []);
   function importAudio(file: File | undefined) {
     if (!file) return;
@@ -240,6 +239,7 @@ export default function EchoMusicPage() {
   const [shuffleTracks, setShuffleTracks] = useState(false);
   const [repeatTrack, setRepeatTrack] = useState(false);
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
+  const coverUrl = coverFor(library.find(item => item.id === selectedTrackId));
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
   const [librarySearch, setLibrarySearch] = useState('');
