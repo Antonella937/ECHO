@@ -45,12 +45,19 @@ export async function reserveMusicJob(input: MusicJobInput): Promise<{ jobId: st
   if (!input.verifiedEntitlement) throw new Error("MUSIC_ENTITLEMENT_REQUIRED");
   // Autonomous singers must have a reusable voice before any credit is reserved.
   // A caller-provided ID cannot override the character's saved voice.
-  if (input.mode === "autonomous" && !input.instrumental) {
+  if (!input.instrumental) {
+    // A saved identity wins for BOTH manual and autonomous singing. Never
+    // silently generate a different singer when a character already has one.
     const savedVoice = await resolveCharacterSingingVoice(input.ownerId, input.characterId, {
-      instrumental: false, requireConfiguredVoice: true,
+      instrumental: false, requireConfiguredVoice: input.mode === "autonomous",
     });
-    if (input.vocalId && input.vocalId !== savedVoice) throw new Error("MUSIC_CHARACTER_VOICE_MISMATCH");
-    input.vocalId = savedVoice;
+    if (savedVoice) {
+      if (input.vocalId && input.vocalId !== savedVoice) throw new Error("MUSIC_CHARACTER_VOICE_MISMATCH");
+      input.vocalId = savedVoice;
+    } else if (input.vocalId) {
+      // Unregistered client-supplied IDs must not bypass character identity.
+      throw new Error("MUSIC_CHARACTER_VOICE_NOT_LINKED");
+    }
   }
   const jobId = randomUUID();
   const result = await db.execute(sql`
@@ -68,12 +75,19 @@ export async function reserveMusicJob(input: MusicJobInput): Promise<{ jobId: st
 export async function submitReservedMusicJob(input: MusicJobInput, jobId: string): Promise<string> {
   validOwner(input.ownerId, input.characterId);
   if (!input.verifiedEntitlement) throw new Error("MUSIC_ENTITLEMENT_REQUIRED");
-  if (input.mode === "autonomous" && !input.instrumental) {
+  if (!input.instrumental) {
+    // A saved identity wins for BOTH manual and autonomous singing. Never
+    // silently generate a different singer when a character already has one.
     const savedVoice = await resolveCharacterSingingVoice(input.ownerId, input.characterId, {
-      instrumental: false, requireConfiguredVoice: true,
+      instrumental: false, requireConfiguredVoice: input.mode === "autonomous",
     });
-    if (input.vocalId && input.vocalId !== savedVoice) throw new Error("MUSIC_CHARACTER_VOICE_MISMATCH");
-    input.vocalId = savedVoice;
+    if (savedVoice) {
+      if (input.vocalId && input.vocalId !== savedVoice) throw new Error("MUSIC_CHARACTER_VOICE_MISMATCH");
+      input.vocalId = savedVoice;
+    } else if (input.vocalId) {
+      // Unregistered client-supplied IDs must not bypass character identity.
+      throw new Error("MUSIC_CHARACTER_VOICE_NOT_LINKED");
+    }
   }
   const claim = await db.execute(sql`
     UPDATE echo_music_generation_jobs SET status='processing',updated_at=now()
