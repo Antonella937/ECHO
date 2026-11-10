@@ -147,12 +147,17 @@ router.post("/music/voices", async (req,res) => {
       res.status(409).json({error:"CHARACTER_SINGING_VOICE_ALREADY_CONFIGURED",
         requiresExplicitReplacement:true,characterId:parsed.data.characterId});return;
     }
-    await db.execute(sql`INSERT INTO echo_character_singing_voices (owner_id,character_id,mureka_vocal_id)
+    const linked = await db.execute(sql`INSERT INTO echo_character_singing_voices (owner_id,character_id,mureka_vocal_id)
       VALUES (${req.userId!},${parsed.data.characterId},${parsed.data.vocalId})
       ON CONFLICT (owner_id,character_id) DO UPDATE SET
         mureka_vocal_id=EXCLUDED.mureka_vocal_id,updated_at=now()
       WHERE echo_character_singing_voices.mureka_vocal_id=EXCLUDED.mureka_vocal_id
-        OR ${parsed.data.replaceExisting}`);
+        OR ${parsed.data.replaceExisting}
+      RETURNING mureka_vocal_id`);
+    if (!linked.rows.length) {
+      res.status(409).json({error:"CHARACTER_SINGING_VOICE_ALREADY_CONFIGURED",
+        requiresExplicitReplacement:true,characterId:parsed.data.characterId});return;
+    }
     res.json({configured:true,characterId:parsed.data.characterId,voiceIdentityLocked:true});
   } catch { res.status(503).json({error:"VOICE_SAVE_UNAVAILABLE"}); }
 });
