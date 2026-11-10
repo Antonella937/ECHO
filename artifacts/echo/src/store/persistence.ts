@@ -103,6 +103,30 @@ export async function loadCharacterPage(
   })}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
 }
 
+/** Read-only feed page, kept separate from full-universe synchronization. */
+export interface PostPage {
+  posts: SocialState['posts'];
+  total: number;
+  nextOffset: number | null;
+  revision: number;
+}
+export async function loadPostPage(options: {
+  universeId?: string;
+  authorId?: string;
+  offset?: number;
+  limit?: number;
+} = {}): Promise<PostPage> {
+  const { universeId = 'primary', authorId, offset = 0, limit = 20 } = options;
+  if (!Number.isSafeInteger(offset) || offset < 0 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
+    throw new Error('Invalid post page');
+  const params = new URLSearchParams({ universeId, offset: String(offset), limit: String(limit) });
+  if (authorId) params.set('authorId', authorId);
+  return customFetch<PostPage>(`/api/universe/posts/page?${params}`, {
+    method: 'GET', responseType: 'json', cache: 'no-store',
+  });
+}
+
 /** Fetch just the server revision, without transferring the entire social state. */
 export async function loadUniverseRevision(universeId = 'primary'): Promise<number> {
   const result = await customFetch<{ revision: number }>(`/api/universe/revision?${new URLSearchParams({ universeId })}`, {
