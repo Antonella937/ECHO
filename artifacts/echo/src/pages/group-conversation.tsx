@@ -95,7 +95,7 @@ export default function GroupConversationPage() {
     return () => { active = false; window.clearInterval(interval); };
   }, [id, user?.id, me.id]);
   useEffect(() => {
-    if (!settingsOpen || !id || !user?.id) return;
+    if (!id || !user?.id) return;
     let active = true;
     setAutonomyLoaded(false);
     setPreferencesLoaded(false);
@@ -111,9 +111,9 @@ export default function GroupConversationPage() {
       .then(result => { if (active) { setAutonomyEnabled(result.enabled); setAutonomyInterval(result.intervalMinutes); setAutonomyLoaded(true); } })
       .catch(() => { if (active) { setAutonomyLoaded(false); setError('No se pudo cargar la configuración de autonomía.'); } });
     return () => { active = false; };
-  }, [settingsOpen, id, user?.id, me.id]);
+  }, [id, user?.id, me.id]);
   const advanceScene = async (count: number) => {
-    if (!id || sceneRunning) return;
+    if (!id || sceneRunning || (count > 1 && sceneTurnMode === 'manual')) return;
     stopSceneRef.current = false;
     setSceneRunning(true);
     try {
@@ -342,13 +342,13 @@ export default function GroupConversationPage() {
         <span className="mr-auto text-xs text-muted-foreground">Modo espectadora · escena grupal</span>
         {sceneRunning ? <button onClick={() => { stopSceneRef.current = true; }} className="rounded-lg bg-secondary px-3 py-2 text-xs">Detener después del turno</button> : <>
           <button onClick={() => void advanceScene(1)} disabled={!autonomyEnabled} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">Siguiente turno</button>
-          <button onClick={() => void advanceScene(12)} disabled={!autonomyEnabled} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
+          <button onClick={() => void advanceScene(12)} disabled={!autonomyEnabled || sceneTurnMode === 'manual'} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
         </>}
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
     </div>}
     <main className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-5" data-testid="group-messages">
-      {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">Mandá el primer mensaje para empezar la conversación.</p></div>}
+      {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">Podés iniciar la escena desde el modo espectadora, sin mandar un mensaje.</p></div>}
       {messages.filter(m => m.pinnedAt).length > 0 && <div className="mb-3 rounded-xl bg-secondary/70 px-3 py-2 text-xs"><Pin className="mr-1 inline h-3 w-3" /> {messages.filter(m => m.pinnedAt).length} mensaje(s) fijado(s)</div>}
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>
         {m.senderId !== me.id && <div className="shrink-0"><CharacterAvatar character={character(m.senderId) ?? me} size={30} /></div>}
