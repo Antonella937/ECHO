@@ -732,6 +732,54 @@ router.get("/music/clip/:id/audio", async (req, res) => {
 
 // Owner-only playback for comparing a character's singing reference with speech.
 // This endpoint never publishes the track or exposes its private storage key.
+const voiceComparisonKey = z.object({ universeId: z.string().min(1).max(128), characterId: z.string().min(1).max(128) }).strict();
+const voiceComparisonInput = voiceComparisonKey.extend({
+  singingTrackId: z.string().uuid(),
+  speechSampleId: z.string().uuid().nullable().default(null),
+  assessment: z.enum(["similar", "different"]),
+  notes: z.string().max(500).default(""),
+}).strict();
+// Comparisons are personal listening notes, never a biometric identity claim.
+router.get("/music/voices/comparison", async (req, res) => {
+  const parsed = voiceComparisonKey.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_VOICE_COMPARISON" }); return; }
+  try {
+    const result = await db.execute(sql`SELECT singing_track_id AS "singingTrackId", speech_sample_id AS "speechSampleId",
+      assessment, notes, updated_at AS "updatedAt" FROM echo_music_voice_comparisons
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+      AND character_id=${parsed.data.characterId} LIMIT 1`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ comparison: result.rows[0] ?? null });
+  } catch (error) { req.log.error({ err: error }, "Voice comparison lookup failed"); res.status(503).json({ error: "VOICE_COMPARISON_UNAVAILABLE" }); }
+});
+router.put("/music/voices/comparison", async (req, res) => {
+  const parsed = voiceComparisonInput.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "INVALID_VOICE_COMPARISON" }); return; }
+  try {
+    const data = parsed.data;
+    const [track] = await db.select({ id: echoMusicLibraryTable.id, characterId: echoMusicLibraryTable.characterId })
+      .from(echoMusicLibraryTable).where(and(eq(echoMusicLibraryTable.id, data.singingTrackId), eq(echoMusicLibraryTable.ownerId, req.userId!))).limit(1);
+    if (!track || track.characterId !== data.characterId) { res.status(404).json({ error: "VOICE_REFERENCE_NOT_FOUND" }); return; }
+    if (data.speechSampleId) {
+      const sample = await db.execute(sql`SELECT s.id FROM echo_voice_samples s
+        JOIN echo_voice_projects p ON p.id=s.project_id
+        WHERE s.id=${data.speechSampleId}::uuid AND s.owner_id=${req.userId!}
+        AND p.owner_id=${req.userId!} AND p.universe_id=${data.universeId}
+        AND p.character_id=${data.characterId} AND p.selected_sample_id=s.id AND s.status='ready' LIMIT 1`);
+      if (!sample.rows.length) { res.status(404).json({ error: "SPEECH_REFERENCE_NOT_FOUND" }); return; }
+    }
+    await db.execute(sql`INSERT INTO echo_music_voice_comparisons
+      (owner_id, universe_id, character_id, singing_track_id, speech_sample_id, assessment, notes)
+      VALUES (${req.userId!},${data.universeId},${data.characterId},${data.singingTrackId}::uuid,
+        ${data.speechSampleId}::uuid,${data.assessment},${data.notes})
+      ON CONFLICT (owner_id, universe_id, character_id) DO UPDATE SET
+        singing_track_id=EXCLUDED.singing_track_id, speech_sample_id=EXCLUDED.speech_sample_id,
+        assessment=EXCLUDED.assessment, notes=EXCLUDED.notes, updated_at=now()`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ saved: true, assessment: data.assessment });
+  } catch (error) { req.log.error({ err: error }, "Voice comparison save failed"); res.status(503).json({ error: "VOICE_COMPARISON_SAVE_UNAVAILABLE" }); }
+});
+
 router.get("/music/library/:id/audio", async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.id);
   if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
