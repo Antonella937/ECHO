@@ -430,7 +430,7 @@ export async function runAutonomyLiveCycle(
     // adapter is deliberately absent until private TTS, consent and budgets exist.
     // Voice failures must never roll back or duplicate an AI text reply.
     if (outcome.status === "executed" && opportunity.situation === "dm" &&
-        preview.decision.action === "draft" && control.dmMediaPreference === "voice" && dependencies.voiceDelivery) {
+        preview.decision.action === "draft" && (control.dmMediaPreference === "voice" || control.dmMediaPreference === "mixed") && dependencies.voiceDelivery) {
       const delivery = dependencies.voiceDelivery;
       try {
         const fresh = await dependencies.repository.read(ownerId, universeId);
