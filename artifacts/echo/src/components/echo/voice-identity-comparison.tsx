@@ -21,13 +21,14 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
   const [savedStatus, setSavedStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [savedComparison, setSavedComparison] = useState<{ assessment: 'similar' | 'different'; notes: string } | null>(null);
   const candidates = tracks.filter(t => t.status === 'saved_audio' && Boolean(t.audioPath));
   useEffect(() => {
     let active = true;
-    setSavedStatus(''); setRestoring(true);
+    setSavedStatus(''); setSavedComparison(null); setRestoring(true);
     void customFetch<{ comparison: { singingTrackId: string; assessment: 'similar' | 'different'; notes: string } | null }>(
       '/api/music/voices/comparison?' + new URLSearchParams({ universeId, characterId }), { responseType: 'json' })
-      .then(data => { if (active && data.comparison) { setTrackId(data.comparison.singingTrackId); setComparison(data.comparison.assessment); setNotes(data.comparison.notes); setSavedStatus('Comparación guardada anteriormente.'); } })
+      .then(data => { if (active && data.comparison) { setTrackId(data.comparison.singingTrackId); setComparison(data.comparison.assessment); setNotes(data.comparison.notes); setSavedComparison({ assessment: data.comparison.assessment, notes: data.comparison.notes }); setSavedStatus('Comparación guardada anteriormente.'); } })
       .catch(() => {})
       .finally(() => { if (active) setRestoring(false); });
     setSpeechSampleId(''); setSpeechReady(false); setSpeechPreviewAvailable(false); setComparison('pending');
@@ -66,6 +67,7 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
     try {
       await customFetch('/api/music/voices/comparison', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId, characterId, singingTrackId: trackId, speechSampleId: speechFile ? null : speechSampleId || null, assessment: comparison, notes }), responseType: 'json' });
+      setSavedComparison({ assessment: comparison, notes });
       setSavedStatus('Comparación guardada en tu cuenta.');
     } catch { setSavedStatus('No se pudo guardar. Verificá que la actualización del servidor esté desplegada.'); }
     finally { setSaving(false); }
@@ -101,6 +103,14 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
       </label>
       {singingUrl && <audio controls preload="none" src={singingUrl} className="w-full" aria-label="Referencia cantada" />}
     </div>
+    {savedComparison && <div className="space-y-1 rounded-lg border border-border bg-card p-3 text-xs">
+      <p className="font-semibold">Referencia para futuras voces cantadas</p>
+      <p className="text-muted-foreground">{savedComparison.assessment === 'similar'
+        ? 'La comparación manual fue favorable. Conservá la voz cantada vinculada y usá las mismas referencias autorizadas cuando prepares nuevas canciones.'
+        : 'La comparación manual encontró diferencias. Antes de reemplazar la voz cantada, prepará una referencia vocal clara de 15 a 30 segundos y comprobá su similitud con la voz hablada.'}</p>
+      {savedComparison.notes && <p className="whitespace-pre-wrap text-muted-foreground">Características a conservar o corregir: {savedComparison.notes}</p>}
+      <p className="text-muted-foreground">La guía no modifica el ID vocal, no clona voces ni genera cargos. La similitud sigue sin verificarse automáticamente.</p>
+    </div>}
     {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     {speechUrl && singingUrl && <div className="space-y-2">
       <p className="text-xs font-medium">3. ¿Te parece la misma identidad vocal?</p>
