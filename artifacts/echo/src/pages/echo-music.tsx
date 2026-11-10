@@ -416,6 +416,21 @@ export default function EchoMusicPage() {
   const [voiceSampleUploadBusy,setVoiceSampleUploadBusy] = useState(false);
   const [voiceSampleStorageKey,setVoiceSampleStorageKey] = useState('');
   const [voiceSampleUploadError,setVoiceSampleUploadError] = useState('');
+  const [voiceSamplePreflightBusy,setVoiceSamplePreflightBusy] = useState(false);
+  const [voiceSamplePreflightStatus,setVoiceSamplePreflightStatus] = useState('');
+  async function verifyStoredVocalSample() {
+    if (!me?.id || !voiceSample || !voiceCloneConsent || !voiceSampleStorageKey || voiceSamplePreflightBusy) return;
+    setVoiceSamplePreflightBusy(true);setVoiceSamplePreflightStatus('');
+    try {
+      const result=await customFetch<{status:string;estimatedCloneCostUsd:number}>('/api/music/voices/clone/sample/preflight',{
+        method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify({characterId:me.id,storageKey:voiceSampleStorageKey,durationSeconds:voiceSample.duration,consentConfirmed:true})
+      });
+      if (result.status !== 'ready_for_confirmation') throw new Error('VOICE_SAMPLE_PREFLIGHT_FAILED');
+      setVoiceSamplePreflightStatus(t('Muestra privada verificada y lista para la confirmación de clonación.') + ' · USD ' + result.estimatedCloneCostUsd.toFixed(2));
+    } catch(error) {setVoiceSamplePreflightStatus(error instanceof Error?error.message:'VOICE_SAMPLE_PREFLIGHT_FAILED');}
+    finally {setVoiceSamplePreflightBusy(false);}
+  }
   async function stageVocalSample() {
     if (!me?.id || !voiceSample || !voiceCloneConsent || voiceSampleUploadBusy) return;
     setVoiceSampleUploadBusy(true);setVoiceSampleUploadError('');setVoiceSampleStorageKey('');
@@ -431,7 +446,7 @@ export default function EchoMusicPage() {
     finally {setVoiceSampleUploadBusy(false);}
   }
   async function prepareVocalSample(file?: File) {
-    setVoiceSample(null); setVoiceSampleError('');setVoiceSampleStorageKey('');setVoiceSampleUploadError('');
+    setVoiceSample(null); setVoiceSampleError('');setVoiceSampleStorageKey('');setVoiceSampleUploadError('');setVoiceSamplePreflightStatus('');
     if (!file) return;
     if (!/\.(mp3|m4a)$/i.test(file.name) || file.size >= 10 * 1024 * 1024) {
       setVoiceSampleError(t('Archivo incompatible o demasiado grande.')); return;
@@ -704,7 +719,9 @@ export default function EchoMusicPage() {
           <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceCloneQuoteBusy} onClick={() => void previewVoiceClone('upload')} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneQuoteBusy ? '…' : t("Consultar costo sin generar")}</button>
           {voiceCloneQuote && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneQuote}</p>}
           <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceSampleUploadBusy} onClick={() => void stageVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSampleUploadBusy ? '…' : t("Guardar muestra privada (sin generar)")}</button>
-          {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>}
+          {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>
+          {voiceSampleStorageKey && <button type="button" disabled={voiceSamplePreflightBusy || !voiceCloneConsent} onClick={() => void verifyStoredVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSamplePreflightBusy ? '…' : t("Verificar muestra privada")}</button>}
+          {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>}
           {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>
         </details>
         <p className="text-xs text-muted-foreground">{t("Desde una canción de mi biblioteca")}: {t("Mi biblioteca")} → {t("Guardar voz")}</p>
