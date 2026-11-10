@@ -51,9 +51,9 @@ export function chooseGroupSpeaker(input: GroupAutonomyPolicyInput & {
   // Do not react immediately; let human participants finish typing.
   if (!input.sceneMode && input.now.getTime() - lastAt < 2 * 60_000) return null;
   // Manual scenes advance only when the owner explicitly requests a turn.
-  if (input.turnMode === 'round_robin') {
-    const index = eligible.indexOf(input.lastSenderId ?? '');
-    return eligible[(index + 1) % eligible.length] ?? null;
-  }
-  return eligible.find(id => id !== input.lastSenderId) ?? eligible[0] ?? null;
+  // Rotate across every eligible participant, including automatic spectator scenes.
+  // Picking the first candidate other than the last sender causes A/B/A/B forever
+  // when there are three or more characters in a group.
+  const index = eligible.indexOf(input.lastSenderId ?? '');
+  return eligible[(index + 1) % eligible.length] ?? null;
 }
