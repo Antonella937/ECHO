@@ -75,7 +75,7 @@ export default function EchoVideoPage() {
             ? (es?'Credenciales detectadas, pero no se pudo verificar el bucket.':'Credentials detected, but bucket verification failed.')
             : !readiness.bucketPrivate
               ? (es?'Atención: el bucket es público. No se habilitarán archivos privados.':'Warning: the bucket is public. Private assets cannot be enabled.')
-              : (es?'Bucket privado verificado.':'Private bucket verified.')}}</p>
+              : (es?'Bucket privado verificado.':'Private bucket verified.')}</p>
     </div>
     {readiness && <p className="text-xs text-muted-foreground">{readiness.databaseMigrationVerified ? (es?'Base de datos Video/GIF verificada.':'Video/GIF database verified.') : (es?'No se pudo verificar la base de datos Video/GIF.':'Could not verify Video/GIF database.')}</p>}
     <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Biblioteca de videos':'Video library'}>
