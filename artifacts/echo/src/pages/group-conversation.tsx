@@ -286,7 +286,7 @@ export default function GroupConversationPage() {
       <form onSubmit={searchMessages} className="flex gap-2"><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar en esta conversación" className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm" /><button type="submit" className="rounded-xl bg-secondary px-3 text-sm">Buscar</button></form>
       {!!searchResults.length && <div className="mt-2 max-h-44 space-y-2 overflow-y-auto">{searchResults.map(m => <div key={m.id} className="rounded-lg bg-secondary p-2 text-xs"><strong>{character(m.senderId)?.name ?? m.senderId}</strong><p className="break-words">{m.text}</p></div>)}</div>}
     </div>}
-    {settingsOpen && <div className="border-b border-border bg-background p-4">
+    {settingsOpen && <div role="region" aria-label="Configuración del grupo" className="min-h-0 max-h-[min(75dvh,720px)] shrink-0 overflow-y-auto overscroll-contain border-b border-border bg-background p-4 pb-8 [-webkit-overflow-scrolling:touch]">
       <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Información del grupo</h2><button onClick={() => setSettingsOpen(false)} className="text-sm text-muted-foreground">Cerrar</button></div>
       <label className="mb-1 block text-xs text-muted-foreground">Nombre</label>
       <div className="flex gap-2"><input value={groupName} maxLength={80} onChange={e => setGroupName(e.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3" /><button onClick={() => void editGroup()} disabled={savingSettings || !groupName.trim()} className="rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">Guardar</button></div>
@@ -318,7 +318,7 @@ export default function GroupConversationPage() {
         </select>
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={sceneObserverEnabled} onChange={e => setSceneObserverEnabled(e.target.checked)} disabled={!sceneLoaded || sceneSaving} /> Modo espectadora (sin participar)</label>
         <button type="button" onClick={() => void saveScene()} disabled={!sceneLoaded || sceneSaving} className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{sceneSaving ? 'Guardando…' : 'Guardar escena'}</button>
-        <p className="mt-2 text-xs text-muted-foreground">La configuración se guarda en el grupo. La ejecución automática de turnos y el acceso sin identidad participante requieren la siguiente integración.</p>
+        <p className="mt-2 text-xs text-muted-foreground">La configuración se guarda en este grupo y se aplica a los próximos turnos.</p>
       </div>
       <div className="mt-4 border-t border-border pt-3">
         <p className="font-semibold">Autonomía del grupo</p>
