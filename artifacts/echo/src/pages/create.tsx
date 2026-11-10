@@ -40,12 +40,14 @@ export default function CreatePage() {
   const search = useSearch();
   const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
   const { me, state, actions } = useSocial();
+  const imageCoStarOptions = (state.characters ?? []).filter(c => !c.archived && c.id !== me.id);
   const { user } = useUser();
   const [, navigate] = useLocation();
   const back = useBack();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [mediaSource, setMediaSource] = useState<'upload' | 'ai'>('upload');
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiCoStars, setAiCoStars] = useState<string[]>([]);
   const [aiPreview, setAiPreview] = useState(false);
   const [aiPrepared, setAiPrepared] = useState<{ preparedPrompt: string; referenceCount: number; style: string } | null>(null);
   const [aiPreparing, setAiPreparing] = useState(false);
@@ -168,7 +170,7 @@ export default function CreatePage() {
     try {
       const result = await customFetch<{ preparedPrompt: string; referenceCount?: number; style: string; generationEnabled: boolean }>(aiEditSource ? '/api/ai-engine/images/prepare-edit' : '/api/ai-engine/images/prepare', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(!aiEditSource && aiCoStars.length ? { selectedCharacterIds: aiCoStars } : {}), ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (result.generationEnabled) throw new Error(t('La preparación no debe generar imágenes.'));
       setAiPrepared({ preparedPrompt: result.preparedPrompt, referenceCount: result.referenceCount ?? (aiEditSource ? 1 : 0), style: result.style });
@@ -186,7 +188,7 @@ export default function CreatePage() {
     try {
       const result = await customFetch<{ objectPath: string }>('/api/ai-engine/images/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), imageTransferAcknowledgement: 'image-transfer-preview-v1', ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), characterId: me.id, prompt: aiPrompt.trim(), ...(!aiEditSource && aiCoStars.length ? { selectedCharacterIds: aiCoStars } : {}), imageTransferAcknowledgement: 'image-transfer-preview-v1', ...(aiEditSource ? { sourceObjectPath: aiEditSource } : {}) }), responseType: 'json',
       });
       if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(result.objectPath)) throw Error(t('El generador devolvió una imagen inválida.'));
       setAiGeneratedPath(result.objectPath);
@@ -306,6 +308,22 @@ export default function CreatePage() {
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> {t('Crear una imagen para')} {me.name}</div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("Describí la escena. Cuando conectemos el modelo, usará las referencias visuales del personaje y el estilo de Ajustes.")}</p>
           {aiEditSource && <div className="mt-3 rounded-xl border border-border p-3 text-xs" data-testid="ai-edit-source"><p className="font-semibold">{t("Modo edición · vista previa gratuita")}</p><img src={resolveMedia(aiEditSource)} alt={t("Imagen original para editar")} className="mt-2 max-h-44 w-full rounded-lg object-contain" /><button type="button" className="mt-2 underline" onClick={() => { setAiEditSource(null); setAiPrepared(null); setAiPreview(false); setAiTransferAcknowledged(false); }}>{t("Volver a imagen nueva")}</button></div>}
+          {!aiEditSource && <div className="mt-3 space-y-2 rounded-xl border border-border bg-background/40 p-3">
+            <p className="text-xs font-semibold">{t('Personajes que aparecen en la foto')}</p>
+            <p className="text-xs text-muted-foreground">{t('El personaje activo aparece siempre. Elegí hasta tres personajes más; ECHO usará sus identidades visuales individuales.')}</p>
+            <div className="flex flex-wrap gap-2">
+              {imageCoStarOptions.map(character => {
+                const chosen = aiCoStars.includes(character.id);
+                return <button key={character.id} type="button" aria-pressed={chosen}
+                  disabled={!chosen && aiCoStars.length >= 3}
+                  onClick={() => { setAiCoStars(current => chosen ? current.filter(id => id !== character.id) : current.length < 3 ? [...current, character.id] : current); setAiPrepared(null); setAiPreview(false); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
+                  className={cn('rounded-lg border px-3 py-2 text-xs disabled:opacity-40', chosen ? 'border-primary bg-primary/10 text-primary' : 'border-border')}>
+                  {chosen ? '✓ ' : '+ '}{character.name}
+                </button>;
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">{1 + aiCoStars.length}/4 {t('personajes seleccionados')}</p>
+          </div>}
           <textarea aria-label={t("Descripción de imagen IA")} value={aiPrompt} onChange={e => { setAiPrompt(e.target.value.slice(0, 2000)); setAiPreview(false); setAiPrepared(null); setAiGeneratedPath(null); setAiTransferAcknowledged(false); }}
             rows={4} maxLength={2000} placeholder={`${t('Ej.:')} ${me.name} ${t('sacándose una selfie en el backstage después de un concierto, luz tenue, expresión espontánea.')}`}
             className="mt-3 min-h-28 w-full resize-y rounded-xl border border-input bg-background px-3 py-3 text-sm focus:border-primary/60 focus:outline-none"
