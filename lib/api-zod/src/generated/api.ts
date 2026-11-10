@@ -1118,6 +1118,7 @@ export const GetUniverseResponse = zod.object({
 }).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
+  "primaryCharacterId": zod.string().optional(),
   "characters": zod.array(zod.object({
   "configuration": zod.object({
   "version": zod.literal(1),
@@ -1662,6 +1663,7 @@ export const SaveUniverseBody = zod.object({
 }).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
+  "primaryCharacterId": zod.string().optional(),
   "characters": zod.array(zod.object({
   "configuration": zod.object({
   "version": zod.literal(1),
@@ -2194,6 +2196,7 @@ export const SaveUniverseResponse = zod.object({
 }).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
+  "primaryCharacterId": zod.string().optional(),
   "characters": zod.array(zod.object({
   "configuration": zod.object({
   "version": zod.literal(1),
@@ -2776,6 +2779,7 @@ export const VerifyUniverseResponse = zod.object({
 }).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
+  "primaryCharacterId": zod.string().optional(),
   "characters": zod.array(zod.object({
   "configuration": zod.object({
   "version": zod.literal(1),
@@ -3630,6 +3634,7 @@ export const CreateCreatorUniverseBody = zod.object({
 }).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
+  "primaryCharacterId": zod.string().optional(),
   "characters": zod.array(zod.object({
   "configuration": zod.object({
   "version": zod.literal(1),
@@ -4162,6 +4167,7 @@ export const CreateCreatorUniverseResponse = zod.object({
 }).optional(),
   "version": zod.number().int(),
   "currentCharacterId": zod.string(),
+  "primaryCharacterId": zod.string().optional(),
   "characters": zod.array(zod.object({
   "configuration": zod.object({
   "version": zod.literal(1),
