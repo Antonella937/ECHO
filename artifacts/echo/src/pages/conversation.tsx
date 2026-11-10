@@ -1,3 +1,4 @@
+import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
 import { useConversationText } from '@/lib/conversation-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
@@ -52,6 +53,7 @@ export default function ConversationPage() {
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
   const [text, setText] = useState('');
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
@@ -458,6 +460,7 @@ export default function ConversationPage() {
             <button type="button" onClick={() => { recorder.stop(); setRecordingTip(false); }} disabled={recorder.status !== 'recording'} aria-label={t("Detener grabación")} className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-stop-recording"><Square className="h-4 w-4 fill-current" /></button>
           </div>
         ) : (
+          <FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="mb-1" />
           <div className="flex items-center gap-2 pb-1">
             <input ref={fileRef} type="file" multiple hidden accept="image/*,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
               onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }} data-testid="input-attachment-file" />
@@ -465,6 +468,7 @@ export default function ConversationPage() {
               <Paperclip className="h-5 w-5" strokeWidth={1.7} />
             </button>
             <textarea
+              ref={composerRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={`${t("Escribir como")} ${me.name.split(' ')[0]}…`}
