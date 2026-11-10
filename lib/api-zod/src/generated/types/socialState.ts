@@ -25,6 +25,7 @@ export interface SocialState {
   creatorSetup?: CreatorSetup;
   version: number;
   currentCharacterId: string;
+  primaryCharacterId?: string;
   characters: Character[];
   follows: SocialStateFollows;
   posts: Post[];
