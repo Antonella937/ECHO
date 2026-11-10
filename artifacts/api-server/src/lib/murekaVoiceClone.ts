@@ -6,7 +6,8 @@
  * Provider schema: https://fal.ai/models/mureka/api/voice/clone/api
  */
 export const MUREKA_VOICE_CLONE_MODEL = "mureka/api/voice/clone" as const;
-const QUEUE_APP = MUREKA_VOICE_CLONE_MODEL;
+// fal queue status and result URLs use the owner/app namespace.
+const QUEUE_APP = MUREKA_VOICE_CLONE_MODEL.split("/").slice(0, 2).join("/");
 const REQUEST_ID = /^[a-zA-Z0-9_-]{8,128}$/;
 const VOCAL_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 const AUDIO_DATA_URI = /^data:audio\/(?:mpeg|mp3|mp4|x-m4a);base64,([a-zA-Z0-9+/]+={0,2})$/;
@@ -21,6 +22,7 @@ export function validateCloneSample(audioUrl: string): void {
   const match = AUDIO_DATA_URI.exec(audioUrl);
   if (!match) throw new Error("VOICE_CLONE_SAMPLE_INVALID");
   const encoded = match[1];
+  if (encoded.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new Error("VOICE_CLONE_SAMPLE_INVALID");
   const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
   if (estimatedBytes <= 0 || estimatedBytes >= 10 * 1024 * 1024) throw new Error("VOICE_CLONE_SAMPLE_SIZE_INVALID");
 }
