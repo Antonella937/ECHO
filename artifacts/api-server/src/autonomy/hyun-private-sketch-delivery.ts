@@ -25,7 +25,8 @@ export async function dispatchHyunPrivateSketch(input: {
   };
   // The recipient must be the currently selected human-controlled identity.
   // A matching handle alone must never authorize a paid delivery to another AI.
-  if (recipient?.id !== parsed.data.currentCharacterId) return "skipped";
+  if (input.characterId !== "account_mw7bvivjs2rpd" || input.recipientId !== "nela" ||
+      recipient?.id !== parsed.data.currentCharacterId) return "skipped";
   if (!sender || !recipient || !canAttemptHyunPrivateSketch({
     ownerId: input.ownerId, senderHandle: handle(sender),
     recipientHandle: handle(recipient), channel: "dm", explicitlyEnabled: true,
