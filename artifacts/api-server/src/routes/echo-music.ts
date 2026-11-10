@@ -732,6 +732,9 @@ router.get("/music/clip/:id/audio", async (req, res) => {
         const value = upstream.headers.get(header);
         if (value) res.setHeader(header, value);
       }
+      // Supabase private storage can serve MP3 files as application/octet-stream.
+      // The browser player requires a real audio MIME type for these known generated files.
+      if (upstream.ok && track.audioPath.toLowerCase().endsWith(".mp3")) res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Cache-Control", "private, no-store");
       res.setHeader("X-Content-Type-Options", "nosniff");
       if (!upstream.body) { res.end(); return; }
@@ -813,6 +816,9 @@ router.get("/music/library/:id/audio", async (req, res) => {
         const value = upstream.headers.get(header);
         if (value) res.setHeader(header, value);
       }
+      // Supabase private storage can serve MP3 files as application/octet-stream.
+      // The browser player requires a real audio MIME type for these known generated files.
+      if (upstream.ok && track.audioPath.toLowerCase().endsWith(".mp3")) res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Cache-Control", "private, no-store");
       res.setHeader("X-Content-Type-Options", "nosniff");
       if (!upstream.body) { res.end(); return; }
@@ -858,6 +864,9 @@ router.get("/music/published/:id/audio", async (req, res) => {
         const value = upstream.headers.get(header);
         if (value) res.setHeader(header, value);
       }
+      // Supabase private storage can serve MP3 files as application/octet-stream.
+      // The browser player requires a real audio MIME type for these known generated files.
+      if (upstream.ok && track.audioPath.toLowerCase().endsWith(".mp3")) res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Cache-Control", "private, no-store");
       res.setHeader("X-Content-Type-Options", "nosniff");
       if (!upstream.body) { res.end(); return; }
