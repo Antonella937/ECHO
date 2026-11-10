@@ -127,6 +127,29 @@ export async function loadPostPage(options: {
   });
 }
 
+/** Read-only conversation history page, scoped to the authenticated owner's universe. */
+export interface MessagePage {
+  messages: SocialState['messages'];
+  total: number;
+  nextOffset: number | null;
+  revision: number;
+}
+export async function loadMessagePage(options: {
+  threadId: string;
+  universeId?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<MessagePage> {
+  const { threadId, universeId = 'primary', offset = 0, limit = 30 } = options;
+  if (!threadId || !Number.isSafeInteger(offset) || offset < 0 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
+    throw new Error('Invalid message page');
+  const params = new URLSearchParams({ threadId, universeId, offset: String(offset), limit: String(limit) });
+  return customFetch<MessagePage>(`/api/universe/messages/page?${params}`, {
+    method: 'GET', responseType: 'json', cache: 'no-store',
+  });
+}
+
 /** Fetch just the server revision, without transferring the entire social state. */
 export async function loadUniverseRevision(universeId = 'primary'): Promise<number> {
   const result = await customFetch<{ revision: number }>(`/api/universe/revision?${new URLSearchParams({ universeId })}`, {
