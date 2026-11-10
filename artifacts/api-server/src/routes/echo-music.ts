@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { Router, raw, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { db, echoMediaTable, echoMusicLibraryTable } from "@workspace/db";
+import { db, echoMediaTable, echoMusicLibraryTable, echoUniversesTable } from "@workspace/db";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
+import { canReadSocialCharacter, readableUniverseFilter, storyIsStillVisible } from "../lib/socialContentAccess";
 import { storePrivateVocalSample, fetchOwnedPrivateVocalSample } from "../lib/musicVoiceSampleStorage";
 import { submitConfirmedVoiceClone, syncVoiceCloneJob } from "../lib/musicVoiceCloneOrchestrator";
 import { submitConfirmedVocalSeparation, syncVocalSeparation } from "../lib/musicVocalSeparationOrchestrator";
@@ -652,6 +653,83 @@ router.get("/music/published", async (req, res) => {
     res.json({ items: items.map(item => ({ ...item, artistName: byId.get(item.id)?.artistName ?? null, coverPath: byId.get(item.id)?.coverPath ?? null })) });
   } catch (error) { req.log.error({ err: error }, "Published music listing failed"); res.status(503).json({ error: "MUSIC_CATALOG_UNAVAILABLE" }); }
 });
+// A music clip can be streamed from a private library only when it is attached
+// to an existing, readable post/story. A library selection never publishes the song.
+const musicClipAudioQuery = z.object({
+  universeId: z.string().min(1).max(120),
+  surface: z.enum(["post", "story"]),
+  contentId: z.string().min(1).max(255),
+  viewerUniverseId: z.string().min(1).max(120).optional(),
+  viewerCharacterId: z.string().min(1).max(255).optional(),
+}).refine(v => Boolean(v.viewerUniverseId) === Boolean(v.viewerCharacterId));
+router.get("/music/clip/:id/audio", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  const query = musicClipAudioQuery.safeParse(req.query);
+  if (!id.success || !query.success) { res.status(400).json({ error: "INVALID_MUSIC_CLIP" }); return; }
+  try {
+    const [track] = await db.select().from(echoMusicLibraryTable)
+      .where(eq(echoMusicLibraryTable.id, id.data)).limit(1);
+    if (!track?.audioPath || track.status !== "saved_audio") { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+    const { universeId, surface, contentId, viewerUniverseId, viewerCharacterId } = query.data;
+    const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId, track.ownerId), eq(echoUniversesTable.universeId, universeId), readableUniverseFilter())).limit(1);
+    const state = universe?.state as Record<string, unknown> | undefined;
+    const entries = state?.[surface === "post" ? "posts" : "stories"];
+    const content = (Array.isArray(entries) ? entries : []).find((item: unknown) => {
+      if (!item || typeof item !== "object") return false;
+      const value = item as Record<string, unknown>;
+      return value.id === contentId && (value.musicClip as Record<string, unknown> | undefined)?.trackId === id.data;
+    }) as Record<string, unknown> | undefined;
+    const authorId = typeof content?.authorId === "string" ? content.authorId : "";
+    if (!state || !content || !authorId) { res.status(403).json({ error: "MUSIC_CLIP_NOT_SHARED" }); return; }
+    if (surface === "story" && !storyIsStillVisible(state, content, Date.now())) {
+      res.status(403).json({ error: "STORY_NOT_VISIBLE" }); return;
+    }
+    const ownerRead = req.userId === track.ownerId;
+    if (!ownerRead && !viewerCharacterId) { res.status(403).json({ error: "VIEWER_REQUIRED" }); return; }
+    const allowed = await canReadSocialCharacter(req.userId!,
+      { ownerId: track.ownerId, universeId, characterId: authorId },
+      viewerCharacterId && viewerUniverseId ? { universeId: viewerUniverseId, characterId: viewerCharacterId } : undefined);
+    if (!allowed) { res.status(403).json({ error: "MUSIC_CLIP_NOT_VISIBLE" }); return; }
+    if (surface === "story" && content.closeFriendsOnly && !ownerRead) {
+      // Character IDs in a close-friends story belong to the author's universe.
+      // Cross-account close-friends sharing needs a separate scoped grant.
+      res.status(403).json({ error: "CLOSE_FRIENDS_AUDIO_RESTRICTED" }); return;
+    }
+    if (track.audioPath.startsWith("generated/")) {
+      const jobs = await db.execute(sql`SELECT id FROM echo_music_generation_jobs
+        WHERE id=${track.id}::uuid AND owner_id=${track.ownerId}
+          AND status='completed' AND audio_path=${track.audioPath} LIMIT 1`);
+      if (!jobs.rows.length) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+      const upstream = await fetchPrivateGeneratedMusic(track.audioPath, req.headers.range);
+      res.status(upstream.status);
+      for (const header of ["content-type", "content-length", "content-range", "accept-ranges"]) {
+        const value = upstream.headers.get(header);
+        if (value) res.setHeader(header, value);
+      }
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      if (!upstream.body) { res.end(); return; }
+      const { Readable } = await import("node:stream");
+      const stream = Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream);
+      stream.on("error", error => { req.log.warn({ err: error }, "Music clip stream interrupted"); if (!res.headersSent) res.status(502).end(); else res.destroy(error); });
+      stream.pipe(res);
+      return;
+    }
+    const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+      .where(and(eq(echoMediaTable.ownerId, track.ownerId), eq(echoMediaTable.objectPath, track.audioPath))).limit(1);
+    if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
+    const storage = new ObjectStorageService();
+    const file = await storage.getObjectEntityFile(media.objectPath);
+    const response = await storage.downloadObject(file, 0, req.headers.range);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(response.status);
+    if (response.body) pipeMedia(response.body, res, error => req.log.warn({ err: error }, "Music clip stream interrupted"));
+    else res.end();
+  } catch (error) { req.log.error({ err: error }, "Music clip stream failed"); if (!res.headersSent) res.status(503).json({ error: "MUSIC_CLIP_UNAVAILABLE" }); }
+});
+
 router.get("/music/published/:id/audio", async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.id);
   if (!id.success) { res.status(400).json({ error: "INVALID_MUSIC_ID" }); return; }
