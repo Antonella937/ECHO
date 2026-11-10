@@ -455,8 +455,7 @@ export async function runAutonomyLiveCycle(
         // The character's own generated message must explicitly offer a drawing.
         // A probability gate alone must never invent a sketch attachment.
         /\b(sketch|drawing|drawn|artwork|illustration)\b/i.test(preview.decision.text ?? "") &&
-        /\b(send|share|show|here(?:'s| is)|made|finished|working on|take a look)\b/i.test(preview.decision.text ?? "") &&
-        (dependencies.random?.() ?? Math.random()) < 0.08) {
+        /\b(send|share|show|here(?:'s| is)|made|finished|working on|take a look)\b/i.test(preview.decision.text ?? "")) {
       try {
         const fresh = await dependencies.repository.read(ownerId, universeId);
         const parsed = SaveUniverseBody.safeParse({ state: fresh.state, expectedRevision: fresh.revision });
