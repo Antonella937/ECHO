@@ -13,6 +13,13 @@ export default function EchoVideoPage() {
   const [mode, setMode] = useState<'standard'|'advanced_silent'|'advanced_audio'>('standard');
   const [duration, setDuration] = useState<5|10>(5);
   const [aspect, setAspect] = useState<'9:16'|'16:9'|'1:1'>('9:16');
+  const [gifs, setGifs] = useState<Array<{id:string;status:string;durationSeconds:number;width:number;fps:number}>>([]);
+  useEffect(()=>{
+    let active=true;
+    void customFetch<{items:Array<{id:string;status:string;durationSeconds:number;width:number;fps:number}>}>('/api/video/gifs',{responseType:'json'})
+      .then(data=>{if(active)setGifs(data.items);}).catch(()=>{});
+    return ()=>{active=false;};
+  },[]);
   const [gifJobId, setGifJobId] = useState('');
   const [gifSeconds, setGifSeconds] = useState(3);
   const [gifWidth, setGifWidth] = useState<320|480|640>(480);
@@ -72,6 +79,10 @@ export default function EchoVideoPage() {
         : library.length === 0 ? <p className="text-xs text-muted-foreground">{es?'Todavía no generaste videos. Aparecerán acá cuando se active el servicio.':'No generated videos yet. They will appear here when generation is enabled.'}</p>
         : <div className="space-y-2">{library.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>{item.mode} · {item.durationSeconds}s</span><span className="flex items-center gap-2"><span className="text-muted-foreground">{item.status}</span>{item.hasPrivateAsset && <button type="button" aria-label={es?'Descargar archivo privado':'Download private file'} className="rounded-lg border border-border p-2" onClick={async()=>{try{const blob=await customFetch<Blob>('/api/video/library/'+encodeURIComponent(item.id)+'/asset',{responseType:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='echo-video-'+item.id+(blob.type==='image/gif'?'.gif':blob.type==='video/webm'?'.webm':'.mp4');a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch{setError(true);}}}><Download className="h-4 w-4"/></button>}</span></div>)}</div>}
       <p className="text-xs text-muted-foreground">{es?'La conversión a GIF y la descarga estarán disponibles después de conectar el procesamiento privado.':'GIF conversion and downloads will be available after private processing is connected.'}</p>
+    </section>
+    <section className="space-y-2 rounded-2xl border border-border bg-card/60 p-4">
+      <h2 className="text-sm font-semibold">{es?'Mis GIF':'My GIFs'}</h2>
+      {gifs.length===0?<p className="text-xs text-muted-foreground">{es?'Todavía no hay GIF generados.':'No generated GIFs yet.'}</p>:gifs.map(gif=><div key={gif.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>GIF · {gif.durationSeconds}s · {gif.width}px · {gif.fps} FPS</span><span>{gif.status}</span></div>)}
     </section>
     <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Preparación de GIF':'GIF preparation'}>
       <h2 className="text-sm font-semibold">{es?'Convertir video a GIF':'Convert video to GIF'}</h2>
