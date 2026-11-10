@@ -50,7 +50,7 @@ export function chooseGroupSpeaker(input: GroupAutonomyPolicyInput & {
       !input.lastMessageText?.trim())) return null;
   // Do not react immediately; let human participants finish typing.
   if (!input.sceneMode && input.now.getTime() - lastAt < 2 * 60_000) return null;
-  if (input.turnMode === 'manual') return null;
+  // Manual scenes advance only when the owner explicitly requests a turn.
   if (input.turnMode === 'round_robin') {
     const index = eligible.indexOf(input.lastSenderId ?? '');
     return eligible[(index + 1) % eligible.length] ?? null;
