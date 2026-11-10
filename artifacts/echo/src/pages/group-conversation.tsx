@@ -350,7 +350,7 @@ export default function GroupConversationPage() {
       </div>
       {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>}
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">Eliminar grupo definitivamente</button>}
-      {!group?.participantIds.includes(me.id) && <p className="mt-3 text-xs text-muted-foreground">Estás viendo este grupo como espectadora. No sos participante.</p>}
+      {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">Estás viendo este grupo como espectadora. No sos participante.</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">Salir del modo espectadora</button></div>}
     </div>}
     {sceneObserverEnabled && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
       <div className="flex flex-wrap items-center gap-2">
