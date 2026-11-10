@@ -18,9 +18,16 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
   const [loading, setLoading] = useState(false);
   const [comparison, setComparison] = useState<'pending' | 'similar' | 'different'>('pending');
   const [notes, setNotes] = useState('');
+  const [savedStatus, setSavedStatus] = useState('');
+  const [saving, setSaving] = useState(false);
   const candidates = tracks.filter(t => t.status === 'saved_audio' && Boolean(t.audioPath));
   useEffect(() => {
     let active = true;
+    setSavedStatus('');
+    void customFetch<{ comparison: { singingTrackId: string; assessment: 'similar' | 'different'; notes: string } | null }>(
+      '/api/music/voices/comparison?' + new URLSearchParams({ universeId, characterId }), { responseType: 'json' })
+      .then(data => { if (active && data.comparison) { setTrackId(data.comparison.singingTrackId); setComparison(data.comparison.assessment); setNotes(data.comparison.notes); setSavedStatus('Comparación guardada anteriormente.'); } })
+      .catch(() => {});
     setSpeechSampleId(''); setSpeechReady(false); setSpeechPreviewAvailable(false); setComparison('pending');
     void customFetch<ProjectResponse>('/api/voices/premium/projects?' + new URLSearchParams({ characterId, universeId }), { responseType: 'json' })
       .then(result => {
@@ -37,7 +44,7 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
     return () => URL.revokeObjectURL(url);
   }, [speechFile]);
   useEffect(() => {
-    setSingingUrl(''); setComparison('pending'); setNotes('');
+    setSingingUrl(''); setSavedStatus('');
     if (!trackId) return;
     let active = true;
     let url = '';
@@ -51,6 +58,16 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [trackId]);
+  async function saveComparison() {
+    if (!trackId || comparison === 'pending' || !speechUrl || !singingUrl || saving) return;
+    setSaving(true); setSavedStatus('');
+    try {
+      await customFetch('/api/music/voices/comparison', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId, characterId, singingTrackId: trackId, speechSampleId: speechFile ? null : speechSampleId || null, assessment: comparison, notes }), responseType: 'json' });
+      setSavedStatus('Comparación guardada en tu cuenta.');
+    } catch { setSavedStatus('No se pudo guardar. Verificá que la actualización del servidor esté desplegada.'); }
+    finally { setSaving(false); }
+  }
   async function loadSpeechPreview() {
     if (!speechSampleId) return;
     setLoading(true); setError('');
@@ -92,6 +109,8 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
       <label className="block text-xs text-muted-foreground">Notas sobre el timbre (opcional)
         <textarea value={notes} onChange={event => setNotes(event.target.value.slice(0, 500))} rows={2} placeholder="Gravedad, aspereza, resonancia, acento…" className="mt-1 w-full rounded-lg border border-border bg-card p-2 text-sm" />
       </label>
+      {comparison !== 'pending' && <button type="button" disabled={saving} onClick={() => void saveComparison()} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar comparación'}</button>}
+      {savedStatus && <p role="status" className="text-xs text-muted-foreground">{savedStatus}</p>}
       {comparison !== 'pending' && <p role="status" className="text-xs text-muted-foreground">{comparison === 'similar' ? 'Comparación auditiva favorable (no es una verificación biométrica).' : 'Conviene preparar una nueva referencia cantada a partir de la voz hablada autorizada.'} Esta decisión no cambia ni vincula automáticamente la voz del personaje.</p>}
     </div>}
   </section>;
