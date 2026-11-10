@@ -115,7 +115,7 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
       </label>
       {singingUrl && <audio controls preload="none" src={singingUrl} className="w-full" aria-label="Referencia cantada" />}
     </div>
-    {savedComparison && <div className="space-y-1 rounded-lg border border-border bg-card p-3 text-xs">
+    {savedComparison && savedReferenceId === trackId && <div className="space-y-1 rounded-lg border border-border bg-card p-3 text-xs">
       <p className="font-semibold">Referencia para futuras voces cantadas</p>
       <p className="text-muted-foreground">{savedComparison.assessment === 'similar'
         ? 'La comparación manual fue favorable. Conservá la voz cantada vinculada y usá las mismas referencias autorizadas cuando prepares nuevas canciones.'
