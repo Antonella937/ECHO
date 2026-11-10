@@ -1,4 +1,5 @@
 import { loadCharacterPage, loadMessagePage, loadPostPage } from './persistence';
+import { ApiError } from '@workspace/api-client-react';
 
 /** A server-side edit between pages invalidates the entire snapshot. */
 export class StalePageSnapshot extends Error {
@@ -39,11 +40,18 @@ export async function loadConsistentPages<K extends PageKind>(options: {
   while (items.length < maxItems) {
     if (signal?.aborted) throw new Error('Page loading cancelled');
     const limit = Math.min(pageSize, maxItems - items.length);
-    const response = kind === 'characters'
-      ? await loadCharacterPage(universeId, offset, limit, revision)
-      : kind === 'posts'
-        ? await loadPostPage({ universeId, authorId: options.authorId, offset, limit, revision })
-        : await loadMessagePage({ universeId, threadId: options.threadId!, offset, limit, revision });
+    let response: Awaited<ReturnType<typeof loadCharacterPage>> | Awaited<ReturnType<typeof loadPostPage>> | Awaited<ReturnType<typeof loadMessagePage>>;
+    try {
+      response = kind === 'characters'
+        ? await loadCharacterPage(universeId, offset, limit, revision)
+        : kind === 'posts'
+          ? await loadPostPage({ universeId, authorId: options.authorId, offset, limit, revision })
+          : await loadMessagePage({ universeId, threadId: options.threadId!, offset, limit, revision });
+    } catch (error) {
+      // 409 is a stale snapshot, not a generic network failure.
+      if (error instanceof ApiError && error.status === 409) throw new StalePageSnapshot();
+      throw error;
+    }
     if (signal?.aborted) throw new Error('Page loading cancelled');
     if (revision !== undefined && response.revision !== revision) throw new StalePageSnapshot();
     revision = response.revision;
