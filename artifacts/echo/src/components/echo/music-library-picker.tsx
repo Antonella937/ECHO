@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Music2, Loader2 } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
+import { MusicClipPlayer } from './music-clip-player';
 
 export type MusicLibrarySelection = {
   id: string;
@@ -90,6 +91,11 @@ export function MusicLibraryPicker({ onSelect, onCancel, storyClip = false, char
         <input type="range" aria-label="Inicio del fragmento" min={0} max={maxStart} value={Math.min(start, maxStart)}
           onChange={event => setStart(Number(event.target.value))} className="w-full" />
         <p className="text-xs text-muted-foreground">Inicio: {Math.min(start, maxStart)} s</p>
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">Escuchar fragmento antes de adjuntar</p>
+          <MusicClipPlayer clip={{ trackId: track.id, title: track.title,
+            startSeconds: Math.min(start, maxStart), clipSeconds: length }} libraryPreview />
+        </div>
       </div>}
       <div className="flex justify-end gap-2">
         {onCancel && <button type="button" onClick={onCancel} className="rounded-lg border border-border px-4 py-2 text-sm">Cancelar</button>}
