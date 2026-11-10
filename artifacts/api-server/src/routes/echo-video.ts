@@ -97,6 +97,43 @@ router.get("/video/library", async (req, res) => {
   }
 });
 
+const gifDraftSchema = z.object({
+  videoJobId: z.string().uuid(),
+  startSeconds: z.number().finite().min(0).max(10).default(0),
+  durationSeconds: z.number().finite().min(1).max(10),
+  width: z.union([z.literal(320), z.literal(480), z.literal(640)]).default(480),
+  fps: z.union([z.literal(10), z.literal(12), z.literal(15)]).default(12),
+}).strict();
+
+/** GIF preparation is a read-only ownership check. It never converts or debits. */
+router.post("/video/gif/preflight", async (req, res) => {
+  const parsed = gifDraftSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({error:"GIF_DRAFT_INVALID"}); return;
+  }
+  const draft = parsed.data;
+  try {
+    const result = await pool.query<{status:string;duration_seconds:number;result_asset_key:string|null}>(
+      `SELECT status,duration_seconds,result_asset_key FROM echo_video_generation_jobs
+       WHERE owner_id=$1 AND id=$2::uuid LIMIT 1`, [req.userId!,draft.videoJobId]);
+    const source = result.rows[0];
+    if (!source) {res.status(404).json({error:"VIDEO_NOT_FOUND"});return;}
+    if (source.status !== "succeeded" || !source.result_asset_key) {
+      res.status(409).json({error:"VIDEO_NOT_READY"});return;
+    }
+    if (draft.startSeconds + draft.durationSeconds > source.duration_seconds) {
+      res.status(400).json({error:"GIF_TIME_RANGE_INVALID"});return;
+    }
+    res.json({status:"ready_for_converter_configuration", sourceJobId:draft.videoJobId,
+      startSeconds:draft.startSeconds,durationSeconds:draft.durationSeconds,
+      width:draft.width,fps:draft.fps,estimatedCredits:0,canConvert:false,
+      charged:false,providerCallsMade:0});
+  } catch (error) {
+    req.log.warn({err:error},"GIF preparation unavailable");
+    res.status(503).json({error:"GIF_PREPARATION_UNAVAILABLE"});
+  }
+});
+
 /** GIF conversion is intentionally unavailable until a safe private media pipeline exists. */
 router.post("/video/convert-gif", (_req, res) => {
   res.status(503).json({ error: "VIDEO_GIF_CONVERSION_NOT_ENABLED",
