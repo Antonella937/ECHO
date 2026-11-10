@@ -68,6 +68,12 @@ export async function loadUniverse(universeId = 'primary'): Promise<UniverseEnve
   });
 }
 
+/** A page cursor must be a nonnegative safe integer from the current snapshot. */
+function assertPageRevision(revision: number | undefined): void {
+  if (revision !== undefined && (!Number.isSafeInteger(revision) || revision < 0))
+    throw new Error('Invalid page revision');
+}
+
 /** Lightweight profile projection for large universes. Does not include character memories. */
 export interface CharacterPageItem {
   id: string;
@@ -99,6 +105,7 @@ export async function loadCharacterPage(
   if (!Number.isSafeInteger(offset) || offset < 0 ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
     throw new Error('Invalid character page');
+  assertPageRevision(revision);
   return customFetch<CharacterPage>(`/api/universe/characters/page?${new URLSearchParams({
     universeId, offset: String(offset), limit: String(limit),
     ...(revision === undefined ? {} : { revision: String(revision) }),
@@ -123,6 +130,7 @@ export async function loadPostPage(options: {
   if (!Number.isSafeInteger(offset) || offset < 0 ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
     throw new Error('Invalid post page');
+  assertPageRevision(revision);
   const params = new URLSearchParams({ universeId, offset: String(offset), limit: String(limit) });
   if (authorId) params.set('authorId', authorId);
   if (revision !== undefined) params.set('revision', String(revision));
@@ -149,6 +157,7 @@ export async function loadMessagePage(options: {
   if (!threadId || !Number.isSafeInteger(offset) || offset < 0 ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 50)
     throw new Error('Invalid message page');
+  assertPageRevision(revision);
   const params = new URLSearchParams({ threadId, universeId, offset: String(offset), limit: String(limit) });
   if (revision !== undefined) params.set('revision', String(revision));
   return customFetch<MessagePage>(`/api/universe/messages/page?${params}`, {
