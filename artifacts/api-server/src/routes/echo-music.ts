@@ -9,6 +9,7 @@ import { pipeMedia } from "../lib/pipeMedia";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
 import { storePrivateVocalSample, fetchOwnedPrivateVocalSample } from "../lib/musicVoiceSampleStorage";
 import { submitConfirmedVoiceClone, syncVoiceCloneJob } from "../lib/musicVoiceCloneOrchestrator";
+import { submitConfirmedVocalSeparation, syncVocalSeparation } from "../lib/musicVocalSeparationOrchestrator";
 import { reserveMusicJob, submitReservedMusicJob, pollMusicJob, resolveCharacterSingingVoice } from "../lib/musicJobOrchestrator";
 import { MUREKA_SONG_MODEL, MUREKA_INSTRUMENTAL_MODEL } from "../lib/murekaMusic";
 
@@ -202,6 +203,26 @@ router.get("/music/voices/separation/jobs/:id",async(req,res)=>{
    res.setHeader("Cache-Control","no-store");res.json({job:result.rows[0]});
  }catch(error){req.log.warn({err:error},"Vocal separation status failed");
    res.status(503).json({error:"VOCAL_SEPARATION_STATUS_UNAVAILABLE"});}
+});
+
+// Separate consent for paid stem isolation; no charge when feature is disabled.
+router.post("/music/voices/separation/jobs/:id/confirm",async(req,res)=>{
+ const id=z.string().uuid().safeParse(req.params.id);
+ const consent=z.object({chargeConfirmed:z.literal(true),consentConfirmed:z.literal(true)}).strict().safeParse(req.body);
+ if(!id.success || !consent.success){res.status(400).json({error:"VOCAL_SEPARATION_EXPLICIT_CONFIRMATION_REQUIRED"});return;}
+ if(process.env.ECHO_MUSIC_VOCAL_SEPARATION_ENABLED!=="true"){
+   res.status(503).json({error:"VOCAL_SEPARATION_SPENDING_DISABLED",charged:false});return;
+ }
+ try{res.json(await submitConfirmedVocalSeparation(req.userId!,id.data));}
+ catch(error){req.log.error({err:error},"Vocal separation submission failed");
+   res.status(503).json({error:"VOCAL_SEPARATION_SUBMISSION_REQUIRES_REVIEW"});}
+});
+router.post("/music/voices/separation/jobs/:id/sync",async(req,res)=>{
+ const id=z.string().uuid().safeParse(req.params.id);
+ if(!id.success){res.status(400).json({error:"VOCAL_SEPARATION_JOB_ID_INVALID"});return;}
+ try{res.json(await syncVocalSeparation(req.userId!,id.data));}
+ catch(error){req.log.error({err:error},"Vocal separation sync failed");
+   res.status(503).json({error:"VOCAL_SEPARATION_SYNC_UNAVAILABLE"});}
 });
 
 // Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
