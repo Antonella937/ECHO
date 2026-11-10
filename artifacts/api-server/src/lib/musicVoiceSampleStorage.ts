@@ -27,7 +27,7 @@ export async function storePrivateVocalSample(ownerId:string, characterId:string
   const extension = mime === "audio/mpeg" || mime === "audio/mp3" ? "mp3" : mime === "audio/wav" || mime === "audio/x-wav" ? "wav" : "m4a";
   const storageKey = `voice-samples/${ownerId}/${characterId}/${randomUUID()}.${extension}`;
   const endpoint = new URL(`/storage/v1/object/${encodeURIComponent(bucket)}/${storageKey}`,base);
-  const response = await fetch(endpoint,{method:"POST",headers:{Authorization:`Bearer ${key}`,apikey:key,"Content-Type":mime,"x-upsert":"false"},body:bytes,signal:AbortSignal.timeout(45000)});
+  const response = await fetch(endpoint,{method:"POST",headers:{Authorization:`Bearer ${key}`,apikey:key,"Content-Type":mime,"x-upsert":"false"},body:new Uint8Array(bytes),signal:AbortSignal.timeout(45000)});
   if (!response.ok) throw new Error(`VOICE_SAMPLE_UPLOAD_HTTP_${response.status}`);
   return {storageKey,size:bytes.length,mimeType:mime};
 }
