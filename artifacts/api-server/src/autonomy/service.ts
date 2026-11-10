@@ -440,7 +440,7 @@ export async function runAutonomyLiveCycle(
       opportunity, decision: preview.decision, contextHash: preview.contextAudit.contextHash,
       model: preview.model, liveEnabled, now,
     });
-    // Optional private sketch: only an unsolicited Hyun -> Nela DM, never a reply.
+    // Optional private sketch: Hyun must organically offer to share his drawing in the DM.
     // The delivery adapter revalidates identity, recipient, message ownership and
     // the persisted image budget before any provider request.
     if (outcome.status === "executed" && opportunity.situation === "dm" &&
@@ -452,6 +452,10 @@ export async function runAutonomyLiveCycle(
           (message.senderId === character.id && message.recipientId === "nela") ||
           (message.senderId === "nela" && message.recipientId === character.id)
         ).slice(0, 8).some(message => /\b(sketch(?:es)?|drawing|draw(?:ing)?|artwork|illustrat(?:ion|e)|pencil|paint(?:ing)?)\b/i.test(message.text)) &&
+        // The character's own generated message must explicitly offer a drawing.
+        // A probability gate alone must never invent a sketch attachment.
+        /\b(sketch|drawing|drawn|artwork|illustration)\b/i.test(preview.decision.text ?? "") &&
+        /\b(send|share|show|here(?:'s| is)|made|finished|working on|take a look)\b/i.test(preview.decision.text ?? "") &&
         (dependencies.random?.() ?? Math.random()) < 0.08) {
       try {
         const fresh = await dependencies.repository.read(ownerId, universeId);
