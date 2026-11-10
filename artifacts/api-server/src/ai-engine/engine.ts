@@ -25,7 +25,11 @@ export async function previewDecision(provider: TextProvider, state: SocialState
   // Character-specific dialogue language overrides the owner's UI language.
   // This affects generated text only; it never rewrites conversation history.
   const actor = state.characters.find(character => character.id === parsedInput.data.characterId);
-  const characterLanguage = (actor?.configuration?.voice as { outputLanguage?: string } | undefined)?.outputLanguage;
+  // Linked accounts share a canonical persona; prefer its configured dialogue language.
+  const linkedPersonId = (actor as typeof actor & { personId?: string } | undefined)?.personId;
+  const canonicalActor = linkedPersonId ? state.characters.find(character => character.id === linkedPersonId) : undefined;
+  const characterLanguage = (canonicalActor?.configuration?.voice as { outputLanguage?: string } | undefined)?.outputLanguage
+    ?? (actor?.configuration?.voice as { outputLanguage?: string } | undefined)?.outputLanguage;
   const dialogueLanguage = typeof characterLanguage === 'string' && ['es','en','pt','fr','de','it','ko','ja','zh'].includes(characterLanguage)
     ? characterLanguage : language;
   const context = buildCharacterContext(state, parsedInput.data, now, vision, historical);
