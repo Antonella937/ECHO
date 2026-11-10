@@ -33,12 +33,21 @@ export async function dispatchHyunPrivateSketch(input: {
   if (!parsed.data.messages.some(m => m.id === input.messageId &&
     m.senderId === sender.id && m.recipientId === recipient.id &&
     m.origin === "autonomy" && !m.attachments?.some(a => a.type === "image"))) return "skipped";
-  // Fail closed until a persistent, per-message attempt ledger is wired in.
-  // This prevents repeated autonomous requests from spending against the image budget.
-  const [attempt] = await db.execute(sql`SELECT 1 FROM echo_hyun_private_sketch_attempts
-    WHERE owner_id = ${input.ownerId} AND universe_id = ${input.universeId}
-      AND message_id = ${input.messageId} LIMIT 1`).then(result => result.rows).catch(() => []);
-  if (!attempt) return "skipped";
+  const reserved = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${input.ownerId}), 482901)`);
+    const counts = await tx.execute(sql`SELECT
+      count(*) FILTER (WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::int AS monthly,
+      count(*) FILTER (WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::int AS daily
+      FROM echo_hyun_private_sketch_attempts WHERE owner_id = ${input.ownerId}`);
+    const row = counts.rows[0] as {monthly: number; daily: number} | undefined;
+    if (!row || Number(row.monthly) >= 3 || Number(row.daily) >= 1) return false;
+    const inserted = await tx.execute(sql`INSERT INTO echo_hyun_private_sketch_attempts
+      (owner_id, universe_id, message_id, character_id, recipient_id)
+      VALUES (${input.ownerId}, ${input.universeId}, ${input.messageId}, ${sender.id}, ${recipient.id})
+      ON CONFLICT DO NOTHING RETURNING message_id`);
+    return inserted.rows.length === 1;
+  });
+  if (!reserved) return "skipped";
   // The provider is never called before the atomic budget reservation.
   const generated = await generateCharacterImage({
     ownerId: input.ownerId, universeId: input.universeId,
