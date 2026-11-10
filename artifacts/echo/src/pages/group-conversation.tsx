@@ -50,6 +50,12 @@ export default function GroupConversationPage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [sceneContext, setSceneContext] = useState('');
+  const [sceneTurnMode, setSceneTurnMode] = useState<'automatic' | 'round_robin' | 'manual'>('automatic');
+  const [sceneResponseSpeed, setSceneResponseSpeed] = useState<'immediate' | 'normal' | 'slow'>('normal');
+  const [sceneObserverEnabled, setSceneObserverEnabled] = useState(false);
+  const [sceneLoaded, setSceneLoaded] = useState(false);
+  const [sceneSaving, setSceneSaving] = useState(false);
   const [autonomyEnabled, setAutonomyEnabled] = useState(false);
   const [autonomyInterval, setAutonomyInterval] = useState(60);
   const [autonomyLoaded, setAutonomyLoaded] = useState(false);
@@ -91,6 +97,11 @@ export default function GroupConversationPage() {
     let active = true;
     setAutonomyLoaded(false);
     setPreferencesLoaded(false);
+    setSceneLoaded(false);
+    void customFetch<{ context: string; turnMode: 'automatic' | 'round_robin' | 'manual'; responseSpeed: 'immediate' | 'normal' | 'slow'; observerEnabled: boolean }>(`/api/group-dms/${encodeURIComponent(id)}/scene?${scope}`, { method: 'GET', responseType: 'json' })
+      .then(value => { if (active) { setSceneContext(value.context); setSceneTurnMode(value.turnMode); setSceneResponseSpeed(value.responseSpeed); setSceneObserverEnabled(value.observerEnabled); setSceneLoaded(true); } })
+      .catch(() => { if (active) setError('No se pudo cargar el contexto de la escena.'); });
+
     void customFetch<{ muted: boolean; archived: boolean }>(`/api/group-dms/${encodeURIComponent(id)}/preferences?${scope}`, { method: 'GET', responseType: 'json' })
       .then(value => { if (active) { setMuted(value.muted); setArchived(value.archived); setPreferencesLoaded(true); } })
       .catch(() => { if (active) setError('No se pudieron cargar las preferencias del grupo.'); });
@@ -99,6 +110,19 @@ export default function GroupConversationPage() {
       .catch(() => { if (active) { setAutonomyLoaded(false); setError('No se pudo cargar la configuración de autonomía.'); } });
     return () => { active = false; };
   }, [settingsOpen, id, user?.id, me.id]);
+  const saveScene = async () => {
+    if (!id || !sceneLoaded || sceneSaving) return;
+    setSceneSaving(true);
+    try {
+      await customFetch(`/api/group-dms/${encodeURIComponent(id)}/scene`, {
+        method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id,
+          context: sceneContext, turnMode: sceneTurnMode, responseSpeed: sceneResponseSpeed, observerEnabled: sceneObserverEnabled }),
+      });
+      setError('');
+    } catch { setError('No se pudo guardar la escena.'); }
+    finally { setSceneSaving(false); }
+  };
   const savePreferences = async (patch: { muted?: boolean; archived?: boolean }) => {
     if (!id || !preferencesLoaded || savingSettings) return;
     setSavingSettings(true);
@@ -252,6 +276,25 @@ export default function GroupConversationPage() {
       <p className="mt-3 text-xs font-medium">Agregar participantes</p>
       <div className="mt-2 max-h-32 overflow-y-auto">{state.characters.filter(c => !c.archived && c.id !== me.id && !group?.participantIds.includes(c.id)).map(c => <label key={c.id} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={addMemberIds.includes(c.id)} onChange={e => setAddMemberIds(old => e.target.checked ? [...old, c.id] : old.filter(x => x !== c.id))} />{c.name}</label>)}</div>
       <button onClick={() => void addMembers()} disabled={savingSettings || !addMemberIds.length} className="mt-2 rounded-xl bg-secondary px-3 py-2 text-sm disabled:opacity-50">Agregar al grupo</button>
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="font-semibold">Escena del grupo</p>
+        <p className="mt-1 text-xs text-muted-foreground">Definí el contexto y cómo querés que conversen los personajes.</p>
+        <label className="mt-3 block text-xs text-muted-foreground">Contexto de la escena · {sceneContext.length}/10.000</label>
+        <textarea value={sceneContext} maxLength={10000} rows={8} disabled={!sceneLoaded || sceneSaving}
+          onChange={e => setSceneContext(e.target.value)} placeholder="Dónde están, qué pasó antes, qué sabe cada personaje..."
+          className="mt-1 min-h-48 w-full resize-y rounded-xl border border-input bg-background p-3 text-sm" />
+        <label className="mt-3 block text-xs text-muted-foreground">Turnos para hablar</label>
+        <select value={sceneTurnMode} onChange={e => setSceneTurnMode(e.target.value as typeof sceneTurnMode)} disabled={!sceneLoaded || sceneSaving} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+          <option value="automatic">Automático</option><option value="round_robin">Por turnos</option><option value="manual">Manual</option>
+        </select>
+        <label className="mt-3 block text-xs text-muted-foreground">Velocidad de respuesta</label>
+        <select value={sceneResponseSpeed} onChange={e => setSceneResponseSpeed(e.target.value as typeof sceneResponseSpeed)} disabled={!sceneLoaded || sceneSaving} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+          <option value="immediate">Inmediata</option><option value="normal">Normal</option><option value="slow">Pausada</option>
+        </select>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={sceneObserverEnabled} onChange={e => setSceneObserverEnabled(e.target.checked)} disabled={!sceneLoaded || sceneSaving} /> Modo espectadora (sin participar)</label>
+        <button type="button" onClick={() => void saveScene()} disabled={!sceneLoaded || sceneSaving} className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{sceneSaving ? 'Guardando…' : 'Guardar escena'}</button>
+        <p className="mt-2 text-xs text-muted-foreground">La configuración se guarda en el grupo. La ejecución automática de turnos y el acceso sin identidad participante requieren la siguiente integración.</p>
+      </div>
       <div className="mt-4 border-t border-border pt-3">
         <p className="font-semibold">Autonomía del grupo</p>
         <p className="mt-1 text-xs text-muted-foreground">Los personajes autorizados pueden intervenir automáticamente según el intervalo seleccionado.</p>
