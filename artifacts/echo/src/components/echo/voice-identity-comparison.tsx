@@ -20,14 +20,16 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
   const [notes, setNotes] = useState('');
   const [savedStatus, setSavedStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const candidates = tracks.filter(t => t.status === 'saved_audio' && Boolean(t.audioPath));
   useEffect(() => {
     let active = true;
-    setSavedStatus('');
+    setSavedStatus(''); setRestoring(true);
     void customFetch<{ comparison: { singingTrackId: string; assessment: 'similar' | 'different'; notes: string } | null }>(
       '/api/music/voices/comparison?' + new URLSearchParams({ universeId, characterId }), { responseType: 'json' })
       .then(data => { if (active && data.comparison) { setTrackId(data.comparison.singingTrackId); setComparison(data.comparison.assessment); setNotes(data.comparison.notes); setSavedStatus('Comparación guardada anteriormente.'); } })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) setRestoring(false); });
     setSpeechSampleId(''); setSpeechReady(false); setSpeechPreviewAvailable(false); setComparison('pending');
     void customFetch<ProjectResponse>('/api/voices/premium/projects?' + new URLSearchParams({ characterId, universeId }), { responseType: 'json' })
       .then(result => {
@@ -44,7 +46,7 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
     return () => URL.revokeObjectURL(url);
   }, [speechFile]);
   useEffect(() => {
-    setSingingUrl(''); setSavedStatus('');
+    setSingingUrl(''); if (!restoring) setSavedStatus('');
     if (!trackId) return;
     let active = true;
     let url = '';
@@ -110,6 +112,7 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
         <textarea value={notes} onChange={event => setNotes(event.target.value.slice(0, 500))} rows={2} placeholder="Gravedad, aspereza, resonancia, acento…" className="mt-1 w-full rounded-lg border border-border bg-card p-2 text-sm" />
       </label>
       {comparison !== 'pending' && <button type="button" disabled={saving} onClick={() => void saveComparison()} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar comparación'}</button>}
+      {restoring && <p role="status" className="text-xs text-muted-foreground">Recuperando comparación guardada…</p>}
       {savedStatus && <p role="status" className="text-xs text-muted-foreground">{savedStatus}</p>}
       {comparison !== 'pending' && <p role="status" className="text-xs text-muted-foreground">{comparison === 'similar' ? 'Comparación auditiva favorable (no es una verificación biométrica).' : 'Conviene preparar una nueva referencia cantada a partir de la voz hablada autorizada.'} Esta decisión no cambia ni vincula automáticamente la voz del personaje.</p>}
     </div>}
