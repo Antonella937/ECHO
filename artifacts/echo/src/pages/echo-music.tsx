@@ -155,6 +155,33 @@ function translateMusic(label:string, lang:string):string { return lang === 'es'
 type MusicDraftRecord = { id: string; title: string; prompt: string; characterId: string; createdAt: string; durationSeconds: number; status: 'draft' | 'saved_audio'; audioPath?: string; publishedAt?: string | null };
 const libraryKey = (id: string) => `echo-music-drafts-v1:${id}`;
 
+/** Locally trims an owned track to a mono 16 kHz PCM WAV.
+ * This does NOT isolate singing from instruments; use only when the selected
+ * passage is already vocal-dominant or after a separate stem-extraction step.
+ */
+async function trimLibraryVocalReference(audio:Blob,startSeconds:number,lengthSeconds:number):Promise<File> {
+  if(!Number.isFinite(startSeconds) || startSeconds<0 || !Number.isFinite(lengthSeconds) || lengthSeconds<15 || lengthSeconds>30) throw new Error('VOICE_CLIP_RANGE_INVALID');
+  const source=new AudioContext();
+  let decoded:AudioBuffer;
+  try {decoded=await source.decodeAudioData(await audio.arrayBuffer());}
+  finally {await source.close();}
+  if(startSeconds+lengthSeconds>decoded.duration+0.05) throw new Error('VOICE_CLIP_OUT_OF_RANGE');
+  const sampleRate=16000,frameCount=Math.floor(lengthSeconds*sampleRate);
+  const offline=new OfflineAudioContext(1,frameCount,sampleRate);
+  const node=offline.createBufferSource();node.buffer=decoded;node.connect(offline.destination);
+  node.start(0,startSeconds,lengthSeconds);
+  const rendered=await offline.startRendering();
+  const samples=rendered.getChannelData(0);
+  const bytes=new ArrayBuffer(44+samples.length*2),view=new DataView(bytes);
+  const ascii=(offset:number,value:string)=>{for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i));};
+  ascii(0,'RIFF');view.setUint32(4,bytes.byteLength-8,true);ascii(8,'WAVE');ascii(12,'fmt ');
+  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+  view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);
+  view.setUint16(32,2,true);view.setUint16(34,16,true);ascii(36,'data');view.setUint32(40,samples.length*2,true);
+  for(let i=0;i<samples.length;i++){const value=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,value<0?value*32768:value*32767,true);}
+  return new File([bytes],'echo-vocal-reference.wav',{type:'audio/wav'});
+}
+
 export default function EchoMusicPage() {
   const back = useBack();
   const interfaceLanguage = useLanguage();
@@ -323,6 +350,21 @@ export default function EchoMusicPage() {
   const [voiceSource, setVoiceSource] = useState<MusicDraftRecord | null>(null);
   const [voiceStart, setVoiceStart] = useState(0);
   const [voiceLength, setVoiceLength] = useState(20);
+  const [libraryClipBusy,setLibraryClipBusy] = useState(false);
+  const [libraryClipStatus,setLibraryClipStatus] = useState('');
+  async function prepareLibraryClip() {
+    if(!voiceSource || !me?.id || libraryClipBusy || voiceSource.status!=='saved_audio' || !voiceSource.audioPath?.startsWith('generated/')) return;
+    setLibraryClipBusy(true);setLibraryClipStatus('');
+    try {
+      const audio=await customFetch<Blob>('/api/music/generation/'+encodeURIComponent(voiceSource.id)+'/audio',{responseType:'blob'});
+      if(!audio.type.startsWith('audio/'))throw new Error('VOICE_CLIP_SOURCE_INVALID');
+      const file=await trimLibraryVocalReference(audio,voiceStart,voiceLength);
+      setVoiceSample({name:file.name,file,size:file.size,duration:voiceLength});
+      setVoiceSampleStorageKey('');setVoiceCloneJobId('');setVoiceCloneJobStatus('');
+      setLibraryClipStatus(t('Fragmento preparado en este dispositivo. No se envió ni se cobró nada.'));
+    }catch(error){setLibraryClipStatus(error instanceof Error?error.message:'VOICE_CLIP_PREPARATION_FAILED');}
+    finally{setLibraryClipBusy(false);}
+  }
   async function downloadLibraryTrack(item: MusicDraftRecord) {
     if (downloadingId || item.status !== 'saved_audio' || !item.audioPath?.startsWith('generated/')) return;
     setDownloadingId(item.id);
@@ -492,7 +534,7 @@ export default function EchoMusicPage() {
     try {
       const params = new URLSearchParams({characterId:me.id,durationSeconds:String(voiceSample.duration)});
       const result = await customFetch<{storageKey:string;status:string}>('/api/music/voices/clone/sample?' + params.toString(),{
-        method:'POST',headers:{'Content-Type':voiceSample.file.type === 'audio/mp4' || voiceSample.file.name.toLowerCase().endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg','x-voice-consent':'confirmed'},
+        method:'POST',headers:{'Content-Type':voiceSample.file.type === 'audio/wav' ? 'audio/wav' : voiceSample.file.type === 'audio/mp4' || voiceSample.file.name.toLowerCase().endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg','x-voice-consent':'confirmed'},
         body:voiceSample.file,responseType:'json'
       });
       if (result.status !== 'stored_private') throw new Error('VOICE_SAMPLE_UPLOAD_FAILED');
@@ -818,6 +860,9 @@ export default function EchoMusicPage() {
       <p className="text-xs text-primary">{t("Referencia seleccionada. La creación de la voz requiere un paso de clonación confirmado.")}</p>
       <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={voiceCloneConsent} onChange={event => {setVoiceCloneConsent(event.target.checked);setVoiceCloneQuote('');}}/>{t("Confirmo que tengo permiso para utilizar esta voz y crear una identidad vocal reutilizable")}</label>
       <button type="button" disabled={!voiceCloneConsent || voiceCloneQuoteBusy || voiceSource.durationSeconds < 15} onClick={() => void previewVoiceClone('library')} className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneQuoteBusy ? '…' : t("Consultar costo sin generar")}</button>
+      <p className="text-xs text-muted-foreground">{t("Este recorte conserva los instrumentos: elegí una sección donde predomine la voz. Para una clonación fiel todavía hace falta separar la pista vocal.")}</p>
+      <button type="button" disabled={libraryClipBusy || !voiceCloneConsent || voiceSource.durationSeconds<15} onClick={()=>void prepareLibraryClip()} className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{libraryClipBusy?'…':t("Extraer fragmento local de 15–30 s")}</button>
+      {libraryClipStatus && <p role="status" className="text-xs text-primary">{libraryClipStatus}</p>}
       {voiceCloneQuote && <p role="status" className="text-xs text-primary">{voiceCloneQuote}</p>}
       <button type="button" onClick={() => setVoiceSource(null)} className="rounded-xl border border-border px-4 py-2 text-sm">{t("Cerrar")}</button>
     </section>}
