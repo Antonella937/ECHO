@@ -8,7 +8,7 @@ import { prepareImageMessage } from './imageGenerationPayload';
  * This does not enable any API route or make a provider call by itself.
  */
 export interface GenerationDependencies {
-  reserve: (input: { ownerId: string; universeId: string; characterId: string; maximumUsd: number; provider: string; model: string }) => Promise<{ id: string }>;
+  reserve: (input: { ownerId: string; universeId: string; characterId: string; maximumUsd: number; provider: string; model: string; purpose?: 'hyun_private_sketch' }) => Promise<{ id: string }>;
   generate: (input: { prompt: string; style: ImageGenerationStyle; references: ImageGenerationReference[] }) => Promise<ImageGenerationResult>;
   store: (ownerId: string, result: ImageGenerationResult) => Promise<string>;
   settle: (id: string, outcome: { status: 'succeeded' | 'failed' | 'unknown'; reportedCostUsd?: number; objectPath?: string }) => Promise<void>;
@@ -23,6 +23,7 @@ export interface GenerationContext {
   provider: string;
   model: string;
   maximumUsd: number;
+  purpose?: 'hyun_private_sketch';
 }
 export async function orchestrateImageGeneration(deps: GenerationDependencies, input: GenerationContext) {
   if (!Number.isFinite(input.maximumUsd) || input.maximumUsd <= 0) throw Error('INVALID_IMAGE_BUDGET');
@@ -32,7 +33,7 @@ export async function orchestrateImageGeneration(deps: GenerationDependencies, i
   // The reserve must be committed before calling a potentially billable provider.
   const reservation = await deps.reserve({
     ownerId: input.ownerId, universeId: input.universeId, characterId: input.characterId,
-    maximumUsd: input.maximumUsd, provider: input.provider, model: input.model,
+    maximumUsd: input.maximumUsd, provider: input.provider, model: input.model, purpose: input.purpose,
   });
   let result: ImageGenerationResult;
   try {
