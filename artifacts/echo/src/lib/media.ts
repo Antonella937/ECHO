@@ -159,6 +159,16 @@ export function useMediaResolver() {
   return (ref: string, hint?: MediaHint) => {
     const url = resolveMedia(ref, mediaSourceFor(scope, ref, hint));
     if (!ref.startsWith('/objects/') && !ref.startsWith('/api/storage/objects/')) return url;
+    // Uploads are primed under their owner-only URL before the containing story
+    // is persisted. Reuse that locally held image for source-scoped rendering;
+    // otherwise a new story stays black while the authenticated read waits for
+    // the server's universe revision to catch up. Never use this fallback for
+    // another owner's uploads: only the uploading browser can prime the key.
+    const ownerOnlyUrl = privateMediaUrl(ref);
+    const locallyPrimed = privateMediaCache.get(ownerOnlyUrl);
+    if (locallyPrimed && !privateMediaCache.has(url)) {
+      privateMediaCache.set(url, locallyPrimed);
+    }
     if (!privateMediaCache.has(url) && !privateMediaPending.has(url)) {
       queueMicrotask(() => loadPrivateMedia(url));
     }
