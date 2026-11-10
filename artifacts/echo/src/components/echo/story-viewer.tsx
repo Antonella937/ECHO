@@ -341,7 +341,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),14px)+112px)] z-10 flex max-h-[38dvh] flex-col items-center gap-3 overflow-y-auto px-6 text-center">
-          {liveStory.musicClip && <div className="pointer-events-auto w-full max-w-xs"><MusicClipPlayer key={liveStory.id} clip={liveStory.musicClip} compact /></div>}
+          {liveStory.musicClip && <div className="pointer-events-auto w-full max-w-xs"><MusicClipPlayer key={liveStory.id} clip={liveStory.musicClip} compact autoPlay /></div>}
           {liveStory.music && !liveStory.musicClip && (
             <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-[hsl(240_8%_3%/0.6)] px-3 py-1.5 text-xs backdrop-blur" title={t("Solo metadatos: no se reproduce audio")} data-testid={`text-story-music-${story.id}`}>
               <Music2 className="h-3.5 w-3.5 shrink-0 text-primary" />
