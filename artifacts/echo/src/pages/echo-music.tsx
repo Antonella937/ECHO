@@ -5,6 +5,7 @@ import { Music2, LockKeyhole, WandSparkles, ChevronDown, Play, Pause, Upload, Li
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
+import { VoiceIdentityComparison } from '@/components/echo/voice-identity-comparison';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 
 const musicEnglish: Record<string,string> = {
@@ -186,7 +187,7 @@ export default function EchoMusicPage() {
   const back = useBack();
   const interfaceLanguage = useLanguage();
   const t = (label:string) => translateMusic(label, interfaceLanguage);
-  const { me } = useSocial();
+  const { me, universeId } = useSocial();
   const [musicAccess, setMusicAccess] = useState<'loading' | 'active' | 'inactive' | 'error'>('loading');
   const [paidTestEnabled, setPaidTestEnabled] = useState(false);
   const [generationJob, setGenerationJob] = useState<string | null>(null);
@@ -966,6 +967,7 @@ export default function EchoMusicPage() {
         {singingVoiceId&&<button type="button" disabled={voiceLinkBusy} className="text-xs underline text-muted-foreground" onClick={()=>void unlinkSingingVoice()}>{interfaceLanguage==='es'?'Desvincular voz cantada':'Unlink singing voice'}</button>}
         <label className="flex items-center gap-2"><input type="checkbox" checked={protectSingingVoice} onChange={event => setProtectSingingVoice(event.target.checked)}/>{t("Proteger identidad vocal")}</label>
         <p className="text-xs text-muted-foreground">{t("Evita generar canciones cantadas con una voz diferente a la del personaje.")}</p>
+        {me?.id && <VoiceIdentityComparison key={me.id} characterId={me.id} universeId={universeId} tracks={library} singingVoiceId={singingVoiceId} />}
         <p className="text-xs font-semibold">{t("Elegí cómo preparar la voz permanente")}</p>
         <details className="rounded-lg border border-border p-2">
           <summary className="cursor-pointer text-xs font-semibold">{t("Subir muestra vocal")}</summary>
