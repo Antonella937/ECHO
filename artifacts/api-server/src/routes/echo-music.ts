@@ -356,7 +356,9 @@ router.get("/music/library", async (req, res) => {
     const items = await db.select().from(echoMusicLibraryTable)
       .where(eq(echoMusicLibraryTable.ownerId, req.userId!))
       .orderBy(desc(echoMusicLibraryTable.createdAt)).limit(100);
-    res.json({ items });
+    const covers = await db.execute(sql`SELECT id, cover_path AS "coverPath" FROM echo_music_library WHERE owner_id=${req.userId!}`);
+    const coverMap = new Map(covers.rows.map(row => [String(row.id), row.coverPath]));
+    res.json({ items: items.map(item => ({ ...item, coverPath: coverMap.get(item.id) ?? null })) });
   } catch (error) {
     req.log.error({ err: error }, "Music library read failed");
     res.status(503).json({ error: "MUSIC_LIBRARY_UNAVAILABLE" });
@@ -369,6 +371,24 @@ const characterMusicSave = z.object({
   trackId: z.string().uuid(),
   characterId: z.string().min(1).max(128),
 }).strict();
+// Artwork is a private image already owned by the authenticated account.
+// Updating artwork never changes audio or incurs AI generation charges.
+router.patch("/music/library/:id/cover", async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  const body = z.object({ coverPath: z.string().regex(/^\\/objects\\/uploads\\/[a-f0-9-]+$/i).nullable() }).strict().safeParse(req.body);
+  if (!id.success || !body.success) { res.status(400).json({ error: "INVALID_MUSIC_COVER" }); return; }
+  try {
+    if (body.data.coverPath) {
+      const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
+        eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, body.data.coverPath))).limit(1);
+      if (!media) { res.status(403).json({ error: "COVER_NOT_OWNED" }); return; }
+    }
+    const result = await db.execute(sql`UPDATE echo_music_library SET cover_path=${body.data.coverPath}
+      WHERE owner_id=${req.userId!} AND id=${id.data}::uuid RETURNING id,cover_path AS "coverPath"`);
+    if (!result.rows.length) { res.status(404).json({ error: "MUSIC_TRACK_NOT_FOUND" }); return; }
+    res.json({ item: result.rows[0] });
+  } catch (error) { req.log.error({ err: error }, "Music cover update failed"); res.status(503).json({ error: "MUSIC_COVER_UNAVAILABLE" }); }
+});
 router.post("/music/library/save-to-character", async (req, res) => {
   const parsed = characterMusicSave.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_CHARACTER_MUSIC_SAVE" }); return; }
