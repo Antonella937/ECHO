@@ -58,11 +58,14 @@ router.post("/music/voices/clone/quote", async (req,res) => {
   if (!parsed.success) {res.status(400).json({error:"INVALID_VOICE_CLONE_REFERENCE"});return;}
   try {
     if (parsed.data.source === "library") {
-      const found = await db.execute(sql`SELECT id FROM echo_music_library
-        WHERE owner_id=${req.userId!} AND id=${parsed.data.libraryTrackId!}::uuid
-          AND character_id=${parsed.data.characterId} AND status='saved_audio'
-          AND audio_path LIKE 'generated/%' LIMIT 1`);
-      if (!found.rows.length) {res.status(404).json({error:"MUSIC_TRACK_NOT_FOUND"});return;}
+      const found = await db.select({id:echoMusicLibraryTable.id})
+        .from(echoMusicLibraryTable)
+        .where(and(eq(echoMusicLibraryTable.ownerId,req.userId!),
+          eq(echoMusicLibraryTable.id,parsed.data.libraryTrackId!),
+          eq(echoMusicLibraryTable.characterId,parsed.data.characterId),
+          eq(echoMusicLibraryTable.status,"saved_audio")))
+        .limit(1);
+      if (!found.length) {res.status(404).json({error:"MUSIC_TRACK_NOT_FOUND"});return;}
     }
     res.json({status:"preview_only",source:parsed.data.source,characterId:parsed.data.characterId,
       provider:"fal_ai_mureka_voice_clone",model:"mureka/api/voice/clone",
