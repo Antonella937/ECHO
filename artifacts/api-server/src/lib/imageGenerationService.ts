@@ -23,7 +23,12 @@ export async function generateCharacterImage(input: {
   style: ImageGenerationStyle;
   referencePaths: string[];
   edit?: { sourcePath: string; instruction: string };
+  purpose?: 'hyun_private_sketch';
 }) {
+  // Autonomous spending requires a separate explicit operator switch.
+  if (input.purpose === 'hyun_private_sketch' && process.env.ECHO_HYUN_AUTONOMOUS_SKETCH_ENABLED !== 'true') {
+    throw Error('HYUN_PRIVATE_SKETCH_NOT_OPTED_IN');
+  }
   if (!paidImageGenerationActivated()) throw Error('PAID_IMAGE_GENERATION_DISABLED');
   if (!canGenerateImages(input.ownerId)) throw Error('IMAGE_GENERATION_ACCOUNT_NOT_ALLOWED');
   const apiKey = process.env.FAL_KEY;
@@ -52,5 +57,6 @@ export async function generateCharacterImage(input: {
     provider: 'fal.ai',
     model: references.length ? IMAGE_GENERATION_MODEL : FAL_TEXT_IMAGE_MODEL,
     maximumUsd: MAX_IMAGE_COST_USD,
+    purpose: input.purpose,
   });
 }
