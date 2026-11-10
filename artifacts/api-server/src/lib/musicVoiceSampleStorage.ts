@@ -31,6 +31,32 @@ export async function storePrivateVocalSample(ownerId:string, characterId:string
   if (!response.ok) throw new Error(`VOICE_SAMPLE_UPLOAD_HTTP_${response.status}`);
   return {storageKey,size:bytes.length,mimeType:mime};
 }
+/** Download a provider result through a strict fal-host allowlist, then persist privately.
+ * The result is never exposed as a public provider URL.
+ */
+export async function storeSeparatedVocalResult(ownerId:string,characterId:string,sourceUrl:string) {
+  const source=new URL(sourceUrl);
+  if(source.protocol!=="https:" || source.username || source.password || source.port ||
+    !["fal.media","fal.ai","fal.run"].some(h=>source.hostname===h || source.hostname.endsWith("."+h)))
+    throw new Error("VOICE_SEPARATION_SOURCE_UNTRUSTED");
+  const response=await fetch(source,{redirect:"error",signal:AbortSignal.timeout(45000)});
+  if(!response.ok)throw new Error("VOICE_SEPARATION_DOWNLOAD_FAILED");
+  const declared=Number(response.headers.get("content-length")||0);
+  if(declared>=MAX_BYTES)throw new Error("VOICE_SEPARATION_TOO_LARGE");
+  const reader=response.body?.getReader();
+  if(!reader)throw new Error("VOICE_SEPARATION_EMPTY");
+  const chunks:Uint8Array[]=[];let size=0;
+  while(true){
+    const {done,value}=await reader.read();if(done)break;
+    size+=value.length;if(size>=MAX_BYTES){await reader.cancel();throw new Error("VOICE_SEPARATION_TOO_LARGE");}
+    chunks.push(value);
+  }
+  const bytes=Buffer.concat(chunks.map(x=>Buffer.from(x)));
+  const declaredMime=(response.headers.get("content-type")||"").split(";")[0].toLowerCase();
+  const mime=declaredMime==="audio/wav" || declaredMime==="audio/x-wav"?"audio/wav":
+    declaredMime==="audio/mp4"?"audio/mp4":"audio/mpeg";
+  return storePrivateVocalSample(ownerId,characterId,bytes,mime);
+}
 export async function fetchOwnedPrivateVocalSample(ownerId:string,characterId:string,storageKey:string):Promise<{bytes:Buffer;mimeType:string}> {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(ownerId) || !/^[a-zA-Z0-9_-]{1,128}$/.test(characterId)) throw new Error("VOICE_SAMPLE_OWNER_INVALID");
   if (!storageKey.startsWith(`voice-samples/${ownerId}/${characterId}/`) || !/^voice-samples\/[a-zA-Z0-9_-]{1,128}\/[a-zA-Z0-9_-]{1,128}\/[a-f0-9-]{36}\.(mp3|m4a|wav)$/.test(storageKey)) throw new Error("VOICE_SAMPLE_ACCESS_DENIED");
