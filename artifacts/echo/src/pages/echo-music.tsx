@@ -390,15 +390,15 @@ export default function EchoMusicPage() {
   const [singingVoiceId, setSingingVoiceId] = useState<string | null>(null);
   const [voiceConsistency, setVoiceConsistency] = useState('unconfigured');
   const [protectSingingVoice, setProtectSingingVoice] = useState(true);
-  const [voiceSample, setVoiceSample] = useState<{name:string;duration:number;size:number}|null>(null);
+  const [voiceSample, setVoiceSample] = useState<{name:string;duration:number;size:number;file:File}|null>(null);
   const [voiceSampleError, setVoiceSampleError] = useState('');
   const [voiceCloneConsent, setVoiceCloneConsent] = useState(false);
   const [voiceCloneQuote, setVoiceCloneQuote] = useState<string>('');
   const [voiceCloneQuoteBusy, setVoiceCloneQuoteBusy] = useState(false);
   async function previewVoiceClone(source: 'upload' | 'library') {
     if (!me?.id || !voiceCloneConsent || voiceCloneQuoteBusy) return;
-    if (source === 'upload' && !voiceSample) return;
-    if (source === 'library' && !voiceSource) return;
+    if (source === 'upload' && (!voiceSample || !voiceSample.file || voiceSample.file.size !== voiceSample.size)) return;
+    if (source === 'library' && (!voiceSource || voiceSource.status !== 'saved_audio' || !voiceSource.audioPath?.startsWith('generated/') || voiceSource.durationSeconds < 15 || voiceStart + voiceLength > voiceSource.durationSeconds)) return;
     setVoiceCloneQuoteBusy(true); setVoiceCloneQuote('');
     try {
       const result = await customFetch<{estimatedCostUsd:number;status:string}>('/api/music/voices/clone/quote', {
@@ -429,7 +429,7 @@ export default function EchoMusicPage() {
       if (!Number.isFinite(duration) || duration < 15 || duration > 30) {
         setVoiceSampleError(t('Duración incompatible: usá entre 15 y 30 segundos.')); return;
       }
-      setVoiceSample({name:file.name,duration,size:file.size});
+      setVoiceSample({name:file.name,duration,size:file.size,file});
     } catch { setVoiceSampleError(t('Archivo incompatible o demasiado grande.')); }
     finally { URL.revokeObjectURL(url); }
   }
