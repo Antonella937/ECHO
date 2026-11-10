@@ -71,9 +71,9 @@ export function assertHyunPrivateSketchEligible(
 
 
 /**
- * Only an occasional, unsolicited outgoing DM can be considered for a sketch.
- * The caller must still reserve the monthly/daily quota atomically before
- * making a paid request; this function intentionally performs no I/O.
+ * Compatibility guard for callers that still use the older policy interface.
+ * Explicit character intent is required; a random draw is no longer permission
+ * to generate a billable attachment. Both spontaneous DMs and replies qualify.
  */
 export function shouldOfferHyunPrivateSketch(input: {
   scope: PrivateSketchScope;
@@ -82,12 +82,11 @@ export function shouldOfferHyunPrivateSketch(input: {
   monthlyAttempts: number;
   dailyAttempts: number;
   random: number;
+  characterOfferedSketch?: boolean;
 }): boolean {
-  if (!input.isUnsolicited || input.alreadyHasImage ||
-      !Number.isFinite(input.random) || input.random < 0 || input.random >= 1) return false;
+  if (input.alreadyHasImage || input.characterOfferedSketch !== true) return false;
   return canAttemptHyunPrivateSketch(input.scope) &&
-    privateSketchWithinLimits(input.monthlyAttempts, input.dailyAttempts) &&
-    input.random < 0.08;
+    privateSketchWithinLimits(input.monthlyAttempts, input.dailyAttempts);
 }
 
 /** Never use a user's chat message as permission for billable autonomous media. */
