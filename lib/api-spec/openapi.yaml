@@ -640,6 +640,7 @@ components:
         creatorSetup: { $ref: "#/components/schemas/CreatorSetup" }
         version: { type: integer }
         currentCharacterId: { type: string }
+        primaryCharacterId: { type: string, description: 'Optional human-operated account preferred by autonomous characters independently of active identity.' }
         characters:
           type: array
           items: { $ref: "#/components/schemas/Character" }
