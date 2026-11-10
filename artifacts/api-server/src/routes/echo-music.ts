@@ -384,7 +384,7 @@ router.patch("/music/library/:id/cover", async (req, res) => {
       if (!media) { res.status(403).json({ error: "COVER_NOT_OWNED" }); return; }
     }
     const result = await db.execute(sql`UPDATE echo_music_library SET cover_path=${body.data.coverPath}
-      WHERE owner_id=${req.userId!} AND id=${id.data}::uuid RETURNING id,cover_path AS "coverPath"`);
+      WHERE owner_id=${req.userId!} AND id=${id.data} RETURNING id,cover_path AS "coverPath"`);
     if (!result.rows.length) { res.status(404).json({ error: "MUSIC_TRACK_NOT_FOUND" }); return; }
     res.json({ item: result.rows[0] });
   } catch (error) { req.log.error({ err: error }, "Music cover update failed"); res.status(503).json({ error: "MUSIC_COVER_UNAVAILABLE" }); }
@@ -401,7 +401,7 @@ router.patch("/music/library/:id/metadata", async (req, res) => {
   try {
     const result = await db.execute(sql`
       UPDATE echo_music_library SET title=${body.data.title},artist_name=${body.data.artistName || null}
-      WHERE owner_id=${req.userId!} AND id=${id.data}::uuid
+      WHERE owner_id=${req.userId!} AND id=${id.data}
       RETURNING id,title,artist_name AS "artistName"`);
     if (!result.rows.length) { res.status(404).json({ error: "MUSIC_TRACK_NOT_FOUND" }); return; }
     res.json({ item: result.rows[0] });
