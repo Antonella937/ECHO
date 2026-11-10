@@ -229,8 +229,8 @@ export default function CreatePage() {
         }
         if (storyVideo) { setError(t('Las historias admiten solo fotos.')); return; }
         if (musicPartial) { setError(t("Completá título y artista de la música, o dejá ambos vacíos.")); return; }
-        if (!musicClip && musicTitle.trim().toLowerCase() === 'static in my veins') {
-          setError('La canción figura en el texto, pero no tiene un fragmento de audio adjunto. Volvé a elegirla en Canciones compartidas en ECHO antes de publicar.');
+        if (!musicClip && musicTitle.trim()) {
+          setError('La canción figura solo como título y artista. Elegí un fragmento reproducible de ECHO Music antes de publicar la historia.');
           return;
         }
         actions.createStory({ image, caption, closeFriendsOnly, ...(musicClip ? { musicClip } : {}), ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
