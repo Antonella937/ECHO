@@ -65,6 +65,7 @@ export interface Character {
   avatar: MediaRef;
   providerRef: CharacterProviderRef;
   identity: IdentityReference;
+  communityCommentsEnabled?: boolean;
   accountType?: 'personal' | 'artist' | 'band' | 'business' | 'venue' | 'organization';
   verified?: boolean;
   archived?: boolean;
@@ -110,6 +111,8 @@ export interface Post {
 }
 
 export interface Comment {
+  /** Simulated community handle; never impersonates an ECHO account. */
+  guestHandle?: string;
   id: string;
   postId: string;
   authorId: CharacterId;
