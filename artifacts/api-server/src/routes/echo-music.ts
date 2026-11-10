@@ -375,7 +375,7 @@ const characterMusicSave = z.object({
 // Updating artwork never changes audio or incurs AI generation charges.
 router.patch("/music/library/:id/cover", async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.id);
-  const body = z.object({ coverPath: z.string().regex(/^\\/objects\\/uploads\\/[a-f0-9-]+$/i).nullable() }).strict().safeParse(req.body);
+  const body = z.object({ coverPath: z.string().regex(new RegExp("^/objects/uploads/[a-f0-9-]+$", "i")).nullable() }).strict().safeParse(req.body);
   if (!id.success || !body.success) { res.status(400).json({ error: "INVALID_MUSIC_COVER" }); return; }
   try {
     if (body.data.coverPath) {
