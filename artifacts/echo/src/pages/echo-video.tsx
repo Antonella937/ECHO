@@ -13,6 +13,13 @@ export default function EchoVideoPage() {
   const [mode, setMode] = useState<'standard'|'advanced_silent'|'advanced_audio'>('standard');
   const [duration, setDuration] = useState<5|10>(5);
   const [aspect, setAspect] = useState<'9:16'|'16:9'|'1:1'>('9:16');
+  const [readiness, setReadiness] = useState<{privateStorageConfigured:boolean;bucketVerified:boolean}|null>(null);
+  useEffect(() => {
+    let active = true;
+    void customFetch<{privateStorageConfigured:boolean;bucketVerified:boolean}>('/api/video/readiness', {responseType:'json'})
+      .then(value => { if(active) setReadiness(value); }).catch(() => {});
+    return () => {active=false;};
+  }, []);
   const [library, setLibrary] = useState<Array<{id:string;status:string;mode:string;durationSeconds:number;createdAt:string}>>([]);
   const [libraryUnavailable, setLibraryUnavailable] = useState(false);
   useEffect(() => {
@@ -46,6 +53,13 @@ export default function EchoVideoPage() {
     </button>
     {preflight && <p role="status" className="rounded-xl border border-border bg-card p-3 text-sm">{es?'Preparación correcta. Costo estimado:':'Preparation successful. Estimated cost:'} {preflight.estimatedCredits} {es?'créditos. Sin cobros ni llamadas al proveedor.':'credits. No charges or provider calls.'}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{es?'No se pudo comprobar la preparación.':'Could not check the draft.'}</p>}
+    <div className="rounded-2xl border border-border bg-card/60 p-4 text-xs text-muted-foreground">
+      <p className="font-semibold text-foreground">{es?'Almacenamiento privado':'Private storage'}</p>
+      <p className="mt-2">{readiness === null ? (es?'Comprobando configuración…':'Checking configuration…')
+        : readiness.privateStorageConfigured
+          ? (es?'Credenciales configuradas; falta verificar el bucket y habilitar el procesamiento.':'Credentials configured; bucket verification and processing are still pending.')
+          : (es?'Falta configurar el almacenamiento privado de video.':'Private video storage still needs configuration.')}</p>
+    </div>
     <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Biblioteca de videos':'Video library'}>
       <h2 className="text-sm font-semibold">{es?'Mi biblioteca de videos y GIF':'My video & GIF library'}</h2>
       {libraryUnavailable ? <p className="text-xs text-muted-foreground">{es?'La biblioteca estará disponible cuando se inicialice el almacenamiento.':'Library will be available after storage setup.'}</p>
