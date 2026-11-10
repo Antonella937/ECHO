@@ -171,6 +171,7 @@ export function chooseAutonomyOpportunity(input: {
   minCooldownMinutes?: number;
   maxActionsPerDay?: number;
   lane?: "dm" | "social";
+  dmFrequency?: "rarely" | "sometimes" | "frequently";
 }): Opportunity {
   const { state, character } = input;
   const now = input.now ?? new Date();
@@ -221,10 +222,11 @@ export function chooseAutonomyOpportunity(input: {
 
   // A story reply is a private DM, not a public story reaction. Keep it in the
   // existing DM lane so bilateral permissions and delivery limits still apply.
+  const dmChance = input.dmFrequency === "frequently" ? 0.42 : input.dmFrequency === "rarely" ? 0.08 : 0.25;
   if (input.lane === "dm" && !unanswered &&
       history.length < (input.maxActionsPerDay ?? 2) &&
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
-      random() < 0.18) {
+      random() < dmChance) {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = [...state.stories].reverse().find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
