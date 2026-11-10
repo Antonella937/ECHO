@@ -48,6 +48,7 @@ const SavedPage = lazy(() => import('@/pages/saved'));
 const SettingsPage = lazy(() => import('@/pages/settings'));
 const ImageStorageDiagnosticPage = lazy(() => import('@/pages/image-storage-diagnostic'));
 const EchoMusicPage = lazy(() => import('@/pages/echo-music'));
+const EchoVideoPage = lazy(() => import('@/pages/echo-video'));
 const SharedPreviewPage = lazy(() => import('@/pages/shared-preview'));
 const CollaborationPage = lazy(() => import('@/pages/collaboration'));
 const SubscriptionsPage = lazy(() => import('@/pages/subscriptions'));
@@ -317,6 +318,7 @@ function ProtectedRouter() {
           <Route path="/settings" component={SettingsPage} />
           <Route path="/settings/image-storage-diagnostic" component={ImageStorageDiagnosticPage} />
           <Route path="/music" component={EchoMusicPage} />
+          <Route path="/video" component={EchoVideoPage} />
           <Route path="/settings/subscriptions" component={SubscriptionsPage} />
           <Route path="/help" component={HelpCenterPage} />
           <Route path="/admin/support" component={SupportAdminPage} />
