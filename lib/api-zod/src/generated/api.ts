@@ -751,6 +751,7 @@ export const ProposeCharacterResponse = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(proposeCharacterResponseConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(proposeCharacterResponseConfigurationVoiceVocabularyMax),
@@ -1145,6 +1146,7 @@ export const GetUniverseResponse = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(getUniverseResponseStateOneCharactersItemConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(getUniverseResponseStateOneCharactersItemConfigurationVoiceVocabularyMax),
@@ -1690,6 +1692,7 @@ export const SaveUniverseBody = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(saveUniverseBodyStateCharactersItemConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(saveUniverseBodyStateCharactersItemConfigurationVoiceVocabularyMax),
@@ -2223,6 +2226,7 @@ export const SaveUniverseResponse = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(saveUniverseResponseStateOneCharactersItemConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(saveUniverseResponseStateOneCharactersItemConfigurationVoiceVocabularyMax),
@@ -2806,6 +2810,7 @@ export const VerifyUniverseResponse = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(verifyUniverseResponseOneStateOneCharactersItemConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(verifyUniverseResponseOneStateOneCharactersItemConfigurationVoiceVocabularyMax),
@@ -3661,6 +3666,7 @@ export const CreateCreatorUniverseBody = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationVoiceVocabularyMax),
@@ -4194,6 +4200,7 @@ export const CreateCreatorUniverseResponse = zod.object({
 }),
   "voice": zod.object({
   "basicVoiceId": zod.string().regex(/^echo-[fm]-0[1-5]$/).optional(),
+  "outputLanguage": zod.enum(["es","en","pt","fr","de","it","ko","ja","zh"]).optional(),
   "speakingStyle": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceSpeakingStyleMax),
   "messageLength": zod.enum(['short', 'balanced', 'long']),
   "vocabulary": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationVoiceVocabularyMax),
