@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import { Bold, Italic, Underline } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 
@@ -28,7 +28,7 @@ export function FormattingToolbar({ inputRef, value, onChange, maxLength, classN
   const language = useLanguage();
   const selected = useRef<{ start:number; end:number } | null>(null);
   const names = labels[language] ?? labels.en;
-  const buttons: { style:Style; name:string; marker:string; icon:React.ReactNode }[] = [
+  const buttons: { style:Style; name:string; marker:string; icon:ReactNode }[] = [
     {style:'bold',name:names[0],marker:'**',icon:<Bold size={15}/>},
     {style:'italic',name:names[1],marker:'*',icon:<Italic size={15}/>},
     {style:'boldItalic',name:names[2],marker:'***',icon:<span className="text-xs font-bold italic">BI</span>},
