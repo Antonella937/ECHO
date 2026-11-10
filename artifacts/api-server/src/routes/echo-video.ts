@@ -3,7 +3,7 @@ import { z } from "zod";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ECHO_VIDEO_POLICY } from "../lib/entitlements";
-import { videoStorageConfig, VIDEO_PRIVATE_STORAGE_LIMITS, fetchOwnedPrivateVideoAsset } from "../lib/videoPrivateStorage";
+import { videoStorageConfig, VIDEO_PRIVATE_STORAGE_LIMITS, fetchOwnedPrivateVideoAsset, inspectVideoPrivateBucket } from "../lib/videoPrivateStorage";
 
 /** Video/GIF staging only. No provider requests, payment or balance mutations. */
 const router: IRouter = Router();
@@ -35,20 +35,27 @@ router.get("/video/catalog", (_req, res) => {
   });
 });
 
-router.get("/video/readiness", (_req, res) => {
-  const configured = videoStorageConfig() !== null;
+router.get("/video/readiness", async (_req, res) => {
+  const [storage, database] = await Promise.all([
+    inspectVideoPrivateBucket(),
+    pool.query<{video_jobs:string|null;gif_jobs:string|null;ledger:string|null}>(
+      `SELECT to_regclass('public.echo_video_generation_jobs')::text AS video_jobs,
+              to_regclass('public.echo_video_gif_jobs')::text AS gif_jobs,
+              to_regclass('public.echo_video_credit_ledger')::text AS ledger`
+    ).then(result=>Boolean(result.rows[0]?.video_jobs && result.rows[0]?.gif_jobs && result.rows[0]?.ledger))
+     .catch(()=>false),
+  ]);
   res.json({
-    status: "preparation_only",
-    privateStorageConfigured: configured,
-    bucketVerified: false,
-    databaseMigrationVerified: false,
-    generationEnabled: false,
-    checkoutEnabled: false,
-    gifConversionEnabled: false,
-    providerConfigured: false,
-    acceptedMimeTypes: VIDEO_PRIVATE_STORAGE_LIMITS.acceptedMimeTypes,
-    maxVideoBytes: VIDEO_PRIVATE_STORAGE_LIMITS.maxVideoBytes,
-    maxGifBytes: VIDEO_PRIVATE_STORAGE_LIMITS.maxGifBytes,
+    status:"preparation_only",
+    privateStorageConfigured:storage.configured,
+    bucketVerified:storage.verified,
+    bucketPrivate:storage.privateBucket,
+    databaseMigrationVerified:database,
+    generationEnabled:false,checkoutEnabled:false,gifConversionEnabled:false,
+    providerConfigured:false,
+    acceptedMimeTypes:VIDEO_PRIVATE_STORAGE_LIMITS.acceptedMimeTypes,
+    maxVideoBytes:VIDEO_PRIVATE_STORAGE_LIMITS.maxVideoBytes,
+    maxGifBytes:VIDEO_PRIVATE_STORAGE_LIMITS.maxGifBytes,
   });
 });
 
