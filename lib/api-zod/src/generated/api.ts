@@ -1288,6 +1288,13 @@ export const GetUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "taggedAccountIds": zod.array(zod.string()).max(getUniverseResponseStateOnePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
@@ -1330,6 +1337,13 @@ export const GetUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "displayMetrics": zod.object({
   "views": zod.number().int().min(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(getUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
@@ -1818,6 +1832,13 @@ export const SaveUniverseBody = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "taggedAccountIds": zod.array(zod.string()).max(saveUniverseBodyStatePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
@@ -1860,6 +1881,13 @@ export const SaveUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "displayMetrics": zod.object({
   "views": zod.number().int().min(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(saveUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
@@ -2336,6 +2364,13 @@ export const SaveUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "taggedAccountIds": zod.array(zod.string()).max(saveUniverseResponseStateOnePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
@@ -2378,6 +2413,13 @@ export const SaveUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "displayMetrics": zod.object({
   "views": zod.number().int().min(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMin).max(saveUniverseResponseStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
@@ -2904,6 +2946,13 @@ export const VerifyUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "taggedAccountIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOnePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
@@ -2946,6 +2995,13 @@ export const VerifyUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "displayMetrics": zod.object({
   "views": zod.number().int().min(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMin).max(verifyUniverseResponseOneStateOneStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
@@ -3744,6 +3800,13 @@ export const CreateCreatorUniverseBody = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "taggedAccountIds": zod.array(zod.string()).max(createCreatorUniverseBodyStatePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
@@ -3786,6 +3849,13 @@ export const CreateCreatorUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "displayMetrics": zod.object({
   "views": zod.number().int().min(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseBodyStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
@@ -4262,6 +4332,13 @@ export const CreateCreatorUniverseResponse = zod.object({
 })),
   "follows": zod.record(zod.string(), zod.array(zod.string())),
   "posts": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "taggedAccountIds": zod.array(zod.string()).max(createCreatorUniverseResponseStatePostsItemTaggedAccountIdsMax).optional(),
   "commentsEnabled": zod.boolean().optional(),
   "pinned": zod.boolean().optional(),
@@ -4304,6 +4381,13 @@ export const CreateCreatorUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "stories": zod.array(zod.object({
+  "musicClip": zod.object({
+    "trackId": zod.string().uuid(),
+    "title": zod.string().min(1).max(160),
+    "startSeconds": zod.number().min(0),
+    "clipSeconds": zod.union([zod.literal(15), zod.literal(30)])
+  }).optional(),
+
   "displayMetrics": zod.object({
   "views": zod.number().int().min(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMin).max(createCreatorUniverseResponseStateStoriesItemDisplayMetricsViewsMax).nullish().describe('Optional narrative base, added to unique real viewers. Absence/null means zero; never creates viewers.')
 }).optional(),
