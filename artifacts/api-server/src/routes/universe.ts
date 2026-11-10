@@ -55,10 +55,29 @@ router.get("/universe/revision", async (req, res): Promise<void> => {
 
 router.get("/universe", async (req, res): Promise<void> => {
   const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
-  const [meta] = await db.select().from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId)));
+  if (!universeId || universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_UNIVERSE_ID" }); return;
+  }
+  // Read metadata only: do not transfer potentially huge JSON states merely to
+  // check whether a universe is available or select a fallback universe.
+  const [meta] = await db.select({
+    archivedAt: echoUniversesTable.archivedAt,
+    deletedAt: echoUniversesTable.deletedAt,
+  }).from(echoUniversesTable).where(and(
+    eq(echoUniversesTable.ownerId, req.userId!),
+    eq(echoUniversesTable.universeId, universeId),
+  )).limit(1);
   if (meta?.archivedAt || meta?.deletedAt) {
-    const available = await db.select().from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, req.userId!));
-    res.status(409).json({ error: "UNIVERSE_UNAVAILABLE", ownerId: req.userId!, fallbackUniverseId: available.find(row => !row.archivedAt && !row.deletedAt)?.universeId ?? null }); return;
+    const available = await db.select({
+      universeId: echoUniversesTable.universeId,
+      archivedAt: echoUniversesTable.archivedAt,
+      deletedAt: echoUniversesTable.deletedAt,
+    }).from(echoUniversesTable).where(eq(echoUniversesTable.ownerId, req.userId!));
+    res.status(409).json({
+      error: "UNIVERSE_UNAVAILABLE",
+      ownerId: req.userId!,
+      fallbackUniverseId: available.find(row => !row.archivedAt && !row.deletedAt)?.universeId ?? null,
+    }); return;
   }
   res.json(GetUniverseResponse.parse(await readUniverse(req.userId!, universeId)));
 });
