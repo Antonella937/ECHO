@@ -28,6 +28,7 @@ export function applyVerifiedAttractionEvent(
   const target = state.characters.find(c => c.id === event.targetId && !c.archived);
   const relation = actor?.configuration?.relationships.find(r => r.targetId === event.targetId);
   if (!actor || !target || !relation) return reject("RELATIONSHIP_NOT_CONFIGURED");
+  if (relation.preset === "friend" || relation.preset === "close_friend" || relation.preset === "family") return reject("PLATONIC_RELATIONSHIP");
   if (relation.attraction == null) return reject("ATTRACTION_DISABLED");
   const next = Math.max(0, Math.min(100, relation.attraction + changes[event.kind]));
   const delta = next - relation.attraction;
