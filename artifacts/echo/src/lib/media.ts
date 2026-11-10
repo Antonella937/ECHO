@@ -141,11 +141,12 @@ function fetchPrivateMedia(url: string) {
       drainPrivateMediaQueue();
     });
 }
-function loadPrivateMedia(url: string) {
+function loadPrivateMedia(url: string, priority = false) {
   if (privateMediaCache.has(url) || privateMediaPending.has(url) || privateMediaQueued.has(url)) return;
   if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
   privateMediaQueued.add(url);
-  privateMediaQueue.push(url);
+  if (priority) privateMediaQueue.unshift(url);
+  else privateMediaQueue.push(url);
   drainPrivateMediaQueue();
 }
 export function useMediaResolver() {
@@ -170,7 +171,7 @@ export function useMediaResolver() {
       privateMediaCache.set(url, locallyPrimed);
     }
     if (!privateMediaCache.has(url) && !privateMediaPending.has(url)) {
-      queueMicrotask(() => loadPrivateMedia(url));
+      queueMicrotask(() => loadPrivateMedia(url, hint?.sourceType === "story"));
     }
     return privateMediaCache.get(url) ?? '';
   };
