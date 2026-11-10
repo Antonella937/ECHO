@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS echo_music_voice_comparisons (
   character_id text NOT NULL,
   singing_track_id uuid NOT NULL,
   speech_sample_id uuid,
+  singing_vocal_id text,
   assessment text NOT NULL CHECK (assessment IN ('similar','different')),
   notes text NOT NULL DEFAULT '',
   updated_at timestamptz NOT NULL DEFAULT now(),
