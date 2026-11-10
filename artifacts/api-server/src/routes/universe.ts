@@ -63,6 +63,44 @@ router.get("/universe", async (req, res): Promise<void> => {
   res.json(GetUniverseResponse.parse(await readUniverse(req.userId!, universeId)));
 });
 
+// Read-only, owner-isolated paginated profile listing. Transitional endpoint:
+// the legacy JSON universe remains authoritative until partitioned storage is migrated.
+router.get("/universe/characters/page", async (req, res): Promise<void> => {
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "primary";
+  if (!universeId || universeId.length > 100) {
+    res.status(400).json({ error: "INVALID_UNIVERSE_ID" }); return;
+  }
+  const rawLimit = typeof req.query.limit === "string" ? Number(req.query.limit) : 24;
+  const rawOffset = typeof req.query.offset === "string" ? Number(req.query.offset) : 0;
+  if (!Number.isSafeInteger(rawLimit) || rawLimit < 1 || rawLimit > 50 ||
+      !Number.isSafeInteger(rawOffset) || rawOffset < 0 || rawOffset > 1000000) {
+    res.status(400).json({ error: "INVALID_PAGINATION" }); return;
+  }
+  const envelope = await readUniverse(req.userId!, universeId);
+  const state = SaveUniverseBody.shape.state.safeParse(envelope.state);
+  if (!state.success) {
+    res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return;
+  }
+  const characters = state.data.characters.filter(character => !character.archived);
+  const page = characters.slice(rawOffset, rawOffset + rawLimit).map(character => ({
+    id: character.id,
+    personId: character.personId ?? character.id,
+    handle: character.handle,
+    name: character.name,
+    occupation: character.occupation,
+    bio: character.bio,
+    avatar: character.avatar,
+    accountType: character.accountType ?? "personal",
+    verified: character.verified ?? false,
+    privateAccount: character.privateAccount ?? false,
+    displayMetrics: character.displayMetrics ?? null,
+  }));
+  res.setHeader("Cache-Control", "private, no-store");
+  res.json({ characters: page, total: characters.length,
+    nextOffset: rawOffset + page.length < characters.length ? rawOffset + page.length : null,
+    revision: envelope.revision });
+});
+
 // Private historical lookup, never exposed across owners or universes.
 router.get("/universe/memory-archive", async (req, res): Promise<void> => {
   if (process.env.ECHO_MEMORY_ARCHIVE_ENABLED !== "true") {
