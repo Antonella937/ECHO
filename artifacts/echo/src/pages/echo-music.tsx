@@ -413,8 +413,25 @@ export default function EchoMusicPage() {
     } catch (error) {setVoiceCloneQuote(error instanceof Error ? error.message : 'QUOTE_UNAVAILABLE');}
     finally {setVoiceCloneQuoteBusy(false);}
   }
+  const [voiceSampleUploadBusy,setVoiceSampleUploadBusy] = useState(false);
+  const [voiceSampleStorageKey,setVoiceSampleStorageKey] = useState('');
+  const [voiceSampleUploadError,setVoiceSampleUploadError] = useState('');
+  async function stageVocalSample() {
+    if (!me?.id || !voiceSample || !voiceCloneConsent || voiceSampleUploadBusy) return;
+    setVoiceSampleUploadBusy(true);setVoiceSampleUploadError('');setVoiceSampleStorageKey('');
+    try {
+      const params = new URLSearchParams({characterId:me.id,durationSeconds:String(voiceSample.duration)});
+      const result = await customFetch<{storageKey:string;status:string}>('/api/music/voices/clone/sample?' + params.toString(),{
+        method:'POST',headers:{'Content-Type':voiceSample.file.type === 'audio/mp4' || voiceSample.file.name.toLowerCase().endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg','x-voice-consent':'confirmed'},
+        body:voiceSample.file,responseType:'json'
+      });
+      if (result.status !== 'stored_private') throw new Error('VOICE_SAMPLE_UPLOAD_FAILED');
+      setVoiceSampleStorageKey(result.storageKey);
+    } catch(error) {setVoiceSampleUploadError(error instanceof Error?error.message:'VOICE_SAMPLE_UPLOAD_FAILED');}
+    finally {setVoiceSampleUploadBusy(false);}
+  }
   async function prepareVocalSample(file?: File) {
-    setVoiceSample(null); setVoiceSampleError('');
+    setVoiceSample(null); setVoiceSampleError('');setVoiceSampleStorageKey('');setVoiceSampleUploadError('');
     if (!file) return;
     if (!/\.(mp3|m4a)$/i.test(file.name) || file.size >= 10 * 1024 * 1024) {
       setVoiceSampleError(t('Archivo incompatible o demasiado grande.')); return;
@@ -686,6 +703,9 @@ export default function EchoMusicPage() {
           <label className="mt-2 flex items-start gap-2 text-xs"><input type="checkbox" checked={voiceCloneConsent} onChange={event => {setVoiceCloneConsent(event.target.checked);setVoiceCloneQuote('');}}/>{t("Confirmo que tengo permiso para utilizar esta voz y crear una identidad vocal reutilizable")}</label>
           <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceCloneQuoteBusy} onClick={() => void previewVoiceClone('upload')} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneQuoteBusy ? '…' : t("Consultar costo sin generar")}</button>
           {voiceCloneQuote && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneQuote}</p>}
+          <button type="button" disabled={!voiceSample || !voiceCloneConsent || voiceSampleUploadBusy} onClick={() => void stageVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSampleUploadBusy ? '…' : t("Guardar muestra privada (sin generar)")}</button>
+          {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>}
+          {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>
         </details>
         <p className="text-xs text-muted-foreground">{t("Desde una canción de mi biblioteca")}: {t("Mi biblioteca")} → {t("Guardar voz")}</p>
         <details className="rounded-lg border border-border p-2">
