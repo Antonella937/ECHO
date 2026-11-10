@@ -48,7 +48,7 @@ const voiceCloneQuoteSchema = z.object({
   libraryTrackId: z.string().uuid().optional(),
   consentConfirmed: z.literal(true),
 }).strict().superRefine((data, ctx) => {
-  if (data.source === "upload" && (!data.fileName || !/\\.(mp3|m4a)$/i.test(data.fileName) || !data.fileSizeBytes))
+  if (data.source === "upload" && (!data.fileName || !/\.(mp3|m4a)$/i.test(data.fileName) || !data.fileSizeBytes))
     ctx.addIssue({code:z.ZodIssueCode.custom,message:"INVALID_VOICE_SAMPLE"});
   if (data.source === "library" && !data.libraryTrackId)
     ctx.addIssue({code:z.ZodIssueCode.custom,message:"MUSIC_TRACK_REQUIRED"});
