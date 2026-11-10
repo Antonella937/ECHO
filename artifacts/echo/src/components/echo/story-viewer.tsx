@@ -15,7 +15,7 @@ const STORY_REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
 import { useLocation } from 'wouter';
 import { useSocial } from '@/store/social-store';
 import { useStoryGroups, type StoryGroup } from '@/hooks/use-social-selectors';
-import { useMediaResolver, timeAgo } from '@/lib/media';
+import { retryPrivateMedia, useMediaResolver, timeAgo } from '@/lib/media';
 import { CharacterAvatar } from './avatar';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -81,6 +81,7 @@ export function StoryViewerProvider({ children }: { children: ReactNode }) {
 function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIndex: number; onClose(): void }) {
   const t = useStoryViewerText();
   const resolveMedia = useMediaResolver();
+  const [failedStoryImage, setFailedStoryImage] = useState<string | null>(null);
   const { me, actions, state, character, universeId } = useSocial();
   const [, navigate] = useLocation();
   const [gi, setGi] = useState(startIndex);
@@ -106,6 +107,13 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const isMine = group.author.id === me.id;
   const liveStory = state.stories.find((s) => s.id === story.id) ?? story;
   const editingMetrics = editingMetricsId === story.id;
+  const storyImage = resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id });
+  const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
+  const imageUnavailable = Boolean(story.image) && (!storyImage || failedStoryImage === story.id);
+  const retryStoryImage = () => {
+    setFailedStoryImage(null);
+    retryPrivateMedia(story.image, { sourceUniverseId: universeId, sourceCharacterId: story.authorId, sourceType: 'story', sourceContentId: story.id });
+  };
 
   useEffect(() => {
     actions.seeStory(story.id);
@@ -149,7 +157,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     };
   }, [next, prev, onClose, editingMetrics]);
 
-  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showShare || editingMetrics || confirmDelete;
+  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showShare || editingMetrics || confirmDelete || (imageIsPrivate && imageUnavailable);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -230,12 +238,19 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
         <img
           key={story.id}
-          src={resolveMedia(story.image, { sourceType: 'story', sourceContentId: story.id })}
+          src={storyImage}
+          onError={() => setFailedStoryImage(story.id)}
           alt={story.caption || `${t("Historia de")} ${group.author.name}`}
           className="fade-up absolute inset-0 h-full w-full object-contain md:object-cover"
           draggable={false}
           data-testid={`img-story-${story.id}`}
         />
+        {imageIsPrivate && imageUnavailable && (
+          <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-black/70 px-8 text-center text-white" role="status">
+            <p className="text-sm">La foto de esta historia todavía no está disponible.</p>
+            <button type="button" onClick={retryStoryImage} className="rounded-full border border-white/50 px-5 py-2 text-sm font-medium">Reintentar imagen</button>
+          </div>
+        )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[hsl(240_8%_3%/0.75)] to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[hsl(240_8%_3%/0.85)] to-transparent" />
 
