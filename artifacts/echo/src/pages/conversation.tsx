@@ -1,3 +1,4 @@
+import { SocialText } from '@/components/echo/social-text';
 import { useConversationText } from '@/lib/conversation-translations';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { MusicLibraryPicker } from '@/components/echo/music-library-picker';
@@ -602,7 +603,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         <textarea maxLength={1200} value={tweakInstruction} onChange={e => setTweakInstruction(e.target.value)} placeholder={t('¿Qué querés cambiar de esta respuesta?')} className="min-h-20 w-full resize-y rounded-lg border border-input bg-background p-2 text-sm" />
         {tweakBusy && <p role="status" className="text-xs text-muted-foreground">{t('Generando ajuste…')}</p>}
         {tweakError && <p role="alert" className="text-xs text-destructive">{t('No se pudo generar el ajuste. Intentá nuevamente.')}</p>}
-        {tweakPreview && <div className="rounded-xl bg-secondary p-3"><p className="mb-1 text-xs font-semibold">{t('Vista previa')}</p><p className="whitespace-pre-wrap text-sm">{tweakPreview}</p></div>}
+        {tweakPreview && <div className="rounded-xl bg-secondary p-3"><p className="mb-1 text-xs font-semibold">{t('Vista previa')}</p><p className="whitespace-pre-wrap text-sm"><SocialText text={tweakPreview} /></p></div>}
         <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => { setTweakOpen(false); setTweakPreview(''); }} className="rounded-lg bg-secondary px-3 py-2 text-xs">{t('Cancelar')}</button><button type="button" disabled={tweakBusy || !tweakInstruction.trim()} onClick={() => void generateTweak()} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">{t(tweakPreview ? 'Regenerar ajuste' : 'Generar ajuste')}</button>{tweakPreview && <button type="button" onClick={() => { if (onApplyTweak(tweakOriginal, tweakPreview)) { setTweakOpen(false); setTweakPreview(''); } }} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground">{t('Aplicar ajuste')}</button>}</div>
       </div>}
       {m.musicTrackId && <div className="mb-2 rounded-xl border border-border bg-card p-3 text-foreground">
@@ -623,7 +624,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
               mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-secondary text-foreground',
             )}
           >
-            {visibleText}
+            <SocialText text={visibleText} />
           </p>
         )}
         <span className="flex max-w-full shrink-0 flex-wrap gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
