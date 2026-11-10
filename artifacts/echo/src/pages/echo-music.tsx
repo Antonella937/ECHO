@@ -75,6 +75,12 @@ const musicEnglish: Record<string,string> = {
   "Todavía no hay voz cantada vinculada. ¿Querés generar con una voz nueva?": "No singing voice is linked yet. Generate with a new voice?",
   "Preparar voz de Nela": "Prepare Nela voice",
   "Subir muestra vocal": "Upload vocal sample",
+  "Desde una canción de mi biblioteca": "From a song in my library",
+  "Desde un archivo de audio": "From an audio file",
+  "Elegí cómo preparar la voz permanente": "Choose how to prepare the permanent voice",
+  "La canción debe contener una voz clara y autorizada; el fragmento todavía no se extrae ni se envía al proveedor.": "The track must contain a clear, authorized vocal; the clip is not yet extracted or sent to the provider.",
+  "Confirmo que tengo permiso para utilizar esta voz y crear una identidad vocal reutilizable": "I confirm I have permission to use this voice and create a reusable vocal identity",
+  "Referencia seleccionada. La creación de la voz requiere un paso de clonación confirmado.": "Reference selected. Creating the voice requires a confirmed cloning step.",
   "Muestra vocal lista": "Vocal sample ready",
   "Seleccioná un MP3 o M4A de menos de 10 MB y entre 15 y 30 segundos.": "Choose an MP3 or M4A under 10 MB, between 15 and 30 seconds.",
   "El audio debe ser tuyo o contar con autorización para usar esa voz.": "You must own the audio or have permission to use this voice.",
@@ -388,7 +394,7 @@ export default function EchoMusicPage() {
   async function prepareVocalSample(file?: File) {
     setVoiceSample(null); setVoiceSampleError('');
     if (!file) return;
-    if (!/\\.(mp3|m4a)$/i.test(file.name) || file.size >= 10 * 1024 * 1024) {
+    if (!/\.(mp3|m4a)$/i.test(file.name) || file.size >= 10 * 1024 * 1024) {
       setVoiceSampleError(t('Archivo incompatible o demasiado grande.')); return;
     }
     const url = URL.createObjectURL(file);
@@ -641,14 +647,17 @@ export default function EchoMusicPage() {
         {singingVoiceId&&<button type="button" disabled={voiceLinkBusy} className="text-xs underline text-muted-foreground" onClick={()=>void unlinkSingingVoice()}>{interfaceLanguage==='es'?'Desvincular voz cantada':'Unlink singing voice'}</button>}
         <label className="flex items-center gap-2"><input type="checkbox" checked={protectSingingVoice} onChange={event => setProtectSingingVoice(event.target.checked)}/>{t("Proteger identidad vocal")}</label>
         <p className="text-xs text-muted-foreground">{t("Evita generar canciones cantadas con una voz diferente a la del personaje.")}</p>
+        <p className="text-xs font-semibold">{t("Elegí cómo preparar la voz permanente")}</p>
         <details className="rounded-lg border border-border p-2">
           <summary className="cursor-pointer text-xs font-semibold">{t("Subir muestra vocal")}</summary>
+          <p className="mt-2 text-xs font-semibold">{t("Desde un archivo de audio")}</p>
           <p className="mt-2 text-xs text-muted-foreground">{t("Seleccioná un MP3 o M4A de menos de 10 MB y entre 15 y 30 segundos.")}</p>
           <p className="mt-1 text-xs text-muted-foreground">{t("El audio debe ser tuyo o contar con autorización para usar esa voz.")}</p>
           <input type="file" accept=".mp3,.m4a,audio/mpeg,audio/mp4" className="mt-2 block w-full text-xs" onChange={event => {void prepareVocalSample(event.target.files?.[0]);}} />
           {voiceSampleError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleError}</p>}
           {voiceSample && <div className="mt-2 space-y-1 text-xs"><p className="font-semibold">{t("Muestra vocal lista")}: {voiceSample.name} ({Math.round(voiceSample.duration)}s)</p><p className="text-muted-foreground">{t("La muestra está preparada. La clonación no se ejecutará sin confirmar el costo.")}</p></div>}
         </details>
+        <p className="text-xs text-muted-foreground">{t("Desde una canción de mi biblioteca")}: {t("Mi biblioteca")} → {t("Guardar voz")}</p>
         <details className="rounded-lg border border-border p-2">
           <summary className="cursor-pointer text-xs font-semibold">{t("Vincular voz existente")}</summary>
           <p className="mt-2 text-xs text-muted-foreground">{t("Solo ingresá un ID de voz de Mureka que hayas creado y tengas derecho a utilizar. Esto no clona voces ni consume créditos.")}</p>
@@ -678,7 +687,8 @@ export default function EchoMusicPage() {
       <input aria-label={t("Inicio del fragmento")} className="w-full" type="range" min={0} max={Math.max(0,voiceSource.durationSeconds-voiceLength)} step={1} value={voiceStart} onChange={event => setVoiceStart(Number(event.target.value))}/>
       <p className="text-sm">{formatTime(voiceStart)} – {formatTime(voiceStart+voiceLength)}</p>
       <p className="text-xs text-muted-foreground">{t("Crear la voz clonada cuesta aproximadamente USD 5 en fal.ai. Esta pantalla no realiza el cargo ni crea el clon.")}</p>
-      <p className="text-xs text-primary">{t("Referencia vocal preparada. Falta activar la clonación con confirmación de pago.")}</p>
+      <p className="text-xs text-muted-foreground">{t("La canción debe contener una voz clara y autorizada; el fragmento todavía no se extrae ni se envía al proveedor.")}</p>
+      <p className="text-xs text-primary">{t("Referencia seleccionada. La creación de la voz requiere un paso de clonación confirmado.")}</p>
       <button type="button" onClick={() => setVoiceSource(null)} className="rounded-xl border border-border px-4 py-2 text-sm">{t("Cerrar")}</button>
     </section>}
   </main></div>;
