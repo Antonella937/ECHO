@@ -323,7 +323,6 @@ export function chooseAutonomyOpportunity(input: {
   }
 
   const comment = commentTarget(state, character, now, random);
-  const recipients = availableTargets(state, character);
   const following = new Set(state.follows[character.id] ?? []);
   const relevantAuthor = (authorId: string) => authorId !== character.id && following.has(authorId);
   const recentTargetUsed = (situation: AutonomySituation, targetId: string) =>
@@ -366,7 +365,6 @@ export function chooseAutonomyOpportunity(input: {
   // A manually posted story does not consume the autonomous story allowance.
   const anyStoryToday = state.stories.some((item) => item.authorId === character.id && recentDate(item.createdAt));
   const commentCount = state.comments.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
-  const dmCount = state.messages.filter((item) => item.senderId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency), publishStory: false }] : []),
@@ -380,7 +378,7 @@ export function chooseAutonomyOpportunity(input: {
       ? [{ situation: "story_reaction" as const, weight: frequencyWeight(social?.storiesFrequency) }] : []),
     ...(targetMessage && actionCount("dm_reaction") < 2
       ? [{ situation: "dm_reaction" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
-  ].filter((item) => input.lane === "dm" ? item.situation === "dm" : item.situation !== "dm");
+  ];
   if (weights.length === 0) {
     return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "No text action is currently eligible under the anti-repetition caps.", localHour: local.hour, timezone };
   }
@@ -400,13 +398,7 @@ export function chooseAutonomyOpportunity(input: {
       timezone,
     };
   }
-  if (selected.situation === "dm" && recipients.length) {
-    const recipient = recipients.sort((a, b) => {
-      const relation = (id: string) => config?.relationships.find((item) => item.targetId === id)?.closeness ?? 0;
-      return relation(b.id) - relation(a.id);
-    })[0];
-    return { situation: "dm", recipientId: recipient.id, reasonCode: "OPPORTUNITY_SELECTED", reason: "A followed account or existing direct conversation provides a valid recipient.", localHour: local.hour, timezone };
-  }
+
   if (selected.situation === "like_post" && targetPost) {
     return { situation: "like_post", postId: targetPost.id, reasonCode: "OPPORTUNITY_SELECTED",
       reason: "A recent post from a relevant account has text context and has not been liked by this character.", localHour: local.hour, timezone };
