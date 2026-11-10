@@ -56,6 +56,8 @@ export default function GroupConversationPage() {
   const [sceneObserverEnabled, setSceneObserverEnabled] = useState(false);
   const [sceneLoaded, setSceneLoaded] = useState(false);
   const [sceneSaving, setSceneSaving] = useState(false);
+  const [sceneRunning, setSceneRunning] = useState(false);
+  const stopSceneRef = useRef(false);
   const [autonomyEnabled, setAutonomyEnabled] = useState(false);
   const [autonomyInterval, setAutonomyInterval] = useState(60);
   const [autonomyLoaded, setAutonomyLoaded] = useState(false);
@@ -110,6 +112,29 @@ export default function GroupConversationPage() {
       .catch(() => { if (active) { setAutonomyLoaded(false); setError('No se pudo cargar la configuración de autonomía.'); } });
     return () => { active = false; };
   }, [settingsOpen, id, user?.id, me.id]);
+  const advanceScene = async (count: number) => {
+    if (!id || sceneRunning) return;
+    stopSceneRef.current = false;
+    setSceneRunning(true);
+    try {
+      for (let turn = 0; turn < count && !stopSceneRef.current; turn++) {
+        const result = await customFetch<{ status: string; reason?: string }>(`/api/group-dms/${encodeURIComponent(id)}/scene/next`, {
+          method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id }),
+        });
+        if (result.status !== 'sent') {
+          if (turn === 0) setError(`No se generó el turno: ${result.reason ?? 'revisá la autonomía de los personajes'}`);
+          break;
+        }
+        const refreshed = await customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/messages?${scope}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
+        setMessages(refreshed.messages);
+        if (turn + 1 < count && !stopSceneRef.current) {
+          await new Promise(resolve => window.setTimeout(resolve, sceneResponseSpeed === 'immediate' ? 2500 : sceneResponseSpeed === 'slow' ? 12000 : 6000));
+        }
+      }
+    } catch { setError('No se pudo continuar la escena. Comprobá que esté habilitada la autonomía grupal.'); }
+    finally { setSceneRunning(false); }
+  };
   const saveScene = async () => {
     if (!id || !sceneLoaded || sceneSaving) return;
     setSceneSaving(true);
@@ -311,6 +336,16 @@ export default function GroupConversationPage() {
         <p className="mt-2 text-xs text-muted-foreground">Estas preferencias son individuales. Archivar no elimina los mensajes.</p>
       </div>
       <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Salir del grupo</button>
+    </div>}
+    {sceneObserverEnabled && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-auto text-xs text-muted-foreground">Modo espectadora · escena grupal</span>
+        {sceneRunning ? <button onClick={() => { stopSceneRef.current = true; }} className="rounded-lg bg-secondary px-3 py-2 text-xs">Detener después del turno</button> : <>
+          <button onClick={() => void advanceScene(1)} disabled={!autonomyEnabled} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">Siguiente turno</button>
+          <button onClick={() => void advanceScene(12)} disabled={!autonomyEnabled} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
+        </>}
+      </div>
+      <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
     </div>}
     <main className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-5" data-testid="group-messages">
       {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">Mandá el primer mensaje para empezar la conversación.</p></div>}
