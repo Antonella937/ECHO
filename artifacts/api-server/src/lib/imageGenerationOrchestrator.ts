@@ -59,5 +59,5 @@ export async function orchestrateImageGeneration(deps: GenerationDependencies, i
   // Do not release reserved funds based on a model price estimate. The provider's
   // actual charge has not been reconciled, so account for the full cap.
   await deps.settle(reservation.id, { status: 'succeeded', reportedCostUsd: input.maximumUsd, objectPath });
-  return { objectPath, billedUsd: result.billedUsd, jobId: reservation.id };
+  return { objectPath, mimeType: result.mimeType, billedUsd: result.billedUsd, jobId: reservation.id };
 }
