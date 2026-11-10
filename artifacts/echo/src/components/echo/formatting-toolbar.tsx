@@ -55,7 +55,7 @@ export function FormattingToolbar({ inputRef, value, onChange, maxLength, classN
   };
   return <div className={`flex items-center gap-1 ${className}`} role="toolbar" aria-label={language === 'es' ? 'Formato de texto' : 'Text formatting'}>
     {buttons.map(({style,name,marker,icon}) => <button key={style} type="button" title={name} aria-label={name}
-      onPointerDown={() => { const input=inputRef.current; if(input) selected.current={start:input.selectionStart,end:input.selectionEnd}; }}
+      onPointerDown={() => { const input=inputRef.current; if(input) selected.current={start:input.selectionStart ?? value.length,end:input.selectionEnd ?? value.length}; }}
       onMouseDown={e => e.preventDefault()}
       onClick={() => wrap(marker)}
       className="flex h-9 min-w-9 items-center justify-center rounded-lg border border-border/70 bg-secondary/50 px-2 text-foreground hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
