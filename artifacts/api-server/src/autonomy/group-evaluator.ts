@@ -24,7 +24,11 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
   const candidates = (state.characters ?? []).filter(c => participants.includes(c.id)).map(c => {
     const control = controls.characters.get(c.id);
     return {
-      id: c.id, archived: c.archived, enabled: control?.enabled === true, dmEnabled: control?.dmEnabled === true,
+      id: c.id, archived: c.archived, // An explicitly started spectator scene opts the GROUP into conversation.
+      // It must not depend on unrelated spontaneous feed/DM opt-ins.
+      // Preserve explicit character-level autonomy disablement (e.g. the owner's avatar).
+      enabled: sceneMode ? control?.enabled !== false : control?.enabled === true,
+      dmEnabled: sceneMode ? control?.dmEnabled !== false : control?.dmEnabled === true,
       sleeping: /\b(sleep|sleeping|dormir|durmiendo|descansando)\b/i.test(c.configuration?.currentState?.activity ?? ""),
     };
   });
