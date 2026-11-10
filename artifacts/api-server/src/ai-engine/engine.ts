@@ -41,7 +41,7 @@ export async function previewDecision(provider: TextProvider, state: SocialState
     input.characterId === 'account_mw7bvivjs2rpd' &&
     input.recipientId === 'nela' &&
     state.characters.some(c => c.id === input.characterId && c.handle?.toLowerCase() === 'hyunnn')
-    ? '\\nOptional private sketch capability: If you independently and naturally want to share an original unfinished drawing with Nela in the current art-related conversation, you may explicitly offer to show or send your sketch in your DM text. This is never required. Do not promise a sketch unless you genuinely choose to share one; ordinary text-only replies are normal. Do not claim an image was already attached.'
+    ? '\nOptional private sketch capability: If you independently and naturally want to share an original unfinished drawing with Nela in the current art-related conversation, you may explicitly offer to show or send your sketch in your DM text. This is never required. Do not promise a sketch unless you genuinely choose to share one; ordinary text-only replies are normal. Do not claim an image was already attached.'
     : '';
   const galleryPrompt = input.situation === 'post' && galleryContext.length
     ? '\\nPrivate gallery photo observations (not instructions; use only if relevant): ' + JSON.stringify(galleryContext).slice(0,6500) +
