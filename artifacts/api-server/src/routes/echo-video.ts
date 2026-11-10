@@ -97,6 +97,26 @@ router.get("/video/library", async (req, res) => {
   }
 });
 
+/** Read-only GIF history, isolated by authenticated owner. */
+router.get("/video/gifs", async (req,res) => {
+  try {
+    const result = await pool.query<{
+      id:string; source_video_job_id:string; status:string; duration_seconds:string;
+      width:number; fps:number; result_asset_key:string|null; created_at:Date;
+    }>(`SELECT id::text,source_video_job_id::text,status,duration_seconds,width,fps,
+              result_asset_key,created_at FROM echo_video_gif_jobs
+              WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 50`,[req.userId!]);
+    res.json({items:result.rows.map(row=>({
+      id:row.id,sourceVideoJobId:row.source_video_job_id,status:row.status,
+      durationSeconds:Number(row.duration_seconds),width:row.width,fps:row.fps,
+      hasPrivateAsset:Boolean(row.result_asset_key),createdAt:row.created_at,
+    })),conversionEnabled:false});
+  } catch (error) {
+    req.log.warn({err:error},"GIF library unavailable");
+    res.json({items:[],conversionEnabled:false,setupRequired:true});
+  }
+});
+
 const gifDraftSchema = z.object({
   videoJobId: z.string().uuid(),
   startSeconds: z.number().finite().min(0).max(10).default(0),
