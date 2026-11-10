@@ -2,7 +2,7 @@ import { playMessageSound, unlockMessageAudio } from '@/lib/message-sounds';
 import { refreshCreatorHubDmStatus, type CreatorHubDmNotice } from '@/lib/creator-hub-notifications';
 import { useWelcomeText } from '@/lib/welcome-translations';
 import { useOfficialAnnouncementText } from '@/lib/official-announcement-translations';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
@@ -31,31 +31,31 @@ import { MessageSoundObserver } from '@/components/echo/message-sound-observer';
 import { AppIconBadge } from '@/components/echo/app-icon-badge';
 import { FounderSurprise } from '@/components/echo/founder-surprise';
 import { AppearanceSync } from '@/components/echo/appearance-sync';
-import HashtagPage from '@/pages/hashtag';
-import SearchPage from '@/pages/search';
+const HashtagPage = lazy(() => import('@/pages/hashtag'));
+const SearchPage = lazy(() => import('@/pages/search'));
 import { AppSkeleton } from '@/components/echo/skeletons';
 import { EchoSplash } from '@/components/branding/echo-brand';
 import HomePage from '@/pages/home';
-import ProfilePage from '@/pages/profile';
-import PostPage from '@/pages/post';
-import CreatePage from '@/pages/create';
-import NotificationsPage from '@/pages/notifications';
-import MessagesPage from '@/pages/messages';
-import ScenesPage from '@/pages/scenes';
-import ConversationPage from '@/pages/conversation';
-import GroupConversationPage from '@/pages/group-conversation';
-import SavedPage from '@/pages/saved';
-import SettingsPage from '@/pages/settings';
-import ImageStorageDiagnosticPage from '@/pages/image-storage-diagnostic';
-import EchoMusicPage from '@/pages/echo-music';
-import SharedPreviewPage from '@/pages/shared-preview';
-import CollaborationPage from '@/pages/collaboration';
-import SubscriptionsPage from '@/pages/subscriptions';
-import HelpCenterPage from '@/pages/help-center';
-import SupportAdminPage from '@/pages/support-admin';
+const ProfilePage = lazy(() => import('@/pages/profile'));
+const PostPage = lazy(() => import('@/pages/post'));
+const CreatePage = lazy(() => import('@/pages/create'));
+const NotificationsPage = lazy(() => import('@/pages/notifications'));
+const MessagesPage = lazy(() => import('@/pages/messages'));
+const ScenesPage = lazy(() => import('@/pages/scenes'));
+const ConversationPage = lazy(() => import('@/pages/conversation'));
+const GroupConversationPage = lazy(() => import('@/pages/group-conversation'));
+const SavedPage = lazy(() => import('@/pages/saved'));
+const SettingsPage = lazy(() => import('@/pages/settings'));
+const ImageStorageDiagnosticPage = lazy(() => import('@/pages/image-storage-diagnostic'));
+const EchoMusicPage = lazy(() => import('@/pages/echo-music'));
+const SharedPreviewPage = lazy(() => import('@/pages/shared-preview'));
+const CollaborationPage = lazy(() => import('@/pages/collaboration'));
+const SubscriptionsPage = lazy(() => import('@/pages/subscriptions'));
+const HelpCenterPage = lazy(() => import('@/pages/help-center'));
+const SupportAdminPage = lazy(() => import('@/pages/support-admin'));
 import NotFound from '@/pages/not-found';
-import CharacterEditorPage from '@/pages/character-editor';
-import CharacterGalleryPage from '@/pages/character-gallery';
+const CharacterEditorPage = lazy(() => import('@/pages/character-editor'));
+const CharacterGalleryPage = lazy(() => import('@/pages/character-gallery'));
 import LandingPage from '@/pages/landing';
 import PricingPage from '@/pages/pricing';
 import FaqPage from '@/pages/faq';
@@ -71,7 +71,7 @@ import OnboardingPage, { type CreatorOnboardingInput } from '@/pages/onboarding'
 import { AlphaConsentBoundary } from '@/components/echo/alpha-consent';
 import BetaInformationPage from '@/pages/beta-information';
 import CreatorPrivacyCenter from '@/pages/creator-privacy-center';
-import CreatorHubPage from '@/pages/creator-hub';
+const CreatorHubPage = lazy(() => import('@/pages/creator-hub'));
 import { createStarterUniverse } from '@/store/create-starter-universe';
 import { shouldShowCreatorOnboarding } from '@/store/onboarding-routing';
 import { loadLegacyState, loadRecovery } from '@/store/persistence';
@@ -298,6 +298,7 @@ function ProtectedRouter() {
       <FirstWelcomeDialog />
       <FounderSurprise />
       <RoutedErrorBoundary>
+        <Suspense fallback={<AppSkeleton />}>
         <Switch>
           <Route path="/" component={HomePage} />
           <Route path="/profile/:id" component={ProfilePage} />
@@ -325,6 +326,7 @@ function ProtectedRouter() {
           <Route path="/characters/:id/gallery" component={CharacterGalleryPage} />
           <Route component={NotFound} />
         </Switch>
+        </Suspense>
       </RoutedErrorBoundary>
     </Shell>
   );
