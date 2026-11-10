@@ -39,3 +39,32 @@ export function privateSketchWithinLimits(monthlyAttempts: number, dailyAttempts
     && monthlyAttempts < HYUN_PRIVATE_SKETCH_LIMITS.monthlySucceededOrUncertainAttempts
     && dailyAttempts < HYUN_PRIVATE_SKETCH_LIMITS.dailySucceededOrUncertainAttempts;
 }
+
+
+/**
+ * A private unfinished sketch is an artwork, not a photograph of Hyun or Nela.
+ * Keep the scene independent from identity-reference generation to avoid
+ * accidental portraits and expensive multi-reference edits.
+ */
+export function buildHyunPrivateSketchPrompt(subject: string): string {
+  const clean = subject.trim().replace(/\s+/g, " ");
+  if (clean.length < 3 || clean.length > 240) throw Error("INVALID_PRIVATE_SKETCH_SUBJECT");
+  return [
+    "Create a realistic phone photograph of a physical sketchbook page on an artist's desk.",
+    "The drawing is an original, visibly unfinished graphite and ink study.",
+    "Show tentative construction lines, eraser marks, uneven shading and blank areas.",
+    "Avoid polished digital artwork, signatures, watermarks, text overlays, portraits of identifiable real people, and logos.",
+    `Subject of the unfinished study: ${clean}.`,
+    "Natural indoor light, casual imperfect framing, believable paper and pencil textures.",
+  ].join(" ");
+}
+
+/** Only the authorized owner may initiate the narrowly scoped experiment. */
+export function assertHyunPrivateSketchEligible(
+  scope: PrivateSketchScope,
+  monthlyAttempts: number,
+  dailyAttempts: number,
+): void {
+  if (!canAttemptHyunPrivateSketch(scope)) throw Error("PRIVATE_SKETCH_SCOPE_DENIED");
+  if (!privateSketchWithinLimits(monthlyAttempts, dailyAttempts)) throw Error("PRIVATE_SKETCH_QUOTA_EXHAUSTED");
+}
