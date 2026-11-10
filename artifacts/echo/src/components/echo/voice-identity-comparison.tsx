@@ -10,22 +10,24 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
   const [speechFile, setSpeechFile] = useState<File | null>(null);
   const [speechUrl, setSpeechUrl] = useState('');
   const [speechSampleId, setSpeechSampleId] = useState('');
+  const [speechPreviewAvailable, setSpeechPreviewAvailable] = useState(false);
   const [speechReady, setSpeechReady] = useState(false);
   const [trackId, setTrackId] = useState('');
   const [singingUrl, setSingingUrl] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [comparison, setComparison] = useState<'pending' | 'similar' | 'different'>('pending');
-  const candidates = tracks.filter(t => t.status === 'saved_audio' && t.audioPath?.startsWith('generated/'));
+  const [notes, setNotes] = useState('');
+  const candidates = tracks.filter(t => t.status === 'saved_audio' && Boolean(t.audioPath));
   useEffect(() => {
     let active = true;
-    setSpeechSampleId(''); setSpeechReady(false); setComparison('pending');
+    setSpeechSampleId(''); setSpeechReady(false); setSpeechPreviewAvailable(false); setComparison('pending');
     void customFetch<ProjectResponse>('/api/voices/premium/projects?' + new URLSearchParams({ characterId, universeId }), { responseType: 'json' })
       .then(result => {
         if (!active) return;
         const selected = result.samples.find(s => s.id === result.project?.selectedSampleId);
         setSpeechReady(Boolean(selected));
-        if (selected?.audioObjectPath) setSpeechSampleId(selected.id);
+        if (selected) { setSpeechSampleId(selected.id); setSpeechPreviewAvailable(Boolean(selected.audioObjectPath)); }
       }).catch(() => {});
     return () => { active = false; };
   }, [characterId, universeId]);
@@ -35,16 +37,16 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
     return () => URL.revokeObjectURL(url);
   }, [speechFile]);
   useEffect(() => {
-    setSingingUrl(''); setComparison('pending');
+    setSingingUrl(''); setComparison('pending'); setNotes('');
     if (!trackId) return;
     let active = true;
     let url = '';
     setLoading(true); setError('');
-    void customFetch<Blob>('/api/music/generation/' + encodeURIComponent(trackId) + '/audio', { responseType: 'blob' })
+    void customFetch<Blob>('/api/music/library/' + encodeURIComponent(trackId) + '/audio', { responseType: 'blob' })
       .then(blob => {
         if (!blob.type.startsWith('audio/')) throw Error('El archivo no es audio.');
         url = URL.createObjectURL(blob);
-        if (active) setSingingUrl(url);
+        if (active) setSingingUrl(url); else URL.revokeObjectURL(url);
       }).catch(() => { if (active) setError('No se pudo cargar la referencia cantada.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
@@ -64,7 +66,8 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
     <p className="text-xs text-muted-foreground">Voz hablada: {speechReady ? 'configurada' : 'sin muestra Premium detectada'} · Voz cantada: {singingVoiceId ? 'vinculada' : 'todavía sin vincular'}</p>
     <div className="space-y-2">
       <p className="text-xs font-medium">1. Voz hablada</p>
-      {speechSampleId && <button type="button" onClick={() => void loadSpeechPreview()} disabled={loading} className="rounded-lg border border-border px-3 py-2 text-xs">Escuchar muestra guardada</button>}
+      {speechSampleId && speechPreviewAvailable && <button type="button" onClick={() => void loadSpeechPreview()} disabled={loading} className="rounded-lg border border-border px-3 py-2 text-xs">Escuchar muestra guardada</button>}
+      {speechReady && !speechPreviewAvailable && <p className="text-xs text-muted-foreground">La voz hablada está configurada, pero el proveedor no guardó una muestra reproducible. Podés cargar una grabación autorizada para compararla sin generar audio nuevo.</p>}
       <label className="block text-xs text-muted-foreground">O comparar con un archivo de voz autorizado
         <input className="mt-1 block w-full text-xs" type="file" accept="audio/*" onChange={e => { setSpeechFile(e.target.files?.[0] ?? null); setComparison('pending'); }} />
       </label>
@@ -86,6 +89,9 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
         <button type="button" onClick={() => setComparison('similar')} className="rounded-lg border border-border px-3 py-2 text-xs">Sí, se parecen</button>
         <button type="button" onClick={() => setComparison('different')} className="rounded-lg border border-border px-3 py-2 text-xs">No, son diferentes</button>
       </div>
+      <label className="block text-xs text-muted-foreground">Notas sobre el timbre (opcional)
+        <textarea value={notes} onChange={event => setNotes(event.target.value.slice(0, 500))} rows={2} placeholder="Gravedad, aspereza, resonancia, acento…" className="mt-1 w-full rounded-lg border border-border bg-card p-2 text-sm" />
+      </label>
       {comparison !== 'pending' && <p role="status" className="text-xs text-muted-foreground">{comparison === 'similar' ? 'Comparación auditiva favorable (no es una verificación biométrica).' : 'Conviene preparar una nueva referencia cantada a partir de la voz hablada autorizada.'} Esta decisión no cambia ni vincula automáticamente la voz del personaje.</p>}
     </div>}
   </section>;
