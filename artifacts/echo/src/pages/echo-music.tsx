@@ -352,6 +352,52 @@ export default function EchoMusicPage() {
   const [voiceLength, setVoiceLength] = useState(20);
   const [libraryClipBusy,setLibraryClipBusy] = useState(false);
   const [libraryClipStatus,setLibraryClipStatus] = useState('');
+  const [separationJobId,setSeparationJobId]=useState('');
+  const [separationStatus,setSeparationStatus]=useState('');
+  const [separationBusy,setSeparationBusy]=useState(false);
+  async function prepareVocalSeparationJob(){
+    if(!me?.id || !voiceSample || !voiceSampleStorageKey || !voiceCloneConsent || separationBusy)return;
+    setSeparationBusy(true);setSeparationStatus('');
+    try{
+      const result=await customFetch<{jobId:string;status:string}>('/api/music/voices/separation/jobs',{
+        method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify({characterId:me.id,storageKey:voiceSampleStorageKey,durationSeconds:voiceSample.duration,consentConfirmed:true})
+      });
+      setSeparationJobId(result.jobId);setSeparationStatus(t('Separación vocal preparada, sin cargo.'));
+    }catch(error){setSeparationStatus(error instanceof Error?error.message:'VOCAL_SEPARATION_PREPARATION_FAILED');}
+    finally{setSeparationBusy(false);}
+  }
+  async function confirmVocalSeparation(){
+    if(!separationJobId || separationBusy)return;
+    if(!window.confirm(interfaceLanguage==='es'
+      ? 'Separar la voz con Demucs puede generar un cargo adicional en fal.ai, independiente de la clonación. ¿Autorizás este gasto?'
+      : 'Separating vocals with Demucs may incur an additional fal.ai charge, separate from cloning. Authorize this expense?'))return;
+    setSeparationBusy(true);
+    try{
+      const result=await customFetch<{status:string}>('/api/music/voices/separation/jobs/'+encodeURIComponent(separationJobId)+'/confirm',{
+        method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify({chargeConfirmed:true,consentConfirmed:true})
+      });
+      setSeparationStatus(t('Estado de separación')+': '+result.status);
+    }catch(error){setSeparationStatus(error instanceof Error?error.message:'VOCAL_SEPARATION_SPENDING_DISABLED');}
+    finally{setSeparationBusy(false);}
+  }
+  async function syncVocalSeparationResult(){
+    if(!separationJobId || separationBusy)return;
+    setSeparationBusy(true);
+    try{
+      const result=await customFetch<{status:string;isolatedStorageKey?:string}>('/api/music/voices/separation/jobs/'+encodeURIComponent(separationJobId)+'/sync',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:'{}',responseType:'json'
+      });
+      setSeparationStatus(t('Estado de separación')+': '+result.status);
+      if(result.status==='completed' && result.isolatedStorageKey){
+        setVoiceSampleStorageKey(result.isolatedStorageKey);
+        setVoiceCloneJobId('');setVoiceCloneJobStatus('');
+        setSeparationStatus(t('Voz aislada guardada de forma privada. Ya podés preparar su clonación.'));
+      }
+    }catch(error){setSeparationStatus(error instanceof Error?error.message:'VOCAL_SEPARATION_SYNC_UNAVAILABLE');}
+    finally{setSeparationBusy(false);}
+  }
   async function prepareLibraryClip() {
     if(!voiceSource || !me?.id || libraryClipBusy || voiceSource.status!=='saved_audio' || !voiceSource.audioPath?.startsWith('generated/')) return;
     setLibraryClipBusy(true);setLibraryClipStatus('');
@@ -819,6 +865,10 @@ export default function EchoMusicPage() {
           {voiceSampleStorageKey && <p role="status" className="mt-2 text-xs text-primary">{t("Muestra guardada de forma privada. La clonación todavía no se ejecutó.")}</p>
           {voiceSampleStorageKey && <button type="button" disabled={voiceSamplePreflightBusy || !voiceCloneConsent} onClick={() => void verifyStoredVocalSample()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceSamplePreflightBusy ? '…' : t("Verificar muestra privada")}</button>}
           {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>
+          {voiceSampleStorageKey && <button type="button" disabled={separationBusy || !voiceCloneConsent} onClick={()=>void prepareVocalSeparationJob()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{separationBusy?'…':t("Preparar separación vocal (sin cargo)")}</button>}
+          {separationJobId && <button type="button" disabled={separationBusy} onClick={()=>void confirmVocalSeparation()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Autorizar separación vocal (cargo adicional)")}</button>}
+          {separationJobId && <button type="button" disabled={separationBusy} onClick={()=>void syncVocalSeparationResult()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Recuperar voz aislada")}</button>}
+          {separationStatus && <p role="status" className="mt-2 text-xs text-primary">{separationStatus}</p>}
           {voiceSampleStorageKey && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void prepareVoiceCloneJob()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneJobBusy?'…':t("Preparar clonación (sin cargo)")}</button>}
           {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void refreshVoiceCloneJob()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Consultar estado")}</button>}
           {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void confirmVoiceCloneCharge()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Confirmar clonación (aprox. USD 5)")}</button>}
