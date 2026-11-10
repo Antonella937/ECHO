@@ -288,7 +288,7 @@ router.get("/music/voices/:characterId", async (req,res) => {
   try {
     const rows = await db.execute(sql`SELECT mureka_vocal_id FROM echo_character_singing_voices WHERE owner_id=${req.userId!} AND character_id=${characterId.data} LIMIT 1`);
     const speech = await db.execute(sql`
-      SELECT s.provider, s.status FROM echo_voice_projects p
+      SELECT s.id AS "sampleId", s.provider, s.status FROM echo_voice_projects p
       JOIN echo_voice_samples s ON s.id=p.selected_sample_id AND s.owner_id=p.owner_id
       WHERE p.owner_id=${req.userId!} AND p.character_id=${characterId.data}
         AND s.status='ready'
@@ -296,11 +296,12 @@ router.get("/music/voices/:characterId", async (req,res) => {
     `);
     const speechReady = speech.rows.length > 0;
     const singingReady = rows.rows.length > 0;
-    const manual = await db.execute(sql`SELECT assessment, notes, singing_vocal_id AS "singingVocalId", updated_at AS "updatedAt"
+    const manual = await db.execute(sql`SELECT assessment, notes, singing_vocal_id AS "singingVocalId", speech_sample_id AS "speechSampleId", updated_at AS "updatedAt"
       FROM echo_music_voice_comparisons
       WHERE owner_id=${req.userId!} AND character_id=${characterId.data}
       ORDER BY updated_at DESC LIMIT 1`);
     const assessment = speechReady && singingReady && manual.rows[0]?.singingVocalId === rows.rows[0]?.mureka_vocal_id
+      && manual.rows[0]?.speechSampleId === speech.rows[0]?.sampleId
       ? manual.rows[0]?.assessment : null;
     res.setHeader("Cache-Control", "private, no-store");
     res.json({
