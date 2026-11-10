@@ -48,12 +48,19 @@ export async function dispatchHyunPrivateSketch(input: {
     return inserted.rows.length === 1;
   });
   if (!reserved) return "skipped";
-  // The provider is never called before the atomic budget reservation.
-  const generated = await generateCharacterImage({
-    ownerId: input.ownerId, universeId: input.universeId,
-    characterId: sender.id, preparedPrompt: buildHyunPrivateSketchPrompt(input.subject),
-    style: "phone", referencePaths: [], purpose: "hyun_private_sketch",
-  });
+  let generated: Awaited<ReturnType<typeof generateCharacterImage>>;
+  try {
+    generated = await generateCharacterImage({
+      ownerId: input.ownerId, universeId: input.universeId,
+      characterId: sender.id, preparedPrompt: buildHyunPrivateSketchPrompt(input.subject),
+      style: "phone", referencePaths: [], purpose: "hyun_private_sketch",
+    });
+  } catch {
+    await db.execute(sql`UPDATE echo_hyun_private_sketch_attempts SET status = 'failed_or_uncertain'
+      WHERE owner_id = ${input.ownerId} AND universe_id = ${input.universeId}
+        AND message_id = ${input.messageId}`);
+    return "skipped";
+  }
   return db.transaction(async tx => {
     const [fresh] = await tx.select().from(echoUniversesTable).where(where).for("update").limit(1);
     if (!fresh || fresh.archivedAt || fresh.deletedAt) return "skipped";
@@ -71,6 +78,9 @@ export async function dispatchHyunPrivateSketch(input: {
     await tx.update(echoUniversesTable).set({
       state, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date(),
     }).where(where);
+    await tx.execute(sql`UPDATE echo_hyun_private_sketch_attempts SET status = 'attached'
+      WHERE owner_id = ${input.ownerId} AND universe_id = ${input.universeId}
+        AND message_id = ${input.messageId}`);
     return "attached";
   });
 }
