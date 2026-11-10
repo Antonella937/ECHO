@@ -3,7 +3,7 @@ import { useLanguage } from '@/lib/i18n';
 import { galleryLabels } from '@/lib/gallery-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Check, Pencil, Plus, SlidersHorizontal, Images } from 'lucide-react';
+import { Check, Pencil, Plus, SlidersHorizontal, Images, Star } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { VerifiedBadge } from './verified-badge';
@@ -17,6 +17,18 @@ export function AccountManager() {
   const translate = useAccountManagementText();
   const language = useLanguage();
   const galleryLabel = galleryLabels[language].title;
+  const primaryLabels: Record<string, [string,string,string]> = {
+    es:['Personaje principal','Marcar como personaje principal','Los personajes autónomos priorizan esta cuenta'],
+    en:['Main character','Set as main character','Autonomous characters prioritize this account'],
+    pt:['Personagem principal','Definir como personagem principal','Personagens autônomos priorizam esta conta'],
+    fr:['Personnage principal','Définir comme personnage principal','Les personnages autonomes privilégient ce compte'],
+    de:['Hauptfigur','Als Hauptfigur festlegen','Autonome Figuren bevorzugen dieses Konto'],
+    it:['Personaggio principale','Imposta come personaggio principale','I personaggi autonomi danno priorità a questo account'],
+    ko:['대표 캐릭터','대표 캐릭터로 설정','자율 캐릭터가 이 계정을 우선합니다'],
+    ja:['メインキャラクター','メインキャラクターに設定','自律キャラクターがこのアカウントを優先します'],
+    zh:['主角色','设为主角色','自主角色优先与此账号互动'],
+  };
+  const primaryText = primaryLabels[language] ?? primaryLabels.en;
   const { state, me, actions } = useSocial();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<'active' | 'archived'>('active');
@@ -24,6 +36,7 @@ export function AccountManager() {
   const [professionalCreation, setProfessionalCreation] = useState(false);
   const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
   const archivedCount = state.characters.filter((c) => c.archived).length;
+  const primaryId = state.primaryCharacterId ?? state.currentCharacterId;
   const groups = [
     { id: 'people', label: language === 'es' ? 'Personajes y personas' : 'Characters & people', accounts: list.filter(c => !c.accountType || c.accountType === 'personal') },
     { id: 'professional', label: language === 'es' ? 'Proyectos y cuentas profesionales' : 'Projects & professional accounts', accounts: list.filter(c => c.accountType && c.accountType !== 'personal') },
@@ -42,6 +55,7 @@ export function AccountManager() {
           ))}
         </div>
       </div>
+      {tab === 'active' && <p className="mt-3 text-xs text-muted-foreground">{primaryText[2]}</p>}
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Link href="/characters/new" className="flex min-h-12 items-center justify-center gap-1 rounded-2xl bg-primary px-2 py-3 text-center text-xs font-semibold text-primary-foreground sm:text-sm" data-testid="button-create-character">
           <Plus className="h-4 w-4 shrink-0" /> {translate('Crear personaje')}
@@ -86,6 +100,16 @@ export function AccountManager() {
                   </span>
                 )}
               </button>
+              {!c.archived && <button type="button" onClick={() => {
+                if (primaryId !== c.id) {
+                  actions.setPrimaryIdentity(c.id);
+                  toast({ title: primaryText[0] + ': ' + c.name });
+                }
+              }} aria-pressed={primaryId === c.id} aria-label={`${primaryId === c.id ? primaryText[0] : primaryText[1]}: ${c.name}`} title={primaryId === c.id ? primaryText[0] : primaryText[1]}
+                className={cn('tap grid h-11 w-9 shrink-0 place-items-center rounded-full', primaryId === c.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
+                data-testid={`button-primary-character-${c.id}`}>
+                <Star className="h-4 w-4" fill={primaryId === c.id ? 'currentColor' : 'none'} />
+              </button>}
               {!c.archived && <Link href={`/characters/${c.id}/gallery`} aria-label={`Galería de ${c.name}`} title="Galería del personaje" className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"><Images className="h-4 w-4" strokeWidth={1.8}/></Link>}
               <Link href={`/characters/${c.id}/edit`} aria-label={`${translate('Ficha de personaje de ')}${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`link-character-edit-${c.id}`}>
                 <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
