@@ -240,7 +240,7 @@ function FirstWelcomeDialog() {
       <h2 id="echo-welcome-heading" className="text-2xl font-bold">{copy.heading}</h2>
       <p className="mt-4 text-sm leading-7 text-muted-foreground">{copy.message}</p>
       <p className="mt-5 text-sm font-semibold text-primary">{copy.signature}</p>
-      <button type="button" autoFocus onClick={() => { localStorage.setItem('echo-welcome-claimed:' + user.id, '1'); setOpen(false); }} className="mt-7 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">{copy.button}</button>
+      <button type="button" autoFocus onClick={() => { localStorage.setItem('echo-welcome-claimed:' + (user?.id ?? ''), '1'); setOpen(false); }} className="mt-7 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">{copy.button}</button>
     </section>
   </div>;
 }
