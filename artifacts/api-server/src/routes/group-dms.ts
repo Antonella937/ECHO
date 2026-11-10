@@ -1,3 +1,4 @@
+import { runGroupAutonomyOnce } from "../autonomy/group-executor";
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
@@ -296,6 +297,24 @@ router.patch("/group-dms/:groupId/scene", async (req, res) => {
       scene_response_speed AS "responseSpeed", scene_observer_enabled AS "observerEnabled"`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json(result.rows[0]);
+});
+router.post("/group-dms/:groupId/scene/next", async (req, res) => {
+  const parsed = scope.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_SCENE_TURN" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const groupId = String(req.params.groupId);
+  const allowed = await db.execute(sql`SELECT id FROM echo_group_conversations
+    WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
+      AND participant_ids ? ${actorId} AND scene_observer_enabled=true AND autonomy_enabled=true LIMIT 1`);
+  if (!allowed.rows.length) { res.status(403).json({ error: "SCENE_NOT_ENABLED" }); return; }
+  try {
+    const result = await runGroupAutonomyOnce(req.userId!, universeId, groupId, true);
+    res.json(result);
+  } catch (error) {
+    req.log.error({ err: error }, "Group scene turn failed");
+    res.status(503).json({ error: "SCENE_TURN_UNAVAILABLE" });
+  }
 });
 const pinBody = scope.extend({ pinned: z.boolean() });
 router.patch("/group-dms/:groupId/messages/:messageId/pin", async (req, res) => {
