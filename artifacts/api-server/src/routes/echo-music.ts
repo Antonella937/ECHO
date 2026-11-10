@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Router, raw, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -97,6 +98,46 @@ router.post("/music/voices/clone/sample/preflight", async (req,res) => {
     req.log.warn({err:error},"Voice sample preflight failed");
     res.status(400).json({error:"VOICE_SAMPLE_PREFLIGHT_FAILED"});
   }
+});
+
+// Durable preparation, without charging. Requires the Neon clone-jobs migration.
+// Only a later explicitly confirmed transition may submit to the provider.
+router.post("/music/voices/clone/jobs", async(req,res) => {
+  const parsed=voiceSamplePreflight.safeParse(req.body);
+  if (!parsed.success) {res.status(400).json({error:"VOICE_CLONE_JOB_INVALID"});return;}
+  try {
+    await fetchOwnedPrivateVocalSample(req.userId!,parsed.data.characterId,parsed.data.storageKey);
+    const id=randomUUID();
+    const result=await db.execute(sql`
+      INSERT INTO echo_music_voice_clone_jobs
+        (id,owner_id,character_id,sample_storage_key,sample_duration_seconds,consent_confirmed)
+      VALUES (${id}::uuid,${req.userId!},${parsed.data.characterId},
+        ${parsed.data.storageKey},${parsed.data.durationSeconds},true)
+      ON CONFLICT (owner_id,character_id)
+        WHERE status IN ('awaiting_confirmation','submitting','processing','submission_uncertain')
+      DO NOTHING RETURNING id
+    `);
+    if (!result.rows.length) {res.status(409).json({error:"VOICE_CLONE_JOB_ALREADY_ACTIVE"});return;}
+    res.status(201).json({jobId:id,status:"awaiting_confirmation",estimatedCostUsd:5,
+      charged:false,providerCallsMade:0});
+  } catch(error) {
+    req.log.warn({err:error},"Voice clone job preparation failed");
+    res.status(503).json({error:"VOICE_CLONE_JOB_PREPARATION_UNAVAILABLE"});
+  }
+});
+router.get("/music/voices/clone/jobs/:id", async(req,res) => {
+  const id=z.string().uuid().safeParse(req.params.id);
+  if (!id.success) {res.status(400).json({error:"VOICE_CLONE_JOB_ID_INVALID"});return;}
+  try {
+    const result=await db.execute(sql`
+      SELECT id,character_id,status,estimated_cost_usd,provider_vocal_id,error_code,created_at,completed_at
+      FROM echo_music_voice_clone_jobs WHERE id=${id.data}::uuid AND owner_id=${req.userId!} LIMIT 1
+    `);
+    if (!result.rows.length) {res.status(404).json({error:"VOICE_CLONE_JOB_NOT_FOUND"});return;}
+    res.setHeader("Cache-Control","no-store");
+    res.json({job:result.rows[0]});
+  } catch(error) {req.log.warn({err:error},"Voice clone job lookup failed");
+    res.status(503).json({error:"VOICE_CLONE_JOB_LOOKUP_UNAVAILABLE"});}
 });
 
 // Non-billable voice cloning quote. No audio or provider credentials leave ECHO.
