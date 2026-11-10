@@ -6,6 +6,7 @@ export type MusicLibrarySelection = {
   id: string;
   title: string;
   characterId: string;
+  artistName?: string | null;
   durationSeconds: number;
   clipStartSeconds: number;
   clipDurationSeconds: number | null;
@@ -16,6 +17,7 @@ type LibraryTrack = {
   title: string;
   characterId: string;
   durationSeconds: number;
+  artistName?: string | null;
   status: 'draft' | 'saved_audio';
   audioPath?: string | null;
 };
@@ -77,7 +79,7 @@ export function MusicLibraryPicker({ onSelect, onCancel, storyClip = false, char
           aria-pressed={selected === item.id}
           className={`w-full rounded-xl border p-3 text-left text-sm ${selected === item.id ? 'border-primary bg-primary/10' : 'border-border'}`}>
           <span className="block truncate font-semibold">{item.title}</span>
-          <span className="text-xs text-muted-foreground">{Math.floor(item.durationSeconds / 60)}:{String(item.durationSeconds % 60).padStart(2, '0')}</span>
+          <span className="text-xs text-muted-foreground">{item.artistName ? item.artistName + " · " : ""}{Math.floor(item.durationSeconds / 60)}:{String(item.durationSeconds % 60).padStart(2, '0')}</span>
         </button>)}
       </div>
       {track && storyClip && <div className="space-y-2">
@@ -92,7 +94,7 @@ export function MusicLibraryPicker({ onSelect, onCancel, storyClip = false, char
       <div className="flex justify-end gap-2">
         {onCancel && <button type="button" onClick={onCancel} className="rounded-lg border border-border px-4 py-2 text-sm">Cancelar</button>}
         <button type="button" disabled={!track || (storyClip && track.durationSeconds < 1)}
-          onClick={() => { if (track) onSelect({ id: track.id, title: track.title, characterId: track.characterId,
+          onClick={() => { if (track) onSelect({ id: track.id, title: track.title, characterId: track.characterId, artistName: track.artistName,
             durationSeconds: track.durationSeconds, clipStartSeconds: storyClip ? Math.min(start, maxStart) : 0,
             clipDurationSeconds: storyClip ? Math.min(length, track.durationSeconds) : null }); }}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Elegir canción</button>
