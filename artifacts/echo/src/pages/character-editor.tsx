@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
+import { customFetch } from '@workspace/api-client-react';
+import { useLanguage } from '@/lib/i18n';
 import { BadgeCheck, ChevronDown } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
@@ -38,6 +40,29 @@ const EMPTY: BasicForm = { name: '', handle: '', bio: '', avatar: 'asset:account
 
 export default function CharacterEditorPage() {
   const t = useCharacterEditorText();
+  const language = useLanguage();
+  const [voiceEntitlements, setVoiceEntitlements] = useState<{basicVoices:boolean;customVoices:boolean}|null>(null);
+  useEffect(() => {
+    let active = true;
+    void customFetch<{features:{basicVoices:boolean;customVoices:boolean}}>('/api/account/entitlements',{responseType:'json'})
+      .then(data => { if(active) setVoiceEntitlements(data.features); })
+      .catch(() => { if(active) setVoiceEntitlements(null); });
+    return () => { active = false; };
+  }, []);
+  const voiceLabel = (kind:'basic'|'premium') => {
+    const labels: Record<string,[string,string]> = {
+      es:['Voces · Selección predeterminada','Voces · Voice Studio Premium'],
+      en:['Voices · Preset selection','Voices · Premium Voice Studio'],
+      pt:['Vozes · Seleção predefinida','Vozes · Estúdio Premium'],
+      fr:['Voix · Sélection prédéfinie','Voix · Studio Premium'],
+      de:['Stimmen · Voreinstellungen','Stimmen · Premium-Studio'],
+      it:['Voci · Selezione predefinita','Voci · Studio Premium'],
+      ko:['음성 · 기본 목소리 선택','음성 · 프리미엄 스튜디오'],
+      ja:['声 · プリセット選択','声 · プレミアムスタジオ'],
+      zh:['声音 · 预设选择','声音 · 高级工作室']
+    };
+    return (labels[language]??labels.en)[kind==='basic'?0:1];
+  };
   const params = useParams<{ id?: string }>();
   const isNew = !params.id || params.id === 'new';
   const { state, character, actions } = useSocial();
@@ -173,8 +198,22 @@ export default function CharacterEditorPage() {
           <p className="mt-4 rounded-xl border border-border p-3 text-xs text-muted-foreground">{t('Esta cuenta usa la personalidad, memoria y referencias visuales del personaje principal. Podés editar aquí el perfil público, sin duplicar su identidad.')}</p>
         </> : mode === 'assisted' ? <AssistedPanel config={config} set={set} onManual={() => setMode('advanced')} /> : <>
           <BasicFields form={form} setForm={setForm} onBusy={setUploading} />
-          <BasicVoiceCatalogue selectedVoiceId={config.voice.basicVoiceId} onSelect={(basicVoiceId) => set((c) => ({ ...c, voice: { ...c.voice, basicVoiceId } }))} />
-          <PremiumVoiceStudio characterId={account?.id} />
+          {voiceEntitlements?.basicVoices && (
+            <details className="mt-5 rounded-2xl border border-border bg-card/40" data-testid="character-basic-voices-panel">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                <span>{voiceLabel('basic')}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </summary>
+              <div className="border-t border-border px-3 pb-4"><BasicVoiceCatalogue selectedVoiceId={config.voice.basicVoiceId} onSelect={(basicVoiceId) => set((c) => ({ ...c, voice: { ...c.voice, basicVoiceId } }))} /></div>
+            </details>
+          )}
+          {voiceEntitlements?.customVoices && (
+            <details className="mt-3 rounded-2xl border border-primary/30 bg-card/40" data-testid="character-premium-voices-panel">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                <span>{voiceLabel('premium')}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </summary>
+              <div className="border-t border-border px-3 pb-4"><PremiumVoiceStudio characterId={account?.id} /></div>
+            </details>
+          )}
           <VisualIdentity avatar={form.avatar} identity={identity} onBusy={setUploading}
             onChange={(next) => { setIdentityRaw(next); setDirty(true); }} />
           {mode === 'quick' && <>
