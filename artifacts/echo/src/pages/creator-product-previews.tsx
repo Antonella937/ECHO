@@ -341,9 +341,7 @@ export function CreatorStorePreview() {
           <article className="epc-extra-row"><span className="epc-extra-icon lilac"><Sparkles size={18} /></span><div><h3>{t("+1 universo")}</h3><p>{t("Un universo adicional para otra idea.")}</p></div><span className="epc-extra-mark">EXTRA</span></article>
           <section className="epc-coming-panel" aria-label={t("Funciones futuras")}>
             <span className="ep-overline">{t("EN CAMINO")}</span>
-            <div className="epc-coming-item"><AudioLines size={16} /><strong>Voice</strong><span>{t("Integración de voz pendiente")}</span></div>
             <div className="epc-coming-item"><Video size={16} /><strong>Video</strong><span>{t("Coming Soon")}</span></div>
-            <div className="epc-coming-item"><MessageCircle size={16} /><strong>Music</strong><span>{t("Biblioteca disponible · generación pendiente")}</span></div>
           </section>
         </div>
       </section>
