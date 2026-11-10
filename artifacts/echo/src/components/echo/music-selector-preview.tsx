@@ -2,7 +2,6 @@ import { Music2 } from 'lucide-react';
 import { useState } from 'react';
 import { MusicLibraryPicker } from './music-library-picker';
 import { MusicClipPlayer } from './music-clip-player';
-import { useSocial } from '@/store/social-store';
 
 type SelectedTrack = { id: string; title: string; characterId: string; durationSeconds: number; startSeconds: number; clipSeconds: 15 | 30 };
 
@@ -15,7 +14,6 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
   selectedTrack?: SelectedTrack | null;
   onTrackChange?: (track: SelectedTrack | null) => void;
 }) {
-  const { me } = useSocial();
   const [showLibrary, setShowLibrary] = useState(false);
   return <section className="rounded-2xl border border-input bg-card p-4" aria-label="ECHO Music">
     <div className="flex items-center gap-2 text-sm font-semibold"><Music2 className="h-4 w-4 text-primary" /> Música de ECHO</div>
@@ -28,7 +26,7 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
       onTrackChange?.({ id: selection.id, title: selection.title, characterId: selection.characterId,
         durationSeconds: selection.durationSeconds, startSeconds: selection.clipStartSeconds, clipSeconds });
       onTitleChange(selection.title);
-      onArtistChange(me.name);
+      onArtistChange(selection.artistName?.trim() || '');
       setShowLibrary(false);
     }} /></div>}
     {selectedTrack && !showLibrary && <div className="mt-3 space-y-3 rounded-xl border border-border bg-secondary/40 p-3">
