@@ -33,6 +33,7 @@ export type SocialEventPayload =
   | { type: 'notification.read'; notificationId: string }
   | { type: 'notifications.readAll'; recipientId: CharacterId }
   | { type: 'identity.switched'; characterId: CharacterId }
+  | { type: 'identity.primary-set'; characterId: CharacterId }
   | { type: 'state.replaced'; state: SocialState };
 
 export type SocialEvent = SocialEventPayload & {
@@ -276,6 +277,10 @@ function reduceEvent(state: SocialState, ev: SocialEvent): SocialState {
           n.recipientId === ev.recipientId ? { ...n, read: true } : n,
         ),
       };
+
+    case 'identity.primary-set':
+      if (!state.characters.some(c => c.id === ev.characterId && !c.archived)) return state;
+      return { ...state, primaryCharacterId: ev.characterId };
 
     case 'identity.switched':
       if (!state.characters.some((c) => c.id === ev.characterId && !c.archived)) return state;
