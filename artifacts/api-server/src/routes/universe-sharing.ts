@@ -206,6 +206,16 @@ export function createUniverseSharingRouter(
         location: "", avatar: "asset:account-default",
         providerRef: { provider: "mock", externalId: null, status: "not_connected", lastSyncAt: null },
         identity: { provider: "mock", referenceImages: [], seed: 0, appearance: "", styleNotes: "", updatedAt: new Date().toISOString() },
+        // Share the character's reusable persona, not their private memories,
+        // relationship history or current personal circumstances.
+        ...(original.configuration && typeof original.configuration === "object" ? {
+          configuration: {
+            ...(original.configuration as Record<string, unknown>),
+            relationships: [],
+            memory: { permanent: [], relationships: [], recent: [], recentLimit: 50, recentSummary: "" },
+            currentState: { ...(original.configuration as Record<string, Record<string, unknown>>).currentState, summary: "", updatedAt: null },
+          },
+        } : {}),
         accountType: "personal", verified: false, archived: false,
       };
     });
