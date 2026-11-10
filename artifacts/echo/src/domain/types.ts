@@ -205,6 +205,8 @@ export interface SocialState {
   creatorSetup?: import('@workspace/api-client-react').CreatorSetup;
   version: number;
   currentCharacterId: CharacterId;
+  /** Human-operated account to prioritize for autonomous interactions, independent of active identity. */
+  primaryCharacterId?: CharacterId;
   characters: Character[];
   /** follower -> followed ids */
   follows: Record<CharacterId, CharacterId[]>;
