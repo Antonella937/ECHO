@@ -404,7 +404,7 @@ export async function executeAutonomyDecision(input: {
       eq(echoAutonomyRunsTable.ownerId, input.ownerId), eq(echoAutonomyRunsTable.status, "executed"),
       gte(echoAutonomyRunsTable.createdAt, since),
     ));
-    if (input.opportunity.situation !== "dm" && ((ownerHour?.value ?? 0) >= 3 || (ownerDay?.value ?? 0) >= 12)) {
+    if (input.opportunity.situation !== "dm" && ((ownerHour?.value ?? 0) >= 6 || (ownerDay?.value ?? 0) >= 35)) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "rate_limited", lastErrorCode: "OWNER_ACTION_CAP", finishedAt: now, updatedAt: now,
       }).where(and(
