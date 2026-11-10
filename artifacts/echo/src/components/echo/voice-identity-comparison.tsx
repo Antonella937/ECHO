@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
+import { compareAcoustics, type AcousticSummary } from '@/lib/acoustic-voice-comparison';
 
 type Track = { id: string; title: string; status: string; audioPath?: string };
 type Sample = { id: string; audioObjectPath?: string | null };
@@ -23,6 +24,9 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
   const [restoring, setRestoring] = useState(false);
   const [savedComparison, setSavedComparison] = useState<{ assessment: 'similar' | 'different'; notes: string } | null>(null);
   const [savedReferenceId, setSavedReferenceId] = useState('');
+  const [acoustic, setAcoustic] = useState<AcousticSummary | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  useEffect(() => { setAcoustic(null); }, [speechUrl, singingUrl]);
   const candidates = tracks.filter(t => t.status === 'saved_audio' && Boolean(t.audioPath));
   useEffect(() => {
     let active = true;
@@ -62,6 +66,13 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [trackId]);
+  async function analyzeAcoustics() {
+    if (!speechUrl || !singingUrl || analyzing) return;
+    setAnalyzing(true); setError(''); setAcoustic(null);
+    try { setAcoustic(await compareAcoustics(speechUrl, singingUrl)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron analizar las referencias.'); }
+    finally { setAnalyzing(false); }
+  }
   async function saveComparison() {
     if (!trackId || comparison === 'pending' || !speechUrl || !singingUrl || saving) return;
     setSaving(true); setSavedStatus('');
@@ -114,6 +125,17 @@ export function VoiceIdentityComparison({ characterId, universeId, tracks, singi
     </div>}
     {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     {speechUrl && singingUrl && <div className="space-y-2">
+      <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+        <p className="text-xs font-semibold">Análisis acústico automático (local)</p>
+        <p className="text-xs text-muted-foreground">Compara características de frecuencia y textura de los audios en tu dispositivo, sin subirlos a un servicio de análisis ni gastar créditos. No identifica personas ni certifica que sea la misma voz: una canción con instrumentos o efectos puede alterar mucho el resultado.</p>
+        <button type="button" disabled={analyzing || loading} onClick={() => void analyzeAcoustics()} className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{analyzing ? 'Analizando audio…' : 'Analizar similitud acústica'}</button>
+        {acoustic && <div role="status" className="space-y-1 text-xs">
+          <p className="font-semibold">Similitud de características acústicas: {acoustic.score}/100</p>
+          <p className="text-muted-foreground">{acoustic.quality}</p>
+          {acoustic.speechHz && acoustic.singingHz && <p className="text-muted-foreground">Frecuencia tonal estimada: hablada {acoustic.speechHz} Hz · cantada {acoustic.singingHz} Hz (no es una medida de identidad).</p>}
+          <p className="text-muted-foreground">No hay umbral confiable para decidir si dos voces pertenecen a la misma identidad. Escuchá ambas referencias y guardá tu evaluación por separado.</p>
+        </div>}
+      </div>
       <p className="text-xs font-medium">3. ¿Te parece la misma identidad vocal?</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setComparison('similar')} className="rounded-lg border border-border px-3 py-2 text-xs">Sí, se parecen</button>
