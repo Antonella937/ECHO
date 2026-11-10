@@ -460,6 +460,7 @@ export default function ConversationPage() {
             <button type="button" onClick={() => { recorder.stop(); setRecordingTip(false); }} disabled={recorder.status !== 'recording'} aria-label={t("Detener grabación")} className="tap grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-35" data-testid="button-stop-recording"><Square className="h-4 w-4 fill-current" /></button>
           </div>
         ) : (
+          <div>
           <FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="mb-1" />
           <div className="flex items-center gap-2 pb-1">
             <input ref={fileRef} type="file" multiple hidden accept="image/*,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
@@ -487,6 +488,7 @@ export default function ConversationPage() {
                 <Send className="h-5 w-5" strokeWidth={1.8} />
               </button>
             )}
+          </div>
           </div>
         )}
       </form>
