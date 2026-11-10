@@ -377,7 +377,11 @@ export async function runAutonomyLiveCycle(
         // The universe's active owner identity is human-controlled, not an AI
         // character. Its incoming messages do not require an AI DM permission
         // record in the reverse direction. The AI sender still must opt in.
-        const recipientIsOwnerIdentity = opportunity.recipientId === state.currentCharacterId;
+        // currentCharacterId is the account currently being viewed/managed and
+        // may be Mar, Noah, etc. It is NOT the owner's protected identity.
+        // The protected primary identity has the stable id "nela" in ECHO.
+        const recipientIsOwnerIdentity = opportunity.recipientId === "nela" &&
+          state.characters.some(peer => peer.id === "nela" && !peer.archived);
         // The owner's manually controlled identity is not an autonomous peer.
         // DM opt-in authorizes replies to the owner without a separate AI-to-AI
         // allowlist entry. AI-to-AI conversations still require mutual opt-in.
