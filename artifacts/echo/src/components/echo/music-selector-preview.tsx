@@ -49,23 +49,16 @@ export function MusicSelectorPreview({ title, artist, onTitleChange, onArtistCha
   const partial = Boolean(title.trim()) !== Boolean(artist.trim());
   return <section className="rounded-2xl border border-input bg-card p-4" aria-label="ECHO Music">
     <div className="flex items-center gap-2 text-sm font-semibold"><Music2 className="h-4 w-4 text-primary" /> Música</div>
-    <p className="mt-1 text-xs text-muted-foreground">Elegí una canción publicada en ECHO para adjuntar un fragmento de 15 o 30 segundos a tu publicación o historia.</p>
+    <p className="mt-1 text-xs text-muted-foreground">Elegí una canción de ECHO Music para adjuntar un fragmento de 15 o 30 segundos a tu publicación o historia.</p>
     <button type="button" onClick={() => { setShowMyLibrary(value => !value); setMyLibraryError(''); }} className="mt-3 flex h-11 w-full items-center gap-2 rounded-xl border border-border bg-secondary px-3 text-left text-sm"><Music2 className="h-4 w-4 text-primary" /> {showMyLibrary ? 'Cerrar Mi biblioteca' : 'Elegir de Mi biblioteca'}</button>
     {myLibraryError && <p role="alert" className="mt-2 text-xs text-destructive">{myLibraryError}</p>}
     {showMyLibrary && <div className="mt-3"><MusicLibraryPicker storyClip={story} onCancel={() => setShowMyLibrary(false)} onSelect={selection => {
-      // The existing post/story player serves explicitly published songs only.
-      // Private library entries cannot be attached until a surface-scoped
-      // private sharing flow is implemented and authorized.
-      const published = sharedTracks.find(item => item.id === selection.id);
-      if (!published) {
-        setMyLibraryError('Publicá primero esta canción desde ECHO Music para poder adjuntarla.');
-        return;
-      }
+      // Sharing a clip is independent of publishing its full track in the catalog.
       const clipSeconds: 15 | 30 = selection.clipDurationSeconds === 30 ? 30 : 15;
-      onTrackChange?.({ id: published.id, title: published.title, characterId: published.characterId,
-        durationSeconds: published.durationSeconds, startSeconds: selection.clipStartSeconds,
+      onTrackChange?.({ id: selection.id, title: selection.title, characterId: selection.characterId,
+        durationSeconds: selection.durationSeconds, startSeconds: selection.clipStartSeconds,
         clipSeconds });
-      onTitleChange(published.title);
+      onTitleChange(selection.title);
       onArtistChange(me.name);
       setShowMyLibrary(false);
       setMyLibraryError('');
