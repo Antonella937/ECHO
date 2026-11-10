@@ -236,6 +236,7 @@ export default function EchoMusicPage() {
   const [library, setLibrary] = useState<MusicDraftRecord[]>([]);
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
+  const [librarySearch, setLibrarySearch] = useState('');
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishedTracks, setPublishedTracks] = useState<Array<{ id: string; characterId: string; title: string; durationSeconds: number }>>([]);
   const [loadingSharedId, setLoadingSharedId] = useState<string | null>(null);
@@ -345,7 +346,7 @@ export default function EchoMusicPage() {
     } catch { setLibraryError(t("No se pudo eliminar el borrador.")); }
   }
   const audioUrl = resolvedSavedAudio || localAudioUrl;
-  const filteredLibrary = library.filter(item => item.status === libraryFilter).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const filteredLibrary = library.filter(item => item.status === libraryFilter && item.title.toLocaleLowerCase().includes(librarySearch.trim().toLocaleLowerCase())).sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [voiceSource, setVoiceSource] = useState<MusicDraftRecord | null>(null);
   const [voiceStart, setVoiceStart] = useState(0);
@@ -730,18 +731,11 @@ export default function EchoMusicPage() {
       <span className="text-center text-sm font-semibold">ECHO Music · {audioUrl ? t("Reproduciendo") : t("Preparada")}</span>
       <span className="w-11" />
     </header>
-    <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-9 py-8">
-      <div className="mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-[0_25px_80px_rgba(0,0,0,0.55)]">
+    <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-6 py-6">
+      <div className="mx-auto flex aspect-square w-full max-w-[340px] items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black/20 shadow-[0_25px_80px_rgba(0,0,0,0.55)]">
         {coverUrl ? <img src={coverUrl} alt={`${t("Portada de ")}${me.name}`} className="h-full w-full object-contain" /> : <Music2 className="h-24 w-24 text-white/60" />}
       </div>
       <div><h1 className="text-2xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/70">{me.name} · ECHO Music</p></div>
-      {audioUrl && actualDuration > 0 && <section className="rounded-xl border border-white/20 bg-white/10 p-4 space-y-3">
-        <p className="text-sm font-semibold">{t("Elegir fragmento para compartir")}</p>
-        <div className="flex gap-2">{([15, 30] as const).map(seconds => <button key={seconds} type="button" onClick={() => { setClipLength(seconds); setClipStart(start => Math.min(start, Math.max(0, actualDuration - seconds))); }} className={`rounded-full px-4 py-2 text-sm ${clipLength === seconds ? 'bg-white text-black' : 'border border-white/30'}`}>{seconds} s</button>)}</div>
-        <input type="range" aria-label={t("Inicio del fragmento")} min={0} max={Math.max(0, actualDuration - Math.min(clipLength, actualDuration))} step={1} value={clipStart} onChange={event => { const next = Number(event.target.value); setClipStart(next); if (audioRef.current) audioRef.current.currentTime = next; setElapsed(next); }} className="w-full accent-white" />
-        <p className="text-xs text-white/70">{t("Fragmento: ")}{formatTime(clipStart)} – {formatTime(clipEnd)}. {t("Los fragmentos de canciones publicadas se pueden adjuntar desde Crear publicación o historia.")}</p>
-        <button type="button" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = clipStart; audioRef.current.dataset.clipPreview = 'true'; } setElapsed(clipStart); void audioRef.current?.play().catch(() => setPlaying(false)); }} className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold">{t("Escuchar fragmento")}</button>
-      </section>}
       <div>
         <input type="range" min={0} max={Math.max(actualDuration, 1)} step={0.1} value={Math.min(elapsed, Math.max(actualDuration, 1))} disabled={!audioUrl || !actualDuration} onChange={event => { const audio = audioRef.current; if (audio) { audio.currentTime = Number(event.target.value); setElapsed(audio.currentTime); } }} aria-label={t("Progreso de la canción")} className="w-full accent-white disabled:opacity-40" />
         <div className="mt-1 flex justify-between text-xs text-white/65"><span>{formatTime(elapsed)}</span><span>{audioUrl && actualDuration ? formatTime(actualDuration) : '--:--'}</span></div>
@@ -753,6 +747,13 @@ export default function EchoMusicPage() {
       {localAudioError && <p role="alert" className="text-sm text-red-200">{localAudioError}</p>}
       {audioUrl && !savedAudioPath && <p className="text-center text-xs text-white/60">{t("Audio local de prueba: no se guarda hasta que elijas guardarlo.")}</p>}
       {!audioUrl && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-center text-sm"><LockKeyhole className="mx-auto mb-2 h-5 w-5" />{t("Esto es una vista previa del prompt, no una canción generada. Volvé al estudio y tocá «Generar canción de prueba» para solicitar audio real mediante Mureka.")}</div>}
+      <details className="rounded-xl border border-white/15 p-3 text-sm"><summary className="cursor-pointer font-semibold">${t("Elegir fragmento para compartir")}</summary><div className="mt-3">{audioUrl && actualDuration > 0 && <section className="rounded-xl border border-white/20 bg-white/10 p-4 space-y-3">
+        <p className="text-sm font-semibold">{t("Elegir fragmento para compartir")}</p>
+        <div className="flex gap-2">{([15, 30] as const).map(seconds => <button key={seconds} type="button" onClick={() => { setClipLength(seconds); setClipStart(start => Math.min(start, Math.max(0, actualDuration - seconds))); }} className={`rounded-full px-4 py-2 text-sm ${clipLength === seconds ? 'bg-white text-black' : 'border border-white/30'}`}>{seconds} s</button>)}</div>
+        <input type="range" aria-label={t("Inicio del fragmento")} min={0} max={Math.max(0, actualDuration - Math.min(clipLength, actualDuration))} step={1} value={clipStart} onChange={event => { const next = Number(event.target.value); setClipStart(next); if (audioRef.current) audioRef.current.currentTime = next; setElapsed(next); }} className="w-full accent-white" />
+        <p className="text-xs text-white/70">{t("Fragmento: ")}{formatTime(clipStart)} – {formatTime(clipEnd)}. {t("Los fragmentos de canciones publicadas se pueden adjuntar desde Crear publicación o historia.")}</p>
+        <button type="button" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = clipStart; audioRef.current.dataset.clipPreview = 'true'; } setElapsed(clipStart); void audioRef.current?.play().catch(() => setPlaying(false)); }} className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold">{t("Escuchar fragmento")}</button>
+      </section>}</div></details>
       <details className="rounded-xl bg-white/5 p-4 text-xs text-white/75"><summary className="cursor-pointer font-semibold">{t("Ver prompt preparado")}</summary><p className="mt-3 whitespace-pre-wrap">{preview}</p></details>
     </div>
     <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
@@ -807,21 +808,21 @@ export default function EchoMusicPage() {
       <button type="button" onClick={() => setStudioTab('library')} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${studioTab === 'library' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}><Library className="h-4 w-4" /> {t("Mi biblioteca")}</button>
     </nav>
     {studioTab === 'library' ? <section className="space-y-5">
-      <div className="rounded-2xl border border-border bg-card/60 p-5">
-        <div className="flex items-center gap-3"><Disc3 className="h-7 w-7 text-primary" /><div><h1 className="text-xl font-bold">{t("Mi biblioteca")}</h1><p className="text-xs text-muted-foreground">{library.filter(item => item.status === 'saved_audio').length} canciones guardadas · {library.filter(item => item.status === 'draft').length} borradores</p></div></div>
-        <p className="mt-3 text-xs text-muted-foreground">{cloudLibraryAvailable ? t("Biblioteca conectada a tu cuenta de ECHO.") : t("Sincronización pendiente: también se muestran los registros locales.")}</p>
-      </div>
+      <header className="space-y-4 pt-2">
+        <div className="flex items-center gap-3"><Disc3 className="h-8 w-8 text-primary" /><div><h1 className="text-3xl font-bold tracking-tight">{t("Mi biblioteca")}</h1><p className="mt-1 text-sm text-muted-foreground">{library.filter(item => item.status === 'saved_audio').length} {t("canciones guardadas")} · {library.filter(item => item.status === 'draft').length} {t("borradores")}</p></div></div>
+        <input type="search" value={librarySearch} onChange={event => setLibrarySearch(event.target.value)} placeholder={interfaceLanguage === 'es' ? 'Buscar en mi biblioteca' : 'Search my library'} aria-label={interfaceLanguage === 'es' ? 'Buscar en mi biblioteca' : 'Search my library'} className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary" />
+      </header>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={() => setLibraryFilter('saved_audio')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'saved_audio' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Canciones guardadas")}</button>
         <button type="button" onClick={() => setLibraryFilter('draft')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'draft' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Borradores")}</button>
       </div>
       {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
-      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-3">
+      {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex flex-col gap-2 border-b border-border/60 py-3">
         <button type="button" onClick={() => openLibraryItem(item)} className="flex w-full min-w-0 items-center gap-3 text-left">
-          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">{coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-contain" /> : <Music2 className="h-7 w-7 text-primary" />}</div>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.status === 'saved_audio' ? t("Audio guardado") : t("Prompt preparado")} · {formatTime(item.durationSeconds)}</p><p className="mt-1 text-xs text-primary">{item.status === 'saved_audio' ? t("Escuchar canción") : t("Ver borrador")}</p></div>
         </button>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        <div className="flex flex-wrap items-center gap-2 pl-[68px]">
         {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" onClick={() => { setVoiceSource(item); setVoiceStart(0); setVoiceLength(Math.min(20,item.durationSeconds)); setVoiceCloneConsent(false);setVoiceCloneQuote(''); }} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{t("Guardar voz")}</button>}
         {item.status === 'saved_audio' && item.audioPath?.startsWith('generated/') && <button type="button" disabled={!!downloadingId} onClick={() => void downloadLibraryTrack(item)} className="flex items-center gap-1 rounded-lg border border-border px-2 py-2 text-xs font-semibold" aria-label={t("Descargar") + ' ' + item.title}><Download className="h-4 w-4" />{downloadingId === item.id ? t("Descargando…") : t("Descargar")}</button>}
         {item.status === 'saved_audio' && <button type="button" disabled={!!publishingId} onClick={() => void togglePublish(item)} className="rounded-lg border border-border px-2 py-2 text-xs font-semibold">{publishingId === item.id ? '…' : item.publishedAt ? t("Dejar privado") : t("Compartir")}</button>}
