@@ -124,17 +124,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="mt-9" aria-labelledby="about-h">
-          <h2 id="about-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Sobre ECHO")}</h2>
-          <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 text-[13px] leading-relaxed text-muted-foreground" data-testid="text-prototype-notice">
-            <p className="flex gap-2.5"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} />
-              <span>{st("Tu universo, publicaciones, imágenes, comentarios e historias se guardan en tu cuenta privada.")}</span></p>
-            <p className="mt-2.5 pl-[26px]">{st("La autonomía de texto se gestiona con controles individuales y pausa general. Las imágenes IA se pueden generar manualmente; las publicaciones autónomas con imágenes tienen controles independientes.")}</p>
-            <p className="mt-2.5 pl-[26px]">{st("Las fotos de ejemplo son ilustrativas y no muestran a personas reales.")}</p>
-            <p className="mt-2.5 pl-[26px]">{st("Solo tú puedes abrir este universo al iniciar sesión. Puedes cambiar manualmente la identidad activa en esta página.")}</p>
-          </div>
-        </section>
-
         <section className="mt-9" aria-labelledby="storage-h">
           <h2 id="storage-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Almacenamiento")}</h2>
           <div className="mt-3 rounded-2xl border border-border p-4 text-[13px]">
