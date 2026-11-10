@@ -445,7 +445,8 @@ export async function runAutonomyLiveCycle(
     // the persisted image budget before any provider request.
     if (outcome.status === "executed" && opportunity.situation === "dm" &&
         preview.decision.action === "draft" && dependencies.sketchDelivery &&
-        opportunity.reason !== "A recent incoming direct message is awaiting a reply." &&
+        ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" &&
+        character.id === "account_mw7bvivjs2rpd" && opportunity.recipientId === "nela" &&
         (dependencies.random?.() ?? Math.random()) < 0.08) {
       try {
         const fresh = await dependencies.repository.read(ownerId, universeId);
@@ -458,7 +459,7 @@ export async function runAutonomyLiveCycle(
           await dependencies.sketchDelivery({
             ownerId, universeId, characterId: character.id,
             recipientId: opportunity.recipientId, messageId: outgoing.id,
-            subject: "an abstract study of light, shadow and the city",
+            subject: "an unfinished original graphite sketch of urban architecture, shadows and light",
           });
         }
       } catch (error) {
