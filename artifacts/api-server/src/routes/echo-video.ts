@@ -161,6 +161,43 @@ router.post("/video/gif/preflight", async (req, res) => {
   }
 });
 
+/** Download completed GIFs from private storage, never exposing storage credentials. */
+router.get("/video/gifs/:gifId/asset", async (req,res) => {
+  const id=z.string().uuid().safeParse(req.params.gifId);
+  if(!id.success){res.status(400).json({error:"GIF_JOB_ID_INVALID"});return;}
+  try{
+    const result=await pool.query<{status:string;result_asset_key:string|null}>(
+      `SELECT status,result_asset_key FROM echo_video_gif_jobs
+       WHERE id=$1::uuid AND owner_id=$2 LIMIT 1`,[id.data,req.userId!]);
+    const gif=result.rows[0];
+    if(!gif){res.status(404).json({error:"GIF_NOT_FOUND"});return;}
+    if(gif.status!=="succeeded" || !gif.result_asset_key){
+      res.status(409).json({error:"GIF_NOT_READY"});return;
+    }
+    if(!gif.result_asset_key.endsWith("/result.gif")){
+      res.status(503).json({error:"GIF_ASSET_INVALID"});return;
+    }
+    const upstream=await fetchOwnedPrivateVideoAsset(gif.result_asset_key,req.userId!,id.data);
+    if(upstream.headers.get("content-type")?.split(";")[0].toLowerCase()!=="image/gif"){
+      res.status(502).json({error:"GIF_MIME_INVALID"});return;
+    }
+    res.setHeader("Content-Type","image/gif");
+    res.setHeader("Cache-Control","private, no-store");
+    res.setHeader("X-Content-Type-Options","nosniff");
+    res.setHeader("Content-Disposition",`attachment; filename="echo-gif-${id.data}.gif"`);
+    const length=Number(upstream.headers.get("content-length"));
+    if(Number.isFinite(length)&&length>0&&length<=VIDEO_PRIVATE_STORAGE_LIMITS.maxGifBytes)
+      res.setHeader("Content-Length",String(length));
+    if(!upstream.body){res.status(502).end();return;}
+    const {Readable}=await import("node:stream");
+    Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream).pipe(res);
+  }catch(error){
+    req.log.warn({err:error},"Private GIF asset unavailable");
+    if(!res.headersSent)res.status(503).json({error:"GIF_PRIVATE_ASSET_UNAVAILABLE"});
+    else res.end();
+  }
+});
+
 /** Stream a completed private asset only after a server-side owner check. */
 router.get("/video/library/:jobId/asset", async (req, res) => {
   const id = z.string().uuid().safeParse(req.params.jobId);
