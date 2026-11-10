@@ -51,3 +51,25 @@ export async function fetchOwnedPrivateVideoAsset(
   if (!VIDEO_MIME.includes(mime as VideoMime)) throw new Error("VIDEO_STORAGE_MIME_INVALID");
   return response;
 }
+
+/** Persist already-produced bytes; called only after an authorized completed job.
+ * No provider generation is performed here. The caller must verify job ownership.
+ */
+export async function storeCompletedPrivateVideoAsset(
+  ownerId: string, jobId: string, mime: VideoMime, bytes: Buffer,
+): Promise<{storageKey:string;size:number;mimeType:VideoMime}> {
+  const storageKey = videoPrivateAssetKey(ownerId,jobId,mime);
+  const limit = mime === "image/gif" ? VIDEO_PRIVATE_STORAGE_LIMITS.maxGifBytes : VIDEO_PRIVATE_STORAGE_LIMITS.maxVideoBytes;
+  if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > limit) throw new Error("VIDEO_ASSET_SIZE_INVALID");
+  const config = videoStorageConfig();
+  if (!config) throw new Error("VIDEO_STORAGE_NOT_CONFIGURED");
+  const endpoint = new URL(`/storage/v1/object/${encodeURIComponent(config.bucket)}/${storageKey}`,config.url);
+  const response = await fetch(endpoint,{
+    method:"POST",redirect:"error",
+    headers:{Authorization:`Bearer ${config.serviceKey}`,apikey:config.serviceKey,
+      "Content-Type":mime,"x-upsert":"false"},
+    body:bytes,signal:AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw new Error("VIDEO_PRIVATE_UPLOAD_FAILED");
+  return {storageKey,size:bytes.length,mimeType:mime};
+}
