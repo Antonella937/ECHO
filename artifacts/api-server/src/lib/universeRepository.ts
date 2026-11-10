@@ -150,13 +150,16 @@ export async function createAdditionalUniverse(ownerId: string, name: string, st
     const creatorSetup = state.creatorSetup as { plan?: unknown } | undefined;
     const entitlements = await lockEntitlement(tx, ownerId, asPlan(creatorSetup?.plan));
     // Serialize capacity checks by owner before reading the current counts.
-    const rows = await tx.select().from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, ownerId), isNull(echoUniversesTable.deletedAt)));
+    const rows = await tx.select({
+      characterCount: sql<number>`CASE WHEN jsonb_typeof(${echoUniversesTable.state}->'characters') = 'array'
+        THEN jsonb_array_length(${echoUniversesTable.state}->'characters') ELSE 0 END`,
+    }).from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId, ownerId),
+      isNull(echoUniversesTable.deletedAt),
+    ));
     const caps = creatorCapacity(ownerId, membershipPlan, entitlements.addonCharacters, entitlements.addonUniverses);
     if (rows.length >= caps.maxUniverses) throw new StructuralLimitError("UNIVERSE_LIMIT_REACHED");
-    const characterCount = rows.reduce((total, row) => {
-      const characters = row.state.characters;
-      return total + (Array.isArray(characters) ? characters.length : 0);
-    }, 0);
+    const characterCount = rows.reduce((total, row) => total + Number(row.characterCount), 0);
     const newCharacterCount = Array.isArray(state.characters) ? state.characters.length : 0;
     if (characterCount + newCharacterCount > caps.maxCharacters)
       throw new StructuralLimitError("CHARACTER_LIMIT_REACHED");
