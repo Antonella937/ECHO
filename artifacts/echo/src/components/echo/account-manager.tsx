@@ -25,8 +25,8 @@ export function AccountManager() {
   const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
   const archivedCount = state.characters.filter((c) => c.archived).length;
   const groups = [
-    { id: 'people', label: language === 'es' ? 'Personajes y personas' : 'Characters & people', accounts: list.filter(c => !c.accountType || c.accountType === 'personal' || c.accountType === 'artist') },
-    { id: 'professional', label: language === 'es' ? 'Proyectos y cuentas profesionales' : 'Projects & professional accounts', accounts: list.filter(c => c.accountType && c.accountType !== 'personal' && c.accountType !== 'artist') },
+    { id: 'people', label: language === 'es' ? 'Personajes y personas' : 'Characters & people', accounts: list.filter(c => !c.accountType || c.accountType === 'personal') },
+    { id: 'professional', label: language === 'es' ? 'Proyectos y cuentas profesionales' : 'Projects & professional accounts', accounts: list.filter(c => c.accountType && c.accountType !== 'personal') },
   ].filter(group => group.accounts.length > 0);
 
   return (
