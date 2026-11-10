@@ -22,8 +22,19 @@ export function prepareImageScene(
   active: SceneCharacter,
   available: SceneCharacter[],
   style: keyof typeof imageStyleInstructions,
+  selectedCharacterIds?: string[],
 ) {
-  const people = resolveSceneCharacters(scene, active, available);
+  // Explicit selection is authoritative; never silently substitute another character.
+  const people = selectedCharacterIds?.length
+    ? [active, ...selectedCharacterIds.filter(id => id !== active.id).map(id => {
+      const character = available.find(person => person.id === id && !person.archived);
+      if (!character) throw Error('IMAGE_SCENE_CHARACTER_NOT_FOUND');
+      return character;
+    })]
+    : resolveSceneCharacters(scene, active, available);
+  if (people.length > 4 || new Set(people.map(person => person.id)).size !== people.length) {
+    throw Error('INVALID_IMAGE_SCENE_CHARACTER_COUNT');
+  }
   const perPerson = people.map(person => [
     ...new Set([person.avatar, ...(Array.isArray(person.identity?.referenceImages) ? person.identity.referenceImages : [])].filter(isPrivatePath)),
   ]);
