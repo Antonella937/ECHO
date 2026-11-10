@@ -13,6 +13,12 @@ export default function EchoVideoPage() {
   const [mode, setMode] = useState<'standard'|'advanced_silent'|'advanced_audio'>('standard');
   const [duration, setDuration] = useState<5|10>(5);
   const [aspect, setAspect] = useState<'9:16'|'16:9'|'1:1'>('9:16');
+  const [gifJobId, setGifJobId] = useState('');
+  const [gifSeconds, setGifSeconds] = useState(3);
+  const [gifWidth, setGifWidth] = useState<320|480|640>(480);
+  const [gifFps, setGifFps] = useState<10|12|15>(12);
+  const [gifMessage, setGifMessage] = useState('');
+  const [gifChecking, setGifChecking] = useState(false);
   const [readiness, setReadiness] = useState<{privateStorageConfigured:boolean;bucketVerified:boolean}|null>(null);
   useEffect(() => {
     let active = true;
@@ -66,6 +72,27 @@ export default function EchoVideoPage() {
         : library.length === 0 ? <p className="text-xs text-muted-foreground">{es?'Todavía no generaste videos. Aparecerán acá cuando se active el servicio.':'No generated videos yet. They will appear here when generation is enabled.'}</p>
         : <div className="space-y-2">{library.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-xs"><span>{item.mode} · {item.durationSeconds}s</span><span className="text-muted-foreground">{item.status}</span></div>)}</div>}
       <p className="text-xs text-muted-foreground">{es?'La conversión a GIF y la descarga estarán disponibles después de conectar el procesamiento privado.':'GIF conversion and downloads will be available after private processing is connected.'}</p>
+    </section>
+    <section className="space-y-3 rounded-2xl border border-border bg-card/60 p-4" aria-label={es?'Preparación de GIF':'GIF preparation'}>
+      <h2 className="text-sm font-semibold">{es?'Convertir video a GIF':'Convert video to GIF'}</h2>
+      <p className="text-xs text-muted-foreground">{es?'Seleccioná un video terminado de tu biblioteca para preparar una conversión sin costo.':'Select a finished video from your library to prepare a free conversion.'}</p>
+      <select value={gifJobId} onChange={e=>{setGifJobId(e.target.value);setGifMessage('');}} className="w-full rounded-xl border border-border bg-card p-3 text-sm">
+        <option value="">{es?'Seleccionar video':'Select video'}</option>
+        {library.filter(item=>item.status==='succeeded').map(item=><option key={item.id} value={item.id}>{item.mode} · {item.durationSeconds}s · {new Date(item.createdAt).toLocaleDateString()}</option>)}
+      </select>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="space-y-1 text-xs"><span>{es?'Segundos':'Seconds'}</span><select value={gifSeconds} onChange={e=>setGifSeconds(Number(e.target.value))} className="w-full rounded-xl border border-border bg-card p-2">{[1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n}s</option>)}</select></label>
+        <label className="space-y-1 text-xs"><span>{es?'Ancho':'Width'}</span><select value={gifWidth} onChange={e=>setGifWidth(Number(e.target.value) as 320|480|640)} className="w-full rounded-xl border border-border bg-card p-2">{[320,480,640].map(n=><option key={n} value={n}>{n}px</option>)}</select></label>
+        <label className="space-y-1 text-xs"><span>FPS</span><select value={gifFps} onChange={e=>setGifFps(Number(e.target.value) as 10|12|15)} className="w-full rounded-xl border border-border bg-card p-2">{[10,12,15].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
+      </div>
+      <button type="button" disabled={!gifJobId || gifChecking} className="w-full rounded-xl border border-border p-3 text-sm font-semibold disabled:opacity-40" onClick={async()=>{
+        setGifChecking(true);setGifMessage('');
+        try {await customFetch('/api/video/gif/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoJobId:gifJobId,startSeconds:0,durationSeconds:gifSeconds,width:gifWidth,fps:gifFps}),responseType:'json'});
+          setGifMessage(es?'GIF preparado; la conversión real sigue desactivada.':'GIF prepared; actual conversion is still disabled.');
+        }catch{setGifMessage(es?'No se pudo preparar este GIF. Verificá que el video esté terminado y que la duración sea válida.':'Could not prepare this GIF. Check that the video is complete and duration is valid.');}
+        finally{setGifChecking(false);}
+      }}>{gifChecking?(es?'Comprobando…':'Checking…'):(es?'Preparar GIF sin costo':'Prepare GIF for free')}</button>
+      {gifMessage&&<p role="status" className="text-xs text-muted-foreground">{gifMessage}</p>}
     </section>
     <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4"/>{es?'La generación real sigue desactivada.':'Real generation remains disabled.'}</p>
   </main></div>;
