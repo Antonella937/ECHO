@@ -72,3 +72,34 @@ export const ECHO_CREDIT_POLICY = Object.freeze({
   /** No credit grants or deductions before a transactional database ledger exists. */
   walletEnabled: false,
 } as const);
+
+/** ECHO Video/GIF launch proposal. Display-only until billing, wallet and provider are implemented. */
+export const ECHO_VIDEO_POLICY = Object.freeze({
+  enabled: false,
+  checkoutEnabled: false,
+  generationEnabled: false,
+  providerConfigured: false,
+  accessPlans: ["free", "plus", "premium"] as const,
+  creditExpiry: null,
+  currency: "USD",
+  packs: {
+    starter: { credits: 10, priceCents: 799 },
+    creator: { credits: 25, priceCents: 1899 },
+    studio: { credits: 50, priceCents: 3599 },
+  },
+  generation: {
+    maxDurationSeconds: 10,
+    maxConcurrentPerOwner: 1,
+    costs: {
+      standard5s: 1, standard10s: 2,
+      advancedSilent5s: 2, advancedSilent10s: 4,
+      advancedAudio5s: 3, advancedAudio10s: 6,
+      existingVideoToGif: 0,
+    },
+    debitOnlyAfterSuccess: true,
+    refundFailedGeneration: true,
+  },
+  /** A future server-side ledger and provider spending cap are mandatory before enabling. */
+  requireTransactionalLedger: true,
+  requireGlobalSpendCap: true,
+} as const);
