@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
-import { resolveEchoPlan, ECHO_AUDIO_POLICY } from "../lib/entitlements";
+import { resolveEchoPlan, ECHO_AUDIO_POLICY, ECHO_VIDEO_POLICY } from "../lib/entitlements";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { pool, db, echoVoiceBudgetsTable, echoVoiceUsageTable } from "@workspace/db";
 import { and, eq, gte, sql } from "drizzle-orm";
@@ -28,6 +28,7 @@ router.get("/account/entitlements", requireAuth, async (req, res) => {
     const monthlyLimit = eligible ? (budget?.monthlyCharacterLimit ?? 0) : 0;
     const dailyLimit = eligible ? (budget?.maxDailyMessages ?? 0) : 0;
     res.json({ plan, lifetimeAccess, billingExempt: lifetimeAccess !== null, features: { basicVoices: eligible, incomingVoiceMessages: true, characterVoiceReplies: eligible, customVoices: plan === "premium", customVoiceMonthlyAddOnRequired: plan === "premium" && lifetimeAccess === null, music: false, videos: false },
+      video: { available: ECHO_VIDEO_POLICY.enabled, checkoutEnabled: ECHO_VIDEO_POLICY.checkoutEnabled, generationEnabled: ECHO_VIDEO_POLICY.generationEnabled, providerConfigured: ECHO_VIDEO_POLICY.providerConfigured, creditExpiry: ECHO_VIDEO_POLICY.creditExpiry, currency: ECHO_VIDEO_POLICY.currency, packs: ECHO_VIDEO_POLICY.packs, costs: ECHO_VIDEO_POLICY.generation.costs, maxDurationSeconds: ECHO_VIDEO_POLICY.generation.maxDurationSeconds, maxConcurrentPerOwner: ECHO_VIDEO_POLICY.generation.maxConcurrentPerOwner },
       audioCredits: { monthlyLimit: audioCreditsLimit, used: audioCreditsUsed, remaining: Math.max(0,audioCreditsLimit-audioCreditsUsed), maxAudioSeconds: ECHO_AUDIO_POLICY.maxGeneratedAudioSeconds, creditsPerAudio: 1 },
       voice: { enabled: eligible && budget?.enabled === true, engineConfigured: Boolean(process.env.ECHO_KOKORO_TTS_URL),
         preference: eligible ? (budget?.preference ?? "off") : "off", monthlyCharacterLimit: monthlyLimit,
