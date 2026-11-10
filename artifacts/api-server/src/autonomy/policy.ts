@@ -357,9 +357,6 @@ export function chooseAutonomyOpportunity(input: {
     ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency), publishStory: false }] : []),
     ...(storyCount < 1 && !anyStoryToday ? [{ situation: "post" as const, weight: frequencyWeight(social?.storiesFrequency), publishStory: true }] : []),
     ...(comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
-    ...(input.lane === "dm" && recipients.length && dmCount < 1
-      ? [{ situation: "dm" as const, weight: frequencyWeight(social?.initiatesDMs) }]
-      : []),
     ...(targetPost && actionCount("like_post") < 3
       ? [{ situation: "like_post" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
     ...(targetComment && actionCount("like_comment") < 3
