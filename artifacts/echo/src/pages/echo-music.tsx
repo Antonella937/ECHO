@@ -782,7 +782,6 @@ export default function EchoMusicPage() {
         </div>
       </section>
     </div>
-    </div>
     <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" onLoadedMetadata={event => setActualDuration(event.currentTarget.duration)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setElapsed(time); if (event.currentTarget.dataset.clipPreview === 'true' && time >= clipEnd) { event.currentTarget.pause(); delete event.currentTarget.dataset.clipPreview; } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); if (repeatTrack && audioRef.current) { audioRef.current.currentTime = 0; void audioRef.current.play().catch(() => setPlaying(false)); } else if (playableTracks.length > 1 && selectedTrackId) skipTrack(1); }} />
   </div>;
   if (musicAccess !== 'active') return <div>
