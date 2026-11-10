@@ -29,7 +29,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
   const language = useLanguage();
   const collaborationLabels = ({"es":["Invitación a colaborar en esta publicación","Aceptar","Rechazar"],"en":["Invitation to collaborate on this post","Accept","Decline"],"pt":["Convite para colaborar nesta publicação","Aceitar","Recusar"],"fr":["Invitation à collaborer à cette publication","Accepter","Refuser"],"de":["Einladung zur Zusammenarbeit an diesem Beitrag","Annehmen","Ablehnen"],"it":["Invito a collaborare a questo post","Accetta","Rifiuta"],"ko":["이 게시물의 공동 작업 초대","수락","거절"],"ja":["この投稿へのコラボレーション招待","承認","辞退"],"zh":["邀请你共同发布此帖子","接受","拒绝"]} as Record<string, [string, string, string]>)[language] ?? ["Invitation to collaborate on this post","Accept","Decline"];
   const pollLabels = ({ es: ['votos', 'Finalizada'], en: ['votes', 'Closed'], pt: ['votos', 'Encerrada'], fr: ['votes', 'Terminée'], de: ['Stimmen', 'Beendet'], it: ['voti', 'Terminata'], ko: ['표', '종료됨'], ja: ['票', '終了'], zh: ['票', '已结束'] } as Record<string, [string, string]>)[language] ?? ['votes', 'Closed'];
-  const { me, character, actions, state } = useSocial();
+  const { me, character, actions, state, universeId } = useSocial();
   const author = character(post.authorId);
   const [sheet, setSheet] = useState<null | 'comments' | 'likers' | 'share' | 'options'>(null);
   const [burst, setBurst] = useState(0);
@@ -118,7 +118,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         })}</div>
         <p className="mt-2 text-xs text-muted-foreground">{voteCount} {pollLabels[0]}{pollClosed ? ` · ${pollLabels[1]}` : ''}</p>
       </section>}
-      {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact autoPlay /></div>}
+      {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact autoPlay source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
           <Heart className={cn('h-[25px] w-[25px] transition-transform', liked && 'scale-110 fill-primary text-primary')} strokeWidth={1.6} />
