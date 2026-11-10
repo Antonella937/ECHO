@@ -237,15 +237,18 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       </button>
 
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
-        <img
-          key={story.id}
-          src={storyImage}
-          onError={() => setFailedStoryImage(story.id)}
-          alt={story.caption || `${t("Historia de")} ${group.author.name}`}
-          className="fade-up absolute inset-0 h-full w-full object-contain md:object-cover"
-          draggable={false}
-          data-testid={`img-story-${story.id}`}
-        />
+        {storyImage && (
+          <img
+            key={story.id}
+            src={storyImage}
+            onLoad={() => setFailedStoryImage(current => current === story.id ? null : current)}
+            onError={() => setFailedStoryImage(story.id)}
+            alt={story.caption || `${t("Historia de")} ${group.author.name}`}
+            className="fade-up absolute inset-0 h-full w-full object-contain md:object-cover"
+            draggable={false}
+            data-testid={`img-story-${story.id}`}
+          />
+        )}
         {imageIsPrivate && imageUnavailable && (
           <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-black/70 px-8 text-center text-white" role="status">
             <p className="text-sm">La foto de esta historia todavía no está disponible.</p>
