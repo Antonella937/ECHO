@@ -135,7 +135,7 @@ function availableTargets(state: SocialState, character: Character) {
  * A rotating share preserves character-to-character interactions.
  */
 function prioritizeHumanAccount<T>(items: T[], state: SocialState, getId: (item: T) => string, random: () => number): T[] {
-  const humanId = state.currentCharacterId;
+  const humanId = state.primaryCharacterId ?? state.currentCharacterId;
   if (!humanId || !state.characters.some(c => c.id === humanId && !c.archived)) return items;
   const preferred = items.filter(item => getId(item) === humanId);
   const others = items.filter(item => getId(item) !== humanId);
