@@ -435,6 +435,34 @@ export default function EchoMusicPage() {
     } catch(error) {setVoiceCloneJobStatus(error instanceof Error?error.message:'VOICE_CLONE_JOB_PREPARATION_UNAVAILABLE');}
     finally {setVoiceCloneJobBusy(false);}
   }
+  async function confirmVoiceCloneCharge() {
+    if (!voiceCloneJobId || voiceCloneJobBusy || !voiceCloneConsent) return;
+    const agreed=window.confirm(interfaceLanguage === 'en'
+      ? 'Cloning this singing voice may charge approximately USD 5. Confirm that you authorize this paid operation?'
+      : 'Clonar esta voz cantada puede costar aproximadamente USD 5. ¿Confirmás que autorizás este gasto?');
+    if (!agreed) return;
+    setVoiceCloneJobBusy(true);setVoiceCloneJobStatus('');
+    try {
+      const result=await customFetch<{status:string}>('/api/music/voices/clone/jobs/'+encodeURIComponent(voiceCloneJobId)+'/confirm',{
+        method:'POST',headers:{'Content-Type':'application/json'},responseType:'json',
+        body:JSON.stringify({chargeConfirmed:true,consentConfirmed:true})
+      });
+      setVoiceCloneJobStatus(t('Estado de clonación')+': '+result.status);
+    } catch(error) {setVoiceCloneJobStatus(error instanceof Error?error.message:'VOICE_CLONE_SPENDING_DISABLED');}
+    finally {setVoiceCloneJobBusy(false);}
+  }
+  async function syncVoiceCloneResult() {
+    if (!voiceCloneJobId || voiceCloneJobBusy) return;
+    setVoiceCloneJobBusy(true);
+    try {
+      const result=await customFetch<{status:string;vocalId?:string}>('/api/music/voices/clone/jobs/'+encodeURIComponent(voiceCloneJobId)+'/sync',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:'{}',responseType:'json'
+      });
+      setVoiceCloneJobStatus(t('Estado de clonación')+': '+result.status);
+      if(result.status==='completed' && result.vocalId) setSingingVoiceId(result.vocalId);
+    } catch(error) {setVoiceCloneJobStatus(error instanceof Error?error.message:'VOICE_CLONE_SYNC_UNAVAILABLE');}
+    finally {setVoiceCloneJobBusy(false);}
+  }
   async function refreshVoiceCloneJob() {
     if (!voiceCloneJobId || voiceCloneJobBusy) return;
     setVoiceCloneJobBusy(true);
@@ -751,6 +779,8 @@ export default function EchoMusicPage() {
           {voiceSamplePreflightStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceSamplePreflightStatus}</p>
           {voiceSampleStorageKey && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void prepareVoiceCloneJob()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{voiceCloneJobBusy?'…':t("Preparar clonación (sin cargo)")}</button>}
           {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void refreshVoiceCloneJob()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Consultar estado")}</button>}
+          {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy || !voiceCloneConsent} onClick={() => void confirmVoiceCloneCharge()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Confirmar clonación (aprox. USD 5)")}</button>}
+          {voiceCloneJobId && <button type="button" disabled={voiceCloneJobBusy} onClick={() => void syncVoiceCloneResult()} className="mt-2 ml-2 rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50">{t("Sincronizar resultado")}</button>
           {voiceCloneJobStatus && <p role="status" className="mt-2 text-xs text-primary">{voiceCloneJobStatus}</p>}
           {voiceSampleUploadError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceSampleUploadError}</p>
         </details>
