@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ECHO_VIDEO_POLICY } from "../lib/entitlements";
+import { videoStorageConfig, VIDEO_PRIVATE_STORAGE_LIMITS } from "../lib/videoPrivateStorage";
 
 /** Video/GIF staging only. No provider requests, payment or balance mutations. */
 const router: IRouter = Router();
@@ -31,6 +32,23 @@ router.get("/video/catalog", (_req, res) => {
     costs: ECHO_VIDEO_POLICY.generation.costs,
     maxDurationSeconds: ECHO_VIDEO_POLICY.generation.maxDurationSeconds,
     maxConcurrentPerOwner: ECHO_VIDEO_POLICY.generation.maxConcurrentPerOwner,
+  });
+});
+
+router.get("/video/readiness", (_req, res) => {
+  const configured = videoStorageConfig() !== null;
+  res.json({
+    status: "preparation_only",
+    privateStorageConfigured: configured,
+    bucketVerified: false,
+    databaseMigrationVerified: false,
+    generationEnabled: false,
+    checkoutEnabled: false,
+    gifConversionEnabled: false,
+    providerConfigured: false,
+    acceptedMimeTypes: VIDEO_PRIVATE_STORAGE_LIMITS.acceptedMimeTypes,
+    maxVideoBytes: VIDEO_PRIVATE_STORAGE_LIMITS.maxVideoBytes,
+    maxGifBytes: VIDEO_PRIVATE_STORAGE_LIMITS.maxGifBytes,
   });
 });
 
