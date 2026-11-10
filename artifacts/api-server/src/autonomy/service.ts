@@ -447,6 +447,11 @@ export async function runAutonomyLiveCycle(
         preview.decision.action === "draft" && dependencies.sketchDelivery &&
         ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" &&
         character.id === "account_mw7bvivjs2rpd" && opportunity.recipientId === "nela" &&
+        // Do not attach an unrelated drawing to a random DM. A sketch must fit the conversation.
+        [...state.messages].reverse().filter(message =>
+          (message.senderId === character.id && message.recipientId === "nela") ||
+          (message.senderId === "nela" && message.recipientId === character.id)
+        ).slice(0, 8).some(message => /\\b(sketch(?:es)?|drawing|draw(?:ing)?|artwork|illustrat(?:ion|e)|pencil|paint(?:ing)?)\\b/i.test(message.text)) &&
         (dependencies.random?.() ?? Math.random()) < 0.08) {
       try {
         const fresh = await dependencies.repository.read(ownerId, universeId);
