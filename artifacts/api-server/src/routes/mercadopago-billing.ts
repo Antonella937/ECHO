@@ -3,6 +3,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
+import { createMpSandboxPreapproval } from "../lib/mercadopagoSubscriptions";
 
 /**
  * Mercado Pago subscription preflight.
@@ -96,6 +97,72 @@ router.post("/billing/mercadopago/subscription-draft", requireAuth, async (req, 
     amount,
     checkoutUrl: null,
   });
+});
+
+
+/**
+ * Explicitly gated sandbox-only checkout. Uses an existing server-created draft.
+ * No entitlement is granted here, even if the provider says "authorized".
+ */
+router.post("/billing/mercadopago/sandbox-checkout", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
+    res.status(503).json({ error: "MP_SANDBOX_CHECKOUT_DISABLED" }); return;
+  }
+  if (lifetimeAccessForOwner(req.userId!) !== null) {
+    res.status(409).json({ error: "BILLING_EXEMPT" }); return;
+  }
+  const reference = req.body?.reference;
+  const payerEmail = req.body?.payerEmail;
+  const backUrl = process.env.ECHO_MP_CALLBACK_URL;
+  if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference) ||
+      typeof payerEmail !== "string" || payerEmail.length > 254 ||
+      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payerEmail) || !backUrl) {
+    res.status(400).json({ error: "INVALID_SANDBOX_CHECKOUT" }); return;
+  }
+  // The callback URL and ARS price are server-controlled; the browser cannot override either.
+  const client = await pool.connect().catch(() => null);
+  if (!client) { res.status(503).json({ error: "MP_DATABASE_UNAVAILABLE" }); return; }
+  let transactionOpen = false;
+  try {
+    await client.query("BEGIN"); transactionOpen = true;
+    const rows = await client.query<{ plan: "plus" | "premium"; amount_ars: string; provider_preapproval_id: string | null; status: string }>(
+      `SELECT plan,amount_ars,provider_preapproval_id,status FROM echo_mp_subscription_intents
+       WHERE reference=$1 AND owner_id=$2 FOR UPDATE`, [reference, req.userId!]);
+    const draft = rows.rows[0];
+    if (!draft) {
+      await client.query("ROLLBACK"); transactionOpen = false;
+      res.status(404).json({ error: "MP_DRAFT_NOT_FOUND" }); return;
+    }
+    if (draft.provider_preapproval_id || draft.status !== "draft") {
+      await client.query("ROLLBACK"); transactionOpen = false;
+      res.status(409).json({ error: "MP_DRAFT_ALREADY_SUBMITTED" }); return;
+    }
+    const amountArs = parseArsAmount(process.env[draft.plan === "plus" ? "ECHO_MP_PLUS_ARS" : "ECHO_MP_PREMIUM_ARS"]);
+    if (amountArs === null || Math.abs(amountArs - Number(draft.amount_ars)) > 0.001) {
+      await client.query("ROLLBACK"); transactionOpen = false;
+      res.status(409).json({ error: "MP_PRICE_CHANGED" }); return;
+    }
+    const checkout = await createMpSandboxPreapproval({
+      reference, plan: draft.plan, amountArs, payerEmail, backUrl,
+    }, { sandboxEnabled: true });
+    await client.query(
+      `UPDATE echo_mp_subscription_intents
+       SET provider_preapproval_id=$3,status=$4,updated_at=now()
+       WHERE reference=$1 AND owner_id=$2`,
+      [reference, req.userId!, checkout.id, checkout.status],
+    );
+    await client.query("COMMIT"); transactionOpen = false;
+    res.status(201).json({ provider: "mercadopago", environment: "test",
+      reference, checkoutUrl: checkout.checkoutUrl, status: checkout.status,
+      entitlementChanged: false });
+  } catch (error) {
+    if (transactionOpen) await client.query("ROLLBACK").catch(() => {});
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP sandbox checkout unavailable");
+    res.status(503).json({ error: "MP_SANDBOX_CHECKOUT_UNAVAILABLE" });
+  } finally {
+    client.release();
+  }
 });
 
 router.get("/billing/mercadopago/subscription-drafts", requireAuth, async (req, res) => {
