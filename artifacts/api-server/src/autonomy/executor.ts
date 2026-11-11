@@ -83,13 +83,16 @@ export function applyAutonomyDecision(
   if (decision.action === "none" && decision.situation === "story_reaction" && opportunity.storyId) {
     const story = state.stories.find(item => item.id === opportunity.storyId);
     if (!story || !recentWithin(story.createdAt, now, DAY_MS) ||
+      !state.characters.some(item => item.id === characterId && !item.archived) ||
+      !state.characters.some(item => item.id === story.authorId && !item.archived) ||
       story.authorId === characterId || !state.follows[characterId]?.includes(story.authorId) ||
-      !canCharacterViewCloseFriendsStory(state, story, characterId) || story.seenBy.includes(characterId)) {
+      !canCharacterViewCloseFriendsStory(state, story, characterId) ||
+      (story.seenBy ?? []).includes(characterId)) {
       return { state, changed: false, targetId: null };
     }
     return {
       state: { ...state, stories: state.stories.map(item => item.id === story.id
-        ? { ...item, seenBy: [...new Set([...item.seenBy, characterId])] } : item) },
+        ? { ...item, seenBy: [...new Set([...(item.seenBy ?? []), characterId])] } : item) },
       changed: true, targetId: story.id,
     };
   }
