@@ -165,6 +165,46 @@ router.post("/billing/mercadopago/sandbox-checkout", requireAuth, async (req, re
   }
 });
 
+
+/** Owner-only read of provider-verified payment evidence, not membership access. */
+router.get("/billing/mercadopago/subscription-payments/:reference", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const reference = req.params.reference;
+  if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference)) {
+    res.status(400).json({ error: "INVALID_MP_REFERENCE" }); return;
+  }
+  try {
+    const intent = await pool.query(
+      `SELECT reference FROM echo_mp_subscription_intents
+       WHERE reference=$1 AND owner_id=$2 LIMIT 1`, [reference, req.userId!],
+    );
+    if (!intent.rows.length) {
+      res.status(404).json({ error: "MP_SUBSCRIPTION_NOT_FOUND" }); return;
+    }
+    const payments = await pool.query<{
+      provider_payment_id: string; provider_status: string; amount_ars: string;
+      currency: string; provider_verified_at: Date;
+    }>(
+      `SELECT provider_payment_id,provider_status,amount_ars,currency,provider_verified_at
+       FROM echo_mp_verified_payments WHERE reference=$1
+       ORDER BY provider_verified_at DESC LIMIT 30`, [reference],
+    );
+    res.json({
+      reference,
+      payments: payments.rows.map(p => ({
+        paymentId: p.provider_payment_id, status: p.provider_status,
+        amountArs: Number(p.amount_ars), currency: p.currency,
+        verifiedAt: p.provider_verified_at,
+      })),
+      entitlementChanged: false,
+      note: "Recorded payment evidence is not an active paid membership.",
+    });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP payment evidence unavailable");
+    res.status(503).json({ error: "MP_PAYMENT_EVIDENCE_UNAVAILABLE" });
+  }
+});
+
 router.get("/billing/mercadopago/subscription-drafts", requireAuth, async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   try {
