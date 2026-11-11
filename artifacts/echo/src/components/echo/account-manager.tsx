@@ -3,7 +3,7 @@ import { useLanguage } from '@/lib/i18n';
 import { galleryLabels } from '@/lib/gallery-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Check, Pencil, Plus, SlidersHorizontal, Images, Star } from 'lucide-react';
+import { Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, Images, Star } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { VerifiedBadge } from './verified-badge';
@@ -34,6 +34,7 @@ export function AccountManager() {
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const [professionalCreation, setProfessionalCreation] = useState(false);
+  const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
   const archivedCount = state.characters.filter((c) => c.archived).length;
   const primaryId = state.primaryCharacterId ?? state.currentCharacterId;
@@ -100,23 +101,44 @@ export function AccountManager() {
                   </span>
                 )}
               </button>
-              {!c.archived && <button type="button" onClick={() => {
-                if (primaryId !== c.id) {
-                  actions.setPrimaryIdentity(c.id);
-                  toast({ title: primaryText[0] + ': ' + c.name });
-                }
-              }} aria-pressed={primaryId === c.id} aria-label={`${primaryId === c.id ? primaryText[0] : primaryText[1]}: ${c.name}`} title={primaryId === c.id ? primaryText[0] : primaryText[1]}
-                className={cn('tap grid h-11 w-9 shrink-0 place-items-center rounded-full', primaryId === c.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
-                data-testid={`button-primary-character-${c.id}`}>
-                <Star className="h-4 w-4" fill={primaryId === c.id ? 'currentColor' : 'none'} />
-              </button>}
-              {!c.archived && <Link href={`/characters/${c.id}/gallery`} aria-label={`Galería de ${c.name}`} title="Galería del personaje" className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"><Images className="h-4 w-4" strokeWidth={1.8}/></Link>}
-              <Link href={`/characters/${c.id}/edit`} aria-label={`${translate('Ficha de personaje de ')}${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`link-character-edit-${c.id}`}>
-                <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
-              </Link>
-              <button onClick={() => setEditing(c.id)} aria-label={`${translate('Editar ')}${c.name}`} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" data-testid={`button-edit-account-${c.id}`}>
-                <Pencil className="h-4 w-4" strokeWidth={1.8} />
-              </button>
+              <div className="relative shrink-0">
+                <button type="button" aria-label={language === 'es' ? `Opciones de ${c.name}` : `Options for ${c.name}`}
+                  aria-expanded={openActionsId === c.id} aria-haspopup="menu"
+                  onClick={() => setOpenActionsId(current => current === c.id ? null : c.id)}
+                  className="tap grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  data-testid={`button-account-actions-${c.id}`}>
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+                {openActionsId === c.id && (
+                  <div role="menu" aria-label={language === 'es' ? `Opciones de ${c.name}` : `Options for ${c.name}`}
+                    className="absolute right-0 top-full z-50 mt-1 w-60 max-w-[calc(100vw-64px)] overflow-hidden rounded-xl border border-border bg-card p-1.5 text-sm shadow-xl">
+                    {!c.archived && <button type="button" role="menuitem" onClick={() => {
+                      if (primaryId !== c.id) {
+                        actions.setPrimaryIdentity(c.id);
+                        toast({ title: primaryText[0] + ': ' + c.name });
+                      }
+                      setOpenActionsId(null);
+                    }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-secondary">
+                      <Star className="h-4 w-4 shrink-0" fill={primaryId === c.id ? 'currentColor' : 'none'} />
+                      <span>{primaryId === c.id ? primaryText[0] : primaryText[1]}</span>
+                    </button>}
+                    {!c.archived && <Link role="menuitem" href={`/characters/${c.id}/gallery`} onClick={() => setOpenActionsId(null)}
+                      className="flex min-h-11 items-center gap-3 rounded-lg px-3 hover:bg-secondary">
+                      <Images className="h-4 w-4 shrink-0" /><span>{galleryLabel}</span>
+                    </Link>}
+                    <Link role="menuitem" href={`/characters/${c.id}/edit`} onClick={() => setOpenActionsId(null)}
+                      className="flex min-h-11 items-center gap-3 rounded-lg px-3 hover:bg-secondary"
+                      data-testid={`link-character-edit-${c.id}`}>
+                      <SlidersHorizontal className="h-4 w-4 shrink-0" /><span>{translate('Ficha de personaje de ')}{c.name}</span>
+                    </Link>
+                    <button type="button" role="menuitem" onClick={() => { setEditing(c.id); setOpenActionsId(null); }}
+                      className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-secondary"
+                      data-testid={`button-edit-account-${c.id}`}>
+                      <Pencil className="h-4 w-4 shrink-0" /><span>{translate('Editar ')}{c.name}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}</div>)}
