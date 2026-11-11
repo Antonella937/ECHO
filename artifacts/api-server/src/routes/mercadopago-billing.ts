@@ -3,7 +3,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { createMpSandboxPreapproval } from "../lib/mercadopagoSubscriptions";
+import { createMpSandboxPreapproval, fetchMpSandboxPayment } from "../lib/mercadopagoSubscriptions";
 
 /**
  * Mercado Pago subscription preflight.
@@ -209,6 +209,61 @@ router.get("/billing/mercadopago/subscription-status/:reference", requireAuth, a
   } catch (error) {
     req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP subscription status unavailable");
     res.status(503).json({ error: "MP_SUBSCRIPTION_STATUS_UNAVAILABLE" });
+  }
+});
+
+
+/** Test-only reconciliation of provider payment evidence; never grants a membership. */
+router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
+    res.status(503).json({ error: "MP_SANDBOX_CHECKOUT_DISABLED" }); return;
+  }
+  const reference = req.body?.reference;
+  const paymentId = req.body?.paymentId;
+  if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference) ||
+      typeof paymentId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(paymentId)) {
+    res.status(400).json({ error: "INVALID_MP_PAYMENT_REQUEST" }); return;
+  }
+  try {
+    const intentResult = await pool.query<{
+      reference: string; provider_preapproval_id: string | null; amount_ars: string;
+    }>(
+      `SELECT reference,provider_preapproval_id,amount_ars
+       FROM echo_mp_subscription_intents WHERE reference=$1 AND owner_id=$2 LIMIT 1`,
+      [reference, req.userId!],
+    );
+    const intent = intentResult.rows[0];
+    if (!intent || !intent.provider_preapproval_id) {
+      res.status(404).json({ error: "MP_SUBSCRIPTION_NOT_FOUND" }); return;
+    }
+    // Provider GET is the only trusted source of payment data.
+    const payment = await fetchMpSandboxPayment(paymentId);
+    if (payment.subscriptionId !== intent.provider_preapproval_id ||
+        payment.currency !== "ARS" || payment.amountArs === null ||
+        Math.abs(payment.amountArs - Number(intent.amount_ars)) > 0.001) {
+      res.status(409).json({ error: "MP_PAYMENT_SUBSCRIPTION_MISMATCH" }); return;
+    }
+    await pool.query(
+      `INSERT INTO echo_mp_verified_payments
+       (provider_payment_id,reference,provider_preapproval_id,provider_status,amount_ars,currency)
+       VALUES($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (provider_payment_id) DO UPDATE
+       SET provider_status=EXCLUDED.provider_status,
+           provider_verified_at=now()
+       WHERE echo_mp_verified_payments.reference=EXCLUDED.reference
+         AND echo_mp_verified_payments.provider_preapproval_id=EXCLUDED.provider_preapproval_id`,
+      [payment.id, reference, intent.provider_preapproval_id,
+       payment.status, payment.amountArs, payment.currency],
+    );
+    res.json({
+      reference, paymentId: payment.id, paymentStatus: payment.status,
+      providerVerified: true, entitlementChanged: false,
+      note: "Payment evidence recorded. Membership activation remains disabled.",
+    });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP sandbox payment verification unavailable");
+    res.status(503).json({ error: "MP_SANDBOX_PAYMENT_VERIFICATION_UNAVAILABLE" });
   }
 });
 
