@@ -32,6 +32,8 @@ import { runAutonomyDryRun } from "../autonomy/service";
 import { executeAutonomyDecision } from "../autonomy/executor";
 import type { Opportunity } from "../autonomy/policy";
 import { MeteredTextProvider } from "../lib/metered-ai";
+import { db, echoAutonomyRunsTable } from "@workspace/db";
+import { and, desc, eq, gte } from "drizzle-orm";
 
 const router: IRouter = Router();
 const provider = new FreeModelProvider();
@@ -106,6 +108,43 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
     }),
   });
 }
+
+// Owner-scoped recent Kindroid DM failure, never exposes provider secrets or other users' runs.
+router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (req.userId !== "user_3LeoBfUicTthDVixNbkPlqXFkdZ") {
+    res.json({ error: null }); return;
+  }
+  try {
+    const universeId = requestedUniverseId(req.query.universeId);
+    const characterId = req.query.characterId;
+    if (typeof characterId !== "string" || !characterId || characterId.length > 120) {
+      res.status(400).json({ error: "INVALID_CHARACTER_ID" }); return;
+    }
+    const snapshot = await readUniverse(req.userId!, universeId);
+    const parsed = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
+    if (!parsed.success || !parsed.data.state.characters.some(c => c.id === characterId && !c.archived)) {
+      res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
+    }
+    const [run] = await db.select({
+      status: echoAutonomyRunsTable.status,
+      code: echoAutonomyRunsTable.lastErrorCode,
+      createdAt: echoAutonomyRunsTable.createdAt,
+    }).from(echoAutonomyRunsTable).where(and(
+      eq(echoAutonomyRunsTable.ownerId, req.userId!),
+      eq(echoAutonomyRunsTable.universeId, universeId),
+      eq(echoAutonomyRunsTable.characterId, characterId),
+      eq(echoAutonomyRunsTable.lane, "dm"),
+      gte(echoAutonomyRunsTable.createdAt, new Date(Date.now() - 15 * 60_000)),
+    )).orderBy(desc(echoAutonomyRunsTable.createdAt)).limit(1);
+    const allowed = new Set(["KINDROID_TIMEOUT_RETRY_MANUALLY","KINDROID_CONNECTION_RETRY_MANUALLY",
+      "KINDROID_REQUEST_FAILED_RETRY_MANUALLY","KINDROID_RATE_LIMITED","KINDROID_GENERATION_FAILED"]);
+    res.json({ error: run && (run.status === "failed" || run.status === "stale_failed") &&
+      run.code && allowed.has(run.code) ? { code: run.code, at: run.createdAt } : null });
+  } catch {
+    res.status(503).json({ error: "DM_STATUS_UNAVAILABLE" });
+  }
+});
 
 router.get("/autonomy/settings", requireAuth, async (req, res): Promise<void> => {
   try {
