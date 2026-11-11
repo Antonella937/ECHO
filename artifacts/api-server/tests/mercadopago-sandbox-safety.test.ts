@@ -22,6 +22,18 @@ test("rejects invalid amount, payer, reference, or insecure callback",()=>{
   assert.throws(()=>buildMpPreapprovalPayload({...valid,reference:"user-provided-reference"}));
   assert.throws(()=>buildMpPreapprovalPayload({...valid,backUrl:"http://echoverse.pages.dev"}));
 });
+test("sandbox callback rejects local addresses, embedded credentials and fragments", () => {
+  for (const backUrl of [
+    "https://localhost/subscriptions",
+    "https://127.0.0.1/subscriptions",
+    "https://internal.local/subscriptions",
+    "https://user:pass@echoverse.pages.dev/subscriptions",
+    "https://echoverse.pages.dev/subscriptions#token",
+    "https://[::1]/subscriptions",
+  ]) {
+    assert.throws(() => buildMpPreapprovalPayload({ ...valid, backUrl }), backUrl);
+  }
+});
 test("webhook signature accepts only correct signed recent manifest",()=>{
   const ts="1794420000";
   const nowMs=Number(ts)*1000;
