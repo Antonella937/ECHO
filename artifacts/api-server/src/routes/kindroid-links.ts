@@ -13,6 +13,7 @@ const scope = z.object({
 const payload = scope.extend({
   kinId: z.string().trim().min(8).max(160).regex(/^[A-Za-z0-9_-]+$/),
   enabled: z.boolean(),
+  socialContextEnabled: z.boolean().default(false),
 }).strict();
 async function authorized(ownerId: string, universeId: string, characterId: string) {
   // This rollout intentionally remains restricted to the founder account.
@@ -29,9 +30,9 @@ kindroidLinksRouter.get('/characters/kindroid-link',async(req,res)=>{
   if(!p.success){res.status(400).json({error:'INVALID_QUERY'});return;}
   if(!await authorized(req.userId!,p.data.universeId,p.data.characterId)){res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;}
   try{
-    const rows=await db.execute(sql`SELECT kin_id, enabled FROM echo_kindroid_character_links
+    const rows=await db.execute(sql`SELECT kin_id, enabled, social_context_enabled FROM echo_kindroid_character_links
       WHERE owner_id=${req.userId!} AND universe_id=${p.data.universeId} AND character_id=${p.data.characterId} LIMIT 1`);
-    res.json({kinId:rows.rows[0]?.kin_id??'',enabled:rows.rows[0]?.enabled===true});
+    res.json({kinId:rows.rows[0]?.kin_id??'',enabled:rows.rows[0]?.enabled===true,socialContextEnabled:rows.rows[0]?.social_context_enabled===true});
   }catch{res.status(503).json({error:'KINDROID_LINK_UNAVAILABLE'});}
 });
 kindroidLinksRouter.put('/characters/kindroid-link',async(req,res)=>{
@@ -40,10 +41,10 @@ kindroidLinksRouter.put('/characters/kindroid-link',async(req,res)=>{
   if(!p.success){res.status(400).json({error:'INVALID_KINDROID_LINK'});return;}
   if(!await authorized(req.userId!,p.data.universeId,p.data.characterId)){res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;}
   try{
-    await db.execute(sql`INSERT INTO echo_kindroid_character_links (owner_id,universe_id,character_id,kin_id,enabled)
-      VALUES (${req.userId!},${p.data.universeId},${p.data.characterId},${p.data.kinId},${p.data.enabled})
+    await db.execute(sql`INSERT INTO echo_kindroid_character_links (owner_id,universe_id,character_id,kin_id,enabled,social_context_enabled)
+      VALUES (${req.userId!},${p.data.universeId},${p.data.characterId},${p.data.kinId},${p.data.enabled},${p.data.socialContextEnabled})
       ON CONFLICT (owner_id,universe_id,character_id)
-      DO UPDATE SET kin_id=EXCLUDED.kin_id,enabled=EXCLUDED.enabled,updated_at=now()`);
-    res.json({kinId:p.data.kinId,enabled:p.data.enabled});
+      DO UPDATE SET kin_id=EXCLUDED.kin_id,enabled=EXCLUDED.enabled,social_context_enabled=EXCLUDED.social_context_enabled,updated_at=now()`);
+    res.json({kinId:p.data.kinId,enabled:p.data.enabled,socialContextEnabled:p.data.socialContextEnabled});
   }catch{res.status(503).json({error:'KINDROID_LINK_UNAVAILABLE'});}
 });
