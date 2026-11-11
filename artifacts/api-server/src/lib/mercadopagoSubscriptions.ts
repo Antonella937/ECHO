@@ -50,11 +50,11 @@ function normalizePreapproval(input: unknown): MpPreapproval {
 }
 
 /** Provider-authoritative read. Never trust status supplied by a browser or webhook body. */
-export async function fetchMpPreapproval(id: string): Promise<MpPreapproval> {
+export async function fetchMpPreapproval(id: string, options: { fetchImpl?: typeof fetch } = {}): Promise<MpPreapproval> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(`${MP_API}/preapproval/${encodeURIComponent(safeId(id))}`, {
+    const response = await (options.fetchImpl ?? fetch)(`${MP_API}/preapproval/${encodeURIComponent(safeId(id))}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${testToken()}`, Accept: "application/json" },
       signal: controller.signal,
