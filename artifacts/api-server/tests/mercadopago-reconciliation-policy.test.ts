@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canActivatePaidMembership, nextMpSubscriptionStatus } from "../src/lib/mercadopagoReconciliationPolicy";
+import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus } from "../src/lib/mercadopagoReconciliationPolicy";
 
 test("preapproval status transitions do not imply paid access", () => {
   assert.equal(nextMpSubscriptionStatus("draft", "authorized"), "authorized");
@@ -43,4 +43,23 @@ test("no access from uncollected, reversed, expired, or unverified subscription 
   assert.equal(canActivatePaidMembership({ ...base, periodEnd: null }, now), false);
   assert.equal(canActivatePaidMembership({ ...base, paymentVerifiedFromProvider: false }, now), false);
   assert.equal(canActivatePaidMembership({ ...base, paymentMatchesSubscription: false }, now), false);
+});
+
+test("provider-verified payment evidence is rejected for wrong subscription, amount, currency, or period", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const valid = {
+    subscriptionStatus: "authorized" as const,
+    providerPreapprovalId: "preapproval-123",
+    expectedAmountArs: 1200,
+    payment: { status: "approved" as const, subscriptionId: "preapproval-123", amountArs: 1200, currency: "ARS" },
+    periodEnd: new Date("2026-12-11T12:00:00Z"),
+  };
+  assert.deepEqual(evaluateMpSandboxPayment(valid, now), { eligible: true, reason: "VERIFIED_APPROVED_PAYMENT" });
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, subscriptionId: "other" } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, amountArs: 100 } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, currency: "USD" } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, status: "refunded" } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, subscriptionStatus: "canceled" }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, periodEnd: new Date("2026-11-10T12:00:00Z") }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, periodEnd: null }, now).eligible, false);
 });
