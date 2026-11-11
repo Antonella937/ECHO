@@ -57,8 +57,8 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
     <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={()=>{
       if(open){requestVersion.current+=1;setOpen(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
     }}>{es?'¿Qué pensó?':'What did they think?'}</button>
-    {open && <div className="mt-2 rounded-xl border border-border bg-secondary/30 p-3">
-      <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no significa que vio la publicación.':'Private · Manual inspection does not mean the content was viewed.'}</p>
+    {open && <div className="mt-2 max-h-[42dvh] overflow-y-auto overscroll-contain rounded-xl border border-border bg-card/95 p-3 text-foreground shadow-lg backdrop-blur-md" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+      <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no confirma que el personaje haya visto el contenido.':'Private · Manual inspection does not confirm the character viewed this content.'}</p>
       {reactions.length===0 && !loading && <p className="mb-2 text-muted-foreground">{es?'Todavía no hay pensamientos guardados.':'No saved thoughts yet.'}</p>}
       {reactions.map((reaction,index)=><p key={`${reaction.character_id??index}-${index}`} className="mb-2 whitespace-pre-wrap">
         <strong>{state.characters.find(c=>c.id===reaction.character_id)?.name??(es?'Personaje':'Character')}</strong>
