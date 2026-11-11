@@ -79,3 +79,29 @@ export function reconcileMpPaymentStatus(
   if (current === "refunded") return observed === "charged_back" ? "charged_back" : current;
   return observed;
 }
+
+/**
+ * A provider preapproval's next_payment_date is NOT proof of a paid-through
+ * entitlement. A paid period must be derived from a separately verified
+ * installment and its actual billing interval.
+ */
+export function validateMpPaidPeriod(input: {
+  paidAt: Date | null;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+  providerPaymentApproved: boolean;
+}, now: Date = new Date()): { valid: boolean; reason: string } {
+  if (!input.providerPaymentApproved) return { valid: false, reason: "PAYMENT_NOT_APPROVED" };
+  const { paidAt, periodStart, periodEnd } = input;
+  if (!(paidAt instanceof Date) || !(periodStart instanceof Date) || !(periodEnd instanceof Date) ||
+      ![paidAt, periodStart, periodEnd].every(d => Number.isFinite(d.getTime())))
+    return { valid: false, reason: "MISSING_VERIFIED_PERIOD" };
+  if (periodStart.getTime() > paidAt.getTime() || paidAt.getTime() > periodEnd.getTime())
+    return { valid: false, reason: "PAYMENT_OUTSIDE_PERIOD" };
+  if (periodEnd.getTime() <= now.getTime())
+    return { valid: false, reason: "PERIOD_EXPIRED" };
+  // Refuse unreasonable periods until the subscription's billing interval is reconciled.
+  if (periodEnd.getTime() - periodStart.getTime() > 35 * 24 * 60 * 60 * 1000)
+    return { valid: false, reason: "PERIOD_EXCEEDS_MONTHLY_INTERVAL" };
+  return { valid: true, reason: "VERIFIED_PERIOD" };
+}
