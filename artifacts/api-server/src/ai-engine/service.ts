@@ -16,6 +16,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   provider: TextProvider;
   vision?: (ownerId: string, state: import('@workspace/api-zod').SocialState, input: CharacterDecisionInput) => Promise<VisionContext>;
   liveDmReply?: boolean;
+  liveSocialText?: boolean;
 }) {
   if (!ownerId) throw new EngineError('AUTHENTICATION_REQUIRED', 401);
   if (!PreviewCharacterDecisionBody.strict().safeParse(input).success) throw new EngineError('INVALID_PREVIEW_INPUT');
@@ -85,8 +86,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       ((dependencies.liveDmReply === true && input.situation === 'dm' && input.recipientId === 'nela') ||
-       (input.situation === 'comment' && !!input.postId && parsed.data.state.posts.some(p => p.id === input.postId && p.authorId === 'nela')) ||
-       input.situation === 'post')) {
+       (dependencies.liveSocialText === true && input.situation === 'comment' && !!input.postId && parsed.data.state.posts.some(p => p.id === input.postId && p.authorId === 'nela')) ||
+       (dependencies.liveSocialText === true && input.situation === 'post'))) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
