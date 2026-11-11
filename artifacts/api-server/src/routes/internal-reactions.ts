@@ -1,7 +1,7 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
-import { db, echoUniversesTable } from '@workspace/db';
+import { db, echoUniversesTable, echoCharacterBlocksTable, echoCharacterPrivacyTable } from '@workspace/db';
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { storyIsStillVisible, readAcceptedCharacterFollows } from '../lib/socialContentAccess';
 import { kindroidDmProvider } from '../ai-engine/kindroid';
@@ -71,6 +71,34 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
       edge.source.characterId===characterId && edge.target.ownerId===req.userId &&
       edge.target.universeId===universeId && edge.target.characterId===content.authorId);
     if (!followsAuthor) {res.status(403).json({error:'CHARACTER_CANNOT_VIEW_AUTHOR'});return;}
+    // A follow does not override a block in either direction.
+    const blocks = await db.select({
+      blockerId:echoCharacterBlocksTable.blockerCharacterId,
+      blockedId:echoCharacterBlocksTable.blockedCharacterId,
+    }).from(echoCharacterBlocksTable).where(and(
+      eq(echoCharacterBlocksTable.blockerOwnerId,req.userId!),
+      eq(echoCharacterBlocksTable.blockerUniverseId,universeId),
+      eq(echoCharacterBlocksTable.blockedOwnerId,req.userId!),
+      eq(echoCharacterBlocksTable.blockedUniverseId,universeId),
+    ));
+    if (blocks.some(block =>
+      (block.blockerId===characterId && block.blockedId===content.authorId) ||
+      (block.blockerId===content.authorId && block.blockedId===characterId))) {
+      res.status(403).json({error:'CHARACTERS_BLOCKED'});return;
+    }
+    // A private author requires a reciprocal accepted follow.
+    const [privacy] = await db.select({visibility:echoCharacterPrivacyTable.visibility})
+      .from(echoCharacterPrivacyTable).where(and(
+        eq(echoCharacterPrivacyTable.ownerId,req.userId!),
+        eq(echoCharacterPrivacyTable.universeId,universeId),
+        eq(echoCharacterPrivacyTable.characterId,content.authorId),
+      )).limit(1);
+    if (privacy?.visibility==='private' && !acceptedFollows.some(edge =>
+      edge.source.ownerId===req.userId && edge.source.universeId===universeId &&
+      edge.source.characterId===content.authorId && edge.target.ownerId===req.userId &&
+      edge.target.universeId===universeId && edge.target.characterId===characterId)) {
+      res.status(403).json({error:'PRIVATE_AUTHOR_ACCESS_DENIED'});return;
+    }
     // Do not let a manual request bypass close-friends or story expiry.
     if (surface==='story' && (!canCharacterViewCloseFriendsStory(state,content,characterId) ||
         !storyIsStillVisible(state as Record<string,unknown>,content as Record<string,unknown>,Date.now()))) {
