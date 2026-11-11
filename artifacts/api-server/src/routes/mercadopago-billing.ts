@@ -3,7 +3,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { createMpSandboxPreapproval, fetchMpSandboxPayment, fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
+import { createMpSandboxPreapproval, fetchMpSandboxPayment, fetchMpPreapproval, matchesMpSandboxPayer } from "../lib/mercadopagoSubscriptions";
 
 /**
  * Mercado Pago subscription preflight.
@@ -285,9 +285,7 @@ router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (r
     if (preapproval.id !== intent.provider_preapproval_id ||
         preapproval.externalReference !== reference ||
         preapproval.status !== "authorized" ||
-        !preapproval.payerEmail ||
-        !process.env.ECHO_MP_SANDBOX_PAYER_EMAIL ||
-        preapproval.payerEmail.toLowerCase() !== process.env.ECHO_MP_SANDBOX_PAYER_EMAIL.toLowerCase() ||
+        !matchesMpSandboxPayer(preapproval.payerEmail, process.env.ECHO_MP_SANDBOX_PAYER_EMAIL) ||
         preapproval.amountArs === null ||
         Math.abs(preapproval.amountArs - Number(intent.amount_ars)) > 0.001) {
       res.status(409).json({ error: "MP_PROVIDER_SUBSCRIPTION_MISMATCH" }); return;
