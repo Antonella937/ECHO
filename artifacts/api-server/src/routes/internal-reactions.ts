@@ -188,8 +188,9 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     if (!latestUniverse || latestUniverse.archivedAt || latestUniverse.deletedAt ||
         !latestState?.characters?.some(character=>character.id===characterId&&!character.archived) ||
         !latestContent || latestContent.authorId!==content.authorId || latestCaption!==caption ||
-        (surface==='story' && !storyIsStillVisible(latestState as Record<string,unknown>,
-          latestContent as Record<string,unknown>,Date.now()))) {
+        (surface==='story' && (!storyIsStillVisible(latestState as Record<string,unknown>,
+          latestContent as Record<string,unknown>,Date.now()) ||
+          !canCharacterViewCloseFriendsStory(latestState,latestContent,characterId)))) {
       res.status(409).json({error:'INTERNAL_REACTION_CONTENT_CHANGED'});return;
     }
     const inserted = await db.execute(sql`INSERT INTO echo_internal_reactions
