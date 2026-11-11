@@ -14,7 +14,7 @@ let context: AudioContext | null = null;
 let unlocking: Promise<void> | null = null;
 export function unlockMessageAudio(): Promise<void> {
   try {
-    context ??= new AudioContext();
+    context ??= new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
     if (context.state === 'running') return Promise.resolve();
     if (!unlocking) unlocking = context.resume().then(() => undefined).catch(() => undefined).finally(() => { unlocking = null; });
     return unlocking;
@@ -24,7 +24,8 @@ export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' 
   if (!getSoundPreferences()[kind === 'creatorHub' ? 'notification' : kind]) return;
   // On iOS the audio context often starts suspended. Wait for resume instead
   // of silently dropping the very first notification chime.
-  void unlockMessageAudio().then(() => {
+  // Schedule synchronously when already running, preserving iOS user-gesture playback.
+  const schedule = () => {
     if (!context || context.state !== 'running') return;
     try {
       const now = context.currentTime + 0.015;
@@ -50,5 +51,7 @@ export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' 
         oscillator.stop(now + note.t + note.d + 0.01);
       }
     } catch { /* audio must never interrupt messaging */ }
-  });
+  };
+  if (context?.state === 'running') { schedule(); return; }
+  void unlockMessageAudio().then(schedule);
 }
