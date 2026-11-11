@@ -8,7 +8,7 @@ import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspac
 import { clerkClient } from '@clerk/express';
 import { kindroidDmProvider } from './kindroid';
 import { buildCharacterContext } from './context';
-import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
+import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -147,9 +147,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
           // Stories are only remembered if this actor actually viewed them.
           // Never infer story viewing from a follow alone.
-          const seenStories = freshState.stories
-            .filter(s => s.seenBy.includes(input.characterId) && s.authorId !== input.characterId &&
-              canCharacterViewCloseFriendsStory(freshState, s, input.characterId))
+          const seenStories = visibleSeenStoriesForKindroid(freshState, input.characterId)
             .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
             .slice(0,3)
             .map(s => {
@@ -159,7 +157,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // The shared context builder already ranks archived memories and
           // scopes private conversation memories to this exact DM recipient.
           const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
-            .filter(m => m.kind !== 'conversation' || m.targetId === 'nela')
+            .filter(m => kindroidMemoryAllowed(m, 'nela'))
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
           socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
         }
