@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus, validateMpPaidPeriod, planMpMembershipReconciliation } from "../src/lib/mercadopagoReconciliationPolicy";
+import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus, validateMpPaidPeriod, planMpMembershipReconciliation, planMpRenewal } from "../src/lib/mercadopagoReconciliationPolicy";
 
 test("preapproval status transitions do not imply paid access", () => {
   assert.equal(nextMpSubscriptionStatus("draft", "authorized"), "authorized");
@@ -106,4 +106,27 @@ test("membership reconciliation stays on hold until both provider payment and pe
   assert.equal(planMpMembershipReconciliation({ ...valid, payment: { ...valid.payment, subscriptionId: "wrong" } }, now).action, "hold");
   assert.equal(planMpMembershipReconciliation({ ...valid, subscriptionStatus: "canceled" }, now).action, "hold");
   assert.equal(planMpMembershipReconciliation({ ...valid, periodEnd: new Date("2026-11-10T00:00:00Z") }, now).action, "hold");
+});
+
+test("renewal policy refuses duplicate, reversed, expired and non-extending installments", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const base = {
+    paymentId: "payment-456",
+    previouslyAppliedPaymentIds: [] as string[],
+    currentPeriodEnd: new Date("2026-11-20T00:00:00Z"),
+    verifiedPeriodStart: new Date("2026-11-11T00:00:00Z"),
+    verifiedPeriodEnd: new Date("2026-12-11T00:00:00Z"),
+    paidAt: new Date("2026-11-11T10:00:00Z"),
+    paymentStatus: "approved" as const,
+  };
+  assert.equal(planMpRenewal(base, now).action, "extend");
+  assert.equal(planMpRenewal({...base, previouslyAppliedPaymentIds: ["payment-456"]}, now).reason, "PAYMENT_ALREADY_APPLIED");
+  assert.equal(planMpRenewal({...base, paymentStatus: "refunded"}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, paymentStatus: "charged_back"}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, paymentStatus: "pending"}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, verifiedPeriodEnd: new Date("2026-11-19T00:00:00Z")}, now).reason, "PERIOD_NOT_EXTENDED");
+  assert.equal(planMpRenewal({...base, verifiedPeriodEnd: new Date("2026-11-10T00:00:00Z")}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, verifiedPeriodEnd: null}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, currentPeriodEnd: new Date("invalid")}, now).reason, "INVALID_CURRENT_PERIOD");
+  assert.equal(planMpRenewal({...base, paymentId: "bad payment id"}, now).reason, "INVALID_PAYMENT_ID");
 });
