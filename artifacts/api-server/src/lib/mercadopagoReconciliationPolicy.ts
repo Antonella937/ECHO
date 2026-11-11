@@ -69,3 +69,13 @@ export function evaluateMpSandboxPayment(input: {
   }, now);
   return { eligible, reason: eligible ? "VERIFIED_APPROVED_PAYMENT" : "SUBSCRIPTION_OR_PERIOD_NOT_ELIGIBLE" };
 }
+
+/** Reversed payments cannot regain approved status from an out-of-order callback. */
+export function reconcileMpPaymentStatus(
+  current: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown",
+  observed: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown",
+): typeof current {
+  if (current === "charged_back") return current;
+  if (current === "refunded") return observed === "charged_back" ? "charged_back" : current;
+  return observed;
+}
