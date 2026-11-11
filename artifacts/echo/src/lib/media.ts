@@ -80,10 +80,24 @@ export function retryPrivateMedia(ref: string, source?: MediaSource): void {
   if (!ref.startsWith('/objects/') && !ref.startsWith('/api/storage/objects/')) return;
   privateMediaFailures.delete(url);
   privateMediaAttempts.delete(url);
+  // An image element may fail to decode a cached blob even when its download succeeded.
+  // Evict that object URL so Retry fetches fresh bytes instead of redisplaying the broken blob.
+  const cached = privateMediaCache.get(url);
+  if (cached) {
+    privateMediaCache.delete(url);
+    if (cached.startsWith('blob:')) URL.revokeObjectURL(cached);
+  }
   const timer = privateMediaRetryTimers.get(url);
   if (timer) clearTimeout(timer);
   privateMediaRetryTimers.delete(url);
-  loadPrivateMedia(url);
+  // If an earlier request is still running, start a fresh fetch once it finishes.
+  if (privateMediaPending.has(url)) {
+    const wait = setTimeout(() => retryPrivateMedia(ref, source), 800);
+    privateMediaRetryTimers.set(url, wait);
+  } else {
+    loadPrivateMedia(url, true);
+  }
+  privateMediaListeners.forEach(notify => notify());
 }
 
 // Bound simultaneous private-media reads so the feed cannot starve universe sync
