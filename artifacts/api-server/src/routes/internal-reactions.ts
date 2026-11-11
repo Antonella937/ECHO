@@ -77,7 +77,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     const [universe] = await db.select({state:echoUniversesTable.state,archivedAt:echoUniversesTable.archivedAt,deletedAt:echoUniversesTable.deletedAt})
       .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
     if (!universe || universe.archivedAt || universe.deletedAt) {res.status(404).json({error:'UNIVERSE_NOT_FOUND'});return;}
-    const state = universe.state as {characters?:Array<{id:string;archived?:boolean}>;posts?:Array<{id:string;authorId:string;caption?:string}>;stories?:Array<{id:string;authorId:string;caption?:string;seenBy?:string[]}>};
+    const state = universe.state as {characters?:Array<{id:string;archived?:boolean}>;posts?:Array<{id:string;authorId:string;caption?:string;text?:string;content?:string}>;stories?:Array<{id:string;authorId:string;caption?:string;text?:string;content?:string;seenBy?:string[]}>};
     if (!state.characters?.some(c=>c.id===characterId&&!c.archived)) {res.status(404).json({error:'CHARACTER_NOT_FOUND'});return;}
     const content = (surface==='post'?state.posts:state.stories)?.find(c=>c.id===contentId);
     if (!content || content.authorId===characterId) {res.status(404).json({error:'CONTENT_NOT_FOUND'});return;}
@@ -155,7 +155,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     }
     // Do not spend a paid generation on an empty caption when no visual
     // description is available to the text-only Kindroid adapter.
-    const caption = typeof content.caption === 'string' ? content.caption.trim() : '';
+    const caption = [content.caption,content.text,content.content].find(value=>typeof value==='string'&&value.trim().length>0)?.trim() ?? '';
     if (!caption) {
       res.status(422).json({error:'INTERNAL_REACTION_CONTENT_CONTEXT_MISSING'});return;
     }
