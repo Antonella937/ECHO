@@ -3,7 +3,12 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import type { RequestHandler } from "express";
 
-/** Three persistent seats, allocated atomically across concurrent server instances. */
+/** Configurable persistent beta seats (3–50), allocated atomically across concurrent server instances. */
+const configuredSeatLimit = Number(process.env.ECHO_BETA_MAX_SEATS ?? "3");
+if (!Number.isInteger(configuredSeatLimit) || configuredSeatLimit < 1 || configuredSeatLimit > 50) {
+  throw new Error("ECHO_BETA_MAX_SEATS must be an integer from 1 to 50");
+}
+
 export const privateBetaSeats: RequestHandler = async (req, res, next) => {
   if (req.path === "/healthz") return next();
   res.setHeader("Cache-Control", "private, no-store");
@@ -18,7 +23,7 @@ export const privateBetaSeats: RequestHandler = async (req, res, next) => {
       const claimed = await tx.execute(sql`
         INSERT INTO echo_beta_seats (owner_id)
         SELECT ${ownerId}
-        WHERE (SELECT COUNT(*) FROM echo_beta_seats) < 3
+        WHERE (SELECT COUNT(*) FROM echo_beta_seats) < ${configuredSeatLimit}
         ON CONFLICT (owner_id) DO NOTHING
         RETURNING owner_id
       `);
