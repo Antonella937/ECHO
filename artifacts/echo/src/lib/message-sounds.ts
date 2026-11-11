@@ -1,4 +1,4 @@
-/** Short original, iPhone-style chimes synthesized locally (no copyrighted audio assets). */
+/** Original short chimes played as HTMLAudio media, matching ECHO's working music player on iOS. */
 const KEY = 'echo:message-sounds';
 export type SoundPreferences = { incoming: boolean; outgoing: boolean; notification: boolean; group: boolean };
 const defaults: SoundPreferences = { incoming: true, outgoing: true, notification: true, group: true };
@@ -10,48 +10,66 @@ export function saveSoundPreferences(next: SoundPreferences) {
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* private mode */ }
   window.dispatchEvent(new Event('echo:sound-preferences'));
 }
-let context: AudioContext | null = null;
-let unlocking: Promise<void> | null = null;
-export function unlockMessageAudio(): Promise<void> {
-  try {
-    context ??= new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
-    if (context.state === 'running') return Promise.resolve();
-    if (!unlocking) unlocking = context.resume().then(() => undefined).catch(() => undefined).finally(() => { unlocking = null; });
-    return unlocking;
-  } catch { return Promise.resolve(); }
+type Kind = keyof SoundPreferences | 'creatorHub';
+const tones: Record<Kind, number[]> = {
+  incoming: [880, 1318.5], outgoing: [1046.5],
+  group: [523.25, 783.99, 1046.5], notification: [1174.66, 1567.98],
+  creatorHub: [659.25, 987.77, 1318.51],
+};
+const wavCache = new Map<Kind, string>();
+function makeWav(kind: Kind): string {
+  const existing = wavCache.get(kind);
+  if (existing) return existing;
+  const sampleRate = 22050;
+  const step = 0.15;
+  const length = Math.ceil(sampleRate * (tones[kind].length * step + 0.12));
+  const bytes = new Uint8Array(44 + length * 2);
+  const view = new DataView(bytes.buffer);
+  const str = (offset: number, value: string) => { for (let i=0;i<value.length;i++) view.setUint8(offset+i,value.charCodeAt(i)); };
+  str(0,'RIFF'); view.setUint32(4,36+length*2,true); str(8,'WAVE');
+  str(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+  view.setUint16(22,1,true); view.setUint32(24,sampleRate,true);
+  view.setUint32(28,sampleRate*2,true); view.setUint16(32,2,true);
+  view.setUint16(34,16,true); str(36,'data'); view.setUint32(40,length*2,true);
+  for(let i=0;i<length;i++){
+    const time=i/sampleRate;
+    let amplitude=0;
+    tones[kind].forEach((freq,index)=>{
+      const t=time-index*step;
+      if(t<0||t>0.24)return;
+      const envelope=Math.min(1,t/0.012)*Math.min(1,(0.24-t)/0.06);
+      amplitude+=Math.sin(2*Math.PI*freq*t)*envelope*0.16;
+    });
+    view.setInt16(44+i*2,Math.round(Math.max(-1,Math.min(1,amplitude))*32767),true);
+  }
+  // A local Blob URL avoids a large base64 allocation on every notification.
+  const url=URL.createObjectURL(new Blob([bytes],{type:'audio/wav'}));
+  wavCache.set(kind,url);
+  return url;
 }
-export function playMessageSound(kind: 'incoming' | 'outgoing' | 'notification' | 'creatorHub' | 'group') {
-  if (!getSoundPreferences()[kind === 'creatorHub' ? 'notification' : kind]) return;
-  // On iOS the audio context often starts suspended. Wait for resume instead
-  // of silently dropping the very first notification chime.
-  // Schedule synchronously when already running, preserving iOS user-gesture playback.
-  const schedule = () => {
-    if (!context || context.state !== 'running') return;
-    try {
-      const now = context.currentTime + 0.015;
-      const notes = kind === 'group'
-        ? [{ f: 523.25, t: 0, d: 0.12 }, { f: 783.99, t: 0.11, d: 0.14 }, { f: 1046.5, t: 0.23, d: 0.26 }]
-        : kind === 'creatorHub'
-        ? [{ f: 659.25, t: 0, d: 0.14 }, { f: 987.77, t: 0.12, d: 0.16 }, { f: 1318.51, t: 0.24, d: 0.28 }]
-        : kind === 'incoming'
-        ? [{ f: 880, t: 0, d: 0.16 }, { f: 1318.5, t: 0.11, d: 0.27 }]
-        : kind === 'notification'
-          ? [{ f: 1174.66, t: 0, d: 0.14 }, { f: 1567.98, t: 0.13, d: 0.22 }]
-          : [{ f: 1046.5, t: 0, d: 0.095 }];
-      for (const note of notes) {
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = note.f;
-        gain.gain.setValueAtTime(0.0001, now + note.t);
-        gain.gain.exponentialRampToValueAtTime(0.075, now + note.t + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + note.t + note.d);
-        oscillator.connect(gain).connect(context.destination);
-        oscillator.start(now + note.t);
-        oscillator.stop(now + note.t + note.d + 0.01);
-      }
-    } catch { /* audio must never interrupt messaging */ }
-  };
-  if (context?.state === 'running') { schedule(); return; }
-  void unlockMessageAudio().then(schedule);
+const players = new Map<Kind, HTMLAudioElement>();
+function player(kind: Kind) {
+  let audio=players.get(kind);
+  if(!audio){
+    audio=new Audio(makeWav(kind));
+    audio.preload='auto';
+    audio.volume=0.85;
+    players.set(kind,audio);
+  }
+  return audio;
+}
+export function unlockMessageAudio(): Promise<void> {
+  // iOS unlock is performed by play() in the user's direct click/touch handler.
+  return Promise.resolve();
+}
+export function playMessageSound(kind: Kind) {
+  if (!getSoundPreferences()[kind==='creatorHub'?'notification':kind]) return;
+  try {
+    const audio=player(kind);
+    audio.pause();
+    audio.currentTime=0;
+    void audio.play().catch(() => {
+      // Browser media policy may reject autoplay until the user interacts.
+    });
+  } catch { /* Audio must never interrupt messaging. */ }
 }
