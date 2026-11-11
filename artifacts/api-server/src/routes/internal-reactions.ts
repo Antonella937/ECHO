@@ -30,9 +30,11 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
     const [universe] = await db.select({state:echoUniversesTable.state,archivedAt:echoUniversesTable.archivedAt,deletedAt:echoUniversesTable.deletedAt})
       .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
     if (!universe || universe.archivedAt || universe.deletedAt) {res.status(404).json({error:'UNIVERSE_NOT_FOUND'});return;}
-    const state = universe.state as {posts?:Array<{id:string}>;stories?:Array<{id:string}>};
+    const state = universe.state as {characters?:Array<{id:string;archived?:boolean}>;posts?:Array<{id:string;authorId:string}>;stories?:Array<{id:string;authorId:string}>};
     const content = (parsed.data.surface==='post'?state.posts:state.stories)?.find(item=>item.id===parsed.data.contentId);
-    if (!content) {res.status(404).json({error:'CONTENT_NOT_FOUND'});return;}
+    if (!content || !state.characters?.some(character=>character.id===content.authorId&&!character.archived)) {
+      res.status(404).json({error:'CONTENT_NOT_FOUND'});return;
+    }
     if (parsed.data.surface==='story' && !storyIsStillVisible(state as Record<string,unknown>,content as Record<string,unknown>,Date.now())) {
       res.status(404).json({error:'CONTENT_NOT_FOUND'});return;
     }
@@ -45,7 +47,8 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
         AND content_id = ${parsed.data.contentId}
       ORDER BY generated_at DESC LIMIT 50
     `);
-    res.json({reactions:rows.rows});
+    const activeIds = new Set(state.characters.filter(character=>!character.archived).map(character=>character.id));
+    res.json({reactions:rows.rows.filter(row=>typeof row.character_id==='string'&&activeIds.has(row.character_id))});
   } catch {
     res.status(503).json({error:'INTERNAL_REACTIONS_UNAVAILABLE'});
   }
