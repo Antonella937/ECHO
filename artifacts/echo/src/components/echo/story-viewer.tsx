@@ -1,4 +1,5 @@
 import { MusicClipPlayer } from './music-clip-player';
+import { InternalThoughts } from './internal-thoughts';
 import { useStoryViewerText } from '@/lib/story-viewer-translations';
 import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -394,6 +395,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 {totalViews === 0 ? t('Nadie la ha visto todavía') : `${t('Vista por')} ${formatCount(totalViews)}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} ${t("reacción(es)")}` : ''}{liveStory.likes?.length ? ` · ${liveStory.likes.length} ${t("Me gusta")}` : ''}
               </button>
               <StoryMetricsEditor key={story.id} story={liveStory} onOpenChange={open => setEditingMetricsId(open ? story.id : null)} />
+              {active && <div className="pointer-events-auto px-3 pb-2"><InternalThoughts surface="story" contentId={liveStory.id} authorId={liveStory.authorId} /></div>}
               {showViewers && (
                 <div className="absolute bottom-0 left-0 right-0 z-30 max-h-[65dvh] overflow-hidden rounded-t-3xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl" data-testid="story-viewers-sheet">
                   <div className="flex items-center justify-between border-b border-border px-4 py-3">
