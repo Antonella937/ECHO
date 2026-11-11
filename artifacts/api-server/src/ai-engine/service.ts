@@ -8,6 +8,7 @@ import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspac
 import { clerkClient } from '@clerk/express';
 import { kindroidDmProvider } from './kindroid';
 import { buildCharacterContext } from './context';
+import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -147,7 +148,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // Stories are only remembered if this actor actually viewed them.
           // Never infer story viewing from a follow alone.
           const seenStories = freshState.stories
-            .filter(s => s.seenBy.includes(input.characterId) && s.authorId !== input.characterId)
+            .filter(s => s.seenBy.includes(input.characterId) && s.authorId !== input.characterId &&
+              canCharacterViewCloseFriendsStory(freshState, s, input.characterId))
             .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
             .slice(0,3)
             .map(s => {
