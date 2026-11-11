@@ -1,7 +1,10 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
-import { db } from '@workspace/db';
+import { db, echoUniversesTable } from '@workspace/db';
+import { and, eq } from 'drizzle-orm';
+import { kindroidDmProvider } from '../ai-engine/kindroid';
+import { internalReactionPrompt, shouldGenerateInternalReaction } from '../autonomy/internal-reactions';
 import { requireAuth } from '../middlewares/requireAuth';
 
 /**
@@ -35,5 +38,64 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
     res.json({reactions:rows.rows});
   } catch {
     res.status(503).json({error:'INTERNAL_REACTIONS_UNAVAILABLE'});
+  }
+});
+
+const manualPayload = query.extend({characterId:z.string().min(1).max(120)}).strict();
+
+/** Explicit creator request. Does not create a view receipt, comment, like or DM. */
+internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (req,res): Promise<void> => {
+  res.setHeader('Cache-Control','private, no-store');
+  if (req.userId !== 'user_3LeoBfUicTthDVixNbkPlqXFkdZ') {
+    res.status(403).json({error:'INTERNAL_REACTIONS_NOT_AVAILABLE'}); return;
+  }
+  const parsed = manualPayload.safeParse(req.body);
+  if (!parsed.success) {res.status(400).json({error:'INVALID_INTERNAL_REACTION_REQUEST'});return;}
+  const {universeId,surface,contentId,characterId} = parsed.data;
+  try {
+    const [universe] = await db.select({state:echoUniversesTable.state,archivedAt:echoUniversesTable.archivedAt,deletedAt:echoUniversesTable.deletedAt})
+      .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
+    if (!universe || universe.archivedAt || universe.deletedAt) {res.status(404).json({error:'UNIVERSE_NOT_FOUND'});return;}
+    const state = universe.state as {characters?:Array<{id:string;archived?:boolean}>;posts?:Array<{id:string;authorId:string;caption?:string}>;stories?:Array<{id:string;authorId:string;caption?:string;seenBy?:string[]}>};
+    if (!state.characters?.some(c=>c.id===characterId&&!c.archived)) {res.status(404).json({error:'CHARACTER_NOT_FOUND'});return;}
+    const content = (surface==='post'?state.posts:state.stories)?.find(c=>c.id===contentId);
+    if (!content || content.authorId===characterId) {res.status(404).json({error:'CONTENT_NOT_FOUND'});return;}
+    // Conservative initial rollout: only creator-owned content; never leak other
+    // users' private posts/stories into a linked external provider.
+    if (!state.characters.some(c=>c.id===content.authorId&&!c.archived)) {res.status(403).json({error:'CONTENT_ACCESS_UNVERIFIED'});return;}
+    const viewed = surface==='story' && 'seenBy' in content && Array.isArray(content.seenBy) && content.seenBy.includes(characterId);
+    if (!shouldGenerateInternalReaction({
+      characterId,contentId,surface,authorId:content.authorId,
+      actuallyViewed:Boolean(viewed),manualInspectionAllowed:true,audienceAllowed:true,
+      blocked:false,autonomyEnabled:false,publiclyResponded:false,
+    },'manual')) {res.status(403).json({error:'INTERNAL_REACTION_NOT_ALLOWED'});return;}
+    const existing = await db.execute(sql`SELECT reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
+        AND surface=${surface} AND content_id=${contentId} LIMIT 1`);
+    if (existing.rows.length) {res.json({reaction:existing.rows[0],cached:true});return;}
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
+        AND enabled=true AND social_context_enabled=true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId!=='string') {res.status(409).json({error:'KINDROID_SOCIAL_CONTEXT_NOT_ENABLED'});return;}
+    const prompt = internalReactionPrompt(surface,content.caption??'');
+    const result = await kindroidDmProvider(prompt,kinId,'',fetch,'dm').complete({
+      system:'Private internal narration only',context:'',outputSchema:{},conversationMode:'narrative',
+    });
+    const decision = JSON.parse(result.text) as {text?:string};
+    const reactionText = decision.text?.trim().slice(0,2000);
+    if (!reactionText) {res.status(502).json({error:'EMPTY_INTERNAL_REACTION'});return;}
+    const inserted = await db.execute(sql`INSERT INTO echo_internal_reactions
+      (owner_id,universe_id,character_id,surface,content_id,mode,reaction_text,actually_viewed)
+      VALUES (${req.userId!},${universeId},${characterId},${surface},${contentId},'manual',${reactionText},${Boolean(viewed)})
+      ON CONFLICT DO NOTHING RETURNING reaction_text,mode,actually_viewed,generated_at`);
+    if (inserted.rows.length) {res.status(201).json({reaction:inserted.rows[0],cached:false});return;}
+    const winner = await db.execute(sql`SELECT reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
+      AND surface=${surface} AND content_id=${contentId} LIMIT 1`);
+    res.json({reaction:winner.rows[0],cached:true});
+  } catch (error) {
+    const status = typeof error==='object' && error!==null && 'status' in error && typeof error.status==='number' ? error.status : 503;
+    res.status(status>=400&&status<=599?status:503).json({error:'INTERNAL_REACTION_GENERATION_UNAVAILABLE'});
   }
 });
