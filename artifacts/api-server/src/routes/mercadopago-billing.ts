@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
+import { randomUUID } from "node:crypto";
 
 /**
  * Mercado Pago subscription preflight.
@@ -46,6 +47,42 @@ router.get("/billing/mercadopago/config", requireAuth, (req, res) => {
       subscriptionReconciliation: false,
     },
     note: "No payments or subscription activations are enabled.",
+  });
+});
+
+/**
+ * Server-created subscription draft only. It never charges or grants access.
+ * An actual Mercado Pago preapproval is created only after test credentials,
+ * verified callbacks and idempotent reconciliation are in place.
+ */
+router.post("/billing/mercadopago/subscription-draft", requireAuth, (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (lifetimeAccessForOwner(req.userId!) !== null) {
+    res.status(409).json({ error: "BILLING_EXEMPT" });
+    return;
+  }
+  const plan = req.body?.plan;
+  if (plan !== "plus" && plan !== "premium") {
+    res.status(400).json({ error: "INVALID_PLAN" });
+    return;
+  }
+  const amount = parseArsAmount(process.env[plan === "plus" ? "ECHO_MP_PLUS_ARS" : "ECHO_MP_PREMIUM_ARS"]);
+  if (amount === null) {
+    res.status(503).json({ error: "ARS_PRICE_NOT_CONFIGURED" });
+    return;
+  }
+  const reference = `echo:${plan}:${randomUUID()}`;
+  res.status(202).json({
+    status: "draft_only",
+    checkoutEnabled: false,
+    provider: "mercadopago",
+    plan,
+    reference,
+    frequency: 1,
+    frequencyType: "months",
+    currency: "ARS",
+    amount,
+    checkoutUrl: null,
   });
 });
 
