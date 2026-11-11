@@ -15,6 +15,8 @@ export interface InternalReactionCandidate {
   blocked: boolean;
   autonomyEnabled: boolean;
   publiclyResponded: boolean;
+  /** A manual inspection may happen without a prior view receipt; never pretend it was viewed. */
+  manualInspectionAllowed?: boolean;
 }
 
 /** Stable sampling prevents a new reaction every time a feed is refreshed. */
@@ -37,7 +39,7 @@ export function shouldGenerateInternalReaction(
   mode: InternalReactionMode,
   automaticProbability = 0.22,
 ): boolean {
-  if (!candidate.actuallyViewed || !candidate.audienceAllowed || candidate.blocked ||
+  if (!(candidate.actuallyViewed || (mode === 'manual' && candidate.manualInspectionAllowed)) || !candidate.audienceAllowed || candidate.blocked ||
       candidate.characterId === candidate.authorId || candidate.publiclyResponded) return false;
   if (mode === 'manual') return true;
   if (!candidate.autonomyEnabled) return false;
