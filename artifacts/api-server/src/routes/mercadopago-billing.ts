@@ -119,7 +119,7 @@ router.post("/billing/mercadopago/sandbox-checkout", requireAuth, async (req, re
   const backUrl = process.env.ECHO_MP_CALLBACK_URL;
   if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference) ||
       typeof payerEmail !== "string" || payerEmail.length > 254 ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payerEmail) || !backUrl) {
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail) || !backUrl) {
     res.status(400).json({ error: "INVALID_SANDBOX_CHECKOUT" }); return;
   }
   // The callback URL and ARS price are server-controlled; the browser cannot override either.
