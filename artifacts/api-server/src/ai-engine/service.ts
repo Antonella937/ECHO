@@ -130,7 +130,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .filter(t => !['what','have','your','with','this','that','about','latest','post','posted','viste','publicacion','publicaste','sobre','esto','esta','para','como'].includes(t)));
           const visibleAuthorIds = new Set([input.characterId, ...(parsed.data.state.follows[input.characterId] ?? [])]);
           const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
-          const older = terms.size ? freshState.posts
+          // Old posts remain browsable on explicit request; they are not spontaneous memories.
+          const asksAboutPost = /\b(post|posts|posted|posting|publication|picture|photo|painting|drawing|sketch|artwork|feed|publicaci[oó]n|publicaciones|publicaste|subiste|foto|pintura|dibujo|boceto|perfil)\b/i.test(newest.text);
+          const older = asksAboutPost && terms.size ? parsed.data.state.posts
             .filter(p => visibleAuthorIds.has(p.authorId) && !recentIds.has(p.id))
             .map(p => {
               const author = parsed.data.state.characters.find(ch => ch.id === p.authorId);
