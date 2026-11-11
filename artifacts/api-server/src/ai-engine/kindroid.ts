@@ -23,7 +23,13 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       if (!key) throw new EngineError('KINDROID_KEY_MISSING', 503);
       if (!message.trim()) throw new EngineError('KINDROID_MESSAGE_MISSING', 400);
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
-      const style = situation === 'dm' ? (input.conversationMode === 'narrative' ? 'Follow the existing DM narrative style.' : 'Write a natural direct message.') : situation === 'comment' ? 'Write a short, spontaneous social media comment. No roleplay narration, stage directions, or actions in asterisks.' : 'Write a natural social media post caption. No roleplay narration, stage directions, or actions in asterisks.';
+      const style = situation === 'dm'
+        ? (input.conversationMode === 'narrative'
+          ? 'Use the established narrative DM style. You may respond with dialogue, physical actions, internal thoughts, a silent reaction, or any natural combination. A narration-only reaction is a complete valid response: do not force speech, a decision, or a resolution. Keep the character perspective consistent.'
+          : 'Write a natural direct message without roleplay narration or actions in asterisks.')
+        : situation === 'comment'
+          ? 'Write a short, spontaneous social media comment. No roleplay narration, stage directions, or actions in asterisks.'
+          : 'Write a natural social media post caption. No roleplay narration, stage directions, or actions in asterisks.';
       const prompt = `[ECHO text request: ${situation}. ${style} Respect your established personality, relationships, and language. Return only the text to publish, without quotes or explanation.]\n${message}`;
       reserveKindroidRequest();
       let response: Response;
