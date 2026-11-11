@@ -134,7 +134,6 @@ router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> =>
       eq(echoAutonomyRunsTable.ownerId, req.userId!),
       eq(echoAutonomyRunsTable.universeId, universeId),
       eq(echoAutonomyRunsTable.characterId, characterId),
-      eq(echoAutonomyRunsTable.lane, "dm"),
       gte(echoAutonomyRunsTable.createdAt, new Date(Date.now() - 15 * 60_000)),
     )).orderBy(desc(echoAutonomyRunsTable.createdAt)).limit(1);
     const allowed = new Set(["KINDROID_TIMEOUT_RETRY_MANUALLY","KINDROID_CONNECTION_RETRY_MANUALLY",
