@@ -21,8 +21,9 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState('');
   const requestVersion = useRef(0);
-  const eligible = state.characters.filter(c=>!c.archived && c.id!==authorId &&
-    (state.follows[c.id]??[]).includes(authorId));
+  // The API validates accepted follows, blocks, and privacy. Avoid filtering
+  // by legacy local follow arrays, which may be stale or incomplete.
+  const eligible = state.characters.filter(c=>!c.archived && c.id!==authorId);
   useEffect(()=>{requestVersion.current+=1;setOpen(false);setReactions([]);setSelected('');setError('');onOpenChange?.(false);},[contentId,surface,universeId]);
   if(userId!==FOUNDER_ID) return null;
   const payload={universeId,surface,contentId};
@@ -56,6 +57,7 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
     }}>{es?'¿Qué pensó?':'What did they think?'}</button>
     {open && <div className="mt-2 rounded-xl border border-border bg-secondary/30 p-3">
       <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no significa que vio la publicación.':'Private · Manual inspection does not mean the content was viewed.'}</p>
+      {reactions.length===0 && !loading && <p className="mb-2 text-muted-foreground">{es?'Todavía no hay pensamientos guardados.':'No saved thoughts yet.'}</p>}
       {reactions.map((reaction,index)=><p key={`${reaction.character_id??index}-${index}`} className="mb-2 whitespace-pre-wrap">
         <strong>{state.characters.find(c=>c.id===reaction.character_id)?.name??(es?'Personaje':'Character')}</strong>
         {' · '}{reaction.actually_viewed?(es?'Vista real':'Verified view'):(es?'Hipotético':'Hypothetical')}
