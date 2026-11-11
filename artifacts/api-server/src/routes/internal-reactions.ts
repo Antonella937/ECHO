@@ -153,7 +153,13 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     if (process.env.ECHO_INTERNAL_REACTIONS_GENERATION_ENABLED !== 'true') {
       res.status(503).json({error:'INTERNAL_REACTION_GENERATION_DISABLED'});return;
     }
-    const prompt = internalReactionPrompt(surface,content.caption??'','manual');
+    // Do not spend a paid generation on an empty caption when no visual
+    // description is available to the text-only Kindroid adapter.
+    const caption = typeof content.caption === 'string' ? content.caption.trim() : '';
+    if (!caption) {
+      res.status(422).json({error:'INTERNAL_REACTION_CONTENT_CONTEXT_MISSING'});return;
+    }
+    const prompt = internalReactionPrompt(surface,caption,'manual');
     const result = await kindroidDmProvider(prompt,kinId,'',fetch,'internal_reaction').complete({
       system:'Private internal narration only',context:'',outputSchema:{},conversationMode:'narrative',
     });
