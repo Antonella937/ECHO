@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
+import { pool } from "@workspace/db";
 
 /**
  * Mercado Pago subscription preflight.
@@ -55,7 +56,7 @@ router.get("/billing/mercadopago/config", requireAuth, (req, res) => {
  * An actual Mercado Pago preapproval is created only after test credentials,
  * verified callbacks and idempotent reconciliation are in place.
  */
-router.post("/billing/mercadopago/subscription-draft", requireAuth, (req, res) => {
+router.post("/billing/mercadopago/subscription-draft", requireAuth, async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   if (lifetimeAccessForOwner(req.userId!) !== null) {
     res.status(409).json({ error: "BILLING_EXEMPT" });
@@ -72,6 +73,17 @@ router.post("/billing/mercadopago/subscription-draft", requireAuth, (req, res) =
     return;
   }
   const reference = `echo:${plan}:${randomUUID()}`;
+  try {
+    await pool.query(
+      `INSERT INTO echo_mp_subscription_intents(reference,owner_id,plan,amount_ars)
+       VALUES($1,$2,$3,$4)`,
+      [reference, req.userId!, plan, amount],
+    );
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP draft persistence failed");
+    res.status(503).json({ error: "SUBSCRIPTION_DRAFT_UNAVAILABLE" });
+    return;
+  }
   res.status(202).json({
     status: "draft_only",
     checkoutEnabled: false,
@@ -84,6 +96,20 @@ router.post("/billing/mercadopago/subscription-draft", requireAuth, (req, res) =
     amount,
     checkoutUrl: null,
   });
+});
+
+router.get("/billing/mercadopago/subscription-drafts", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  try {
+    const result = await pool.query(
+      `SELECT reference,plan,currency,amount_ars,status,created_at
+       FROM echo_mp_subscription_intents WHERE owner_id=$1
+       ORDER BY created_at DESC LIMIT 20`, [req.userId!]);
+    res.json({ drafts: result.rows, checkoutEnabled: false });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP draft listing failed");
+    res.status(503).json({ error: "SUBSCRIPTION_DRAFTS_UNAVAILABLE" });
+  }
 });
 
 export default router;
