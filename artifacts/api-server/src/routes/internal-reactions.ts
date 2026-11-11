@@ -31,8 +31,11 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
       .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
     if (!universe || universe.archivedAt || universe.deletedAt) {res.status(404).json({error:'UNIVERSE_NOT_FOUND'});return;}
     const state = universe.state as {posts?:Array<{id:string}>;stories?:Array<{id:string}>};
-    const exists = (parsed.data.surface==='post'?state.posts:state.stories)?.some(item=>item.id===parsed.data.contentId);
-    if (!exists) {res.status(404).json({error:'CONTENT_NOT_FOUND'});return;}
+    const content = (parsed.data.surface==='post'?state.posts:state.stories)?.find(item=>item.id===parsed.data.contentId);
+    if (!content) {res.status(404).json({error:'CONTENT_NOT_FOUND'});return;}
+    if (parsed.data.surface==='story' && !storyIsStillVisible(state as Record<string,unknown>,content as Record<string,unknown>,Date.now())) {
+      res.status(404).json({error:'CONTENT_NOT_FOUND'});return;
+    }
     const rows = await db.execute(sql`
       SELECT character_id, surface, content_id, mode, reaction_text, actually_viewed, generated_at
       FROM echo_internal_reactions
