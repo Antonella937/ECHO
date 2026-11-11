@@ -156,7 +156,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (editingMetrics) return;
+      if (editingMetrics || showInternalThoughts) {
+        if (e.key === 'Escape' && showInternalThoughts) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') return;
+      }
       if (document.activeElement === inputRef.current) {
         if (e.key === 'Escape') inputRef.current?.blur();
         return;
@@ -171,7 +174,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [next, prev, onClose, editingMetrics]);
+  }, [next, prev, onClose, editingMetrics, showInternalThoughts]);
 
   const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showInternalThoughts || showShare || editingMetrics || confirmDelete || (imageIsPrivate && imageUnavailable);
 
@@ -288,7 +291,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                   key={`${group.author.id}-${s.id}`}
                   className="story-progress h-full w-full bg-foreground"
                   style={{ animationDuration: `${storyDurationMs}ms`, animationPlayState: isPaused ? 'paused' : 'running' }}
-                  onAnimationEnd={next}
+                  onAnimationEnd={() => { if (!isPaused) next(); }}
                 />
               )}
             </div>
