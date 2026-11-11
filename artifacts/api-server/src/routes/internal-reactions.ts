@@ -1,15 +1,16 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db, echoUniversesTable } from '@workspace/db';
-import { and, eq } from 'drizzle-orm';
+import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
+import { storyIsStillVisible } from '../lib/socialContentAccess';
 import { kindroidDmProvider } from '../ai-engine/kindroid';
 import { internalReactionPrompt, shouldGenerateInternalReaction } from '../autonomy/internal-reactions';
 import { requireAuth } from '../middlewares/requireAuth';
 
 /**
  * Private creator inspection only. No public social API exposes these thoughts.
- * Read-only by design until the generation/permission pipeline is complete.
+ * Manual generation is founder-only and requires explicit Kindroid social-context opt-in.
  */
 export const internalReactionsRouter: IRouter = Router();
 const query = z.object({
@@ -63,6 +64,11 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     // Conservative initial rollout: only creator-owned content; never leak other
     // users' private posts/stories into a linked external provider.
     if (!state.characters.some(c=>c.id===content.authorId&&!c.archived)) {res.status(403).json({error:'CONTENT_ACCESS_UNVERIFIED'});return;}
+    // Do not let a manual request bypass close-friends or story expiry.
+    if (surface==='story' && (!canCharacterViewCloseFriendsStory(state,content,characterId) ||
+        !storyIsStillVisible(state as Record<string,unknown>,content as Record<string,unknown>,Date.now()))) {
+      res.status(403).json({error:'STORY_NOT_VISIBLE_TO_CHARACTER'});return;
+    }
     const viewed = surface==='story' && 'seenBy' in content && Array.isArray(content.seenBy) && content.seenBy.includes(characterId);
     if (!shouldGenerateInternalReaction({
       characterId,contentId,surface,authorId:content.authorId,
