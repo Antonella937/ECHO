@@ -85,7 +85,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       ((dependencies.liveDmReply === true && input.situation === 'dm' && input.recipientId === 'nela') ||
-       (input.situation === 'comment' && !!input.postId && parsed.data.state.posts.some(p => p.id === input.postId && p.authorId === 'nela')))) {
+       (input.situation === 'comment' && !!input.postId && parsed.data.state.posts.some(p => p.id === input.postId && p.authorId === 'nela')) ||
+       input.situation === 'post')) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
@@ -97,7 +98,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
       const targetPost = input.situation === 'comment' ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
-      const sourceText = input.situation === 'comment' ? (targetPost ? `Comment naturally on Nela's ECHO post: ${targetPost.caption.slice(0, 1200)}` : '') : (newest?.senderId === 'nela' ? newest.text : '');
+      const sourceText = input.situation === 'comment'
+        ? (targetPost ? `Comment naturally on Nela's ECHO post: ${targetPost.caption.slice(0, 1200)}` : '')
+        : input.situation === 'post'
+          ? 'Write a short original ECHO feed post in your own voice, grounded only in what you actually know and your current situation. Do not invent photos, outings or shared experiences.'
+          : (newest?.senderId === 'nela' ? newest.text : '');
       if (typeof sourceText === 'string' && sourceText.trim()) {
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
@@ -163,7 +168,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
           socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
         }
-        selectedProvider = kindroidDmProvider(sourceText, kinId, socialContext, fetch, input.situation === 'comment' ? 'comment' : 'dm');
+        selectedProvider = kindroidDmProvider(sourceText, kinId, socialContext, fetch, input.situation === 'comment' ? 'comment' : input.situation === 'post' ? 'post' : 'dm');
       }
     }
   }
