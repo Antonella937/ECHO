@@ -147,7 +147,13 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
       FROM echo_internal_reactions
       WHERE owner_id=${req.userId!} AND mode='manual'
         AND generated_at >= date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
-    if (Number(daily.rows[0]?.total ?? 0) >= 12) {
+    // Count in-flight requests as well as saved rows. A creator can inspect
+    // multiple characters concurrently, so counting completed rows alone
+    // would allow a burst to exceed the daily budget.
+    const ownerPendingPrefix = JSON.stringify([req.userId]).slice(0,-1) + ',';
+    const otherPending = [...pendingManualReactions].filter(key =>
+      key !== pendingKey && key.startsWith(ownerPendingPrefix)).length;
+    if (Number(daily.rows[0]?.total ?? 0) + otherPending >= 12) {
       res.status(429).json({error:'INTERNAL_REACTION_DAILY_LIMIT'});return;
     }
     // Opt-in rollout gate: the API must never charge Kindroid merely because
