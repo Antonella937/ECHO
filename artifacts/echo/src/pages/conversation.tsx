@@ -97,6 +97,29 @@ export default function ConversationPage() {
     return () => { active = false; window.clearInterval(timer); };
   }, [id, user?.id]);
 
+  const [kindroidFailure, setKindroidFailure] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id || !user?.id) { setKindroidFailure(null); return; }
+    let active = true;
+    const check = async () => {
+      try {
+        const params = new URLSearchParams({ universeId: getActiveUniverseId(user.id), characterId: id });
+        const result = await customFetch<{ error: { code: string; at: string } | null }>(
+          `/api/autonomy/dm-error?${params}`, { method: 'GET', responseType: 'json', cache: 'no-store' });
+        if (!active) return;
+        const code = result.error?.code;
+        setKindroidFailure(code === 'KINDROID_RATE_LIMITED'
+          ? 'Kindroid alcanzó temporalmente su límite. Esperá un poco antes de volver a escribir.'
+          : code?.startsWith('KINDROID_')
+            ? 'Kindroid no pudo responder. Revisá la conexión antes de enviar otro mensaje; ECHO no lo reenvió automáticamente.'
+            : null);
+      } catch { if (active) setKindroidFailure(null); }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [id, user?.id]);
+
   // Revoke local previews on unmount / route change.
   useEffect(() => () => pendingRef.current.forEach(p => URL.revokeObjectURL(p.preview)), [id]);
   useEffect(() => { setQuoteId(null); setPending([]); setError(null); }, [id]);
@@ -336,6 +359,11 @@ export default function ConversationPage() {
       </div>
 
       <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
+        {kindroidFailure && (
+          <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
+            {kindroidFailure}
+          </div>
+        )}
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
             <span className="flex-1">{error}</span>
