@@ -179,4 +179,37 @@ router.get("/billing/mercadopago/subscription-drafts", requireAuth, async (req, 
   }
 });
 
+
+/** Read-only status for the authenticated owner; never claims a payment was collected. */
+router.get("/billing/mercadopago/subscription-status/:reference", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const reference = req.params.reference;
+  if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference)) {
+    res.status(400).json({ error: "INVALID_MP_REFERENCE" }); return;
+  }
+  try {
+    const result = await pool.query<{
+      reference: string; plan: string; status: string; currency: string;
+      amount_ars: string; provider_preapproval_id: string | null;
+    }>(
+      `SELECT reference,plan,status,currency,amount_ars,provider_preapproval_id
+       FROM echo_mp_subscription_intents WHERE reference=$1 AND owner_id=$2 LIMIT 1`,
+      [reference, req.userId!],
+    );
+    const item = result.rows[0];
+    if (!item) { res.status(404).json({ error: "MP_SUBSCRIPTION_NOT_FOUND" }); return; }
+    res.json({
+      provider: "mercadopago", environment: "test", reference: item.reference,
+      plan: item.plan, status: item.status, currency: item.currency,
+      amount: Number(item.amount_ars),
+      checkoutCreated: Boolean(item.provider_preapproval_id),
+      paymentVerified: false, entitlementChanged: false,
+      message: "Subscription status does not establish that a payment was collected.",
+    });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP subscription status unavailable");
+    res.status(503).json({ error: "MP_SUBSCRIPTION_STATUS_UNAVAILABLE" });
+  }
+});
+
 export default router;
