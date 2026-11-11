@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { test } from "node:test";
-import { buildMpPreapprovalPayload, createMpSandboxPreapproval, fetchMpSandboxPayment } from "../src/lib/mercadopagoSubscriptions";
+import { buildMpPreapprovalPayload, createMpSandboxPreapproval, fetchMpSandboxPayment, matchesMpSandboxPayer } from "../src/lib/mercadopagoSubscriptions";
 import { verifyMpWebhookSignature } from "../src/lib/mercadopagoWebhookSignature";
 
 const reference = "echo:plus:11111111-1111-4111-8111-111111111111";
@@ -154,4 +154,13 @@ test("sandbox payment verification reads provider data without granting access",
     if (previous === undefined) delete process.env.ECHO_MP_ACCESS_TOKEN;
     else process.env.ECHO_MP_ACCESS_TOKEN = previous;
   }
+});
+
+test("sandbox payer identity fails closed on missing, malformed or different email", () => {
+  assert.equal(matchesMpSandboxPayer("Buyer@Example.com", "buyer@example.com"), true);
+  assert.equal(matchesMpSandboxPayer(" buyer@example.com ", "BUYER@example.com"), true);
+  assert.equal(matchesMpSandboxPayer("other@example.com", "buyer@example.com"), false);
+  assert.equal(matchesMpSandboxPayer(null, "buyer@example.com"), false);
+  assert.equal(matchesMpSandboxPayer("buyer@example.com", undefined), false);
+  assert.equal(matchesMpSandboxPayer("not-an-email", "not-an-email"), false);
 });
