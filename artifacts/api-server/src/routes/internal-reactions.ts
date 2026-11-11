@@ -155,7 +155,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     }
     // Do not spend a paid generation on an empty caption when no visual
     // description is available to the text-only Kindroid adapter.
-    const caption = [content.caption,content.text,content.content].find(value=>typeof value==='string'&&value.trim().length>0)?.trim() ?? '';
+    const caption = [content.caption,content.text,content.content].filter((value):value is string=>typeof value==='string').map(value=>value.trim()).find(value=>value.length>0) ?? '';
     if (!caption) {
       res.status(422).json({error:'INTERNAL_REACTION_CONTENT_CONTEXT_MISSING'});return;
     }
