@@ -7,6 +7,7 @@ import { parseDmConversationPreferences, type DmConversationPreferences } from '
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { clerkClient } from '@clerk/express';
 import { kindroidDmProvider } from './kindroid';
+import { buildCharacterContext } from './context';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -84,7 +85,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       dependencies.liveDmReply === true && input.situation === 'dm' &&
       input.recipientId === 'nela') {
-    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+    const links = await db.execute(sql`SELECT kin_id, social_context_enabled FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
@@ -95,7 +96,22 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
       if (newest?.senderId === 'nela' && typeof newest.text === 'string' && newest.text.trim()) {
-        selectedProvider = kindroidDmProvider(newest.text, kinId);
+        let socialContext = '';
+        if (links.rows[0]?.social_context_enabled === true) {
+          // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
+          // Exclude private DMs and ECHO personality: Kindroid owns the character voice.
+          const scoped = buildCharacterContext(parsed.data.state, input, new Date(), vision, []);
+          const data = JSON.parse(scoped.serialized) as {
+            recentSocial?: { posts?: Array<{ author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
+              comments?: Array<{author?:{name?:string};text?:string;postId?:string}> };
+          };
+          const posts = (data.recentSocial?.posts ?? []).slice(-5).map(p =>
+            `Post by ${(p.author?.name ?? 'Unknown').slice(0,60)}: ${(p.caption ?? '').slice(0,220)}${p.visionSummary ? ' | Image: '+p.visionSummary.slice(0,150):''}`);
+          const comments = (data.recentSocial?.comments ?? []).slice(-5).map(m =>
+            `Comment by ${(m.author?.name ?? 'Unknown').slice(0,60)}: ${(m.text ?? '').slice(0,180)}`);
+          socialContext = [...posts,...comments].join('\n').slice(0,2200);
+        }
+        selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
     }
   }
