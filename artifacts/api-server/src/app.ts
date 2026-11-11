@@ -6,6 +6,7 @@ import router from "./routes";
 import { ensureCreatorProfile } from "./lib/creatorProfileBootstrap";
 import { isAutonomyDmTyping } from "./autonomy/service";
 import { privateBetaSeats } from "./middlewares/privateBetaSeats";
+import { betaApplicationsRouter } from "./routes/beta-applications";
 import { logger } from "./lib/logger";
 import {
   CLERK_PROXY_PATH,
@@ -103,6 +104,9 @@ const publicAccountGate: express.RequestHandler = (req, res, next) => {
   }
   next();
 };
+// Applications are accessible to authenticated users before beta admission.
+// Founder decisions are protected inside the router; all other API routes retain the seat gate.
+app.use("/api/beta", betaApplicationsRouter);
 app.use("/api", accessMode === "public" ? publicAccountGate : betaSeatMode ? privateBetaSeats : betaAllowlistGate);
 
 // Register Creator Hub profiles on first use, without a database SELECT on every API request.
