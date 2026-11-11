@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus } from "../src/lib/mercadopagoReconciliationPolicy";
+import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus } from "../src/lib/mercadopagoReconciliationPolicy";
 
 test("preapproval status transitions do not imply paid access", () => {
   assert.equal(nextMpSubscriptionStatus("draft", "authorized"), "authorized");
@@ -62,4 +62,12 @@ test("provider-verified payment evidence is rejected for wrong subscription, amo
   assert.equal(evaluateMpSandboxPayment({ ...valid, subscriptionStatus: "canceled" }, now).eligible, false);
   assert.equal(evaluateMpSandboxPayment({ ...valid, periodEnd: new Date("2026-11-10T12:00:00Z") }, now).eligible, false);
   assert.equal(evaluateMpSandboxPayment({ ...valid, periodEnd: null }, now).eligible, false);
+});
+
+test("refunded and charged-back payment reversals cannot be undone by stale approvals", () => {
+  assert.equal(reconcileMpPaymentStatus("approved", "refunded"), "refunded");
+  assert.equal(reconcileMpPaymentStatus("refunded", "approved"), "refunded");
+  assert.equal(reconcileMpPaymentStatus("refunded", "charged_back"), "charged_back");
+  assert.equal(reconcileMpPaymentStatus("charged_back", "approved"), "charged_back");
+  assert.equal(reconcileMpPaymentStatus("pending", "approved"), "approved");
 });
