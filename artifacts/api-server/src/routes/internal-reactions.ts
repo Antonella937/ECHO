@@ -133,6 +133,15 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
         AND enabled=true AND social_context_enabled=true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
     if (typeof kinId!=='string') {res.status(409).json({error:'KINDROID_SOCIAL_CONTEXT_NOT_ENABLED'});return;}
+    // Budget guard: limit new manual generations to 12 per owner per UTC day.
+    // Cached reads above never consume this allowance.
+    const daily = await db.execute(sql`SELECT count(*)::int AS total
+      FROM echo_internal_reactions
+      WHERE owner_id=${req.userId!} AND mode='manual'
+        AND generated_at >= date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
+    if (Number(daily.rows[0]?.total ?? 0) >= 12) {
+      res.status(429).json({error:'INTERNAL_REACTION_DAILY_LIMIT'});return;
+    }
     const prompt = internalReactionPrompt(surface,content.caption??'','manual');
     const result = await kindroidDmProvider(prompt,kinId,'',fetch,'internal_reaction').complete({
       system:'Private internal narration only',context:'',outputSchema:{},conversationMode:'narrative',
