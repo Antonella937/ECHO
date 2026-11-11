@@ -32,6 +32,12 @@ export function PushNotificationSettings() {
   const ownerId = user?.id ?? '';
   const [prefs, setPrefs] = useState(() => ownerId ? readPushPreferences(ownerId) : defaults);
   const [notice, setNotice] = useState('');
+  const [deviceInfo, setDeviceInfo] = useState({ ios: false, installed: false });
+  useEffect(() => {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const installed = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    setDeviceInfo({ ios, installed });
+  }, []);
   useEffect(() => { if (ownerId) setPrefs(readPushPreferences(ownerId)); }, [ownerId]);
   const syncCreatorHubPush = async (enabled: boolean) => {
     await customFetch("/api/creator-hub/social/dm-notifications/push-preference", { method: "PUT", responseType: "json", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
@@ -43,6 +49,10 @@ export function PushNotificationSettings() {
   const request = async () => {
     if (!ownerId) { setNotice(t("Iniciá sesión para activar las notificaciones.")); return; }
     if (!isOneSignalConfigured()) { setNotice(t("OneSignal todavía no está configurado.")); return; }
+    if (deviceInfo.ios && !deviceInfo.installed) {
+      setNotice(t('Primero instalá ECHO en la pantalla de inicio desde Safari y abrila desde su icono. Después activá los avisos aquí.'));
+      return;
+    }
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       setNotice(t("En iPhone, abrí ECHO desde Safari y agregalo a la pantalla de inicio antes de activar los avisos."));
       return;
@@ -67,6 +77,21 @@ export function PushNotificationSettings() {
   return <section className="mt-9" aria-labelledby="push-h">
     <h2 id="push-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Bell className="h-4 w-4" /> {t("Notificaciones del celular")}</h2>
     <div className="mt-3 space-y-3 rounded-2xl border border-border bg-card/60 p-4">
+      <div className="rounded-xl border border-border bg-secondary/30 p-3" data-testid="echo-install-guide">
+        <h3 className="text-sm font-semibold">{t("Instalar ECHO en la pantalla de inicio")}</h3>
+        {deviceInfo.ios ? <ol className="mt-2 list-inside list-decimal space-y-1 text-xs text-muted-foreground">
+          <li>{t("Abrí ECHO en Safari.")}</li>
+          <li>{t("Tocá Compartir y elegí Agregar a pantalla de inicio.")}</li>
+          <li>{t("Confirmá Agregar y abrí ECHO desde el nuevo icono.")}</li>
+          <li>{t("Volvé a Ajustes y activá las notificaciones del celular.")}</li>
+        </ol> : <ol className="mt-2 list-inside list-decimal space-y-1 text-xs text-muted-foreground">
+          <li>{t("Abrí ECHO en Chrome o en tu navegador compatible.")}</li>
+          <li>{t("En el menú del navegador, elegí Instalar aplicación o Agregar a pantalla de inicio.")}</li>
+          <li>{t("Abrí ECHO desde el icono y activá las notificaciones en Ajustes.")}</li>
+        </ol>}
+        {deviceInfo.installed && <p className="mt-2 text-xs font-medium text-primary">{t("ECHO está abierta como aplicación instalada en este dispositivo.")}</p>}
+        <p className="mt-2 text-xs text-muted-foreground">{t("Con los permisos y el servicio push activos, podés recibir avisos incluso cuando ECHO no está abierta. La entrega depende del sistema y de la conexión.")}</p>
+      </div>
       <p className="text-xs text-muted-foreground">{t("Elegí qué avisos querés recibir. Para recibir avisos con ECHO cerrado, activá las notificaciones en este dispositivo. Los mensajes grupales todavía requieren conexión de envío push desde el servidor.")}</p>
       <label className="flex items-center justify-between gap-3 text-sm font-semibold">
         <span className="flex items-center gap-2">{prefs.enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} {t("Activar avisos")}</span>
