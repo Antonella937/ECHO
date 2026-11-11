@@ -21,6 +21,7 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState('');
   const requestVersion = useRef(0);
+  const pendingGeneration = useRef(false);
   // The API validates accepted follows, blocks, and privacy. Avoid filtering
   // by legacy local follow arrays, which may be stale or incomplete.
   const eligible = state.characters.filter(c=>!c.archived && c.id!==authorId);
@@ -38,7 +39,8 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
     finally {if(version===requestVersion.current)setLoading(false);}
   };
   const generate=async()=>{
-    if(!selected || loading) return;
+    if(!selected || loading || pendingGeneration.current) return;
+    pendingGeneration.current=true;
     const version=++requestVersion.current;
     setLoading(true);setError('');
     try {
@@ -49,11 +51,11 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
       if(version===requestVersion.current)setReactions(old=>[response.reaction,...old.filter(r=>r.character_id!==selected)]);
     } catch {
       if(version===requestVersion.current)setError(es?'La generación no está disponible o el personaje no tiene acceso.':'Generation unavailable or character lacks access.');
-    } finally {if(version===requestVersion.current)setLoading(false);}
+    } finally {pendingGeneration.current=false;if(version===requestVersion.current)setLoading(false);}
   };
   return <section className="mt-2 text-xs" data-testid={`internal-thoughts-${surface}-${contentId}`}>
     <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={()=>{
-      if(open){requestVersion.current+=1;setLoading(false);setOpen(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
+      if(open){requestVersion.current+=1;setOpen(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
     }}>{es?'¿Qué pensó?':'What did they think?'}</button>
     {open && <div className="mt-2 rounded-xl border border-border bg-secondary/30 p-3">
       <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no significa que vio la publicación.':'Private · Manual inspection does not mean the content was viewed.'}</p>
@@ -68,7 +70,7 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
           <option value="">{es?'Elegí un personaje':'Choose a character'}</option>
           {eligible.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button type="button" disabled={!selected||loading} onClick={()=>void generate()} className="rounded-md border border-border px-3 py-2 disabled:opacity-50">{loading?'…':es?'Consultar':'Inspect'}</button>
+        <button type="button" disabled={!selected||loading||pendingGeneration.current} onClick={()=>void generate()} className="rounded-md border border-border px-3 py-2 disabled:opacity-50">{loading?'…':es?'Consultar':'Inspect'}</button>
       </div>
       {error && <p role="alert" className="mt-2 text-destructive">{error}</p>}
     </div>}
