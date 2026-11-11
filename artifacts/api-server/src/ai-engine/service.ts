@@ -6,6 +6,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { clerkClient } from '@clerk/express';
+import { kindroidAyelenProvider } from './kindroid';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -76,6 +77,25 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       console.warn('DM preference lookup skipped', { reason: error instanceof Error ? error.name : 'UNKNOWN' });
     }
   }
-  return previewDecision(dependencies.provider, parsed.data.state, input, snapshot.revision,
+  // Experimental routing is strictly scoped to the founder's incoming 1:1 DMs
+  // for Ayelen. Never route background autonomy or previews to Kindroid.
+  let selectedProvider = dependencies.provider;
+  if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      (input.universeId ?? 'primary') === 'primary' &&
+      dependencies.liveDmReply === true &&
+      input.situation === 'dm' &&
+      input.characterId === 'account_mwbg7w50t3t2w' &&
+      input.recipientId === 'nela') {
+    const thread = parsed.data.state.messages
+      .filter(m => (m.senderId === 'nela' && m.recipientId === input.characterId) ||
+                   (m.senderId === input.characterId && m.recipientId === 'nela'))
+      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const newest = thread[0];
+    if (newest?.senderId === 'nela' && typeof newest.text === 'string' && newest.text.trim()) {
+      selectedProvider = kindroidAyelenProvider(newest.text);
+    }
+  }
+  return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
     new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences);
 }
