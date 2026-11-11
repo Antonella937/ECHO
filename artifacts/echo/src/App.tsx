@@ -172,7 +172,7 @@ function OfficialUpdateObserver() {
       } catch { /* keep existing experience when announcements API is unavailable */ }
     };
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 30000);
+    const interval = setInterval(() => { void refresh(); }, 300000);
     document.addEventListener('visibilitychange', refresh);
     return () => { active = false; clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [user?.id]);
@@ -626,7 +626,7 @@ function InterfaceLanguageSync() {
       finally { busy = false; }
     };
     const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
-    const timer = window.setInterval(onVisible, 15000);
+    const timer = window.setInterval(onVisible, 120000);
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
