@@ -96,6 +96,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [replyFocused, setReplyFocused] = useState(false);
   const [reply, setReply] = useState('');
   const [showViewers, setShowViewers] = useState(false);
+  const [showInternalThoughts, setShowInternalThoughts] = useState(false);
   const [viewerFilter, setViewerFilter] = useState<'views' | 'likes'>('views');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -172,7 +173,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     };
   }, [next, prev, onClose, editingMetrics]);
 
-  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showShare || editingMetrics || confirmDelete || (imageIsPrivate && imageUnavailable);
+  const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showInternalThoughts || showShare || editingMetrics || confirmDelete || (imageIsPrivate && imageUnavailable);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -395,7 +396,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 {totalViews === 0 ? t('Nadie la ha visto todavía') : `${t('Vista por')} ${formatCount(totalViews)}`}{liveStory.reactions?.length ? ` · ${liveStory.reactions.length} ${t("reacción(es)")}` : ''}{liveStory.likes?.length ? ` · ${liveStory.likes.length} ${t("Me gusta")}` : ''}
               </button>
               <StoryMetricsEditor key={story.id} story={liveStory} onOpenChange={open => setEditingMetricsId(open ? story.id : null)} />
-              {active && <div className="pointer-events-auto px-3 pb-2"><InternalThoughts surface="story" contentId={liveStory.id} authorId={liveStory.authorId} /></div>}
+              {active && <div className="pointer-events-auto px-3 pb-2"><InternalThoughts surface="story" contentId={liveStory.id} authorId={liveStory.authorId} onOpenChange={setShowInternalThoughts} /></div>}
               {showViewers && (
                 <div className="absolute bottom-0 left-0 right-0 z-30 max-h-[65dvh] overflow-hidden rounded-t-3xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl" data-testid="story-viewers-sheet">
                   <div className="flex items-center justify-between border-b border-border px-4 py-3">
