@@ -84,8 +84,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   let selectedProvider = dependencies.provider;
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      dependencies.liveDmReply === true && input.situation === 'dm' &&
-      input.recipientId === 'nela') {
+      ((dependencies.liveDmReply === true && input.situation === 'dm' && input.recipientId === 'nela') ||
+       (input.situation === 'comment' && !!input.postId && parsed.data.state.posts.some(p => p.id === input.postId && p.authorId === 'nela')))) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
@@ -96,7 +96,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
                      (m.senderId === input.characterId && m.recipientId === 'nela'))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
-      if (newest?.senderId === 'nela' && typeof newest.text === 'string' && newest.text.trim()) {
+      const targetPost = input.situation === 'comment' ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
+      const sourceText = input.situation === 'comment' ? (targetPost ? `Comment naturally on Nela's ECHO post: ${targetPost.caption.slice(0, 1200)}` : '') : (newest?.senderId === 'nela' ? newest.text : '');
+      if (typeof sourceText === 'string' && sourceText.trim()) {
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
@@ -127,12 +129,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // Recover older public posts on demand from persisted ECHO history.
           // The author must be followed by the actor (or be the actor); never
           // retrieve private messages, restricted stories, or unrelated accounts.
-          const terms = new Set((newest.text.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
+          const terms = new Set((sourceText.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
             .filter(t => !['what','have','your','with','this','that','about','latest','post','posted','viste','publicacion','publicaste','sobre','esto','esta','para','como'].includes(t)));
           const visibleAuthorIds = new Set([input.characterId, ...(parsed.data.state.follows[input.characterId] ?? [])]);
           const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
           // Old posts remain browsable on explicit request; they are not spontaneous memories.
-          const asksAboutPost = /\b(post|posts|posted|posting|publication|picture|photo|painting|drawing|sketch|artwork|feed|publicaci[oó]n|publicaciones|publicaste|subiste|foto|pintura|dibujo|boceto|perfil)\b/i.test(newest.text);
+          const asksAboutPost = /\b(post|posts|posted|posting|publication|picture|photo|painting|drawing|sketch|artwork|feed|publicaci[oó]n|publicaciones|publicaste|subiste|foto|pintura|dibujo|boceto|perfil)\b/i.test(sourceText);
           const older = asksAboutPost && terms.size ? freshState.posts
             .filter(p => visibleAuthorIds.has(p.authorId) && !recentIds.has(p.id))
             .map(p => {
@@ -161,7 +163,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
           socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
         }
-        selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
+        selectedProvider = kindroidDmProvider(sourceText, kinId, socialContext, fetch, input.situation === 'comment' ? 'comment' : 'dm');
       }
     }
   }
