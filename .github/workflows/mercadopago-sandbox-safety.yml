@@ -1,0 +1,33 @@
+name: ECHO Mercado Pago sandbox safety
+
+on:
+  push:
+    paths:
+      - 'artifacts/api-server/src/lib/mercadopagoSubscriptions.ts'
+      - 'artifacts/api-server/src/lib/mercadopagoWebhookSignature.ts'
+      - 'artifacts/api-server/tests/mercadopago-sandbox-safety.test.ts'
+      - 'artifacts/api-server/package.json'
+      - '.github/workflows/mercadopago-sandbox-safety.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate subscription payloads and webhook signatures offline
+        run: pnpm --filter @workspace/api-server run test:mercadopago-sandbox
