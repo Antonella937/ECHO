@@ -32,7 +32,7 @@ jobs:
         with:
           name: echo-build-${{ github.sha }}
           path: |
-            artifacts/echo/dist/
+            artifacts/echo/dist/public/
             artifacts/api-server/dist/
           retention-days: 3
           if-no-files-found: error
