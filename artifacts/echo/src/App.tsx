@@ -54,6 +54,7 @@ const CollaborationPage = lazy(() => import('@/pages/collaboration'));
 const SubscriptionsPage = lazy(() => import('@/pages/subscriptions'));
 const HelpCenterPage = lazy(() => import('@/pages/help-center'));
 const SupportAdminPage = lazy(() => import('@/pages/support-admin'));
+const BetaAdminPage = lazy(() => import('@/pages/beta-admin'));
 import NotFound from '@/pages/not-found';
 const CharacterEditorPage = lazy(() => import('@/pages/character-editor'));
 const CharacterGalleryPage = lazy(() => import('@/pages/character-gallery'));
@@ -322,6 +323,7 @@ function ProtectedRouter() {
           <Route path="/settings/subscriptions" component={SubscriptionsPage} />
           <Route path="/help" component={HelpCenterPage} />
           <Route path="/admin/support" component={SupportAdminPage} />
+          <Route path="/admin/beta" component={BetaAdminPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/characters/new" component={CharacterEditorPage} />
           <Route path="/characters/:id/edit" component={CharacterEditorPage} />
