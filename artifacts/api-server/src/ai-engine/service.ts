@@ -6,7 +6,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { clerkClient } from '@clerk/express';
-import { kindroidAyelenProvider } from './kindroid';
+import { kindroidDmProvider } from './kindroid';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -77,23 +77,26 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       console.warn('DM preference lookup skipped', { reason: error instanceof Error ? error.name : 'UNKNOWN' });
     }
   }
-  // Experimental routing is strictly scoped to the founder's incoming 1:1 DMs
-  // for Ayelen. Never route background autonomy or previews to Kindroid.
+  // Linked Kin IDs are stored server-side, never exposed to the client.
+  // Only the founder's direct incoming DM lane is routed; social actions stay native.
   let selectedProvider = dependencies.provider;
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      (input.universeId ?? 'primary') === 'primary' &&
-      dependencies.liveDmReply === true &&
-      input.situation === 'dm' &&
-      input.characterId === 'account_mwbg7w50t3t2w' &&
+      dependencies.liveDmReply === true && input.situation === 'dm' &&
       input.recipientId === 'nela') {
-    const thread = parsed.data.state.messages
-      .filter(m => (m.senderId === 'nela' && m.recipientId === input.characterId) ||
-                   (m.senderId === input.characterId && m.recipientId === 'nela'))
-      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const newest = thread[0];
-    if (newest?.senderId === 'nela' && typeof newest.text === 'string' && newest.text.trim()) {
-      selectedProvider = kindroidAyelenProvider(newest.text);
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId === 'string' && kinId.length > 0) {
+      const thread = parsed.data.state.messages
+        .filter(m => (m.senderId === 'nela' && m.recipientId === input.characterId) ||
+                     (m.senderId === input.characterId && m.recipientId === 'nela'))
+        .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const newest = thread[0];
+      if (newest?.senderId === 'nela' && typeof newest.text === 'string' && newest.text.trim()) {
+        selectedProvider = kindroidDmProvider(newest.text, kinId);
+      }
     }
   }
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
