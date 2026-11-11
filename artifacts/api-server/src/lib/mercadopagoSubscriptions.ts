@@ -192,3 +192,11 @@ export async function fetchMpSandboxPayment(
     clearTimeout(timeout);
   }
 }
+
+/** Compare the sandbox payer returned by the provider with the server's test identity. */
+export function matchesMpSandboxPayer(providerEmail: string | null, configuredEmail: string | undefined): boolean {
+  if (!providerEmail || !configuredEmail) return false;
+  const normalize = (value: string) => value.trim().toLowerCase();
+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalize(providerEmail)) &&
+    normalize(providerEmail) === normalize(configuredEmail);
+}
