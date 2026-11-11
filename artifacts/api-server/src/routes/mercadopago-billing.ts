@@ -113,7 +113,9 @@ router.post("/billing/mercadopago/sandbox-checkout", requireAuth, async (req, re
     res.status(409).json({ error: "BILLING_EXEMPT" }); return;
   }
   const reference = req.body?.reference;
-  const payerEmail = req.body?.payerEmail;
+  // Never accept payer identity from the browser. Until verified account-email
+  // lookup is integrated, sandbox tests use a server-configured test payer only.
+  const payerEmail = process.env.ECHO_MP_SANDBOX_PAYER_EMAIL;
   const backUrl = process.env.ECHO_MP_CALLBACK_URL;
   if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference) ||
       typeof payerEmail !== "string" || payerEmail.length > 254 ||
