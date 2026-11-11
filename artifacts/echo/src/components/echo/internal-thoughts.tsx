@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { useSocial } from '@/store/social-store';
 import { useLanguage } from '@/lib/i18n';
@@ -20,36 +20,39 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
   const [selected,setSelected] = useState('');
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState('');
+  const requestVersion = useRef(0);
   const eligible = state.characters.filter(c=>!c.archived && c.id!==authorId &&
     (state.follows[c.id]??[]).includes(authorId));
-  useEffect(()=>{setOpen(false);setReactions([]);setSelected('');setError('');},[contentId,surface,universeId]);
+  useEffect(()=>{requestVersion.current+=1;setOpen(false);setReactions([]);setSelected('');setError('');onOpenChange?.(false);},[contentId,surface,universeId]);
   if(userId!==FOUNDER_ID) return null;
   const payload={universeId,surface,contentId};
   const load=async()=>{
+    const version=++requestVersion.current;
     setLoading(true);setError('');
     try {
       const q=new URLSearchParams(payload);
       const response=await customFetch<{reactions:Reaction[]}>(`/api/internal-reactions?${q.toString()}`,{responseType:'json'});
-      setReactions(response.reactions??[]);
-    } catch {setError(es?'No se pudieron consultar los pensamientos.':'Could not load private thoughts.');}
-    finally {setLoading(false);}
+      if(version===requestVersion.current)setReactions(response.reactions??[]);
+    } catch {if(version===requestVersion.current)setError(es?'No se pudieron consultar los pensamientos.':'Could not load private thoughts.');}
+    finally {if(version===requestVersion.current)setLoading(false);}
   };
   const generate=async()=>{
     if(!selected || loading) return;
+    const version=++requestVersion.current;
     setLoading(true);setError('');
     try {
       const response=await customFetch<{reaction:Reaction}>('/api/internal-reactions/manual',{
         method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...payload,characterId:selected}),
       });
-      setReactions(old=>[response.reaction,...old.filter(r=>r.character_id!==selected)]);
+      if(version===requestVersion.current)setReactions(old=>[response.reaction,...old.filter(r=>r.character_id!==selected)]);
     } catch {
-      setError(es?'La generación no está disponible o el personaje no tiene acceso.':'Generation unavailable or character lacks access.');
-    } finally {setLoading(false);}
+      if(version===requestVersion.current)setError(es?'La generación no está disponible o el personaje no tiene acceso.':'Generation unavailable or character lacks access.');
+    } finally {if(version===requestVersion.current)setLoading(false);}
   };
   return <section className="mt-2 text-xs" data-testid={`internal-thoughts-${surface}-${contentId}`}>
     <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={()=>{
-      if(open){setOpen(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
+      if(open){requestVersion.current+=1;setLoading(false);setOpen(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
     }}>{es?'¿Qué pensó?':'What did they think?'}</button>
     {open && <div className="mt-2 rounded-xl border border-border bg-secondary/30 p-3">
       <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no significa que vio la publicación.':'Private · Manual inspection does not mean the content was viewed.'}</p>
