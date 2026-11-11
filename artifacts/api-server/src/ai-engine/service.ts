@@ -112,7 +112,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // Recover older public posts on demand from persisted ECHO history.
           // The author must be followed by the actor (or be the actor); never
           // retrieve private messages, restricted stories, or unrelated accounts.
-          const terms = new Set((newest.text.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+          const terms = new Set((newest.text.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
             .filter(t => !['what','have','your','with','this','that','about','latest','post','posted','viste','publicacion','publicaste','sobre','esto','esta','para','como'].includes(t)));
           const visibleAuthorIds = new Set([input.characterId, ...(parsed.data.state.follows[input.characterId] ?? [])]);
           const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
@@ -128,7 +128,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .sort((a,b) => b.score-a.score || new Date(b.p.createdAt).getTime()-new Date(a.p.createdAt).getTime())
             .slice(0,3)
             .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
-          socialContext = [...posts,...comments,...older].join('\\n').slice(0,3000);
+          socialContext = [...posts,...comments,...older].join('\n').slice(0,3000);
         }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
