@@ -249,7 +249,10 @@ router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (r
        (provider_payment_id,reference,provider_preapproval_id,provider_status,amount_ars,currency)
        VALUES($1,$2,$3,$4,$5,$6)
        ON CONFLICT (provider_payment_id) DO UPDATE
-       SET provider_status=EXCLUDED.provider_status,
+       SET provider_status=CASE
+             WHEN echo_mp_verified_payments.provider_status IN ('refunded','charged_back')
+               THEN echo_mp_verified_payments.provider_status
+             ELSE EXCLUDED.provider_status END,
            provider_verified_at=now()
        WHERE echo_mp_verified_payments.reference=EXCLUDED.reference
          AND echo_mp_verified_payments.provider_preapproval_id=EXCLUDED.provider_preapproval_id
