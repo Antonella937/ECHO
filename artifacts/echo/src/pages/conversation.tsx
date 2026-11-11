@@ -10,7 +10,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X, ImagePlus } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -47,8 +47,45 @@ export default function ConversationPage() {
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
+  const [wallpaperOpen, setWallpaperOpen] = useState(false);
+  const [wallpaper, setWallpaper] = useState<string | null>(null);
+  const [wallpaperError, setWallpaperError] = useState('');
+  const wallpaperInputRef = useRef<HTMLInputElement>(null);
   const { me, character, actions, state } = useSocial();
   const other = character(id);
+  const wallpaperKey = user?.id && id ? `echo-dm-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${me.id}:${id}` : '';
+  useEffect(() => {
+    if (!wallpaperKey) { setWallpaper(null); return; }
+    try { setWallpaper(window.localStorage.getItem(wallpaperKey)); } catch { setWallpaper(null); }
+  }, [wallpaperKey]);
+  const chooseWallpaper = async (file?: File) => {
+    if (!file || !wallpaperKey) return;
+    setWallpaperError('');
+    if (!file.type.startsWith('image/')) { setWallpaperError(t('Elegí una imagen válida.')); return; }
+    try {
+      const image = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 1080 / Math.max(image.width, image.height));
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('canvas unavailable');
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      image.close();
+      const encoded = canvas.toDataURL('image/jpeg', 0.72);
+      window.localStorage.setItem(wallpaperKey, encoded);
+      setWallpaper(encoded);
+      setWallpaperOpen(false);
+    } catch {
+      setWallpaperError(t('No se pudo guardar el fondo. Probá con otra foto.'));
+    }
+  };
+  const clearWallpaper = () => {
+    try { if (wallpaperKey) window.localStorage.removeItem(wallpaperKey); } catch { /* storage unavailable */ }
+    setWallpaper(null);
+    setWallpaperOpen(false);
+    setWallpaperError('');
+  };
   const messages = useThreadMessages(id);
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
@@ -294,7 +331,11 @@ export default function ConversationPage() {
   }, [id, messages.length]);
 
   return (
-    <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="relative flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
+      {wallpaper && <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${wallpaper}")` }} />
+        <div className="absolute inset-0 bg-background/65" />
+      </div>}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="flex h-16 items-center gap-2 px-2">
           <button onClick={back} aria-label={t("Volver")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
@@ -308,12 +349,25 @@ export default function ConversationPage() {
             </div>
           </Link>
 
+          <button type="button" onClick={() => setWallpaperOpen(true)} aria-label={t("Fondo del chat")} title={t("Fondo del chat")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-dm-wallpaper"><ImagePlus className="h-5 w-5" /></button>
           <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="ml-auto tap flex h-11 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-primary hover:bg-primary/20" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
+      <input ref={wallpaperInputRef} type="file" accept="image/*" className="hidden" onChange={e => { void chooseWallpaper(e.target.files?.[0]); e.target.value = ''; }} data-testid="input-dm-wallpaper" />
+      {wallpaperOpen && <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/65 p-5" role="dialog" aria-modal="true" aria-label={t("Fondo del chat")}>
+        <div className="w-full max-w-sm space-y-4 rounded-3xl border border-border bg-card p-5 shadow-2xl">
+          <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{t("Fondo del chat")}</h2><button type="button" onClick={() => setWallpaperOpen(false)} aria-label={t("Cerrar")} className="rounded-full p-2 hover:bg-secondary"><X className="h-5 w-5" /></button></div>
+          <p className="text-sm text-muted-foreground">{t("Personalizá esta conversación con una foto oscurecida, sin perder la legibilidad de los mensajes.")}</p>
+          <p className="text-xs text-muted-foreground">{t("El fondo se guarda solo en este dispositivo y navegador.")}</p>
+          {wallpaper && <div className="h-32 rounded-2xl bg-cover bg-center" style={{ backgroundImage: `url("${wallpaper}")` }} />}
+          {wallpaperError && <p role="alert" className="text-sm text-destructive">{wallpaperError}</p>}
+          <button type="button" onClick={() => wallpaperInputRef.current?.click()} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">{t("Elegir foto")}</button>
+          {wallpaper && <button type="button" onClick={clearWallpaper} className="w-full rounded-xl bg-secondary px-4 py-3 font-semibold">{t("Quitar fondo")}</button>}
+        </div>
+      </div>}
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
@@ -358,7 +412,7 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
+      <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/85 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
