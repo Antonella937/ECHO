@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { test } from "node:test";
-import { buildMpPreapprovalPayload, createMpSandboxPreapproval, fetchMpSandboxPayment, matchesMpSandboxPayer } from "../src/lib/mercadopagoSubscriptions";
+import { buildMpPreapprovalPayload, createMpSandboxPreapproval, fetchMpSandboxPayment, fetchMpPreapproval, matchesMpSandboxPayer } from "../src/lib/mercadopagoSubscriptions";
 import { verifyMpWebhookSignature } from "../src/lib/mercadopagoWebhookSignature";
 
 const reference = "echo:plus:11111111-1111-4111-8111-111111111111";
@@ -163,4 +163,33 @@ test("sandbox payer identity fails closed on missing, malformed or different ema
   assert.equal(matchesMpSandboxPayer(null, "buyer@example.com"), false);
   assert.equal(matchesMpSandboxPayer("buyer@example.com", undefined), false);
   assert.equal(matchesMpSandboxPayer("not-an-email", "not-an-email"), false);
+});
+
+test("provider preapproval read normalizes authoritative subscription identity and amount", async () => {
+  const previous = process.env.ECHO_MP_ACCESS_TOKEN;
+  process.env.ECHO_MP_ACCESS_TOKEN = "TEST-offline-token";
+  try {
+    let calls = 0;
+    const fetchImpl = (async (url: string | URL | Request) => {
+      calls++;
+      assert.equal(String(url), "https://api.mercadopago.com/preapproval/sub_123");
+      return new Response(JSON.stringify({
+        id: "sub_123", status: "authorized", external_reference: reference,
+        payer_email: "buyer@example.com", next_payment_date: "2026-12-11T00:00:00Z",
+        auto_recurring: { transaction_amount: 1200 },
+      }), { status: 200 });
+    }) as typeof fetch;
+    const item = await fetchMpPreapproval("sub_123", { fetchImpl });
+    assert.equal(calls, 1);
+    assert.equal(item.id, "sub_123");
+    assert.equal(item.status, "authorized");
+    assert.equal(item.externalReference, reference);
+    assert.equal(item.payerEmail, "buyer@example.com");
+    assert.equal(item.amountArs, 1200);
+    await assert.rejects(() => fetchMpPreapproval("../unsafe", { fetchImpl }), /INVALID_MP_RESOURCE_ID/);
+    assert.equal(calls, 1);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_MP_ACCESS_TOKEN;
+    else process.env.ECHO_MP_ACCESS_TOKEN = previous;
+  }
 });
