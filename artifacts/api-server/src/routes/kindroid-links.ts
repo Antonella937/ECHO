@@ -6,6 +6,10 @@ import { requireAuth } from '../middlewares/requireAuth';
 
 export const kindroidLinksRouter: IRouter = Router();
 kindroidLinksRouter.use('/characters/kindroid-link', requireAuth);
+kindroidLinksRouter.get('/characters/kindroid-eligibility', requireAuth, (req,res) => {
+  res.setHeader('Cache-Control','private, no-store');
+  res.json({ eligible: req.userId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' });
+});
 const scope = z.object({
   characterId: z.string().min(1).max(120),
   universeId: z.string().min(1).max(120).default('primary'),
