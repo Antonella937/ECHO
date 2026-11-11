@@ -132,7 +132,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
           // Old posts remain browsable on explicit request; they are not spontaneous memories.
           const asksAboutPost = /\b(post|posts|posted|posting|publication|picture|photo|painting|drawing|sketch|artwork|feed|publicaci[oó]n|publicaciones|publicaste|subiste|foto|pintura|dibujo|boceto|perfil)\b/i.test(newest.text);
-          const older = asksAboutPost && terms.size ? parsed.data.state.posts
+          const older = asksAboutPost && terms.size ? freshState.posts
             .filter(p => visibleAuthorIds.has(p.authorId) && !recentIds.has(p.id))
             .map(p => {
               const author = parsed.data.state.characters.find(ch => ch.id === p.authorId);
