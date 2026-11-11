@@ -102,14 +102,33 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // Exclude private DMs and ECHO personality: Kindroid owns the character voice.
           const scoped = buildCharacterContext(parsed.data.state, input, new Date(), vision, []);
           const data = JSON.parse(scoped.serialized) as {
-            recentSocial?: { posts?: Array<{ author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
+            recentSocial?: { posts?: Array<{ id?:string; author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
               comments?: Array<{author?:{name?:string};text?:string;postId?:string}> };
           };
           const posts = (data.recentSocial?.posts ?? []).slice(-5).map(p =>
             `Post by ${(p.author?.name ?? 'Unknown').slice(0,60)}: ${(p.caption ?? '').slice(0,220)}${p.visionSummary ? ' | Image: '+p.visionSummary.slice(0,150):''}`);
           const comments = (data.recentSocial?.comments ?? []).slice(-5).map(m =>
             `Comment by ${(m.author?.name ?? 'Unknown').slice(0,60)}: ${(m.text ?? '').slice(0,180)}`);
-          socialContext = [...posts,...comments].join('\n').slice(0,2200);
+          // Recover older public posts on demand from persisted ECHO history.
+          // The author must be followed by the actor (or be the actor); never
+          // retrieve private messages, restricted stories, or unrelated accounts.
+          const terms = new Set((newest.text.toLocaleLowerCase().match(/[\\p{L}\\p{N}]{4,}/gu) ?? [])
+            .filter(t => !['what','have','your','with','this','that','about','latest','post','posted','viste','publicacion','publicaste','sobre','esto','esta','para','como'].includes(t)));
+          const visibleAuthorIds = new Set([input.characterId, ...(parsed.data.state.follows[input.characterId] ?? [])]);
+          const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
+          const older = terms.size ? parsed.data.state.posts
+            .filter(p => visibleAuthorIds.has(p.authorId) && !recentIds.has(p.id))
+            .map(p => {
+              const author = parsed.data.state.characters.find(ch => ch.id === p.authorId);
+              const haystack = [p.caption,author?.name,author?.handle].filter(Boolean).join(' ').toLocaleLowerCase();
+              const score = [...terms].filter(term => haystack.includes(term)).length;
+              return {p,author,score};
+            })
+            .filter(x => x.score > 0)
+            .sort((a,b) => b.score-a.score || new Date(b.p.createdAt).getTime()-new Date(a.p.createdAt).getTime())
+            .slice(0,3)
+            .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
+          socialContext = [...posts,...comments,...older].join('\\n').slice(0,3000);
         }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
