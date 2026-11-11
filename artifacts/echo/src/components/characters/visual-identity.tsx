@@ -54,8 +54,13 @@ export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
       if (picker.current) picker.current.value = '';
     }
   }
-  return <section className="mt-6 rounded-2xl border border-border bg-card/40 p-4" data-testid="section-character-visual-identity">
-    <h3 className="font-display text-lg">{t("Identidad visual")}</h3>
+  return <details className="group mt-6 overflow-hidden rounded-2xl border border-border bg-card/40" data-testid="section-character-visual-identity">
+    <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+      <span className="font-display text-lg">{t("Identidad visual")}</span>
+      <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+    </summary>
+    <div className="border-t border-border px-4 pb-4">
+
     <p className="mt-1 mb-4 text-xs text-muted-foreground">{t("Estas referencias ayudan a mantener la apariencia del personaje en futuras imágenes IA. La foto de perfil es la referencia facial principal.")}</p>
     <div className="mb-4 flex items-center gap-3">
       {avatar && <div className="h-20 w-20 shrink-0"><ReferencePhoto src={resolve(avatar)} alt={t("Referencia facial principal")} className="h-20 w-20 object-cover" /></div>}
@@ -75,5 +80,6 @@ export function VisualIdentity({ avatar, identity, onChange, onBusy }: {
     <input ref={picker} type="file" accept="image/*" multiple className="hidden" onChange={e => void addFiles(e.target.files)} />
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
     <p className="mt-3 text-xs text-muted-foreground">{t("Las fotos se almacenan de forma privada. Guardá el personaje para conservar los cambios. Cambiar el avatar no elimina estas referencias.")}</p>
-  </section>;
+    </div>
+  </details>;
 }
