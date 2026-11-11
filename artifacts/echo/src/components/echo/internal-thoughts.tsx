@@ -5,12 +5,12 @@ import { useSocial } from '@/store/social-store';
 import { useLanguage } from '@/lib/i18n';
 
 type Reaction = { character_id?: string; reaction_text?: string; mode?: string; actually_viewed?: boolean };
-type Props = { surface:'post'|'story'; contentId:string; authorId:string };
+type Props = { surface:'post'|'story'; contentId:string; authorId:string; onOpenChange?:(open:boolean)=>void };
 
 const FOUNDER_ID = 'user_3LeoBfUicTthDVixNbkPlqXFkdZ';
 
 /** Creator-only, explicit inspection. Never fires a paid request on mount. */
-export function InternalThoughts({surface,contentId,authorId}:Props) {
+export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props) {
   const {userId} = useAuth();
   const {state,universeId} = useSocial();
   const language = useLanguage();
@@ -49,7 +49,7 @@ export function InternalThoughts({surface,contentId,authorId}:Props) {
   };
   return <section className="mt-2 text-xs" data-testid={`internal-thoughts-${surface}-${contentId}`}>
     <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={()=>{
-      if(open){setOpen(false);} else {setOpen(true);void load();}
+      if(open){setOpen(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
     }}>{es?'¿Qué pensó?':'What did they think?'}</button>
     {open && <div className="mt-2 rounded-xl border border-border bg-secondary/30 p-3">
       <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no significa que vio la publicación.':'Private · Manual inspection does not mean the content was viewed.'}</p>
