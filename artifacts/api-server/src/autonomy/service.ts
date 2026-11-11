@@ -418,6 +418,7 @@ export async function runAutonomyLiveCycle(
         read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
         vision: (id, state, input) => visionService.loadContext(id, state, input),
         liveDmReply: dependencies.lane === 'dm' && opportunity.situation === 'dm',
+        liveSocialText: dependencies.lane !== 'dm' && (opportunity.situation === 'comment' || opportunity.situation === 'post'),
       });
     } finally {
       activeDmTyping.delete(typingId);

@@ -1,4 +1,5 @@
 import { MusicClipPlayer } from './music-clip-player';
+import { InternalThoughts } from './internal-thoughts';
 import { useLanguage } from '@/lib/i18n';
 import { useFeedText } from '@/lib/feed-translations';
 import { useRef, useState, type ReactNode } from 'react';
@@ -167,6 +168,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         <Link href={`/p/${post.id}`} className="mt-1 block text-[11.5px] uppercase tracking-[0.08em] text-muted-foreground/80" data-testid={`link-post-time-${post.id}`}>
           {timeAgo(post.createdAt)}{post.editedAt ? t(' · editada') : ''}
         </Link>
+        <InternalThoughts surface="post" contentId={post.id} authorId={post.authorId} />
         {post.commentsEnabled === false && <p className="mt-1 text-[12px] text-muted-foreground" data-testid={`status-comments-off-${post.id}`}>{t("Comentarios desactivados")}</p>}
       </div>
 

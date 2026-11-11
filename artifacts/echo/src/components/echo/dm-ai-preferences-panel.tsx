@@ -10,8 +10,8 @@ type Length = 'short' | 'balanced' | 'detailed';
 interface Preferences { style: Style; responseTiming: Timing; responseLength: Length; autonomousInitiative: boolean }
 const defaults: Preferences = { style: 'natural', responseTiming: 'realistic', responseLength: 'balanced', autonomousInitiative: true };
 
-export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, peers = [] }: {
-  open: boolean; onClose: () => void; characterId: string; universeId: string; peers?: Array<{ id: string; name: string }>;
+export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, peers = [], onStyleSaved }: {
+  open: boolean; onClose: () => void; characterId: string; universeId: string; peers?: Array<{ id: string; name: string }>; onStyleSaved?: (style: Style) => void;
 }) {
   const { user } = useUser();
   const t = useSceneSettingsText();
@@ -48,6 +48,7 @@ export function DmAiPreferencesPanel({ open, onClose, characterId, universeId, p
     ]);
     const succeeded = results.every(result => result.status === 'fulfilled');
     setSaved(succeeded);
+    if (succeeded) onStyleSaved?.(prefs.style);
     setStatus(succeeded ? t('savedOnline') : t('failed'));
     setSaving(false);
   };

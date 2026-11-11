@@ -1,0 +1,132 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus, validateMpPaidPeriod, planMpMembershipReconciliation, planMpRenewal } from "../src/lib/mercadopagoReconciliationPolicy";
+
+test("preapproval status transitions do not imply paid access", () => {
+  assert.equal(nextMpSubscriptionStatus("draft", "authorized"), "authorized");
+  assert.equal(nextMpSubscriptionStatus("authorized", "paused"), "paused");
+  assert.equal(nextMpSubscriptionStatus("authorized", "cancelled"), "canceled");
+  assert.equal(nextMpSubscriptionStatus("canceled", "authorized"), "canceled");
+  assert.equal(nextMpSubscriptionStatus("pending", "unknown"), "pending");
+});
+test("paid membership requires separately verified approved payment and future period", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const valid = { subscriptionStatus:"authorized" as const, paymentStatus:"approved" as const,
+    paymentVerifiedFromProvider:true, paymentMatchesSubscription:true, periodEnd:new Date("2026-12-11T12:00:00Z") };
+  assert.equal(canActivatePaidMembership(valid,now),true);
+  assert.equal(canActivatePaidMembership({...valid,paymentVerifiedFromProvider:false},now),false);
+  assert.equal(canActivatePaidMembership({...valid,paymentMatchesSubscription:false},now),false);
+  assert.equal(canActivatePaidMembership({...valid,paymentStatus:"pending"},now),false);
+  assert.equal(canActivatePaidMembership({...valid,paymentStatus:"refunded"},now),false);
+  assert.equal(canActivatePaidMembership({...valid,subscriptionStatus:"paused"},now),false);
+  assert.equal(canActivatePaidMembership({...valid,periodEnd:new Date("2026-11-10T12:00:00Z")},now),false);
+  assert.equal(canActivatePaidMembership({...valid,periodEnd:null},now),false);
+});
+
+test("no access from uncollected, reversed, expired, or unverified subscription payments", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const base = {
+    subscriptionStatus: "authorized" as const,
+    paymentStatus: "approved" as const,
+    paymentVerifiedFromProvider: true,
+    paymentMatchesSubscription: true,
+    periodEnd: new Date("2026-12-11T12:00:00Z"),
+  };
+  for (const paymentStatus of ["pending", "rejected", "refunded", "charged_back", "unknown"] as const) {
+    assert.equal(canActivatePaidMembership({ ...base, paymentStatus }, now), false, paymentStatus);
+  }
+  for (const subscriptionStatus of ["draft", "pending", "paused", "canceled", "failed"] as const) {
+    assert.equal(canActivatePaidMembership({ ...base, subscriptionStatus }, now), false, subscriptionStatus);
+  }
+  assert.equal(canActivatePaidMembership({ ...base, periodEnd: new Date("2026-11-11T12:00:00Z") }, now), false);
+  assert.equal(canActivatePaidMembership({ ...base, periodEnd: new Date("invalid") }, now), false);
+  assert.equal(canActivatePaidMembership({ ...base, periodEnd: null }, now), false);
+  assert.equal(canActivatePaidMembership({ ...base, paymentVerifiedFromProvider: false }, now), false);
+  assert.equal(canActivatePaidMembership({ ...base, paymentMatchesSubscription: false }, now), false);
+});
+
+test("provider-verified payment evidence is rejected for wrong subscription, amount, currency, or period", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const valid = {
+    subscriptionStatus: "authorized" as const,
+    providerPreapprovalId: "preapproval-123",
+    expectedAmountArs: 1200,
+    payment: { status: "approved" as const, subscriptionId: "preapproval-123", amountArs: 1200, currency: "ARS" },
+    periodEnd: new Date("2026-12-11T12:00:00Z"),
+  };
+  assert.deepEqual(evaluateMpSandboxPayment(valid, now), { eligible: true, reason: "VERIFIED_APPROVED_PAYMENT" });
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, subscriptionId: "other" } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, amountArs: 100 } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, currency: "USD" } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, payment: { ...valid.payment, status: "refunded" } }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, subscriptionStatus: "canceled" }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, periodEnd: new Date("2026-11-10T12:00:00Z") }, now).eligible, false);
+  assert.equal(evaluateMpSandboxPayment({ ...valid, periodEnd: null }, now).eligible, false);
+});
+
+test("refunded and charged-back payment reversals cannot be undone by stale approvals", () => {
+  assert.equal(reconcileMpPaymentStatus("approved", "refunded"), "refunded");
+  assert.equal(reconcileMpPaymentStatus("refunded", "approved"), "refunded");
+  assert.equal(reconcileMpPaymentStatus("refunded", "charged_back"), "charged_back");
+  assert.equal(reconcileMpPaymentStatus("charged_back", "approved"), "charged_back");
+  assert.equal(reconcileMpPaymentStatus("pending", "approved"), "approved");
+});
+
+test("monthly entitlement periods require actual payment evidence and bounded dates", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const base = {
+    providerPaymentApproved: true,
+    paidAt: new Date("2026-11-11T10:00:00Z"),
+    periodStart: new Date("2026-11-11T00:00:00Z"),
+    periodEnd: new Date("2026-12-11T00:00:00Z"),
+  };
+  assert.equal(validateMpPaidPeriod(base, now).valid, true);
+  assert.equal(validateMpPaidPeriod({ ...base, providerPaymentApproved: false }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, paidAt: null }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodEnd: null }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodEnd: new Date("2026-11-10T00:00:00Z") }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodEnd: new Date("2027-11-11T00:00:00Z") }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodStart: new Date("2026-11-12T00:00:00Z") }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, paidAt: new Date("invalid") }, now).valid, false);
+});
+
+test("membership reconciliation stays on hold until both provider payment and period are verified", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const valid = {
+    plan: "plus" as const, subscriptionStatus: "authorized" as const,
+    providerPreapprovalId: "preapproval-123", expectedAmountArs: 1200,
+    payment: { status: "approved" as const, subscriptionId: "preapproval-123", amountArs: 1200, currency: "ARS" },
+    paidAt: new Date("2026-11-11T10:00:00Z"),
+    periodStart: new Date("2026-11-11T00:00:00Z"),
+    periodEnd: new Date("2026-12-11T00:00:00Z"),
+  };
+  assert.equal(planMpMembershipReconciliation(valid, now).action, "eligible_for_activation");
+  assert.equal(planMpMembershipReconciliation({ ...valid, periodStart: null }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, payment: { ...valid.payment, status: "refunded" } }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, payment: { ...valid.payment, subscriptionId: "wrong" } }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, subscriptionStatus: "canceled" }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, periodEnd: new Date("2026-11-10T00:00:00Z") }, now).action, "hold");
+});
+
+test("renewal policy refuses duplicate, reversed, expired and non-extending installments", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const base = {
+    paymentId: "payment-456",
+    previouslyAppliedPaymentIds: [] as string[],
+    currentPeriodEnd: new Date("2026-11-20T00:00:00Z"),
+    verifiedPeriodStart: new Date("2026-11-11T00:00:00Z"),
+    verifiedPeriodEnd: new Date("2026-12-11T00:00:00Z"),
+    paidAt: new Date("2026-11-11T10:00:00Z"),
+    paymentStatus: "approved" as const,
+  };
+  assert.equal(planMpRenewal(base, now).action, "extend");
+  assert.equal(planMpRenewal({...base, previouslyAppliedPaymentIds: ["payment-456"]}, now).reason, "PAYMENT_ALREADY_APPLIED");
+  assert.equal(planMpRenewal({...base, paymentStatus: "refunded"}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, paymentStatus: "charged_back"}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, paymentStatus: "pending"}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, verifiedPeriodEnd: new Date("2026-11-19T00:00:00Z")}, now).reason, "PERIOD_NOT_EXTENDED");
+  assert.equal(planMpRenewal({...base, verifiedPeriodEnd: new Date("2026-11-10T00:00:00Z")}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, verifiedPeriodEnd: null}, now).action, "hold");
+  assert.equal(planMpRenewal({...base, currentPeriodEnd: new Date("invalid")}, now).reason, "INVALID_CURRENT_PERIOD");
+  assert.equal(planMpRenewal({...base, paymentId: "bad payment id"}, now).reason, "INVALID_PAYMENT_ID");
+});

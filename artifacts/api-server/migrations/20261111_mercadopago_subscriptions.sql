@@ -19,3 +19,20 @@ CREATE TABLE IF NOT EXISTS echo_mp_webhook_events (
   processed_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'received' CHECK (status IN ('received','processed','rejected','failed'))
 );
+
+-- Immutable provider payment observations, separate from entitlement grants.
+-- One provider payment can be recorded only once, even across webhook retries.
+CREATE TABLE IF NOT EXISTS echo_mp_verified_payments (
+  provider_payment_id TEXT PRIMARY KEY,
+  reference TEXT NOT NULL REFERENCES echo_mp_subscription_intents(reference),
+  provider_preapproval_id TEXT NOT NULL,
+  provider_status TEXT NOT NULL CHECK (provider_status IN ('approved','pending','rejected','refunded','charged_back','unknown')),
+  amount_ars NUMERIC(12,2),
+  currency TEXT,
+  provider_verified_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS echo_mp_verified_payments_reference_idx
+  ON echo_mp_verified_payments(reference, recorded_at DESC);
+-- This ledger is not an access-control source: payment reversals and the paid-through
+-- period must be reconciled before any membership is activated.

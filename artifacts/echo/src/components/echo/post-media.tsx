@@ -38,9 +38,10 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   if (count <= 1) {
     return (
       <div className="relative w-full overflow-hidden bg-card sm:rounded-[22px]"><button onClick={onTap} className="relative block w-full overflow-hidden" aria-label="Doble toque para indicar que te gusta" data-testid={`button-image-${postId}`}>
+        {fit && media[0]?.url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 scale-110 bg-cover bg-center blur-2xl" style={{ backgroundImage: `url("${resolveMedia(media[0].url)}")` }} />}
         <GracefulImage key={resolveMedia(media[0]?.url ?? '')} src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} draggable={false} containerClassName="aspect-[4/5] w-full" className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={<span className="absolute inset-0 animate-pulse bg-card" />} errorFallback={imageFallback} data-testid={`img-post-${postId}`} />
         {overlay}
-      </button><button type="button" onClick={() => setFit(v => !v)} aria-label={fit ? "Ampliar foto" : "Ver foto completa"} title={fit ? "Ampliar foto" : "Ver foto completa"} className="absolute bottom-3 left-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white" data-testid={`button-post-fit-${postId}`}>{fit ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
+      </button><button type="button" onClick={() => setFit(v => !v)} aria-label={fit ? "Ampliar foto" : "Ver foto completa"} title={fit ? "Ampliar foto" : "Ver foto completa"} className="absolute bottom-3 right-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white" data-testid={`button-post-fit-${postId}`}>{fit ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
     );
   }
 
@@ -76,7 +77,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
         data-testid={`button-image-${postId}`}
       >
         {media.map((m, i) => (
-          <div key={m.id} className="w-full shrink-0 snap-center snap-always" data-testid={`slide-post-${postId}-${i}`}>
+          <div key={m.id} className="relative w-full shrink-0 snap-center snap-always overflow-hidden" data-testid={`slide-post-${postId}-${i}`}>
             {m.type === 'video' ? (
               <video
                 src={resolveMedia(m.url)}
@@ -89,13 +90,16 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
                 data-testid={`video-post-${postId}-${i}`}
               />
             ) : (
+              <>
+                {fit && <div aria-hidden="true" className="pointer-events-none absolute inset-0 scale-110 bg-cover bg-center blur-2xl" style={{ backgroundImage: `url("${resolveMedia(m.url)}")` }} />}
               <GracefulImage key={resolveMedia(m.url)} src={resolveMedia(m.url)} alt={`${alt} · foto ${i + 1} de ${count}`} loading={eager && i === 0 ? 'eager' : 'lazy'} draggable={false} containerClassName="aspect-[4/5] w-full" className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={imageFallback} data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`} />
+              </>
             )}
           </div>
         ))}
       </div>
       {overlay}
-      <button type="button" onClick={() => setFit(v => !v)} aria-label={fit ? "Ampliar foto" : "Ver foto completa"} className="absolute bottom-3 left-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white" data-testid={`button-post-fit-${postId}`}>{fit ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
+      <button type="button" onClick={() => setFit(v => !v)} aria-label={fit ? "Ampliar foto" : "Ver foto completa"} className="absolute bottom-3 right-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white" data-testid={`button-post-fit-${postId}`}>{fit ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
       <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-[hsl(240_8%_3%/0.7)] px-2.5 py-1 text-[11.5px] font-semibold tabular-nums backdrop-blur" aria-live="polite" data-testid={`text-carousel-position-${postId}`}>
         {index + 1}/{count}
       </span>

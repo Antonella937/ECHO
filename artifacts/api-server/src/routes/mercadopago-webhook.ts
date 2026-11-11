@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { verifyMpWebhookSignature } from "../lib/mercadopagoWebhookSignature";
 import { fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
+import { nextMpSubscriptionStatus, type MpSubscriptionStatus } from "../lib/mercadopagoReconciliationPolicy";
 
 /**
  * Public provider callback, registered BEFORE the private-beta auth gate.
@@ -34,7 +35,7 @@ router.post("/billing/mercadopago/webhook", async (req, res) => {
       return;
     }
     const result = await pool.query(
-      `SELECT reference,plan,amount_ars FROM echo_mp_subscription_intents
+      `SELECT reference,plan,amount_ars,status FROM echo_mp_subscription_intents
        WHERE reference=$1 AND provider_preapproval_id=$2 LIMIT 1`,
       [subscription.externalReference, dataId],
     );
@@ -45,11 +46,39 @@ router.post("/billing/mercadopago/webhook", async (req, res) => {
       return;
     }
     const eventKey = `preapproval:${dataId}:${subscription.status}:${requestId}`;
-    await pool.query(
-      `INSERT INTO echo_mp_webhook_events(event_key,topic,provider_resource_id,status)
-       VALUES($1,$2,$3,'received') ON CONFLICT (event_key) DO NOTHING`,
-      [eventKey, topic, dataId],
-    );
+    // Reconcile the subscription *status* only. No payment or membership grant is made here.
+    // Locking and the event key make retries safe and prevent older states from reactivating canceled intents.
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{ status: MpSubscriptionStatus }>(
+        `SELECT status FROM echo_mp_subscription_intents
+         WHERE reference=$1 AND provider_preapproval_id=$2 FOR UPDATE`,
+        [subscription.externalReference, dataId],
+      );
+      if (!locked.rows.length) {
+        await client.query("ROLLBACK");
+        res.status(202).json({ accepted: true, ignored: true });
+        return;
+      }
+      const nextStatus = nextMpSubscriptionStatus(locked.rows[0].status, subscription.status);
+      await client.query(
+        `UPDATE echo_mp_subscription_intents SET status=$3,updated_at=now()
+         WHERE reference=$1 AND provider_preapproval_id=$2 AND status<>$3`,
+        [subscription.externalReference, dataId, nextStatus],
+      );
+      await client.query(
+        `INSERT INTO echo_mp_webhook_events(event_key,topic,provider_resource_id,status,processed_at)
+         VALUES($1,$2,$3,'processed',now()) ON CONFLICT (event_key) DO NOTHING`,
+        [eventKey, topic, dataId],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
     res.status(202).json({ accepted: true, entitlementChanged: false });
   } catch (error) {
     req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP webhook processing unavailable");

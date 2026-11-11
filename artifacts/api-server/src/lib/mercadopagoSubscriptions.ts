@@ -50,11 +50,11 @@ function normalizePreapproval(input: unknown): MpPreapproval {
 }
 
 /** Provider-authoritative read. Never trust status supplied by a browser or webhook body. */
-export async function fetchMpPreapproval(id: string): Promise<MpPreapproval> {
+export async function fetchMpPreapproval(id: string, options: { fetchImpl?: typeof fetch } = {}): Promise<MpPreapproval> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(`${MP_API}/preapproval/${encodeURIComponent(safeId(id))}`, {
+    const response = await (options.fetchImpl ?? fetch)(`${MP_API}/preapproval/${encodeURIComponent(safeId(id))}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${testToken()}`, Accept: "application/json" },
       signal: controller.signal,
@@ -81,7 +81,15 @@ export function buildMpPreapprovalPayload(input: {
   if (!Number.isFinite(input.amountArs) || input.amountArs <= 0) throw new Error("INVALID_MP_AMOUNT");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.payerEmail)) throw new Error("INVALID_MP_PAYER_EMAIL");
   const url = new URL(input.backUrl);
-  if (url.protocol !== "https:") throw new Error("INVALID_MP_BACK_URL");
+  if (url.protocol !== "https:" || url.username || url.password || url.hash ||
+      !url.hostname || url.hostname === "localhost" || url.hostname.endsWith(".localhost") ||
+      url.hostname.endsWith(".local") ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) ||
+      url.hostname.includes(":")) throw new Error("INVALID_MP_BACK_URL");
+  // The callback must be an explicitly configured ECHO URL, never a caller-selected redirect.
+  const configuredCallback = process.env.ECHO_MP_CALLBACK_URL;
+  if (configuredCallback && url.toString() !== new URL(configuredCallback).toString())
+    throw new Error("MP_BACK_URL_NOT_CONFIGURED");
   return {
     reason: `ECHO ${input.plan === "plus" ? "Plus" : "Premium"}`,
     external_reference: input.reference,
@@ -94,4 +102,101 @@ export function buildMpPreapprovalPayload(input: {
       currency_id: "ARS",
     },
   };
+}
+
+/**
+ * Strictly test-only checkout transport. Not connected to any public route.
+ * Calling this function requires an explicit server-side sandbox opt-in;
+ * it must never accept a production credential or a browser-supplied token.
+ */
+export async function createMpSandboxPreapproval(input: {
+  reference: string;
+  plan: "plus" | "premium";
+  amountArs: number;
+  payerEmail: string;
+  backUrl: string;
+}, options: { sandboxEnabled: boolean; fetchImpl?: typeof fetch }): Promise<{ id: string; checkoutUrl: string; status: "pending" | "authorized" }> {
+  if (!options.sandboxEnabled || process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
+    throw new Error("MP_SANDBOX_CHECKOUT_DISABLED");
+  }
+  const payload = buildMpPreapprovalPayload(input);
+  const token = testToken();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await (options.fetchImpl ?? fetch)(`${MP_API}/preapproval`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": input.reference,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`MP_PROVIDER_HTTP_${response.status}`);
+    const data: unknown = await response.json();
+    if (!data || typeof data !== "object") throw new Error("INVALID_MP_RESPONSE");
+    const item = data as Record<string, unknown>;
+    if ((typeof item.id !== "string" && typeof item.id !== "number") ||
+      typeof item.init_point !== "string" || !["pending", "authorized"].includes(String(item.status)) ||
+      item.external_reference !== input.reference) throw new Error("INVALID_MP_RESPONSE");
+    const checkout = new URL(item.init_point);
+    if (checkout.protocol !== "https:" ||
+      !["mercadopago.com", "mercadopago.com.ar"].some(domain => checkout.hostname === domain || checkout.hostname.endsWith(`.${domain}`))) {
+      throw new Error("INVALID_MP_CHECKOUT_URL");
+    }
+    return { id: String(item.id), checkoutUrl: checkout.toString(), status: item.status as "pending" | "authorized" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Independently inspect a sandbox payment. A webhook body is never payment proof. */
+export async function fetchMpSandboxPayment(
+  paymentId: string,
+  options: { fetchImpl?: typeof fetch } = {},
+): Promise<{
+  id: string; status: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown";
+  amountArs: number | null; currency: string | null; subscriptionId: string | null;
+}> {
+  const id = safeId(paymentId);
+  const token = testToken();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await (options.fetchImpl ?? fetch)(`${MP_API}/v1/payments/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      method: "GET", signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`MP_PAYMENT_HTTP_${response.status}`);
+    const raw: unknown = await response.json();
+    if (!raw || typeof raw !== "object") throw new Error("INVALID_MP_PAYMENT");
+    const data = raw as Record<string, unknown>;
+    if (String(data.id ?? "") !== id) throw new Error("MP_PAYMENT_ID_MISMATCH");
+    const statuses = ["approved", "pending", "rejected", "refunded", "charged_back"];
+    const status = typeof data.status === "string" && statuses.includes(data.status)
+      ? data.status as "approved" | "pending" | "rejected" | "refunded" | "charged_back" : "unknown";
+    const amount = data.transaction_amount;
+    const subscriptionId = data.point_of_interaction && typeof data.point_of_interaction === "object"
+      ? (data.point_of_interaction as Record<string, unknown>).subscription_id : null;
+    return {
+      id, status,
+      amountArs: typeof amount === "number" && Number.isFinite(amount) && amount > 0 ? amount : null,
+      currency: typeof data.currency_id === "string" ? data.currency_id : null,
+      subscriptionId: typeof subscriptionId === "string" || typeof subscriptionId === "number"
+        ? String(subscriptionId) : null,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Compare the sandbox payer returned by the provider with the server's test identity. */
+export function matchesMpSandboxPayer(providerEmail: string | null, configuredEmail: string | undefined): boolean {
+  if (!providerEmail || !configuredEmail) return false;
+  const normalize = (value: string) => value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalize(providerEmail)) &&
+    normalize(providerEmail) === normalize(configuredEmail);
 }

@@ -14,10 +14,12 @@
     "typecheck:privacy-tests": "tsc -p tsconfig.privacy-tests.json",
     "typecheck:social-follows-tests": "tsc -p tsconfig.social-follows-tests.json",
     "test:social-follows": "tsx --test tests/social-follows.test.ts",
+    "test:internal-reactions": "tsx --test tests/internal-reactions.test.ts",
     "test:vision": "tsx --test tests/vision.test.ts tests/vision-active-universe.test.ts",
     "test:support": "tsx --test tests/support-routes.test.ts",
     "test:credit-audio": "tsx --test tests/mp3-duration.test.ts",
-    "test:image-offline": "tsx --test tests/image-generation-offline.test.ts tests/image-edit-offline.test.ts tests/image-prompt-builder.test.ts tests/image-scene-preparation.test.ts"
+    "test:image-offline": "tsx --test tests/image-generation-offline.test.ts tests/image-edit-offline.test.ts tests/image-prompt-builder.test.ts tests/image-scene-preparation.test.ts",
+    "test:mercadopago-sandbox": "tsx --test tests/mercadopago-sandbox-safety.test.ts tests/mercadopago-reconciliation-policy.test.ts"
   },
   "dependencies": {
     "@clerk/express": "^2.1.86",

@@ -10,7 +10,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X, ImagePlus } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -47,8 +47,56 @@ export default function ConversationPage() {
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
+  const [wallpaperOpen, setWallpaperOpen] = useState(false);
+  const [dmStyle, setDmStyle] = useState<'natural' | 'narrative' | 'mixed' | null>(null);
+  const [wallpaper, setWallpaper] = useState<string | null>(null);
+  const [wallpaperError, setWallpaperError] = useState('');
+  const wallpaperInputRef = useRef<HTMLInputElement>(null);
   const { me, character, actions, state } = useSocial();
   const other = character(id);
+  const wallpaperKey = user?.id && id ? `echo-dm-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${me.id}:${id}` : '';
+  useEffect(() => {
+    if (!wallpaperKey) { setWallpaper(null); return; }
+    try { setWallpaper(window.localStorage.getItem(wallpaperKey)); } catch { setWallpaper(null); }
+  }, [wallpaperKey]);
+  const chooseWallpaper = async (file?: File) => {
+    if (!file || !wallpaperKey) return;
+    setWallpaperError('');
+    if (!file.type.startsWith('image/')) { setWallpaperError(t('Elegí una imagen válida.')); return; }
+    try {
+      const image = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 1080 / Math.max(image.width, image.height));
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('canvas unavailable');
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      image.close();
+      const encoded = canvas.toDataURL('image/jpeg', 0.72);
+      window.localStorage.setItem(wallpaperKey, encoded);
+      setWallpaper(encoded);
+      setWallpaperOpen(false);
+    } catch {
+      setWallpaperError(t('No se pudo guardar el fondo. Probá con otra foto.'));
+    }
+  };
+  const clearWallpaper = () => {
+    try { if (wallpaperKey) window.localStorage.removeItem(wallpaperKey); } catch { /* storage unavailable */ }
+    setWallpaper(null);
+    setWallpaperOpen(false);
+    setWallpaperError('');
+  };
+  useEffect(() => {
+    if (!user?.id || !id) { setDmStyle(null); return; }
+    let active = true;
+    setDmStyle(null);
+    const universeId = getActiveUniverseId(user.id);
+    customFetch<{ preferences?: { style?: 'natural' | 'narrative' | 'mixed' } }>(`/api/dm/conversation-preferences?${new URLSearchParams({ universeId, characterId: id })}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
+      .then(result => { if (active) setDmStyle(result.preferences?.style ?? 'natural'); })
+      .catch(() => { if (active) setDmStyle(null); });
+    return () => { active = false; };
+  }, [user?.id, id]);
   const messages = useThreadMessages(id);
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
@@ -294,7 +342,11 @@ export default function ConversationPage() {
   }, [id, messages.length]);
 
   return (
-    <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="relative flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
+      {wallpaper && <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${wallpaper}")` }} />
+        <div className="absolute inset-0 bg-background/65" />
+      </div>}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
         <div className="flex h-16 items-center gap-2 px-2">
           <button onClick={back} aria-label={t("Volver")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
@@ -308,12 +360,25 @@ export default function ConversationPage() {
             </div>
           </Link>
 
+          <button type="button" onClick={() => setWallpaperOpen(true)} aria-label={t("Fondo del chat")} title={t("Fondo del chat")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-dm-wallpaper"><ImagePlus className="h-5 w-5" /></button>
           <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="ml-auto tap flex h-11 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-primary hover:bg-primary/20" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
-      <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
+      <input ref={wallpaperInputRef} type="file" accept="image/*" className="hidden" onChange={e => { void chooseWallpaper(e.target.files?.[0]); e.target.value = ''; }} data-testid="input-dm-wallpaper" />
+      {wallpaperOpen && <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/65 p-5" role="dialog" aria-modal="true" aria-label={t("Fondo del chat")}>
+        <div className="w-full max-w-sm space-y-4 rounded-3xl border border-border bg-card p-5 shadow-2xl">
+          <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{t("Fondo del chat")}</h2><button type="button" onClick={() => setWallpaperOpen(false)} aria-label={t("Cerrar")} className="rounded-full p-2 hover:bg-secondary"><X className="h-5 w-5" /></button></div>
+          <p className="text-sm text-muted-foreground">{t("Personalizá esta conversación con una foto oscurecida, sin perder la legibilidad de los mensajes.")}</p>
+          <p className="text-xs text-muted-foreground">{t("El fondo se guarda solo en este dispositivo y navegador.")}</p>
+          {wallpaper && <div className="h-32 rounded-2xl bg-cover bg-center" style={{ backgroundImage: `url("${wallpaper}")` }} />}
+          {wallpaperError && <p role="alert" className="text-sm text-destructive">{wallpaperError}</p>}
+          <button type="button" onClick={() => wallpaperInputRef.current?.click()} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">{t("Elegir foto")}</button>
+          {wallpaper && <button type="button" onClick={clearWallpaper} className="w-full rounded-xl bg-secondary px-4 py-3 font-semibold">{t("Quitar fondo")}</button>}
+        </div>
+      </div>}
+      <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} onStyleSaved={setDmStyle} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
@@ -327,7 +392,7 @@ export default function ConversationPage() {
               showTime={i === 0 || new Date(m.createdAt).getTime() - new Date(messages[i - 1].createdAt).getTime() > 3 * 3600_000}
               state={state} quoted={m.quoteMessageId ? byId.get(m.quoteMessageId) ?? null : undefined}
               names={{ [me.id]: t('Tú'), [other.id]: other.name.split(' ')[0] }}
-              isLastMine={m.id === lastMineId}
+              isLastMine={m.id === lastMineId} showMessageMetadata={dmStyle === 'natural'}
               reacting={reacting === m.id}
               onToggleReacting={() => setReacting(r => r === m.id ? null : m.id)}
               onReact={(v) => { try { actions.reactMessage(m.id, v); } catch (e) { setError((e as Error).message); } setReacting(null); }}
@@ -358,7 +423,7 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
+      <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/85 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
@@ -534,9 +599,9 @@ function summarize(m: Message, t: (key: string) => string): string {
   return t('Mensaje');
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, showMessageMetadata, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
-  quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
+  quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; showMessageMetadata: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
   canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
@@ -601,7 +666,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   return (
     <li onContextMenu={(e) => { e.preventDefault(); if (window.matchMedia('(min-width: 640px)').matches) { clearPress(); setMenuOpen(true); } }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) { clearPress(); gesture.current = { x: touch.clientX, y: touch.clientY, opened: false, swiped: false }; } }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
-      {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
+      {showMessageMetadata && showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
           <span className="text-[11px] text-muted-foreground">{story?.reactions?.some(r => r.actorId === m.senderId && r.value === m.text) || REACTIONS.includes(m.text)
@@ -714,9 +779,10 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         </div>
       )}
       {m.editedAt && <span className="mt-0.5 text-[10px] text-muted-foreground">{t('Editado')}</span>}
-      {mine && isLastMine && (
-        <span className="mt-0.5 text-[11px] text-muted-foreground" data-testid={`status-read-${m.id}`}>{t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>
-      )}
+      {showMessageMetadata && <span className={cn('mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground', mine ? 'self-end' : 'self-start')} data-testid={`message-timestamp-${m.id}`}>
+        <time dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</time>
+        {mine && <span data-testid={`status-read-${m.id}`}>· {t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>}
+      </span>}
     </li>
   );
 }
