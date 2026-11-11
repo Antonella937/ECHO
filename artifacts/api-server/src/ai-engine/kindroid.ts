@@ -1,6 +1,20 @@
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 
-/** Private, opt-in Kindroid DM adapter. No profile changes, chat breaks, or social autonomy. */
+/** Private, opt-in Kindroid text adapter. Social mutations remain ECHO-owned. */
+// A process-local guard avoids bursts against Kindroid. Multi-instance deployments
+// require a shared Redis/database limiter before enabling concurrent workers.
+const recentRequests: number[] = [];
+function reserveKindroidRequest() {
+  const now = Date.now();
+  while (recentRequests.length && recentRequests[0] <= now - 30_000) recentRequests.shift();
+  if (recentRequests.length >= 10) {
+    const error = new EngineError('KINDROID_RATE_LIMITED', 429);
+    error.retryAfterMs = Math.max(1000, recentRequests[0] + 30_000 - now);
+    throw error;
+  }
+  recentRequests.push(now);
+}
+
 export function kindroidDmProvider(message: string, kinId: string, socialContext = '', request: typeof fetch = fetch, situation: 'dm' | 'comment' | 'post' = 'dm'): TextProvider {
   return {
     name: 'kindroid',
@@ -11,6 +25,7 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
       const style = situation === 'dm' ? (input.conversationMode === 'narrative' ? 'Follow the existing DM narrative style.' : 'Write a natural direct message.') : situation === 'comment' ? 'Write a short, spontaneous social media comment. No roleplay narration, stage directions, or actions in asterisks.' : 'Write a natural social media post caption. No roleplay narration, stage directions, or actions in asterisks.';
       const prompt = `[ECHO text request: ${situation}. ${style} Respect your established personality, relationships, and language. Return only the text to publish, without quotes or explanation.]\n${message}`;
+      reserveKindroidRequest();
       let response: Response;
       try {
         response = await request('https://api.kindroid.ai/v1/send-message', {
