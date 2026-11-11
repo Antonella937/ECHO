@@ -1,8 +1,8 @@
 import { canCharacterViewCloseFriendsStory } from "./storySharePolicy";
-import type { SocialState, Story } from "@workspace/api-zod";
+import type { SocialState } from "@workspace/api-zod";
 
 /** Re-evaluate current audience even when an old view receipt exists. */
-export function visibleSeenStoriesForKindroid(state: SocialState, actorId: string): Story[] {
+export function visibleSeenStoriesForKindroid(state: SocialState, actorId: string): SocialState["stories"] {
   return state.stories.filter(story =>
     story.authorId !== actorId &&
     story.seenBy.includes(actorId) &&
