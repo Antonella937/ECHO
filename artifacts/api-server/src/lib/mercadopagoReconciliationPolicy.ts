@@ -147,3 +147,36 @@ export function planMpMembershipReconciliation(input: {
   if (!period.valid) return { action: "hold", plan: null, periodEnd: null, reason: period.reason };
   return { action: "eligible_for_activation", plan: input.plan, periodEnd: input.periodEnd, reason: "VERIFIED_PAYMENT_AND_PERIOD" };
 }
+
+/**
+ * Read-only renewal guard: never extend membership from a duplicate installment,
+ * an unverified billing period, or a reversed payment.
+ * The caller must source the period and payment ID from the provider.
+ */
+export function planMpRenewal(input: {
+  paymentId: string;
+  previouslyAppliedPaymentIds: readonly string[];
+  currentPeriodEnd: Date | null;
+  verifiedPeriodStart: Date | null;
+  verifiedPeriodEnd: Date | null;
+  paidAt: Date | null;
+  paymentStatus: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown";
+}, now: Date = new Date()): { action: "extend" | "hold"; periodEnd: Date | null; reason: string } {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(input.paymentId))
+    return { action: "hold", periodEnd: null, reason: "INVALID_PAYMENT_ID" };
+  if (input.previouslyAppliedPaymentIds.includes(input.paymentId))
+    return { action: "hold", periodEnd: null, reason: "PAYMENT_ALREADY_APPLIED" };
+  const period = validateMpPaidPeriod({
+    paidAt: input.paidAt,
+    periodStart: input.verifiedPeriodStart,
+    periodEnd: input.verifiedPeriodEnd,
+    providerPaymentApproved: input.paymentStatus === "approved",
+  }, now);
+  if (!period.valid) return { action: "hold", periodEnd: null, reason: period.reason };
+  if (input.currentPeriodEnd !== null &&
+      (!(input.currentPeriodEnd instanceof Date) || !Number.isFinite(input.currentPeriodEnd.getTime())))
+    return { action: "hold", periodEnd: null, reason: "INVALID_CURRENT_PERIOD" };
+  if (input.currentPeriodEnd && input.verifiedPeriodEnd!.getTime() <= input.currentPeriodEnd.getTime())
+    return { action: "hold", periodEnd: null, reason: "PERIOD_NOT_EXTENDED" };
+  return { action: "extend", periodEnd: input.verifiedPeriodEnd, reason: "VERIFIED_NEW_INSTALLMENT" };
+}
