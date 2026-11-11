@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { test } from "node:test";
-import { buildMpPreapprovalPayload } from "../src/lib/mercadopagoSubscriptions";
+import { buildMpPreapprovalPayload, createMpSandboxPreapproval } from "../src/lib/mercadopagoSubscriptions";
 import { verifyMpWebhookSignature } from "../src/lib/mercadopagoWebhookSignature";
 
 const reference = "echo:plus:11111111-1111-4111-8111-111111111111";
@@ -37,4 +37,39 @@ test("webhook signature accepts only correct signed recent manifest",()=>{
   assert.equal(verifyMpWebhookSignature({...input,nowMs:nowMs+300001}),false);
   assert.equal(verifyMpWebhookSignature({...input,secret:"wrong-secret"}),false);
   assert.equal(verifyMpWebhookSignature({...input,signature:"ts=invalid,v1=abc"}),false);
+});
+
+test("sandbox checkout is disabled by default and makes no provider calls", async () => {
+  let calls = 0;
+  const original = process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+  delete process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+  try {
+    await assert.rejects(createMpSandboxPreapproval(valid, {
+      sandboxEnabled: true,
+      fetchImpl: (async () => { calls++; throw Error("SHOULD_NOT_CALL_PROVIDER"); }) as typeof fetch,
+    }), /MP_SANDBOX_CHECKOUT_DISABLED/);
+    assert.equal(calls, 0);
+  } finally {
+    if (original === undefined) delete process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+    else process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED = original;
+  }
+});
+test("sandbox checkout rejects production credentials before network", async () => {
+  const oldFlag = process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+  const oldToken = process.env.ECHO_MP_ACCESS_TOKEN;
+  process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED = "true";
+  process.env.ECHO_MP_ACCESS_TOKEN = "APP_USR_production";
+  let calls = 0;
+  try {
+    await assert.rejects(createMpSandboxPreapproval(valid, {
+      sandboxEnabled: true,
+      fetchImpl: (async () => { calls++; throw Error("SHOULD_NOT_CALL_PROVIDER"); }) as typeof fetch,
+    }), /MP_TEST_CREDENTIALS_UNAVAILABLE/);
+    assert.equal(calls, 0);
+  } finally {
+    if (oldFlag === undefined) delete process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+    else process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED = oldFlag;
+    if (oldToken === undefined) delete process.env.ECHO_MP_ACCESS_TOKEN;
+    else process.env.ECHO_MP_ACCESS_TOKEN = oldToken;
+  }
 });
