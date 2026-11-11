@@ -768,9 +768,10 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         </div>
       )}
       {m.editedAt && <span className="mt-0.5 text-[10px] text-muted-foreground">{t('Editado')}</span>}
-      {mine && isLastMine && (
-        <span className="mt-0.5 text-[11px] text-muted-foreground" data-testid={`status-read-${m.id}`}>{t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>
-      )}
+      <span className={cn('mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground', mine ? 'self-end' : 'self-start')} data-testid={`message-timestamp-${m.id}`}>
+        <time dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</time>
+        {mine && <span data-testid={`status-read-${m.id}`}>· {t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>}
+      </span>
     </li>
   );
 }
