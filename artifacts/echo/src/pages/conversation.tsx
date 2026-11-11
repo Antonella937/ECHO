@@ -48,6 +48,7 @@ export default function ConversationPage() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
   const [wallpaperOpen, setWallpaperOpen] = useState(false);
+  const [dmStyle, setDmStyle] = useState<'natural' | 'narrative' | 'mixed' | null>(null);
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const [wallpaperError, setWallpaperError] = useState('');
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +87,16 @@ export default function ConversationPage() {
     setWallpaperOpen(false);
     setWallpaperError('');
   };
+  useEffect(() => {
+    if (!user?.id || !id) { setDmStyle(null); return; }
+    let active = true;
+    setDmStyle(null);
+    const universeId = getActiveUniverseId(user.id);
+    customFetch<{ preferences?: { style?: 'natural' | 'narrative' | 'mixed' } }>(`/api/dm/conversation-preferences?${new URLSearchParams({ universeId, characterId: id })}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
+      .then(result => { if (active) setDmStyle(result.preferences?.style ?? 'natural'); })
+      .catch(() => { if (active) setDmStyle(null); });
+    return () => { active = false; };
+  }, [user?.id, id]);
   const messages = useThreadMessages(id);
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
@@ -365,7 +376,7 @@ export default function ConversationPage() {
           {wallpaper && <button type="button" onClick={clearWallpaper} className="w-full rounded-xl bg-secondary px-4 py-3 font-semibold">{t("Quitar fondo")}</button>}
         </div>
       </div>}
-      <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
+      <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} onStyleSaved={setDmStyle} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
       <div className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
@@ -381,7 +392,7 @@ export default function ConversationPage() {
               showTime={i === 0 || new Date(m.createdAt).getTime() - new Date(messages[i - 1].createdAt).getTime() > 3 * 3600_000}
               state={state} quoted={m.quoteMessageId ? byId.get(m.quoteMessageId) ?? null : undefined}
               names={{ [me.id]: t('Tú'), [other.id]: other.name.split(' ')[0] }}
-              isLastMine={m.id === lastMineId}
+              isLastMine={m.id === lastMineId} showMessageMetadata={dmStyle === 'natural'}
               reacting={reacting === m.id}
               onToggleReacting={() => setReacting(r => r === m.id ? null : m.id)}
               onReact={(v) => { try { actions.reactMessage(m.id, v); } catch (e) { setError((e as Error).message); } setReacting(null); }}
@@ -588,9 +599,9 @@ function summarize(m: Message, t: (key: string) => string): string {
   return t('Mensaje');
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
+function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, showMessageMetadata, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
   m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
-  quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
+  quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; showMessageMetadata: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
   canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
@@ -655,7 +666,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   return (
     <li onContextMenu={(e) => { e.preventDefault(); if (window.matchMedia('(min-width: 640px)').matches) { clearPress(); setMenuOpen(true); } }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) { clearPress(); gesture.current = { x: touch.clientX, y: touch.clientY, opened: false, swiped: false }; } }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
-      {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
+      {showMessageMetadata && showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
       {m.storyId && (
         <div className={cn('mb-1 flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
           <span className="text-[11px] text-muted-foreground">{story?.reactions?.some(r => r.actorId === m.senderId && r.value === m.text) || REACTIONS.includes(m.text)
@@ -768,10 +779,10 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         </div>
       )}
       {m.editedAt && <span className="mt-0.5 text-[10px] text-muted-foreground">{t('Editado')}</span>}
-      <span className={cn('mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground', mine ? 'self-end' : 'self-start')} data-testid={`message-timestamp-${m.id}`}>
+      {showMessageMetadata && <span className={cn('mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground', mine ? 'self-end' : 'self-start')} data-testid={`message-timestamp-${m.id}`}>
         <time dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</time>
         {mine && <span data-testid={`status-read-${m.id}`}>· {t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>}
-      </span>
+      </span>}
     </li>
   );
 }
