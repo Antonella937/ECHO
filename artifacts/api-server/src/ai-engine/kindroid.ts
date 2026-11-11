@@ -1,7 +1,7 @@
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 
 /** Private, opt-in Kindroid DM adapter. No profile changes, chat breaks, or social autonomy. */
-export function kindroidAyelenProvider(message: string, request: typeof fetch = fetch): TextProvider {
+export function kindroidDmProvider(message: string, kinId: string, request: typeof fetch = fetch): TextProvider {
   return {
     name: 'kindroid',
     async complete(input) {
@@ -14,7 +14,7 @@ export function kindroidAyelenProvider(message: string, request: typeof fetch = 
           method: 'POST',
           signal: AbortSignal.timeout(40000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ai_id: '562c75hV0xuGHl59PUXD', message: message.slice(0, 6000), stream: false }),
+          body: JSON.stringify({ ai_id: kinId, message: message.slice(0, 6000), stream: false }),
         });
       } catch { throw new EngineError('KINDROID_CONNECTION_FAILED', 502); }
       if (!response.ok) {
