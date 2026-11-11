@@ -33,3 +33,39 @@ export function canActivatePaidMembership(input: {
     Number.isFinite(input.periodEnd.getTime()) &&
     input.periodEnd.getTime() > now.getTime();
 }
+
+/**
+ * Read-only payment evidence decision. No membership mutation is performed.
+ * Provider payment must identify the exact preapproval and billed amount.
+ */
+export function evaluateMpSandboxPayment(input: {
+  subscriptionStatus: MpSubscriptionStatus;
+  providerPreapprovalId: string;
+  expectedAmountArs: number;
+  payment: {
+    status: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown";
+    subscriptionId: string | null;
+    amountArs: number | null;
+    currency: string | null;
+  };
+  periodEnd: Date | null;
+}, now: Date = new Date()): { eligible: boolean; reason: string } {
+  if (!input.providerPreapprovalId || !Number.isFinite(input.expectedAmountArs) ||
+      input.expectedAmountArs <= 0) return { eligible: false, reason: "INVALID_SUBSCRIPTION" };
+  if (input.payment.subscriptionId !== input.providerPreapprovalId)
+    return { eligible: false, reason: "SUBSCRIPTION_MISMATCH" };
+  if (input.payment.currency !== "ARS" || input.payment.amountArs === null ||
+      !Number.isFinite(input.payment.amountArs) ||
+      Math.abs(input.payment.amountArs - input.expectedAmountArs) > 0.001)
+    return { eligible: false, reason: "PAYMENT_AMOUNT_MISMATCH" };
+  if (input.payment.status !== "approved")
+    return { eligible: false, reason: "PAYMENT_NOT_APPROVED" };
+  const eligible = canActivatePaidMembership({
+    subscriptionStatus: input.subscriptionStatus,
+    paymentStatus: input.payment.status,
+    paymentVerifiedFromProvider: true,
+    paymentMatchesSubscription: true,
+    periodEnd: input.periodEnd,
+  }, now);
+  return { eligible, reason: eligible ? "VERIFIED_APPROVED_PAYMENT" : "SUBSCRIPTION_OR_PERIOD_NOT_ELIGIBLE" };
+}
