@@ -156,7 +156,7 @@ export default function GroupConversationPage() {
     finally { setSceneSaving(false); }
   };
   const savePreferences = async (patch: { muted?: boolean; archived?: boolean }) => {
-    if (!id || !preferencesLoaded || savingSettings) return;
+    if (!id || !preferencesLoaded || savingSettings) return false;
     setSavingSettings(true);
     try {
       const value = await customFetch<{ muted: boolean; archived: boolean }>(`/api/group-dms/${encodeURIComponent(id)}/preferences`, {
@@ -164,7 +164,8 @@ export default function GroupConversationPage() {
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, ...patch }),
       });
       setMuted(value.muted); setArchived(value.archived); setError('');
-    } catch { setError('No se pudieron guardar las preferencias del grupo.'); }
+      return true;
+    } catch { setError('No se pudieron guardar las preferencias del grupo.'); return false; }
     finally { setSavingSettings(false); }
   };
   const saveAutonomy = async (enabled: boolean, intervalMinutes: number) => {
@@ -357,8 +358,7 @@ export default function GroupConversationPage() {
       </div>
       {group && group.createdBy !== me.id && !group.participantIds.includes(me.id) && <button type="button" disabled={savingSettings || !preferencesLoaded} onClick={async () => {
         if (!window.confirm('¿Quitar esta escena de tus conversaciones? Se archivará solo para esta identidad; no se borrarán mensajes de los participantes.')) return;
-        await savePreferences({ archived: true });
-        navigate('/messages');
+        if (await savePreferences({ archived: true })) navigate('/messages');
       }} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Quitar de mis conversaciones (espectador)</button>}
       {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">{gl("Salir del grupo")}</button>}
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
