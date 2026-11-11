@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { test } from "node:test";
-import { buildMpPreapprovalPayload, createMpSandboxPreapproval } from "../src/lib/mercadopagoSubscriptions";
+import { buildMpPreapprovalPayload, createMpSandboxPreapproval, fetchMpSandboxPayment } from "../src/lib/mercadopagoSubscriptions";
 import { verifyMpWebhookSignature } from "../src/lib/mercadopagoWebhookSignature";
 
 const reference = "echo:plus:11111111-1111-4111-8111-111111111111";
@@ -103,5 +103,43 @@ test("sandbox provider response must match reference and trusted checkout host",
     else process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED = oldFlag;
     if (oldToken === undefined) delete process.env.ECHO_MP_ACCESS_TOKEN;
     else process.env.ECHO_MP_ACCESS_TOKEN = oldToken;
+  }
+});
+
+test("sandbox payment verification reads provider data without granting access", async () => {
+  const previous = process.env.ECHO_MP_ACCESS_TOKEN;
+  process.env.ECHO_MP_ACCESS_TOKEN = "TEST-offline-fixture";
+  let calls = 0;
+  const fakeFetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls++;
+    assert.equal(String(url), "https://api.mercadopago.com/v1/payments/123");
+    assert.equal(init?.method, "GET");
+    return new Response(JSON.stringify({
+      id: 123, status: "approved", transaction_amount: 1200, currency_id: "ARS",
+      point_of_interaction: { subscription_id: "preapproval-123" },
+    }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const payment = await fetchMpSandboxPayment("123", { fetchImpl: fakeFetch });
+    assert.deepEqual(payment, {
+      id: "123", status: "approved", amountArs: 1200,
+      currency: "ARS", subscriptionId: "preapproval-123",
+    });
+    assert.equal(calls, 1);
+    await assert.rejects(fetchMpSandboxPayment("../123", { fetchImpl: fakeFetch }), /INVALID_MP_RESOURCE_ID/);
+    assert.equal(calls, 1);
+    await assert.rejects(fetchMpSandboxPayment("123", {
+      fetchImpl: (async () => new Response(JSON.stringify({ id: 999, status: "approved" }), { status: 200 })) as typeof fetch,
+    }), /MP_PAYMENT_ID_MISMATCH/);
+    const reversed = await fetchMpSandboxPayment("123", {
+      fetchImpl: (async () => new Response(JSON.stringify({
+        id: 123, status: "refunded", transaction_amount: 1200, currency_id: "ARS",
+      }), { status: 200 })) as typeof fetch,
+    });
+    assert.equal(reversed.status, "refunded");
+    assert.equal(reversed.subscriptionId, null);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_MP_ACCESS_TOKEN;
+    else process.env.ECHO_MP_ACCESS_TOKEN = previous;
   }
 });
