@@ -22,6 +22,14 @@ export const privateBetaSeats: RequestHandler = async (req, res, next) => {
   res.setHeader("Cache-Control", "private, no-store");
   const ownerId = getAuth(req).userId;
   if (!ownerId) { res.status(401).json({ error: "Authentication required" }); return; }
+  if (process.env.ECHO_BETA_APPROVAL_REQUIRED === "true") {
+    try {
+      const approved = await db.execute(sql`SELECT 1 FROM echo_beta_approvals WHERE owner_id = ${ownerId} AND status = 'approved' LIMIT 1`);
+      if (approved.rows.length === 0) {
+        res.status(403).json({ error: "PRIVATE_BETA_APPROVAL_REQUIRED" }); return;
+      }
+    } catch { res.status(503).json({ error: "PRIVATE_BETA_APPROVAL_UNAVAILABLE" }); return; }
+  }
   if (invitedIdsRaw && !invitedIds.has(ownerId)) {
     res.status(403).json({ error: "PRIVATE_BETA_INVITATION_REQUIRED" }); return;
   }
