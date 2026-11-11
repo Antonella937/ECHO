@@ -65,14 +65,46 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
   const [coverStoryId, setCoverStoryId] = useState<string | null>(initial?.coverStoryId ?? null);
   const [coverImage, setCoverImage] = useState(initial?.coverImage ?? '');
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [pendingCover, setPendingCover] = useState<string | null>(null);
+  const [coverOffsetX, setCoverOffsetX] = useState(50);
+  const [coverOffsetY, setCoverOffsetY] = useState(50);
+  const [coverZoom, setCoverZoom] = useState(1);
+  const pendingFile = useRef<File | null>(null);
   const coverInput = useRef<HTMLInputElement>(null);
-  const uploadCover = async (file?: File) => {
+  const uploadCover = (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { setError(t('Elegí una imagen para la portada.')); return; }
+    if (pendingCover) URL.revokeObjectURL(pendingCover);
+    pendingFile.current = file;
+    setPendingCover(URL.createObjectURL(file));
+    setCoverOffsetX(50); setCoverOffsetY(50); setCoverZoom(1);
+    setError(null);
+    if (coverInput.current) coverInput.current.value = '';
+  };
+  const applyCover = async () => {
+    if (!pendingCover) return;
     setUploadingCover(true); setError(null);
-    try { setCoverImage(await uploadPrivateImage(await compressImage(file, 1080))); }
-    catch (e) { setError((e as Error).message); }
-    finally { setUploadingCover(false); if (coverInput.current) coverInput.current.value = ''; }
+    try {
+      const img = new Image();
+      img.src = pendingCover;
+      await img.decode();
+      const size = 720;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No se pudo preparar la portada.');
+      const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight) * coverZoom;
+      const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+      const x = (size - w) * coverOffsetX / 100;
+      const y = (size - h) * coverOffsetY / 100;
+      ctx.drawImage(img, x, y, w, h);
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo recortar la portada.')), 'image/jpeg', 0.9));
+      setCoverImage(await uploadPrivateImage(await compressImage(new File([blob], 'highlight-cover.jpg', { type: 'image/jpeg' }), 1080)));
+      URL.revokeObjectURL(pendingCover);
+      setPendingCover(null);
+      pendingFile.current = null;
+    } catch (e) { setError((e as Error).message); }
+    finally { setUploadingCover(false); }
   };
   const collections = getOrderedHighlights(state, me.id);
   const [position, setPosition] = useState(initial ? collections.findIndex(h => h.id === initial.id) : collections.length);
@@ -100,7 +132,7 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
       ) : (
         <div className="flex gap-2">
           {initial && <button onClick={() => setConfirm(true)} aria-label={t("Eliminar destacada")} className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-destructive" data-testid="button-highlight-delete"><Trash2 className="h-5 w-5" /></button>}
-          <button onClick={save} disabled={!title.trim() || (!ids.length && !coverImage) || uploadingCover} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-highlight-save">{t("Guardar")}</button>
+          <button onClick={save} disabled={!title.trim() || (!ids.length && !coverImage) || uploadingCover || Boolean(pendingCover)} className="h-12 flex-1 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40" data-testid="button-highlight-save">{t("Guardar")}</button>
         </div>
       )}>
       {confirm ? <p className="pb-2 text-sm text-muted-foreground">{t("Se quita la destacada del perfil. Las historias no se borran.")}</p> : (
@@ -134,6 +166,18 @@ function HighlightEditor({ initial, onClose }: { initial: StoryHighlight | null;
             <p className="text-xs font-semibold">{t("Portada personalizada")}</p>
             <p className="mt-1 text-xs text-muted-foreground">{t("Podés subir una foto diferente sin publicarla como historia.")}</p>
             {coverImage && <img src={resolveMedia(coverImage)} alt={t("Portada personalizada")} className="mt-3 h-24 w-24 rounded-full object-cover" />}
+            {pendingCover && (
+              <div className="mt-3 flex flex-col gap-3" data-testid="highlight-cover-crop-editor">
+                <p className="text-xs text-muted-foreground">Mové los controles para centrar la imagen dentro del círculo.</p>
+                <div className="relative mx-auto h-44 w-44 overflow-hidden rounded-full border-2 border-primary bg-black" style={{ touchAction: 'none' }}>
+                  <img src={pendingCover} alt="Vista previa de portada" draggable={false} className="h-full w-full" style={{ objectFit: 'cover', objectPosition: `${coverOffsetX}% ${coverOffsetY}%`, transform: `scale(${coverZoom})` }} />
+                </div>
+                <label className="text-xs">Horizontal <input type="range" min="0" max="100" value={coverOffsetX} onChange={e => setCoverOffsetX(Number(e.target.value))} className="block w-full" data-testid="slider-highlight-cover-x" /></label>
+                <label className="text-xs">Vertical <input type="range" min="0" max="100" value={coverOffsetY} onChange={e => setCoverOffsetY(Number(e.target.value))} className="block w-full" data-testid="slider-highlight-cover-y" /></label>
+                <label className="text-xs">Zoom <input type="range" min="1" max="2.5" step="0.05" value={coverZoom} onChange={e => setCoverZoom(Number(e.target.value))} className="block w-full" data-testid="slider-highlight-cover-zoom" /></label>
+                <button type="button" disabled={uploadingCover} onClick={() => void applyCover()} className="h-11 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-50" data-testid="button-highlight-apply-crop">Aplicar encuadre</button>
+              </div>
+            )}
             <input ref={coverInput} type="file" accept="image/*" className="hidden" aria-label={t("Elegir portada personalizada")} onChange={e => void uploadCover(e.target.files?.[0])} data-testid="input-highlight-custom-cover" />
             <div className="mt-3 flex gap-2">
               <button type="button" disabled={uploadingCover} onClick={() => coverInput.current?.click()} className="h-11 rounded-xl bg-secondary px-4 text-xs font-semibold disabled:opacity-50" data-testid="button-highlight-upload-cover">{t(uploadingCover ? 'Subiendo…' : 'Subir portada')}</button>
