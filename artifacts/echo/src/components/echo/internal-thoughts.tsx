@@ -59,7 +59,12 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
       if(open){requestVersion.current+=1;setOpen(false);setConfirmGeneration(false);onOpenChange?.(false);} else {setOpen(true);onOpenChange?.(true);void load();}
     }}>{es?'¿Qué pensó?':'What did they think?'}</button>
     {open && <div className="mt-2 max-h-[42dvh] overflow-y-auto overscroll-contain rounded-xl border border-border bg-card/95 p-3 text-foreground shadow-lg backdrop-blur-md" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
-      <p className="mb-2 text-muted-foreground">{es?'Privado · Una consulta manual no confirma que el personaje haya visto el contenido.':'Private · Manual inspection does not confirm the character viewed this content.'}</p>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <p className="text-muted-foreground">{es?'Privado · Una consulta manual no confirma que el personaje haya visto el contenido.':'Private · Manual inspection does not confirm the character viewed this content.'}</p>
+        <button type="button" aria-label={es?'Cerrar pensamientos':'Close private thoughts'} className="shrink-0 rounded-md border border-border px-2 py-1" onClick={()=>{
+          requestVersion.current+=1;setOpen(false);setConfirmGeneration(false);onOpenChange?.(false);
+        }}>{es?'Cerrar':'Close'}</button>
+      </div>
       {reactions.length===0 && !loading && !error && <p className="mb-2 text-muted-foreground">{es?'Todavía no hay pensamientos guardados.':'No saved thoughts yet.'}</p>}
       {reactions.map((reaction,index)=><p key={`${reaction.character_id??index}-${index}`} className="mb-2 whitespace-pre-wrap">
         <strong>{state.characters.find(c=>c.id===reaction.character_id)?.name??(es?'Personaje':'Character')}</strong>
