@@ -3,7 +3,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { createMpSandboxPreapproval, fetchMpSandboxPayment } from "../lib/mercadopagoSubscriptions";
+import { createMpSandboxPreapproval, fetchMpSandboxPayment, fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
 
 /**
  * Mercado Pago subscription preflight.
@@ -278,6 +278,15 @@ router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (r
     const intent = intentResult.rows[0];
     if (!intent || !intent.provider_preapproval_id) {
       res.status(404).json({ error: "MP_SUBSCRIPTION_NOT_FOUND" }); return;
+    }
+    // Re-read the subscription directly from Mercado Pago. A stored preapproval
+    // identifier alone is not evidence that the provider still recognizes it.
+    const preapproval = await fetchMpPreapproval(intent.provider_preapproval_id);
+    if (preapproval.id !== intent.provider_preapproval_id ||
+        preapproval.externalReference !== reference ||
+        preapproval.amountArs === null ||
+        Math.abs(preapproval.amountArs - Number(intent.amount_ars)) > 0.001) {
+      res.status(409).json({ error: "MP_PROVIDER_SUBSCRIPTION_MISMATCH" }); return;
     }
     // Provider GET is the only trusted source of payment data.
     const payment = await fetchMpSandboxPayment(paymentId);
