@@ -49,6 +49,9 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
 });
 
 const manualPayload = query.extend({characterId:z.string().min(1).max(120)}).strict();
+// Process-local guard: repeated taps must not trigger duplicate paid calls.
+// A distributed reservation is still required before multi-instance rollout.
+const pendingManualReactions = new Set<string>();
 
 /** Explicit creator request. Does not create a view receipt, comment, like or DM. */
 internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (req,res): Promise<void> => {
@@ -59,6 +62,11 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
   const parsed = manualPayload.safeParse(req.body);
   if (!parsed.success) {res.status(400).json({error:'INVALID_INTERNAL_REACTION_REQUEST'});return;}
   const {universeId,surface,contentId,characterId} = parsed.data;
+  const pendingKey = JSON.stringify([req.userId,universeId,surface,contentId,characterId]);
+  if (pendingManualReactions.has(pendingKey)) {
+    res.status(409).json({error:'INTERNAL_REACTION_ALREADY_GENERATING'});return;
+  }
+  pendingManualReactions.add(pendingKey);
   try {
     const [universe] = await db.select({state:echoUniversesTable.state,archivedAt:echoUniversesTable.archivedAt,deletedAt:echoUniversesTable.deletedAt})
       .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
@@ -144,5 +152,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
   } catch (error) {
     const status = typeof error==='object' && error!==null && 'status' in error && typeof error.status==='number' ? error.status : 503;
     res.status(status>=400&&status<=599?status:503).json({error:'INTERNAL_REACTION_GENERATION_UNAVAILABLE'});
+  } finally {
+    pendingManualReactions.delete(pendingKey);
   }
 });
