@@ -132,7 +132,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
       actuallyViewed:Boolean(viewed),manualInspectionAllowed:true,audienceAllowed:true,
       blocked:false,autonomyEnabled:false,publiclyResponded:false,
     },'manual')) {res.status(403).json({error:'INTERNAL_REACTION_NOT_ALLOWED'});return;}
-    const existing = await db.execute(sql`SELECT reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
+    const existing = await db.execute(sql`SELECT character_id,reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
       WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
         AND surface=${surface} AND content_id=${contentId} LIMIT 1`);
     if (existing.rows.length) {res.json({reaction:existing.rows[0],cached:true});return;}
@@ -196,7 +196,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     const inserted = await db.execute(sql`INSERT INTO echo_internal_reactions
       (owner_id,universe_id,character_id,surface,content_id,mode,reaction_text,actually_viewed)
       VALUES (${req.userId!},${universeId},${characterId},${surface},${contentId},'manual',${reactionText},${Boolean(viewed)})
-      ON CONFLICT DO NOTHING RETURNING reaction_text,mode,actually_viewed,generated_at`);
+      ON CONFLICT DO NOTHING RETURNING character_id,reaction_text,mode,actually_viewed,generated_at`);
     if (inserted.rows.length) {res.status(201).json({reaction:inserted.rows[0],cached:false});return;}
     const winner = await db.execute(sql`SELECT reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
       WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
