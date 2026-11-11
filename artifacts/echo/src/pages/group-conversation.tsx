@@ -360,6 +360,15 @@ export default function GroupConversationPage() {
         if (!window.confirm('¿Quitar esta escena de tus conversaciones? Se archivará solo para esta identidad; no se borrarán mensajes de los participantes.')) return;
         if (await savePreferences({ archived: true })) navigate('/messages');
       }} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Quitar de mis conversaciones (espectador)</button>}
+      {group && group.createdBy !== me.id && <button type="button" disabled={savingSettings} onClick={async () => {
+        if (!window.confirm('¿Eliminar esta conversación de tu cuenta? No se borrarán los mensajes de los demás participantes.')) return;
+        setSavingSettings(true);
+        try {
+          await customFetch(`/api/group-dms/${encodeURIComponent(group.id)}/for-me?${new URLSearchParams({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id })}`, { method: 'DELETE', responseType: 'json' });
+          navigate('/messages');
+        } catch { setError('No se pudo eliminar esta conversación de tu cuenta.'); }
+        finally { setSavingSettings(false); }
+      }} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">Eliminar de mis conversaciones</button>}
       {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">{gl("Salir del grupo")}</button>}
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
       {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">{gl("Estás viendo este grupo como espectadora. No sos participante.")}</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">{gl("Salir del modo espectadora")}</button></div>}
