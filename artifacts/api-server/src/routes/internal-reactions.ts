@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, echoUniversesTable } from '@workspace/db';
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
-import { storyIsStillVisible } from '../lib/socialContentAccess';
+import { storyIsStillVisible, readAcceptedCharacterFollows } from '../lib/socialContentAccess';
 import { kindroidDmProvider } from '../ai-engine/kindroid';
 import { internalReactionPrompt, shouldGenerateInternalReaction } from '../autonomy/internal-reactions';
 import { requireAuth } from '../middlewares/requireAuth';
@@ -64,6 +64,13 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     // Conservative initial rollout: only creator-owned content; never leak other
     // users' private posts/stories into a linked external provider.
     if (!state.characters.some(c=>c.id===content.authorId&&!c.archived)) {res.status(403).json({error:'CONTENT_ACCESS_UNVERIFIED'});return;}
+    // Only characters who follow the author can inspect their content.
+    const acceptedFollows = await readAcceptedCharacterFollows(req.userId!,universeId);
+    const followsAuthor = acceptedFollows.some(edge =>
+      edge.source.ownerId===req.userId && edge.source.universeId===universeId &&
+      edge.source.characterId===characterId && edge.target.ownerId===req.userId &&
+      edge.target.universeId===universeId && edge.target.characterId===content.authorId);
+    if (!followsAuthor) {res.status(403).json({error:'CHARACTER_CANNOT_VIEW_AUTHOR'});return;}
     // Do not let a manual request bypass close-friends or story expiry.
     if (surface==='story' && (!canCharacterViewCloseFriendsStory(state,content,characterId) ||
         !storyIsStillVisible(state as Record<string,unknown>,content as Record<string,unknown>,Date.now()))) {
