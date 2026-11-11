@@ -82,6 +82,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const t = useStoryViewerText();
   const resolveMedia = useMediaResolver();
   const [failedStoryImage, setFailedStoryImage] = useState<string | null>(null);
+  const [storyImageWaitExpired, setStoryImageWaitExpired] = useState(false);
   const { me, actions, state, character, universeId } = useSocial();
   const [, navigate] = useLocation();
   const [gi, setGi] = useState(startIndex);
@@ -114,7 +115,15 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const storyMediaSource = { sourceUniverseId: universeId, sourceCharacterId: story.authorId, sourceType: 'story' as const, sourceContentId: story.id };
   const storyImage = resolveMedia(story.image, storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
+  // A private image can take a few seconds to resolve on mobile. Loading is not an error.
+  useEffect(() => {
+    setStoryImageWaitExpired(false);
+    setFailedStoryImage(null);
+    const timer = window.setTimeout(() => setStoryImageWaitExpired(true), 15000);
+    return () => window.clearTimeout(timer);
+  }, [story.id]);
   const imageUnavailable = Boolean(story.image) && (!storyImage || failedStoryImage === story.id);
+  const showImageError = imageUnavailable && (failedStoryImage === story.id || storyImageWaitExpired);
   const retryStoryImage = () => {
     setFailedStoryImage(null);
     retryPrivateMedia(story.image, storyMediaSource);
@@ -253,7 +262,12 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             data-testid={`img-story-${story.id}`}
           />
         )}
-        {imageIsPrivate && imageUnavailable && (
+        {imageIsPrivate && imageUnavailable && !showImageError && (
+          <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/40" role="status" aria-label="Cargando imagen">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          </div>
+        )}
+        {imageIsPrivate && showImageError && (
           <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-black/70 px-8 text-center text-white" role="status">
             <p className="text-sm">La foto de esta historia todavía no está disponible.</p>
             <button type="button" onClick={retryStoryImage} className="rounded-full border border-white/50 px-5 py-2 text-sm font-medium">Reintentar imagen</button>
