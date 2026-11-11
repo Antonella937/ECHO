@@ -128,7 +128,17 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .sort((a,b) => b.score-a.score || new Date(b.p.createdAt).getTime()-new Date(a.p.createdAt).getTime())
             .slice(0,3)
             .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
-          socialContext = [...posts,...comments,...older].join('\n').slice(0,3000);
+          // Stories are only remembered if this actor actually viewed them.
+          // Never infer story viewing from a follow alone.
+          const seenStories = parsed.data.state.stories
+            .filter(s => s.seenBy.includes(input.characterId) && s.authorId !== input.characterId)
+            .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+            .slice(0,3)
+            .map(s => {
+              const author = parsed.data.state.characters.find(ch => ch.id === s.authorId);
+              return `Story actually viewed by this character, posted by ${(author?.name ?? 'Unknown').slice(0,60)}: ${s.caption.slice(0,200)}`;
+            });
+          socialContext = [...posts,...comments,...older,...seenStories].join('\n').slice(0,3400);
         }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
