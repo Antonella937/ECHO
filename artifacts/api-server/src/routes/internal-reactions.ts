@@ -148,6 +148,11 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     if (Number(daily.rows[0]?.total ?? 0) >= 12) {
       res.status(429).json({error:'INTERNAL_REACTION_DAILY_LIMIT'});return;
     }
+    // Opt-in rollout gate: the API must never charge Kindroid merely because
+    // the route was deployed. Explicit server configuration is required.
+    if (process.env.ECHO_INTERNAL_REACTIONS_GENERATION_ENABLED !== 'true') {
+      res.status(503).json({error:'INTERNAL_REACTION_GENERATION_DISABLED'});return;
+    }
     const prompt = internalReactionPrompt(surface,content.caption??'','manual');
     const result = await kindroidDmProvider(prompt,kinId,'',fetch,'internal_reaction').complete({
       system:'Private internal narration only',context:'',outputSchema:{},conversationMode:'narrative',
