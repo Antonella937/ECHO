@@ -40,6 +40,14 @@ export class MeteredTextProvider implements TextProvider {
     this.name = inner.name;
   }
   async complete(input: Parameters<TextProvider["complete"]>[0]): ReturnType<TextProvider["complete"]> {
+    // Founder-only Kindroid DMs are paid through the founder's own Kindroid
+    // subscription, not through ECHO's text-generation provider budget.
+    // Defense in depth: even if this adapter is wrapped by a metered runtime,
+    // do not reserve or charge ECHO AI units for its text response.
+    if (this.ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" &&
+        this.inner.name === "kindroid") {
+      return this.inner.complete(input);
+    }
     const reservation = await reserve(this.ownerId, this.category, "text_generation");
     try {
       const result = await this.inner.complete(input);
