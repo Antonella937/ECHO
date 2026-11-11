@@ -89,3 +89,21 @@ test("monthly entitlement periods require actual payment evidence and bounded da
   assert.equal(validateMpPaidPeriod({ ...base, periodStart: new Date("2026-11-12T00:00:00Z") }, now).valid, false);
   assert.equal(validateMpPaidPeriod({ ...base, paidAt: new Date("invalid") }, now).valid, false);
 });
+
+test("membership reconciliation stays on hold until both provider payment and period are verified", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const valid = {
+    plan: "plus" as const, subscriptionStatus: "authorized" as const,
+    providerPreapprovalId: "preapproval-123", expectedAmountArs: 1200,
+    payment: { status: "approved" as const, subscriptionId: "preapproval-123", amountArs: 1200, currency: "ARS" },
+    paidAt: new Date("2026-11-11T10:00:00Z"),
+    periodStart: new Date("2026-11-11T00:00:00Z"),
+    periodEnd: new Date("2026-12-11T00:00:00Z"),
+  };
+  assert.equal(planMpMembershipReconciliation(valid, now).action, "eligible_for_activation");
+  assert.equal(planMpMembershipReconciliation({ ...valid, periodStart: null }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, payment: { ...valid.payment, status: "refunded" } }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, payment: { ...valid.payment, subscriptionId: "wrong" } }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, subscriptionStatus: "canceled" }, now).action, "hold");
+  assert.equal(planMpMembershipReconciliation({ ...valid, periodEnd: new Date("2026-11-10T00:00:00Z") }, now).action, "hold");
+});
