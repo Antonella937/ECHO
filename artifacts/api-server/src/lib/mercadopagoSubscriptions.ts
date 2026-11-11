@@ -144,3 +144,43 @@ export async function createMpSandboxPreapproval(input: {
     clearTimeout(timeout);
   }
 }
+
+/** Independently inspect a sandbox payment. A webhook body is never payment proof. */
+export async function fetchMpSandboxPayment(
+  paymentId: string,
+  options: { fetchImpl?: typeof fetch } = {},
+): Promise<{
+  id: string; status: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown";
+  amountArs: number | null; currency: string | null; subscriptionId: string | null;
+}> {
+  const id = safeId(paymentId);
+  const token = testToken();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await (options.fetchImpl ?? fetch)(`${MP_API}/v1/payments/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      method: "GET", signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`MP_PAYMENT_HTTP_${response.status}`);
+    const raw: unknown = await response.json();
+    if (!raw || typeof raw !== "object") throw new Error("INVALID_MP_PAYMENT");
+    const data = raw as Record<string, unknown>;
+    if (String(data.id ?? "") !== id) throw new Error("MP_PAYMENT_ID_MISMATCH");
+    const statuses = ["approved", "pending", "rejected", "refunded", "charged_back"];
+    const status = typeof data.status === "string" && statuses.includes(data.status)
+      ? data.status as "approved" | "pending" | "rejected" | "refunded" | "charged_back" : "unknown";
+    const amount = data.transaction_amount;
+    const subscriptionId = data.point_of_interaction && typeof data.point_of_interaction === "object"
+      ? (data.point_of_interaction as Record<string, unknown>).subscription_id : null;
+    return {
+      id, status,
+      amountArs: typeof amount === "number" && Number.isFinite(amount) && amount > 0 ? amount : null,
+      currency: typeof data.currency_id === "string" ? data.currency_id : null,
+      subscriptionId: typeof subscriptionId === "string" || typeof subscriptionId === "number"
+        ? String(subscriptionId) : null,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
