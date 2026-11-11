@@ -124,7 +124,9 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
         !storyIsStillVisible(state as Record<string,unknown>,content as Record<string,unknown>,Date.now()))) {
       res.status(403).json({error:'STORY_NOT_VISIBLE_TO_CHARACTER'});return;
     }
-    const viewed = surface==='story' && 'seenBy' in content && Array.isArray(content.seenBy) && content.seenBy.includes(characterId);
+    // A legacy seenBy array is not an authenticated view receipt. Until the
+    // actual story-view persistence is verified, do not claim a real view.
+    const viewed = false;
     if (!shouldGenerateInternalReaction({
       characterId,contentId,surface,authorId:content.authorId,
       actuallyViewed:Boolean(viewed),manualInspectionAllowed:true,audienceAllowed:true,
