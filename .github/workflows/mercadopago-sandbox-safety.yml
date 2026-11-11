@@ -5,7 +5,9 @@ on:
     paths:
       - 'artifacts/api-server/src/lib/mercadopagoSubscriptions.ts'
       - 'artifacts/api-server/src/lib/mercadopagoWebhookSignature.ts'
+      - 'artifacts/api-server/src/lib/mercadopagoReconciliationPolicy.ts'
       - 'artifacts/api-server/tests/mercadopago-sandbox-safety.test.ts'
+      - 'artifacts/api-server/tests/mercadopago-reconciliation-policy.test.ts'
       - 'artifacts/api-server/package.json'
       - '.github/workflows/mercadopago-sandbox-safety.yml'
   pull_request:
