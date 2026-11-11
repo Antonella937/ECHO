@@ -285,6 +285,9 @@ router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (r
     if (preapproval.id !== intent.provider_preapproval_id ||
         preapproval.externalReference !== reference ||
         preapproval.status !== "authorized" ||
+        !preapproval.payerEmail ||
+        !process.env.ECHO_MP_SANDBOX_PAYER_EMAIL ||
+        preapproval.payerEmail.toLowerCase() !== process.env.ECHO_MP_SANDBOX_PAYER_EMAIL.toLowerCase() ||
         preapproval.amountArs === null ||
         Math.abs(preapproval.amountArs - Number(intent.amount_ars)) > 0.001) {
       res.status(409).json({ error: "MP_PROVIDER_SUBSCRIPTION_MISMATCH" }); return;
