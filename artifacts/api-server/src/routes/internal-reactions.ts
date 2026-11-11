@@ -27,6 +27,12 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
   const parsed = query.safeParse(req.query);
   if (!parsed.success) { res.status(400).json({error:'INVALID_INTERNAL_REACTIONS_QUERY'}); return; }
   try {
+    const [universe] = await db.select({state:echoUniversesTable.state,archivedAt:echoUniversesTable.archivedAt,deletedAt:echoUniversesTable.deletedAt})
+      .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
+    if (!universe || universe.archivedAt || universe.deletedAt) {res.status(404).json({error:'UNIVERSE_NOT_FOUND'});return;}
+    const state = universe.state as {posts?:Array<{id:string}>;stories?:Array<{id:string}>};
+    const exists = (parsed.data.surface==='post'?state.posts:state.stories)?.some(item=>item.id===parsed.data.contentId);
+    if (!exists) {res.status(404).json({error:'CONTENT_NOT_FOUND'});return;}
     const rows = await db.execute(sql`
       SELECT character_id, surface, content_id, mode, reaction_text, actually_viewed, generated_at
       FROM echo_internal_reactions
