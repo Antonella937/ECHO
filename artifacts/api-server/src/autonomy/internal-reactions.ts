@@ -48,6 +48,7 @@ export function shouldGenerateInternalReaction(
 }
 
 /** Narration is private; it must not imply a public action or invent knowledge. */
-export function internalReactionPrompt(surface: InternalReactionSurface, visibleCaption: string): string {
-  return `You just viewed this ${surface} in ECHO. Write a brief PRIVATE internal reaction in your established narrative voice: thoughts, feelings, or physical reaction, without forcing dialogue. You may feel indifferent, conflicted, amused or anything consistent with your personality. This is NOT a comment, like, DM or notification to the author. Do not claim knowledge of private facts, unseen media, or events not in the provided context. Do not write a public response. Visible caption: ${visibleCaption.slice(0, 1200)}`;
+export function internalReactionPrompt(surface: InternalReactionSurface, visibleCaption: string, mode: InternalReactionMode = 'automatic'): string {
+  const introduction = mode === 'manual' ? `Imagine encountering this ${surface} in your ECHO feed. This is a creator-requested hypothetical perspective, not evidence you actually viewed it.` : `You just viewed this ${surface} in ECHO.`;
+  return `${introduction} Write a brief PRIVATE internal reaction in your established narrative voice: thoughts, feelings, or physical reaction, without forcing dialogue. You may feel indifferent, conflicted, amused or anything consistent with your personality. This is NOT a comment, like, DM or notification to the author. Do not claim knowledge of private facts, unseen media, or events not in the provided context. Do not write a public response. Visible caption: ${visibleCaption.slice(0, 1200)}`;
 }
