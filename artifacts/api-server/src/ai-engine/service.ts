@@ -103,7 +103,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const scoped = buildCharacterContext(parsed.data.state, input, new Date(), vision, historical);
           const data = JSON.parse(scoped.serialized) as {
             recentSocial?: { posts?: Array<{ id?:string; author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
-              comments?: Array<{author?:{name?:string};text?:string;postId?:string}> }; historicalRecalled?: Array<{kind?:string;targetId?:string|null;text?:string}>;
+              comments?: Array<{author?:{name?:string};text?:string;postId?:string}> }; memory?: { historicalRecalled?: Array<{kind?:string;targetId?:string|null;text?:string}> };
           };
           const posts = (data.recentSocial?.posts ?? []).slice(-5).map(p =>
             `Post by ${(p.author?.name ?? 'Unknown').slice(0,60)}: ${(p.caption ?? '').slice(0,220)}${p.visionSummary ? ' | Image: '+p.visionSummary.slice(0,150):''}`);
@@ -140,7 +140,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             });
           // The shared context builder already ranks archived memories and
           // scopes private conversation memories to this exact DM recipient.
-          const memories = (data.historicalRecalled ?? []).slice(0,3)
+          const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
             .filter(m => m.kind !== 'conversation' || m.targetId === 'nela')
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
           socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
