@@ -168,6 +168,30 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     const decision = JSON.parse(result.text) as {text?:string};
     const reactionText = decision.text?.trim().slice(0,2000);
     if (!reactionText) {res.status(502).json({error:'EMPTY_INTERNAL_REACTION'});return;}
+    // Kindroid can take several seconds. Re-check the current universe before
+    // storing a thought about a post/story that may have changed or expired.
+    const [latestUniverse] = await db.select({
+      state:echoUniversesTable.state,
+      archivedAt:echoUniversesTable.archivedAt,
+      deletedAt:echoUniversesTable.deletedAt,
+    }).from(echoUniversesTable).where(and(
+      eq(echoUniversesTable.ownerId,req.userId!),
+      eq(echoUniversesTable.universeId,universeId),
+    )).limit(1);
+    const latestState = latestUniverse?.state as typeof state | undefined;
+    const latestContent = (surface==='post'?latestState?.posts:latestState?.stories)?.find(item=>item.id===contentId);
+    const latestCaption = latestContent
+      ? [latestContent.caption,latestContent.text,latestContent.content]
+          .filter((value):value is string=>typeof value==='string')
+          .map(value=>value.trim()).find(value=>value.length>0) ?? ''
+      : '';
+    if (!latestUniverse || latestUniverse.archivedAt || latestUniverse.deletedAt ||
+        !latestState?.characters?.some(character=>character.id===characterId&&!character.archived) ||
+        !latestContent || latestContent.authorId!==content.authorId || latestCaption!==caption ||
+        (surface==='story' && !storyIsStillVisible(latestState as Record<string,unknown>,
+          latestContent as Record<string,unknown>,Date.now()))) {
+      res.status(409).json({error:'INTERNAL_REACTION_CONTENT_CHANGED'});return;
+    }
     const inserted = await db.execute(sql`INSERT INTO echo_internal_reactions
       (owner_id,universe_id,character_id,surface,content_id,mode,reaction_text,actually_viewed)
       VALUES (${req.userId!},${universeId},${characterId},${surface},${contentId},'manual',${reactionText},${Boolean(viewed)})
