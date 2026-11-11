@@ -1,6 +1,6 @@
 import { useCharacterDetailsText } from '@/lib/character-details-translations';
 import { useRef, useState } from 'react';
-import { ImagePlus, X } from 'lucide-react';
+import { ChevronDown, ImagePlus, X } from 'lucide-react';
 import type { IdentityReference } from '@/domain/types';
 import { compressImage, uploadPrivateImage, useMediaResolver } from '@/lib/media';
 import { Area } from './ui';
