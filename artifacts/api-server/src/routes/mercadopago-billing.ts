@@ -11,7 +11,7 @@ import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 const router: IRouter = Router();
 
 const parseArsAmount = (value: string | undefined): number | null => {
-  if (!value || !/^[1-9]\d{0,8}(?:\.\\d{1,2})?$/.test(value)) return null;
+  if (!value || !/^[1-9]\d{0,8}(?:\.\d{1,2})?$/.test(value)) return null;
   const amount = Number(value);
   return Number.isFinite(amount) && amount > 0 ? amount : null;
 };
