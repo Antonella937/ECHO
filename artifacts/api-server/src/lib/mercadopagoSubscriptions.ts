@@ -81,7 +81,15 @@ export function buildMpPreapprovalPayload(input: {
   if (!Number.isFinite(input.amountArs) || input.amountArs <= 0) throw new Error("INVALID_MP_AMOUNT");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.payerEmail)) throw new Error("INVALID_MP_PAYER_EMAIL");
   const url = new URL(input.backUrl);
-  if (url.protocol !== "https:") throw new Error("INVALID_MP_BACK_URL");
+  if (url.protocol !== "https:" || url.username || url.password || url.hash ||
+      !url.hostname || url.hostname === "localhost" || url.hostname.endsWith(".localhost") ||
+      url.hostname.endsWith(".local") ||
+      /^\\d{1,3}(?:\\.\\d{1,3}){3}$/.test(url.hostname) ||
+      url.hostname.includes(":")) throw new Error("INVALID_MP_BACK_URL");
+  // The callback must be an explicitly configured ECHO URL, never a caller-selected redirect.
+  const configuredCallback = process.env.ECHO_MP_CALLBACK_URL;
+  if (configuredCallback && url.toString() !== new URL(configuredCallback).toString())
+    throw new Error("MP_BACK_URL_NOT_CONFIGURED");
   return {
     reason: `ECHO ${input.plan === "plus" ? "Plus" : "Premium"}`,
     external_reference: input.reference,
