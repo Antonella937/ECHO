@@ -95,3 +95,52 @@ export function buildMpPreapprovalPayload(input: {
     },
   };
 }
+
+/**
+ * Strictly test-only checkout transport. Not connected to any public route.
+ * Calling this function requires an explicit server-side sandbox opt-in;
+ * it must never accept a production credential or a browser-supplied token.
+ */
+export async function createMpSandboxPreapproval(input: {
+  reference: string;
+  plan: "plus" | "premium";
+  amountArs: number;
+  payerEmail: string;
+  backUrl: string;
+}, options: { sandboxEnabled: boolean; fetchImpl?: typeof fetch }): Promise<{ id: string; checkoutUrl: string; status: "pending" | "authorized" }> {
+  if (!options.sandboxEnabled || process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
+    throw new Error("MP_SANDBOX_CHECKOUT_DISABLED");
+  }
+  const payload = buildMpPreapprovalPayload(input);
+  const token = testToken();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await (options.fetchImpl ?? fetch)(`${MP_API}/preapproval`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": input.reference,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`MP_PROVIDER_HTTP_${response.status}`);
+    const data: unknown = await response.json();
+    if (!data || typeof data !== "object") throw new Error("INVALID_MP_RESPONSE");
+    const item = data as Record<string, unknown>;
+    if ((typeof item.id !== "string" && typeof item.id !== "number") ||
+      typeof item.init_point !== "string" || !["pending", "authorized"].includes(String(item.status)) ||
+      item.external_reference !== input.reference) throw new Error("INVALID_MP_RESPONSE");
+    const checkout = new URL(item.init_point);
+    if (checkout.protocol !== "https:" ||
+      !["mercadopago.com", "mercadopago.com.ar"].some(domain => checkout.hostname === domain || checkout.hostname.endsWith(`.${domain}`))) {
+      throw new Error("INVALID_MP_CHECKOUT_URL");
+    }
+    return { id: String(item.id), checkoutUrl: checkout.toString(), status: item.status as "pending" | "authorized" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
