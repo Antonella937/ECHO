@@ -84,7 +84,7 @@ export function buildMpPreapprovalPayload(input: {
   if (url.protocol !== "https:" || url.username || url.password || url.hash ||
       !url.hostname || url.hostname === "localhost" || url.hostname.endsWith(".localhost") ||
       url.hostname.endsWith(".local") ||
-      /^\\d{1,3}(?:\\.\\d{1,3}){3}$/.test(url.hostname) ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) ||
       url.hostname.includes(":")) throw new Error("INVALID_MP_BACK_URL");
   // The callback must be an explicitly configured ECHO URL, never a caller-selected redirect.
   const configuredCallback = process.env.ECHO_MP_CALLBACK_URL;
