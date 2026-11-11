@@ -42,6 +42,14 @@ const EMPTY: BasicForm = { name: '', handle: '', bio: '', avatar: 'asset:account
 export default function CharacterEditorPage() {
   const t = useCharacterEditorText();
   const language = useLanguage();
+  const [kindroidEligible, setKindroidEligible] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void customFetch<{eligible:boolean}>('/api/characters/kindroid-eligibility',{responseType:'json'})
+      .then(result => { if (active) setKindroidEligible(result.eligible === true); })
+      .catch(() => { if (active) setKindroidEligible(false); });
+    return () => { active = false; };
+  }, []);
   const [voiceEntitlements, setVoiceEntitlements] = useState<{basicVoices:boolean;customVoices:boolean}|null>(null);
   useEffect(() => {
     let active = true;
@@ -262,7 +270,7 @@ export default function CharacterEditorPage() {
             <BadgeCheck className="h-4 w-4" /> {t("Verificación y cifras visibles")}
           </button>
         )}
-        {account && <KindroidLinkPanel characterId={account.id} />}
+        {account && kindroidEligible && <KindroidLinkPanel characterId={account.id} />}
         {account && <AccountActions account={account} dirty={dirty} />}
         {account && <Link href={`/profile/${account.id}`} className="mt-4 grid h-11 place-items-center text-sm text-muted-foreground underline" data-testid="link-character-profile">{t("Ver perfil")}</Link>}
       </div>
