@@ -355,6 +355,11 @@ export default function GroupConversationPage() {
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={archived} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ archived: e.target.checked })} /> Archivar este grupo</label>
         <p className="mt-2 text-xs text-muted-foreground">Estas preferencias son individuales. Archivar no elimina los mensajes.</p>
       </div>
+      {group && group.createdBy !== me.id && !group.participantIds.includes(me.id) && <button type="button" disabled={savingSettings || !preferencesLoaded} onClick={async () => {
+        if (!window.confirm('¿Quitar esta escena de tus conversaciones? Se archivará solo para esta identidad; no se borrarán mensajes de los participantes.')) return;
+        await savePreferences({ archived: true });
+        navigate('/messages');
+      }} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">Quitar de mis conversaciones (espectador)</button>}
       {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">{gl("Salir del grupo")}</button>}
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
       {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">{gl("Estás viendo este grupo como espectadora. No sos participante.")}</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">{gl("Salir del modo espectadora")}</button></div>}
