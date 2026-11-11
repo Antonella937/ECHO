@@ -244,7 +244,7 @@ router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (r
         Math.abs(payment.amountArs - Number(intent.amount_ars)) > 0.001) {
       res.status(409).json({ error: "MP_PAYMENT_SUBSCRIPTION_MISMATCH" }); return;
     }
-    await pool.query(
+    const savedPayment = await pool.query(
       `INSERT INTO echo_mp_verified_payments
        (provider_payment_id,reference,provider_preapproval_id,provider_status,amount_ars,currency)
        VALUES($1,$2,$3,$4,$5,$6)
@@ -252,10 +252,14 @@ router.post("/billing/mercadopago/sandbox-verify-payment", requireAuth, async (r
        SET provider_status=EXCLUDED.provider_status,
            provider_verified_at=now()
        WHERE echo_mp_verified_payments.reference=EXCLUDED.reference
-         AND echo_mp_verified_payments.provider_preapproval_id=EXCLUDED.provider_preapproval_id`,
+         AND echo_mp_verified_payments.provider_preapproval_id=EXCLUDED.provider_preapproval_id
+       RETURNING provider_payment_id`,
       [payment.id, reference, intent.provider_preapproval_id,
        payment.status, payment.amountArs, payment.currency],
     );
+    if (savedPayment.rowCount !== 1) {
+      res.status(409).json({ error: "MP_PAYMENT_ALREADY_LINKED_ELSEWHERE" }); return;
+    }
     res.json({
       reference, paymentId: payment.id, paymentStatus: payment.status,
       providerVerified: true, entitlementChanged: false,
