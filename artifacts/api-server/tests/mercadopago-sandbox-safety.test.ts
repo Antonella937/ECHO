@@ -73,3 +73,35 @@ test("sandbox checkout rejects production credentials before network", async () 
     else process.env.ECHO_MP_ACCESS_TOKEN = oldToken;
   }
 });
+
+test("sandbox provider response must match reference and trusted checkout host", async () => {
+  const oldFlag = process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+  const oldToken = process.env.ECHO_MP_ACCESS_TOKEN;
+  process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED = "true";
+  process.env.ECHO_MP_ACCESS_TOKEN = "TEST-offline-fixture";
+  const provider = (payload: Record<string, unknown>) => (async (_url: string | URL | Request, init?: RequestInit) => {
+    assert.equal(init?.method, "POST");
+    assert.equal((init?.headers as Record<string, string>)["X-Idempotency-Key"], reference);
+    return { ok: true, json: async () => payload } as Response;
+  }) as typeof fetch;
+  try {
+    const accepted = await createMpSandboxPreapproval(valid, { sandboxEnabled: true, fetchImpl: provider({
+      id: "sandbox-123", init_point: "https://www.mercadopago.com.ar/checkout/test",
+      external_reference: reference, status: "pending",
+    }) });
+    assert.equal(accepted.id, "sandbox-123");
+    assert.equal(accepted.status, "pending");
+    for (const bad of [
+      { id: "sandbox-123", init_point: "https://evil.example/checkout", external_reference: reference, status: "pending" },
+      { id: "sandbox-123", init_point: "https://www.mercadopago.com.ar/checkout/test", external_reference: "another-reference", status: "pending" },
+      { id: "sandbox-123", init_point: "http://www.mercadopago.com.ar/checkout/test", external_reference: reference, status: "pending" },
+    ]) {
+      await assert.rejects(createMpSandboxPreapproval(valid, { sandboxEnabled: true, fetchImpl: provider(bad) }), /INVALID_MP_/);
+    }
+  } finally {
+    if (oldFlag === undefined) delete process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED;
+    else process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED = oldFlag;
+    if (oldToken === undefined) delete process.env.ECHO_MP_ACCESS_TOKEN;
+    else process.env.ECHO_MP_ACCESS_TOKEN = oldToken;
+  }
+});
