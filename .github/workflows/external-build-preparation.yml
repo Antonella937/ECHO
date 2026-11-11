@@ -25,6 +25,8 @@ jobs:
         run: pnpm --filter @workspace/echo run build
       - name: Build ECHO API
         run: pnpm --filter @workspace/api-server run build
+      - name: Validate API Docker image (no push or deploy)
+        run: docker build --file Dockerfile.echo-api --tag echo-api:build-check .
       - name: Save build outputs for inspection
         uses: actions/upload-artifact@v4
         with:
