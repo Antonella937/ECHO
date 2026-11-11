@@ -193,12 +193,47 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
           !canCharacterViewCloseFriendsStory(latestState,latestContent,characterId)))) {
       res.status(409).json({error:'INTERNAL_REACTION_CONTENT_CHANGED'});return;
     }
+    // Access may be revoked while the external model is responding. Do not
+    // persist the result if follows, blocks or privacy changed meanwhile.
+    const [latestFollows, latestBlocks, latestPrivacy] = await Promise.all([
+      readAcceptedCharacterFollows(req.userId!,universeId),
+      db.select({
+        blockerId:echoCharacterBlocksTable.blockerCharacterId,
+        blockedId:echoCharacterBlocksTable.blockedCharacterId,
+      }).from(echoCharacterBlocksTable).where(and(
+        eq(echoCharacterBlocksTable.blockerOwnerId,req.userId!),
+        eq(echoCharacterBlocksTable.blockerUniverseId,universeId),
+        eq(echoCharacterBlocksTable.blockedOwnerId,req.userId!),
+        eq(echoCharacterBlocksTable.blockedUniverseId,universeId),
+      )),
+      db.select({visibility:echoCharacterPrivacyTable.visibility})
+        .from(echoCharacterPrivacyTable).where(and(
+          eq(echoCharacterPrivacyTable.ownerId,req.userId!),
+          eq(echoCharacterPrivacyTable.universeId,universeId),
+          eq(echoCharacterPrivacyTable.characterId,content.authorId),
+        )).limit(1),
+    ]);
+    const stillFollowsAuthor = latestFollows.some(edge =>
+      edge.source.ownerId===req.userId && edge.source.universeId===universeId &&
+      edge.source.characterId===characterId && edge.target.ownerId===req.userId &&
+      edge.target.universeId===universeId && edge.target.characterId===content.authorId);
+    const reciprocalFollow = latestFollows.some(edge =>
+      edge.source.ownerId===req.userId && edge.source.universeId===universeId &&
+      edge.source.characterId===content.authorId && edge.target.ownerId===req.userId &&
+      edge.target.universeId===universeId && edge.target.characterId===characterId);
+    const nowBlocked = latestBlocks.some(block =>
+      (block.blockerId===characterId && block.blockedId===content.authorId) ||
+      (block.blockerId===content.authorId && block.blockedId===characterId));
+    if (!stillFollowsAuthor || nowBlocked ||
+        (latestPrivacy[0]?.visibility==='private' && !reciprocalFollow)) {
+      res.status(409).json({error:'INTERNAL_REACTION_ACCESS_CHANGED'});return;
+    }
     const inserted = await db.execute(sql`INSERT INTO echo_internal_reactions
       (owner_id,universe_id,character_id,surface,content_id,mode,reaction_text,actually_viewed)
       VALUES (${req.userId!},${universeId},${characterId},${surface},${contentId},'manual',${reactionText},${Boolean(viewed)})
       ON CONFLICT DO NOTHING RETURNING character_id,reaction_text,mode,actually_viewed,generated_at`);
     if (inserted.rows.length) {res.status(201).json({reaction:inserted.rows[0],cached:false});return;}
-    const winner = await db.execute(sql`SELECT reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
+    const winner = await db.execute(sql`SELECT character_id,reaction_text,mode,actually_viewed,generated_at FROM echo_internal_reactions
       WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
       AND surface=${surface} AND content_id=${contentId} LIMIT 1`);
     res.json({reaction:winner.rows[0],cached:true});
