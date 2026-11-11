@@ -7,6 +7,7 @@ import { ensureCreatorProfile } from "./lib/creatorProfileBootstrap";
 import { isAutonomyDmTyping } from "./autonomy/service";
 import { privateBetaSeats } from "./middlewares/privateBetaSeats";
 import { betaApplicationsRouter } from "./routes/beta-applications";
+import mercadoPagoWebhookRouter from "./routes/mercadopago-webhook";
 import { logger } from "./lib/logger";
 import {
   CLERK_PROXY_PATH,
@@ -107,6 +108,8 @@ const publicAccountGate: express.RequestHandler = (req, res, next) => {
 // Applications are accessible to authenticated users before beta admission.
 // Founder decisions are protected inside the router; all other API routes retain the seat gate.
 app.use("/api/beta", betaApplicationsRouter);
+// Provider callbacks must be reachable without a Clerk session; verify HMAC inside router.
+app.use("/api", mercadoPagoWebhookRouter);
 app.use("/api", accessMode === "public" ? publicAccountGate : betaSeatMode ? privateBetaSeats : betaAllowlistGate);
 
 // Register Creator Hub profiles on first use, without a database SELECT on every API request.
