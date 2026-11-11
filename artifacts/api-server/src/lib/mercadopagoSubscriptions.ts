@@ -197,6 +197,6 @@ export async function fetchMpSandboxPayment(
 export function matchesMpSandboxPayer(providerEmail: string | null, configuredEmail: string | undefined): boolean {
   if (!providerEmail || !configuredEmail) return false;
   const normalize = (value: string) => value.trim().toLowerCase();
-  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalize(providerEmail)) &&
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalize(providerEmail)) &&
     normalize(providerEmail) === normalize(configuredEmail);
 }
