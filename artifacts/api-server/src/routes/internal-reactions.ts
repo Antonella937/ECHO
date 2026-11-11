@@ -187,6 +187,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
       : '';
     if (!latestUniverse || latestUniverse.archivedAt || latestUniverse.deletedAt ||
         !latestState?.characters?.some(character=>character.id===characterId&&!character.archived) ||
+        !latestState?.characters?.some(character=>character.id===content.authorId&&!character.archived) ||
         !latestContent || latestContent.authorId!==content.authorId || latestCaption!==caption ||
         (surface==='story' && (!storyIsStillVisible(latestState as Record<string,unknown>,
           latestContent as Record<string,unknown>,Date.now()) ||
@@ -227,6 +228,14 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
     if (!stillFollowsAuthor || nowBlocked ||
         (latestPrivacy[0]?.visibility==='private' && !reciprocalFollow)) {
       res.status(409).json({error:'INTERNAL_REACTION_ACCESS_CHANGED'});return;
+    }
+    // Consent to share character context with Kindroid may be withdrawn while
+    // generation is in flight. Never retain the response after opt-out.
+    const currentLink = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId}
+        AND enabled=true AND social_context_enabled=true LIMIT 1`);
+    if (currentLink.rows[0]?.kin_id !== kinId) {
+      res.status(409).json({error:'KINDROID_SOCIAL_CONTEXT_CONSENT_CHANGED'});return;
     }
     const inserted = await db.execute(sql`INSERT INTO echo_internal_reactions
       (owner_id,universe_id,character_id,surface,content_id,mode,reaction_text,actually_viewed)
