@@ -22,10 +22,11 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
   const [error,setError] = useState('');
   const requestVersion = useRef(0);
   const pendingGeneration = useRef(false);
+  const [confirmGeneration,setConfirmGeneration] = useState(false);
   // The API validates accepted follows, blocks, and privacy. Avoid filtering
   // by legacy local follow arrays, which may be stale or incomplete.
   const eligible = state.characters.filter(c=>!c.archived && c.id!==authorId);
-  useEffect(()=>{requestVersion.current+=1;setOpen(false);setReactions([]);setSelected('');setError('');onOpenChange?.(false);},[contentId,surface,universeId]);
+  useEffect(()=>{requestVersion.current+=1;setOpen(false);setReactions([]);setSelected('');setError('');setConfirmGeneration(false);onOpenChange?.(false);},[contentId,surface,universeId]);
   if(userId!==FOUNDER_ID) return null;
   const payload={universeId,surface,contentId};
   const load=async()=>{
@@ -39,10 +40,10 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
     finally {if(version===requestVersion.current)setLoading(false);}
   };
   const generate=async()=>{
-    if(!selected || loading || pendingGeneration.current) return;
+    if(!selected || loading || pendingGeneration.current || !confirmGeneration) return;
     pendingGeneration.current=true;
     const version=++requestVersion.current;
-    setLoading(true);setError('');
+    setLoading(true);setError('');setConfirmGeneration(false);
     try {
       const response=await customFetch<{reaction:Reaction}>('/api/internal-reactions/manual',{
         method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
@@ -66,12 +67,13 @@ export function InternalThoughts({surface,contentId,authorId,onOpenChange}:Props
         <span className="block mt-1">{reaction.reaction_text}</span>
       </p>)}
       <div className="flex flex-wrap gap-2">
-        <select aria-label={es?'Elegir personaje':'Choose character'} className="min-w-0 flex-1 rounded-md border border-border bg-background p-2" value={selected} onChange={e=>setSelected(e.target.value)}>
+        <select aria-label={es?'Elegir personaje':'Choose character'} className="min-w-0 flex-1 rounded-md border border-border bg-background p-2" value={selected} onChange={e=>{setSelected(e.target.value);setConfirmGeneration(false);}}>
           <option value="">{es?'Elegí un personaje':'Choose a character'}</option>
           {eligible.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button type="button" disabled={!selected||loading||pendingGeneration.current} onClick={()=>void generate()} className="rounded-md border border-border px-3 py-2 disabled:opacity-50">{loading?'…':es?'Consultar':'Inspect'}</button>
+        <button type="button" disabled={!selected||!confirmGeneration||loading||pendingGeneration.current} onClick={()=>void generate()} className="rounded-md border border-border px-3 py-2 disabled:opacity-50">{loading?'…':es?'Consultar':'Inspect'}</button>
       </div>
+      <label className="mt-2 flex items-start gap-2 text-muted-foreground"><input type="checkbox" checked={confirmGeneration} disabled={!selected||loading||pendingGeneration.current} onChange={e=>setConfirmGeneration(e.target.checked)} className="mt-0.5" /><span>{es?'Confirmo que quiero solicitar un pensamiento privado. Si no está guardado, puede consumir una generación de Kindroid.':'I confirm this private thought request. If not cached, it may consume a Kindroid generation.'}</span></label>
       {error && <p role="alert" className="mt-2 text-destructive">{error}</p>}
     </div>}
   </section>;
