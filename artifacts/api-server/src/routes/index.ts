@@ -11,6 +11,7 @@ import universeRouter from "./universe";
 import universeSharingRouter from "./universe-sharing";
 import { createSupabaseStorageRouter } from "./supabase-storage";
 import charactersRouter from "./characters";
+import { kindroidLinksRouter } from "./kindroid-links";
 import aiEngineRouter from "./ai-engine";
 import basicVoiceRouter from "./basic-voice";
 import premiumVoiceRouter from "./premium-voice";
@@ -49,6 +50,7 @@ router.use(universeSharingRouter);
 // Supabase reports STORAGE_UNAVAILABLE when its credentials are missing.
 router.use(createSupabaseStorageRouter());
 router.use(charactersRouter);
+router.use(kindroidLinksRouter);
 router.use(aiEngineRouter);
 router.use(basicVoiceRouter);
 router.use(premiumVoiceRouter);
