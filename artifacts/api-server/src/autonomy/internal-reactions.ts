@@ -43,6 +43,8 @@ export function shouldGenerateInternalReaction(
       candidate.characterId === candidate.authorId || candidate.publiclyResponded) return false;
   if (mode === 'manual') return true;
   if (!candidate.autonomyEnabled) return false;
+  // Invalid probabilities must fail closed rather than trigger unexpected paid calls.
+  if (!Number.isFinite(automaticProbability)) return false;
   const probability = Math.max(0, Math.min(1, automaticProbability));
   return stableFraction(`${candidate.characterId}:${candidate.surface}:${candidate.contentId}:internal-reaction:v1`) < probability;
 }
