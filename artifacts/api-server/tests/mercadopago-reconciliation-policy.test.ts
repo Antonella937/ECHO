@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus } from "../src/lib/mercadopagoReconciliationPolicy";
+import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus, validateMpPaidPeriod } from "../src/lib/mercadopagoReconciliationPolicy";
 
 test("preapproval status transitions do not imply paid access", () => {
   assert.equal(nextMpSubscriptionStatus("draft", "authorized"), "authorized");
@@ -70,4 +70,22 @@ test("refunded and charged-back payment reversals cannot be undone by stale appr
   assert.equal(reconcileMpPaymentStatus("refunded", "charged_back"), "charged_back");
   assert.equal(reconcileMpPaymentStatus("charged_back", "approved"), "charged_back");
   assert.equal(reconcileMpPaymentStatus("pending", "approved"), "approved");
+});
+
+test("monthly entitlement periods require actual payment evidence and bounded dates", () => {
+  const now = new Date("2026-11-11T12:00:00Z");
+  const base = {
+    providerPaymentApproved: true,
+    paidAt: new Date("2026-11-11T10:00:00Z"),
+    periodStart: new Date("2026-11-11T00:00:00Z"),
+    periodEnd: new Date("2026-12-11T00:00:00Z"),
+  };
+  assert.equal(validateMpPaidPeriod(base, now).valid, true);
+  assert.equal(validateMpPaidPeriod({ ...base, providerPaymentApproved: false }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, paidAt: null }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodEnd: null }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodEnd: new Date("2026-11-10T00:00:00Z") }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodEnd: new Date("2027-11-11T00:00:00Z") }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, periodStart: new Date("2026-11-12T00:00:00Z") }, now).valid, false);
+  assert.equal(validateMpPaidPeriod({ ...base, paidAt: new Date("invalid") }, now).valid, false);
 });
