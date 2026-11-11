@@ -112,23 +112,36 @@ export default function SettingsPage() {
           </div></details>
         </section>
 
-        <AppearanceSection />
+        <SettingsAccordion title={st("Apariencia")} testId="settings-collapse-appearance">
+          <AppearanceSection />
+        </SettingsAccordion>
 
-        <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
+        <SettingsAccordion title={st("Generación de imágenes IA")} testId="settings-collapse-image-style">
+          <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
+        </SettingsAccordion>
 
-        <MessageSoundSettings />
+        <SettingsAccordion title={st("Sonidos de mensajes")} testId="settings-collapse-sounds">
+          <MessageSoundSettings />
+        </SettingsAccordion>
 
-        <MusicConnectionsSection />
+        <SettingsAccordion title={st("Conexiones de música")} testId="settings-collapse-music">
+          <MusicConnectionsSection />
+        </SettingsAccordion>
 
-        <PushNotificationSettings />
+        <SettingsAccordion title={st("Notificaciones")} testId="settings-collapse-notifications">
+          <PushNotificationSettings />
+        </SettingsAccordion>
 
+        <SettingsAccordion title={st("Ayuda y seguridad")} testId="settings-collapse-support">
         <section className="mt-9" aria-labelledby="support-h">
           <h2 id="support-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Ayuda y seguridad")}</h2>
           <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
             <Link href="/help" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">{st("Centro de ayuda · Reportar un problema")}</Link>
           </div>
         </section>
+        </SettingsAccordion>
 
+        <SettingsAccordion title={st("Almacenamiento")} testId="settings-collapse-storage">
         <section className="mt-9" aria-labelledby="storage-h">
           <h2 id="storage-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Almacenamiento")}</h2>
           <div className="mt-3 rounded-2xl border border-border p-4 text-[13px]">
@@ -156,11 +169,25 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+        </SettingsAccordion>
 
         <NelaEasterEgg />
       </div>
 
     </div>
+  );
+}
+
+/** Collapsed by default; content mounts normally when opened and keeps existing controls intact. */
+function SettingsAccordion({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+  return (
+    <details className="group mt-4 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid={testId}>
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-border px-3 pb-4">{children}</div>
+    </details>
   );
 }
 
