@@ -120,15 +120,15 @@ export default function SettingsPage() {
           <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
         </SettingsAccordion>
 
-        <SettingsAccordion title={st("Sonidos de mensajes")} testId="settings-collapse-sounds">
+        <SettingsAccordion title={({"es":"Sonidos de mensajes","en":"Message sounds","pt":"Sons de mensagens","fr":"Sons des messages","de":"Nachrichtentöne","it":"Suoni dei messaggi","ko":"메시지 소리","ja":"メッセージ音","zh":"消息提示音"} satisfies Record<Language, string>)[language]} testId="settings-collapse-sounds">
           <MessageSoundSettings />
         </SettingsAccordion>
 
-        <SettingsAccordion title={st("Conexiones de música")} testId="settings-collapse-music">
+        <SettingsAccordion title={({"es":"Conexiones de música","en":"Music connections","pt":"Conexões de música","fr":"Connexions musicales","de":"Musikverbindungen","it":"Connessioni musicali","ko":"음악 연결","ja":"音楽連携","zh":"音乐连接"} satisfies Record<Language, string>)[language]} testId="settings-collapse-music">
           <MusicConnectionsSection />
         </SettingsAccordion>
 
-        <SettingsAccordion title={st("Notificaciones")} testId="settings-collapse-notifications">
+        <SettingsAccordion title={({"es":"Notificaciones","en":"Notifications","pt":"Notificações","fr":"Notifications","de":"Benachrichtigungen","it":"Notifiche","ko":"알림","ja":"通知","zh":"通知"} satisfies Record<Language, string>)[language]} testId="settings-collapse-notifications">
           <PushNotificationSettings />
         </SettingsAccordion>
 
