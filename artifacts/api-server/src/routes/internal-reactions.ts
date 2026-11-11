@@ -47,8 +47,46 @@ internalReactionsRouter.get('/internal-reactions', requireAuth, async (req,res):
         AND content_id = ${parsed.data.contentId}
       ORDER BY generated_at DESC LIMIT 50
     `);
+    // Saved thoughts are not a bypass around subsequently revoked access.
+    // Re-evaluate each viewer against current follows, blocks, privacy and
+    // close-friends membership before exposing historical private text.
+    const [acceptedFollows, blocks, authorPrivacy, consentLinks] = await Promise.all([
+      readAcceptedCharacterFollows(req.userId!,parsed.data.universeId),
+      db.select({
+        blockerId:echoCharacterBlocksTable.blockerCharacterId,
+        blockedId:echoCharacterBlocksTable.blockedCharacterId,
+      }).from(echoCharacterBlocksTable).where(and(
+        eq(echoCharacterBlocksTable.blockerOwnerId,req.userId!),
+        eq(echoCharacterBlocksTable.blockerUniverseId,parsed.data.universeId),
+        eq(echoCharacterBlocksTable.blockedOwnerId,req.userId!),
+        eq(echoCharacterBlocksTable.blockedUniverseId,parsed.data.universeId),
+      )),
+      db.select({visibility:echoCharacterPrivacyTable.visibility})
+        .from(echoCharacterPrivacyTable).where(and(
+          eq(echoCharacterPrivacyTable.ownerId,req.userId!),
+          eq(echoCharacterPrivacyTable.universeId,parsed.data.universeId),
+          eq(echoCharacterPrivacyTable.characterId,content.authorId),
+        )).limit(1),
+      db.execute(sql`SELECT character_id FROM echo_kindroid_character_links
+        WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+          AND enabled=true AND social_context_enabled=true`),
+    ]);
     const activeIds = new Set(state.characters.filter(character=>!character.archived).map(character=>character.id));
-    res.json({reactions:rows.rows.filter(row=>typeof row.character_id==='string'&&activeIds.has(row.character_id))});
+    const consentIds = new Set(consentLinks.rows.map(row=>row.character_id));
+    const hasFollow = (sourceId:string,targetId:string) => acceptedFollows.some(edge =>
+      edge.source.ownerId===req.userId && edge.source.universeId===parsed.data.universeId &&
+      edge.source.characterId===sourceId && edge.target.ownerId===req.userId &&
+      edge.target.universeId===parsed.data.universeId && edge.target.characterId===targetId);
+    res.json({reactions:rows.rows.filter(row=>{
+      const viewerId = row.character_id;
+      if (typeof viewerId!=='string' || !activeIds.has(viewerId) || !consentIds.has(viewerId) ||
+          viewerId===content.authorId || !hasFollow(viewerId,content.authorId)) return false;
+      if (authorPrivacy[0]?.visibility==='private' && !hasFollow(content.authorId,viewerId)) return false;
+      if (blocks.some(block=>
+        (block.blockerId===viewerId && block.blockedId===content.authorId) ||
+        (block.blockerId===content.authorId && block.blockedId===viewerId))) return false;
+      return parsed.data.surface!=='story' || canCharacterViewCloseFriendsStory(state,content,viewerId);
+    })});
   } catch {
     res.status(503).json({error:'INTERNAL_REACTIONS_UNAVAILABLE'});
   }
