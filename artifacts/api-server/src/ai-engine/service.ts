@@ -85,7 +85,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       dependencies.liveDmReply === true && input.situation === 'dm' &&
       input.recipientId === 'nela') {
-    const links = await db.execute(sql`SELECT kin_id, social_context_enabled FROM echo_kindroid_character_links
+    const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
@@ -100,7 +100,21 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
           // Exclude private DMs and ECHO personality: Kindroid owns the character voice.
-          const scoped = buildCharacterContext(parsed.data.state, input, new Date(), vision, historical);
+          const resetAtRaw = links.rows[0]?.context_reset_at;
+          const resetAt = resetAtRaw ? new Date(String(resetAtRaw)).getTime() : 0;
+          const sinceReset = (createdAt: string | Date | undefined | null) =>
+            !!createdAt && new Date(createdAt).getTime() >= resetAt;
+          // For linked founder Kindroids, ECHO's pre-reset activity is not part of the new story.
+          // Keep Kindroid's own memories untouched and filter before building social context.
+          const freshState = {
+            ...parsed.data.state,
+            posts: parsed.data.state.posts.filter(p => sinceReset(p.createdAt)),
+            comments: parsed.data.state.comments.filter(c => sinceReset(c.createdAt)),
+            stories: parsed.data.state.stories.filter(st => sinceReset(st.createdAt)),
+            messages: parsed.data.state.messages.filter(m => sinceReset(m.createdAt)),
+          };
+          const freshHistorical = historical.filter(h => sinceReset(h.occurredAt));
+          const scoped = buildCharacterContext(freshState, input, new Date(), vision, freshHistorical);
           const data = JSON.parse(scoped.serialized) as {
             recentSocial?: { posts?: Array<{ id?:string; author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
               comments?: Array<{author?:{name?:string};text?:string;postId?:string}> }; memory?: { historicalRecalled?: Array<{kind?:string;targetId?:string|null;text?:string}> };
@@ -116,7 +130,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .filter(t => !['what','have','your','with','this','that','about','latest','post','posted','viste','publicacion','publicaste','sobre','esto','esta','para','como'].includes(t)));
           const visibleAuthorIds = new Set([input.characterId, ...(parsed.data.state.follows[input.characterId] ?? [])]);
           const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
-          const older = terms.size ? parsed.data.state.posts
+          const older = terms.size ? freshState.posts
             .filter(p => visibleAuthorIds.has(p.authorId) && !recentIds.has(p.id))
             .map(p => {
               const author = parsed.data.state.characters.find(ch => ch.id === p.authorId);
@@ -130,7 +144,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
           // Stories are only remembered if this actor actually viewed them.
           // Never infer story viewing from a follow alone.
-          const seenStories = parsed.data.state.stories
+          const seenStories = freshState.stories
             .filter(s => s.seenBy.includes(input.characterId) && s.authorId !== input.characterId)
             .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
             .slice(0,3)
