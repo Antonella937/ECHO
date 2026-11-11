@@ -1,0 +1,26 @@
+name: Kindroid privacy and DM regression tests
+
+on:
+  push:
+    paths:
+      - "artifacts/api-server/src/ai-engine/kindroid.ts"
+      - "artifacts/api-server/src/ai-engine/service.ts"
+      - "artifacts/api-server/src/lib/kindroidSocialPrivacy.ts"
+      - "artifacts/api-server/src/lib/storySharePolicy.ts"
+      - "artifacts/api-server/tests/kindroid-*.test.ts"
+      - ".github/workflows/kindroid-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  kindroid-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run Kindroid offline privacy and duplicate-send tests
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/kindroid-integration-offline.test.ts tests/kindroid-social-privacy-offline.test.ts
