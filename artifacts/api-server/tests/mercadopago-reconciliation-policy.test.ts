@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus, validateMpPaidPeriod } from "../src/lib/mercadopagoReconciliationPolicy";
+import { canActivatePaidMembership, evaluateMpSandboxPayment, nextMpSubscriptionStatus, reconcileMpPaymentStatus, validateMpPaidPeriod, planMpMembershipReconciliation } from "../src/lib/mercadopagoReconciliationPolicy";
 
 test("preapproval status transitions do not imply paid access", () => {
   assert.equal(nextMpSubscriptionStatus("draft", "authorized"), "authorized");
