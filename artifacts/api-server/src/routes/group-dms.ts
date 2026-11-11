@@ -39,7 +39,8 @@ router.get("/group-dms", async (req, res) => {
     FROM echo_group_conversations g LEFT JOIN echo_group_member_preferences p
       ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
     WHERE g.owner_id = ${req.userId!} AND g.universe_id = ${universeId}
-    AND (g.participant_ids ? ${actorId} OR g.scene_observer_enabled=true) ORDER BY g.updated_at DESC LIMIT 100`);
+    AND (g.participant_ids ? ${actorId} OR g.scene_observer_enabled=true)
+    AND COALESCE(p.deleted, false) = false ORDER BY g.updated_at DESC LIMIT 100`);
   res.json({ groups: result.rows.map(row => serializeGroup(row as Record<string, unknown>)) });
 });
 router.post("/group-dms", async (req, res) => {
@@ -374,6 +375,26 @@ router.get("/group-dms/:groupId/search", async (req, res) => {
   res.json({ messages: result.rows });
 });
 const preferencesBody = scope.extend({ muted: z.boolean().optional(), archived: z.boolean().optional() }).refine(v => v.muted !== undefined || v.archived !== undefined);
+// Hide a group/scene only for this identity. Never delete shared messages or other members' access.
+router.delete("/group-dms/:groupId/for-me", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const groupId = String(req.params.groupId);
+  try {
+    const result = await db.execute(sql`INSERT INTO echo_group_member_preferences
+      (owner_id, universe_id, group_id, actor_id, muted, archived, deleted)
+      SELECT g.owner_id, g.universe_id, g.id, ${actorId}, false, false, true
+      FROM echo_group_conversations g
+      WHERE g.owner_id=${req.userId!} AND g.universe_id=${universeId} AND g.id=${groupId}
+        AND (g.participant_ids ? ${actorId} OR g.scene_observer_enabled=true)
+      ON CONFLICT (owner_id, universe_id, group_id, actor_id)
+      DO UPDATE SET deleted=true, updated_at=now() RETURNING group_id`);
+    if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+    res.json({ deletedForMe: true });
+  } catch { res.status(503).json({ error: "GROUP_HIDE_FAILED" }); }
+});
 router.get("/group-dms/:groupId/preferences", async (req, res) => {
   const parsed = scope.safeParse(req.query);
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
