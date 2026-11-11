@@ -9,11 +9,22 @@ if (!Number.isInteger(configuredSeatLimit) || configuredSeatLimit < 1 || configu
   throw new Error("ECHO_BETA_MAX_SEATS must be an integer from 1 to 50");
 }
 
+// Optional invitation allowlist. When configured, only explicitly invited Clerk IDs can claim seats.
+const invitedIdsRaw = process.env.ECHO_BETA_INVITED_USER_IDS?.trim() ?? "";
+const invitedIds = new Set(invitedIdsRaw.split(",").map(id => id.trim()).filter(Boolean));
+if (invitedIdsRaw && (invitedIds.size > configuredSeatLimit ||
+  [...invitedIds].some(id => !/^user_[A-Za-z0-9]+$/.test(id)))) {
+  throw new Error("ECHO_BETA_INVITED_USER_IDS must contain valid unique Clerk IDs within the seat limit");
+}
+
 export const privateBetaSeats: RequestHandler = async (req, res, next) => {
   if (req.path === "/healthz") return next();
   res.setHeader("Cache-Control", "private, no-store");
   const ownerId = getAuth(req).userId;
   if (!ownerId) { res.status(401).json({ error: "Authentication required" }); return; }
+  if (invitedIdsRaw && !invitedIds.has(ownerId)) {
+    res.status(403).json({ error: "PRIVATE_BETA_INVITATION_REQUIRED" }); return;
+  }
   try {
     const admitted = await db.transaction(async tx => {
       // The same transaction-level lock serializes all seat claims, even across servers.
