@@ -105,3 +105,45 @@ export function validateMpPaidPeriod(input: {
     return { valid: false, reason: "PERIOD_EXCEEDS_MONTHLY_INTERVAL" };
   return { valid: true, reason: "VERIFIED_PERIOD" };
 }
+
+/**
+ * Plan for a membership mutation, but do not execute one.
+ * The caller must prove the installment, its ownership and paid period first.
+ */
+export function planMpMembershipReconciliation(input: {
+  plan: "plus" | "premium";
+  subscriptionStatus: MpSubscriptionStatus;
+  providerPreapprovalId: string;
+  expectedAmountArs: number;
+  payment: {
+    status: "approved" | "pending" | "rejected" | "refunded" | "charged_back" | "unknown";
+    subscriptionId: string | null;
+    amountArs: number | null;
+    currency: string | null;
+  };
+  paidAt: Date | null;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+}, now: Date = new Date()): {
+  action: "eligible_for_activation" | "hold";
+  plan: "plus" | "premium" | null;
+  periodEnd: Date | null;
+  reason: string;
+} {
+  const payment = evaluateMpSandboxPayment({
+    subscriptionStatus: input.subscriptionStatus,
+    providerPreapprovalId: input.providerPreapprovalId,
+    expectedAmountArs: input.expectedAmountArs,
+    payment: input.payment,
+    periodEnd: input.periodEnd,
+  }, now);
+  if (!payment.eligible) return { action: "hold", plan: null, periodEnd: null, reason: payment.reason };
+  const period = validateMpPaidPeriod({
+    paidAt: input.paidAt,
+    periodStart: input.periodStart,
+    periodEnd: input.periodEnd,
+    providerPaymentApproved: input.payment.status === "approved",
+  }, now);
+  if (!period.valid) return { action: "hold", plan: null, periodEnd: null, reason: period.reason };
+  return { action: "eligible_for_activation", plan: input.plan, periodEnd: input.periodEnd, reason: "VERIFIED_PAYMENT_AND_PERIOD" };
+}
