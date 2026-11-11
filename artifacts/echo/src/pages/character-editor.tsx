@@ -26,6 +26,7 @@ import { SocialSection } from '@/components/characters/social-section';
 import { MemorySection } from '@/components/characters/memory-section';
 import { StateSection } from '@/components/characters/state-section';
 import { AssistedPanel } from '@/components/characters/assisted-panel';
+import { KindroidLinkPanel } from '@/components/characters/kindroid-link-panel';
 import { AccountActions } from '@/components/characters/account-actions';
 import { Area, NumberInput, Text, type SetCfg } from '@/components/characters/ui';
 
@@ -261,6 +262,7 @@ export default function CharacterEditorPage() {
             <BadgeCheck className="h-4 w-4" /> {t("Verificación y cifras visibles")}
           </button>
         )}
+        {account && <KindroidLinkPanel characterId={account.id} />}
         {account && <AccountActions account={account} dirty={dirty} />}
         {account && <Link href={`/profile/${account.id}`} className="mt-4 grid h-11 place-items-center text-sm text-muted-foreground underline" data-testid="link-character-profile">{t("Ver perfil")}</Link>}
       </div>
