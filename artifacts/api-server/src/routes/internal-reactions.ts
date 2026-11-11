@@ -125,7 +125,7 @@ internalReactionsRouter.post('/internal-reactions/manual', requireAuth, async (r
         AND enabled=true AND social_context_enabled=true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
     if (typeof kinId!=='string') {res.status(409).json({error:'KINDROID_SOCIAL_CONTEXT_NOT_ENABLED'});return;}
-    const prompt = internalReactionPrompt(surface,content.caption??'');
+    const prompt = internalReactionPrompt(surface,content.caption??'','manual');
     const result = await kindroidDmProvider(prompt,kinId,'',fetch,'dm').complete({
       system:'Private internal narration only',context:'',outputSchema:{},conversationMode:'narrative',
     });
