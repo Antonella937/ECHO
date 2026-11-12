@@ -26,9 +26,10 @@ export function UniverseManagementForm({ universe, action, busy, cancel, submit 
       <Field id="universe-edit-name" label={t("Nombre del universo")}>
         <input id="universe-edit-name" className={inputCls} value={name} maxLength={60} required disabled={busy} onChange={event => setName(event.target.value)} />
       </Field>
-      <Field id="universe-edit-description" label={t("Descripción")}>
+      <Field id="universe-edit-description" label={t("Contexto del universo (historia, ambientación y reglas)")}>
         <textarea id="universe-edit-description" className={`${inputCls} min-h-24 py-3`} value={description} maxLength={500} disabled={busy} onChange={event => setDescription(event.target.value)} />
       </Field>
+      <p className="mt-1 text-xs text-muted-foreground">{t("Este contexto orienta a los personajes del universo. Cada personaje conserva sus propios conocimientos, recuerdos y personalidad. Máximo 500 caracteres por ahora.")}</p>
     </> : <p className="mb-4 break-words text-sm text-muted-foreground">
       {action === 'delete'
         ? t('Eliminar «{name}» es irreversible. Perderás sus personajes, publicaciones, Stories, mensajes y memoria. Los demás universos no se eliminarán.', { name: universe.name })
