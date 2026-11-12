@@ -26,7 +26,7 @@ async function ownedWorld(ownerId: string, universeId: string) {
 }
 function validCharacters(state: { characters?: Array<{id?:string;archived?:boolean}> } | undefined, ids: string[]) {
   const allowed = new Set((state?.characters ?? []).filter(c => !c.archived).map(c => c.id));
-  return ids.every(id => allowed.has(id));
+  return ids.length === new Set(ids).size && ids.every(id => allowed.has(id));
 }
 function journalAudienceIsValid(entry: z.infer<typeof entrySchema>) {
   return (entry.knowledgeScope !== 'selected' || entry.knownCharacterIds.length > 0)
