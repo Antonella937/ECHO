@@ -131,7 +131,7 @@ router.get("/universe/:universeId/journals/knowledge/:characterId",async(req,res
   if(!world||!validCharacters(world.state,[characterId])){res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;}
   const r=await db.execute(sql`SELECT id,title,content,truth_status,keywords FROM echo_world_journals
     WHERE owner_id=${req.userId!} AND universe_id=${p.data.universeId}
-    AND status='published' AND (knowledge_scope='everyone'
+    AND status='published' AND ((knowledge_scope='everyone' AND category <> 'secret')
       OR (knowledge_scope='selected' AND ${characterId}=ANY(known_character_ids)))
     ORDER BY updated_at DESC LIMIT 100`);
   res.setHeader("Cache-Control","private, no-store");res.json({entries:r.rows});
