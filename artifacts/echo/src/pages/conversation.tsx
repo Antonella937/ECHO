@@ -51,7 +51,17 @@ export default function ConversationPage() {
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
   const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
   const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
-  useEffect(()=>setAppearance(readDmAppearance(appearanceKey)),[appearanceKey]);
+  useEffect(()=>{
+    setAppearance(readDmAppearance(appearanceKey));
+    if(!user?.id || !id)return;
+    let active=true;
+    customFetch<{appearance:typeof appearance}>(`/api/dm/appearance?${new URLSearchParams({universeId:getActiveUniverseId(user.id),characterId:id})}`,
+      {method:'GET',responseType:'json',cache:'no-store'})
+      .then(result=>{if(active&&result.appearance){setAppearance(result.appearance);
+        try{localStorage.setItem(appearanceKey,JSON.stringify(result.appearance));}catch{/* optional cache */}
+      }}).catch(()=>{/* use cached appearance while offline */});
+    return()=>{active=false;};
+  },[appearanceKey,user?.id,id]);
   const { me, character, actions, state } = useSocial();
   const other = character(id);
   const messages = useThreadMessages(id);
