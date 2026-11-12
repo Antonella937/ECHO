@@ -13,13 +13,14 @@ export async function checkWorldJournalAfterDm(ownerId:string, universeId:string
   const key=ownerId+':'+universeId+':'+threadId;
   if(inFlight.has(key)) return;
   const active=new Set(characters.filter(c=>!c.archived).map(c=>c.id));
-  const thread=messages.filter(m=>m.threadId===threadId && active.has(m.senderId) &&
+  const allThread=messages.filter(m=>m.threadId===threadId && active.has(m.senderId) &&
     active.has(m.recipientId) && m.senderId!==m.recipientId &&
-    m.text.trim().length>0 && (!m.hiddenForIds || m.hiddenForIds.length===0)).slice(-20);
+    m.text.trim().length>0 && (!m.hiddenForIds || m.hiddenForIds.length===0));
+  const thread=allThread.slice(-20);
   // Wait for a substantial conversation before spending any model quota.
   if(thread.length<8) return;
   const last=thread[thread.length-1];
-  if(!last || thread.length%4!==0) return;
+  if(!last || allThread.length%4!==0) return;
   inFlight.add(key);
   try {
     const recent=await db.execute(sql`SELECT id FROM echo_world_journals
