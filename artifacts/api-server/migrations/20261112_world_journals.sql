@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS echo_world_journals (
  created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now(),
  CONSTRAINT journal_secret_not_public CHECK (category <> 'secret' OR knowledge_scope <> 'everyone'),
+ CONSTRAINT journal_audience_consistent CHECK (
+   (knowledge_scope = 'selected' AND cardinality(known_character_ids) > 0)
+   OR (knowledge_scope IN ('everyone','nobody') AND cardinality(known_character_ids) = 0)
+ ),
  CONSTRAINT journal_published_requires_approval CHECK (status <> 'published' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS idx_echo_world_journals_universe_status ON echo_world_journals(owner_id,universe_id,status);
