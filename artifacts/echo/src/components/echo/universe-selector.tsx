@@ -25,6 +25,7 @@ export function UniverseSelector() {
   const [name, setName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
+  const [universeContext, setUniverseContext] = useState('');
   const ownerId = user?.id ?? '';
   const activeId = ownerId ? getActiveUniverseId(ownerId) : 'primary';
   const enabled = open && Boolean(isSignedIn);
@@ -78,7 +79,7 @@ export function UniverseSelector() {
     <>
       <button type="button" className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-left"
         data-testid="button-universe-selector"
-        onClick={() => { setManagement(null); setCreating(false); setError(null); setName(''); setDisplayName(''); setUsername(''); setOpen(true); }}>
+        onClick={() => { setManagement(null); setCreating(false); setError(null); setName(''); setDisplayName(''); setUsername(''); setUniverseContext(''); setOpen(true); }}>
         <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">{t("Universos")}</span>
@@ -163,6 +164,7 @@ export function UniverseSelector() {
             void run(async () => {
               if (!capacity || !hasCapacity) throw new Error(t('No hay capacidad disponible.'));
               const data = newUniverseInput({ plan: capacity.plan === 'free' ? 'free' : 'creator', universeName: name, displayName, username, bio: '' });
+              if (data.state.creatorSetup) data.state.creatorSetup.universeDescription = universeContext.trim();
               await actions.retrySync();
               if (ownerRef.current !== ownerId) throw new Error('La sesión cambió.');
               const created = await create.mutateAsync({ data });
@@ -178,6 +180,9 @@ export function UniverseSelector() {
             </Field>
             <Field id="new-universe-username" label={t("Usuario del personaje")}>
               <input id="new-universe-username" className={inputCls} value={username} maxLength={31} required disabled={busy} autoCapitalize="none" autoCorrect="off" onChange={e => setUsername(e.target.value)} />
+            </Field>
+            <Field id="new-universe-context" label={t("Contexto del universo (opcional)")}>
+              <textarea id="new-universe-context" className={`${inputCls} min-h-28 py-3`} value={universeContext} maxLength={500} disabled={busy} onChange={e => setUniverseContext(e.target.value)} placeholder={t("Historia, ambientación, reglas y situación actual del mundo…")} />
             </Field>
             <div className="mt-5 flex gap-2">
               <button type="button" className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-semibold" disabled={busy} onClick={() => setCreating(false)}>{t("Volver")}</button>
