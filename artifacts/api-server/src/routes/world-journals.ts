@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { validJournalAudience } from "../lib/worldJournalAudience";
+import { suggestWorldJournal } from "../lib/worldJournalProposal";
 
 const router: IRouter = Router();
 router.use("/universe/:universeId/journals", requireAuth);
@@ -142,6 +143,22 @@ router.post("/universe/:universeId/journals/:journalId/archive",async(req,res):P
     AND universe_id=${p.data.universeId} RETURNING id,status`);
   if(!r.rows.length){res.status(404).json({error:"JOURNAL_NOT_FOUND"});return;}
   res.json(r.rows[0]);
+});
+// Owner-triggered extraction uses free models and never persists or publishes by itself.
+router.post("/universe/:universeId/journals/suggest",async(req,res):Promise<void>=>{
+  const p=invalid(req);
+  const body=z.object({excerpt:z.string().trim().min(20).max(6000)}).strict().safeParse(req.body);
+  if(!p.success||!body.success){res.status(400).json({error:"INVALID_EXCERPT"});return;}
+  const world=await ownedWorld(req.userId!,p.data.universeId);
+  if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
+  const characters=world.state.characters.filter(c=>!c.archived && c.id).map(c=>({id:c.id!,name:c.id!}));
+  try{
+    const candidate=await suggestWorldJournal(body.data.excerpt,characters);
+    res.setHeader("Cache-Control","private, no-store");
+    res.json({candidate});
+  }catch{
+    res.status(503).json({error:"JOURNAL_SUGGESTION_UNAVAILABLE"});
+  }
 });
 // A proposal is only a draft. The AI may suggest text, but never approve or publish it.
 router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<void>=>{
