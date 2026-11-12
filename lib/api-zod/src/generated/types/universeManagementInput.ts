@@ -16,7 +16,7 @@ export interface UniverseManagementInput {
      * @maxLength 60
      */
   name?: string;
-  /** @maxLength 500 */
+  /** @maxLength 8000 */
   description?: string;
   /** @maxLength 80 */
   confirmationText?: string;
