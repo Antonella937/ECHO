@@ -329,7 +329,7 @@ export default function ConversationPage() {
         <ul className="flex flex-col gap-1.5">
           {messages.map((m, i) => (
             <Bubble
-              key={m.id} m={m} mine={m.senderId === me.id} meId={me.id} otherId={other.id}
+              key={m.id} m={m} layout={appearance.layout??'chat'} mine={m.senderId === me.id} meId={me.id} otherId={other.id}
               showTime={i === 0 || new Date(m.createdAt).getTime() - new Date(messages[i - 1].createdAt).getTime() > 3 * 3600_000}
               state={state} quoted={m.quoteMessageId ? byId.get(m.quoteMessageId) ?? null : undefined}
               names={{ [me.id]: t('Tú'), [other.id]: other.name.split(' ')[0] }}
@@ -541,8 +541,8 @@ function summarize(m: Message, t: (key: string) => string): string {
   return t('Mensaje');
 }
 
-function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
-  m: Message; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
+function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
+  m: Message; layout: 'chat' | 'narrative'; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
   onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
@@ -661,7 +661,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
         {visibleText && (
           <p
             className={cn(
-              'min-w-0 max-w-[92%] sm:max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
+              'min-w-0 max-w-[92%] sm:max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] px-4 py-2.5 text-[15px] leading-snug', layout==='narrative'?'rounded-lg border-l-2 border-primary/60 bg-card/90 italic leading-relaxed backdrop-blur-md':'rounded-[22px]',
               mine ? 'rounded-br-md bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/40' : 'rounded-bl-md bg-card text-card-foreground shadow-lg ring-1 ring-border',
             )}
           >
