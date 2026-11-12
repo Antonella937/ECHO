@@ -101,6 +101,54 @@ router.get("/group-dms/:groupId/canon-candidates", async (req, res) => {
     res.json({ candidates: privateConversationCandidates([...messages.rows].reverse(), members.filter((x): x is string => typeof x === "string")) });
   } catch { res.status(503).json({ error: "GROUP_CANON_CANDIDATES_UNAVAILABLE" }); }
 });
+const groupCanonDecision = scope.extend({
+  messageId: id, action: z.enum(["approve","dismiss"]),
+  text: z.string().trim().min(1).max(1200).optional(),
+}).strict();
+router.post("/group-dms/:groupId/canon-candidates/decision", async (req, res) => {
+  const groupId = id.safeParse(req.params.groupId);
+  const input = groupCanonDecision.safeParse(req.body);
+  if (!groupId.success || !input.success) { res.status(400).json({error:"INVALID_CANON_DECISION"}); return; }
+  const { universeId, actorId, messageId, action, text } = input.data;
+  try {
+    const result = await db.transaction(async tx => {
+      const [universe] = await tx.select().from(echoUniversesTable)
+        .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId)))
+        .for("update").limit(1);
+      if (!universe || universe.archivedAt || universe.deletedAt) return {status:404,error:"UNIVERSE_NOT_FOUND"};
+      const state = universe.state;
+      if (state.currentCharacterId !== actorId) return {status:403,error:"GROUP_VIEWER_IDENTITY_MISMATCH"};
+      const groups = await tx.execute(sql`SELECT participant_ids AS "participantIds" FROM echo_group_conversations
+        WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId.data}
+        AND participant_ids ? ${actorId} LIMIT 1`);
+      const members = groups.rows[0]?.participantIds;
+      if (!Array.isArray(members) || !members.includes(actorId)) return {status:404,error:"GROUP_NOT_FOUND"};
+      const rows = await tx.execute(sql`SELECT id,sender_id AS "senderId",body AS text,created_at AS "createdAt"
+        FROM echo_group_messages WHERE owner_id=${req.userId!} AND universe_id=${universeId}
+        AND group_id=${groupId.data} AND id=${messageId} LIMIT 1`);
+      const candidate = privateConversationCandidates(rows.rows as Array<Record<string,unknown>>,members.filter((x):x is string=>typeof x==="string"))[0];
+      if (!candidate || candidate.sourceId !== messageId) return {status:404,error:"CANON_CANDIDATE_NOT_FOUND"};
+      const setup = (state.creatorSetup ?? {}) as Record<string,unknown>;
+      const entries = Array.isArray(setup.canonKnowledgeEvents) ? setup.canonKnowledgeEvents : [];
+      const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds : [];
+      const key = `group:${groupId.data}:${messageId}`;
+      if (dismissed.includes(key) || entries.some(row=>row && typeof row==="object" && (row as Record<string,unknown>).sourceKey===key))
+        return {status:200,duplicate:true};
+      const nextSetup = action==="dismiss"
+        ? {...setup,dismissedCanonEventIds:[...dismissed.slice(-999),key]}
+        : {...setup,canonKnowledgeEvents:[...entries.slice(-199),{
+          sourceKey:key,text:text??candidate.text,visibility:"participants",
+          witnessIds:candidate.witnessIds,occurredAt:candidate.occurredAt,
+        }]};
+      await tx.update(echoUniversesTable).set({
+        state:{...state,creatorSetup:nextSetup},revision:sql`${echoUniversesTable.revision} + 1`,updatedAt:new Date(),
+      }).where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId)));
+      return {status:200,saved:true};
+    });
+    if ("error" in result) {res.status(result.status).json({error:result.error});return;}
+    res.json(result);
+  } catch {res.status(503).json({error:"GROUP_CANON_DECISION_UNAVAILABLE"});}
+});
 router.post("/group-dms/:groupId/messages", async (req, res) => {
   const parsed = sendBody.safeParse(req.body);
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_MESSAGE" }); return; }
