@@ -36,7 +36,7 @@ export async function checkWorldJournalAfterDm(ownerId:string, universeId:string
        knowledge_scope,known_character_ids,source_type,source_reference,created_by,status)
       VALUES (${ownerId},${universeId},${candidate.title},${candidate.content},
        ${candidate.category},${candidate.truthStatus},
-       ARRAY[${sql.join(candidate.keywords.map(k=>sql`${k}`),sql`,`)}]::text[],
+       ${candidate.keywords.length ? sql`ARRAY[${sql.join(candidate.keywords.map(k=>sql`${k}`),sql`,`)}]::text[]` : sql`ARRAY[]::text[]`},
        'nobody',ARRAY[]::text[],'ai_suggestion',${'dm:'+threadId+':'+last.id},
        ${ownerId},'draft')`);
   } catch(error) {
