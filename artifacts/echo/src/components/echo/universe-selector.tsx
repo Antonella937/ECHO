@@ -1,3 +1,4 @@
+import { UniverseLoreSections } from './universe-lore-sections';
 import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Check, ChevronRight, Layers, Plus } from 'lucide-react';
@@ -185,9 +186,7 @@ export function UniverseSelector() {
             <Field id="new-universe-username" label={t("Usuario del personaje")}>
               <input id="new-universe-username" className={inputCls} value={username} maxLength={31} required disabled={busy} autoCapitalize="none" autoCorrect="off" onChange={e => setUsername(e.target.value)} />
             </Field>
-            <Field id="new-universe-context" label={t("Contexto del universo (opcional)")}>
-              <textarea id="new-universe-context" className={`${inputCls} min-h-28 py-3`} value={universeContext} maxLength={8000} disabled={busy} onChange={e => setUniverseContext(e.target.value)} placeholder={t("Historia, ambientación, reglas y situación actual del mundo…")} />
-            </Field>
+            <UniverseLoreSections prefix="new-universe-lore" value={universeContext} onChange={setUniverseContext} disabled={busy} />
             <Field id="new-universe-timeline" label={t("Cronología inicial (opcional)")}>
               <textarea id="new-universe-timeline" className={`${inputCls} min-h-24 py-3`} value={universeTimeline} maxLength={4000} disabled={busy} onChange={e => setUniverseTimeline(e.target.value)} placeholder={t("Acontecimientos anteriores al comienzo de la historia…")} />
             </Field>
