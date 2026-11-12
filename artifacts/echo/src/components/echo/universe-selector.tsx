@@ -26,6 +26,7 @@ export function UniverseSelector() {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [universeContext, setUniverseContext] = useState('');
+  const [universeTimeline, setUniverseTimeline] = useState('');
   const ownerId = user?.id ?? '';
   const activeId = ownerId ? getActiveUniverseId(ownerId) : 'primary';
   const enabled = open && Boolean(isSignedIn);
@@ -79,7 +80,7 @@ export function UniverseSelector() {
     <>
       <button type="button" className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-left"
         data-testid="button-universe-selector"
-        onClick={() => { setManagement(null); setCreating(false); setError(null); setName(''); setDisplayName(''); setUsername(''); setUniverseContext(''); setOpen(true); }}>
+        onClick={() => { setManagement(null); setCreating(false); setError(null); setName(''); setDisplayName(''); setUsername(''); setUniverseContext(''); setUniverseTimeline(''); setOpen(true); }}>
         <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">{t("Universos")}</span>
@@ -164,7 +165,10 @@ export function UniverseSelector() {
             void run(async () => {
               if (!capacity || !hasCapacity) throw new Error(t('No hay capacidad disponible.'));
               const data = newUniverseInput({ plan: capacity.plan === 'free' ? 'free' : 'creator', universeName: name, displayName, username, bio: '' });
-              if (data.state.creatorSetup) data.state.creatorSetup.universeDescription = universeContext.trim();
+              if (data.state.creatorSetup) {
+                data.state.creatorSetup.universeDescription = universeContext.trim();
+                data.state.creatorSetup.universeTimeline = universeTimeline.trim();
+              }
               await actions.retrySync();
               if (ownerRef.current !== ownerId) throw new Error('La sesión cambió.');
               const created = await create.mutateAsync({ data });
@@ -183,6 +187,9 @@ export function UniverseSelector() {
             </Field>
             <Field id="new-universe-context" label={t("Contexto del universo (opcional)")}>
               <textarea id="new-universe-context" className={`${inputCls} min-h-28 py-3`} value={universeContext} maxLength={8000} disabled={busy} onChange={e => setUniverseContext(e.target.value)} placeholder={t("Historia, ambientación, reglas y situación actual del mundo…")} />
+            </Field>
+            <Field id="new-universe-timeline" label={t("Cronología inicial (opcional)")}>
+              <textarea id="new-universe-timeline" className={`${inputCls} min-h-24 py-3`} value={universeTimeline} maxLength={4000} disabled={busy} onChange={e => setUniverseTimeline(e.target.value)} placeholder={t("Acontecimientos anteriores al comienzo de la historia…")} />
             </Field>
             <div className="mt-5 flex gap-2">
               <button type="button" className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-semibold" disabled={busy} onClick={() => setCreating(false)}>{t("Volver")}</button>
