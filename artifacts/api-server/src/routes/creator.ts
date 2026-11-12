@@ -1,8 +1,8 @@
 import { dmCanonCandidates } from "../lib/canon-knowledge";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
-import { db, echoMediaTable } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { ECHO_CREDIT_POLICY, resolveEchoPlan } from "../lib/entitlements";
@@ -244,6 +244,59 @@ router.get("/creator/universes/:universeId/dm-canon-candidates/:peerId", async (
     const messages = Array.isArray(state.messages) ? state.messages : [];
     res.json({ candidates: dmCanonCandidates(messages, viewerId, peerId.data) });
   } catch { res.status(503).json({ error: "DM_CANON_CANDIDATES_UNAVAILABLE" }); }
+});
+
+
+const dmCanonAction = z.object({
+  text: z.string().trim().min(1).max(1200).optional(),
+  action: z.enum(["approve","dismiss"]),
+}).strict();
+router.post("/creator/universes/:universeId/dm-canon-candidates/:peerId/:messageId/decision", async (req, res) => {
+  const universeId = z.string().min(1).max(120).safeParse(req.params.universeId);
+  const peerId = z.string().min(1).max(120).safeParse(req.params.peerId);
+  const messageId = z.string().min(1).max(120).safeParse(req.params.messageId);
+  const decision = dmCanonAction.safeParse(req.body);
+  if (!universeId.success || !peerId.success || !messageId.success || !decision.success) {
+    res.status(400).json({ error: "INVALID_CANON_DECISION" }); return;
+  }
+  try {
+    const result = await db.transaction(async tx => {
+      const [universe] = await tx.select().from(echoUniversesTable)
+        .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId.data)))
+        .for("update").limit(1);
+      if (!universe || universe.archivedAt || universe.deletedAt) return { status: 404, error: "UNIVERSE_NOT_FOUND" };
+      const state = universe.state;
+      const viewerId = state.currentCharacterId;
+      if (!viewerId || viewerId === peerId.data ||
+        !state.characters.some(ch => ch.id === viewerId && !ch.archived) ||
+        !state.characters.some(ch => ch.id === peerId.data && !ch.archived)) {
+        return { status: 403, error: "DM_VIEWER_NOT_ALLOWED" };
+      }
+      const candidate = dmCanonCandidates(state.messages as unknown as Array<Record<string,unknown>>, viewerId, peerId.data)
+        .find(item => item.sourceId === messageId.data);
+      if (!candidate) return { status: 404, error: "CANON_CANDIDATE_NOT_FOUND" };
+      const setup = (state.creatorSetup ?? {}) as Record<string, unknown>;
+      const entries = Array.isArray(setup.canonKnowledgeEvents) ? setup.canonKnowledgeEvents : [];
+      const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds : [];
+      const key = `dm:${viewerId}:${peerId.data}:${messageId.data}`;
+      if (entries.some(item => item && typeof item === "object" && (item as Record<string,unknown>).sourceKey === key) ||
+          dismissed.includes(key)) return { status: 200, duplicate: true };
+      const nextSetup = decision.data.action === "dismiss"
+        ? { ...setup, dismissedCanonEventIds: [...dismissed.slice(-999), key] }
+        : { ...setup, canonKnowledgeEvents: [...entries.slice(-199), {
+            sourceKey: key, text: decision.data.text ?? candidate.text,
+            visibility: "participants", witnessIds: candidate.witnessIds,
+            occurredAt: candidate.occurredAt,
+          }] };
+      await tx.update(echoUniversesTable).set({
+        state: { ...state, creatorSetup: nextSetup },
+        revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date(),
+      }).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId.data)));
+      return { status: 200, saved: true };
+    });
+    if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+    res.json(result);
+  } catch { res.status(503).json({ error: "CANON_DECISION_UNAVAILABLE" }); }
 });
 
 return router;
