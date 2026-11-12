@@ -93,6 +93,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
               </span>
             )}
           />
+          {post.musicClip && <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[min(75%,280px)]"><div className="pointer-events-auto"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.music?.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div></div>}
           {tagged.length > 0 && <button type="button" onClick={() => setShowPhotoTags(v => !v)} aria-label={t("Con")} aria-expanded={showPhotoTags} className="absolute bottom-3 left-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white shadow-md" data-testid={`button-photo-tags-${post.id}`}><UserRound className="h-4 w-4" /></button>}
           {showPhotoTags && tagged.length > 0 && <div className="absolute bottom-14 left-3 z-10 max-w-[85%] rounded-xl bg-black/80 p-2 text-white shadow-lg" data-testid={`overlay-photo-tags-${post.id}`}>
             <p className="mb-1 text-[11px] opacity-75">{t("Con")}</p>
@@ -100,6 +101,8 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
           </div>}
         </div>
       )}
+
+      {media.length === 0 && post.musicClip && <div className="px-3 pt-2"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.music?.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
 
       {invitedMe && <div className="mx-4 my-3 rounded-xl border border-border bg-secondary/50 p-3 text-sm">
         <p className="mb-2 font-medium">{collaborationLabels[0]}</p>
@@ -118,7 +121,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         })}</div>
         <p className="mt-2 text-xs text-muted-foreground">{voteCount} {pollLabels[0]}{pollClosed ? ` · ${pollLabels[1]}` : ''}</p>
       </section>}
-      {post.musicClip && <div className="flex justify-start px-3 pt-2"><div className="max-w-[85%] min-w-0"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.music?.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div></div>}
+
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
           <Heart className={cn('h-[25px] w-[25px] transition-transform', liked && 'scale-110 fill-primary text-primary')} strokeWidth={1.6} />
