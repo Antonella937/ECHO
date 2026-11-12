@@ -118,7 +118,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         })}</div>
         <p className="mt-2 text-xs text-muted-foreground">{voteCount} {pollLabels[0]}{pollClosed ? ` · ${pollLabels[1]}` : ''}</p>
       </section>}
-      {post.musicClip && <div className="px-3 pt-3"><MusicClipPlayer clip={post.musicClip} compact autoPlay source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
+      {post.musicClip && <div className="flex justify-start px-3 pt-2"><div className="max-w-[85%] min-w-0"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.music?.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div></div>}
       <div className="flex items-center px-2.5 pt-2">
         <IconBtn label={t(liked ? 'Quitar me gusta' : 'Me gusta')} pressed={liked} onClick={() => actions.toggleLike(post.id)} testId={`button-like-${post.id}`}>
           <Heart className={cn('h-[25px] w-[25px] transition-transform', liked && 'scale-110 fill-primary text-primary')} strokeWidth={1.6} />
