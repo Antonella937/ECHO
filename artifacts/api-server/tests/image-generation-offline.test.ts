@@ -3,11 +3,12 @@ import test from 'node:test';
 import { orchestrateImageGeneration } from '../src/lib/imageGenerationOrchestrator';
 import { buildOpenRouterImageRequest } from '../src/lib/openRouterImageAdapter';
 import { requestOpenRouterImage } from '../src/lib/openRouterImageTransport';
+import { IMAGE_GENERATION_MODEL } from '../src/lib/imageGenerationProvider';
 
 const context = {
   ownerId: 'user_test', universeId: 'primary', characterId: 'char_test',
   prompt: 'A portrait in natural light', style: 'natural' as const,
-  references: [], provider: 'openrouter', model: 'qwen/qwen-image-2.1-turbo',
+  references: [], provider: 'openrouter', model: IMAGE_GENERATION_MODEL,
   maximumUsd: 0.10,
 };
 
@@ -53,7 +54,7 @@ test('storage failure records the provider charge without losing the reservation
     store: async () => { events.push('store'); throw Error('storage unavailable'); },
     settle: async (_id, outcome) => {
       events.push('settle:' + outcome.status);
-      assert.equal(outcome.reportedCostUsd, 0.02);
+      assert.equal(outcome.reportedCostUsd, context.maximumUsd);
     },
   }, context), /storage unavailable/);
   assert.deepEqual(events, ['reserve', 'generate', 'store', 'settle:failed']);
@@ -79,7 +80,7 @@ test('OpenRouter transport parses a generated PNG and reported USD cost without 
     assert.equal(init?.method, 'POST');
     assert.equal(init?.headers && (init.headers as Record<string,string>).Authorization, 'Bearer offline-test-key');
     const body = JSON.parse(String(init?.body));
-    assert.equal(body.model, 'qwen/qwen-image-2.1-turbo');
+    assert.equal(body.model, IMAGE_GENERATION_MODEL);
     assert.equal(body.resolution, '1K');
     assert.equal(body.n, 1);
     return new Response(JSON.stringify({
