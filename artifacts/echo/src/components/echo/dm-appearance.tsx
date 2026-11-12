@@ -44,7 +44,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    <label className="mt-3 block text-xs">{lang==='es'?'Importar foto':lang==='pt'?'Importar foto':lang==='fr'?'Importer une photo':lang==='de'?'Foto importieren':lang==='it'?'Importa foto':lang==='ko'?'사진 가져오기':lang==='ja'?'写真を読み込む':lang==='zh'?'导入照片':'Import photo'}
     <input className="mt-1 block w-full text-xs" type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{
      const file=e.target.files?.[0];if(!file)return;
-     if(file.size>2_000_000){setUploadError(true);return;}
+     if(file.size>2_000_000 || !['image/jpeg','image/png','image/webp'].includes(file.type)){setUploadError(true);return;}
      const reader=new FileReader();reader.onload=()=>{if(typeof reader.result==='string'){setDraft(old=>({...old,background:'photo',image:reader.result as string}));setUploadError(false);}};
      reader.onerror=()=>setUploadError(true);reader.readAsDataURL(file);
     }}/>
