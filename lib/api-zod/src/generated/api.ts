@@ -765,7 +765,7 @@ export const ProposeCharacterResponse = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(proposeCharacterResponseConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(proposeCharacterResponseConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(proposeCharacterResponseConfigurationRelationshipsItemClosenessMin).max(proposeCharacterResponseConfigurationRelationshipsItemClosenessMax),
@@ -1161,7 +1161,7 @@ export const GetUniverseResponse = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(getUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(getUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(getUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemClosenessMin).max(getUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemClosenessMax),
@@ -1708,7 +1708,7 @@ export const SaveUniverseBody = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(saveUniverseBodyStateCharactersItemConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(saveUniverseBodyStateCharactersItemConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(saveUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMin).max(saveUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMax),
@@ -2243,7 +2243,7 @@ export const SaveUniverseResponse = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(saveUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(saveUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(saveUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemClosenessMin).max(saveUniverseResponseStateOneCharactersItemConfigurationRelationshipsItemClosenessMax),
@@ -2828,7 +2828,7 @@ export const VerifyUniverseResponse = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(verifyUniverseResponseOneStateOneCharactersItemConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(verifyUniverseResponseOneStateOneCharactersItemConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(verifyUniverseResponseOneStateOneCharactersItemConfigurationRelationshipsItemClosenessMin).max(verifyUniverseResponseOneStateOneCharactersItemConfigurationRelationshipsItemClosenessMax),
@@ -3686,7 +3686,7 @@ export const CreateCreatorUniverseBody = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMin).max(createCreatorUniverseBodyStateCharactersItemConfigurationRelationshipsItemClosenessMax),
@@ -4221,7 +4221,7 @@ export const CreateCreatorUniverseResponse = zod.object({
   "relationships": zod.array(zod.object({
   "id": zod.string(),
   "targetId": zod.string().describe('\'owner\' denotes the universe owner, never a login credential'),
-  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'custom']),
+  "preset": zod.enum(['stranger', 'acquaintance', 'friend', 'close_friend', 'family', 'crush', 'romantic_tension', 'partner', 'ex', 'rival', 'former_friend', 'trusted_ally', 'distrust', 'custom']),
   "customLabel": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemCustomLabelMax),
   "description": zod.string().max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemDescriptionMax),
   "closeness": zod.number().int().min(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemClosenessMin).max(createCreatorUniverseResponseStateCharactersItemConfigurationRelationshipsItemClosenessMax),
