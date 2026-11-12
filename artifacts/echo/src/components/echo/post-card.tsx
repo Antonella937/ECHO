@@ -102,7 +102,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </div>
       )}
 
-      {media.length === 0 && post.musicClip && <div className="px-3 pt-2"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.music?.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
+      {media.length === 0 && post.musicClip && <div className="px-3 pt-2"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.musicClip.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
 
       {invitedMe && <div className="mx-4 my-3 rounded-xl border border-border bg-secondary/50 p-3 text-sm">
         <p className="mb-2 font-medium">{collaborationLabels[0]}</p>
