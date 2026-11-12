@@ -648,7 +648,7 @@ router.put("/universe", async (req, res): Promise<void> => {
     ...state.messages.flatMap(m => (m.attachments ?? []).map(item => item.url))];
   // Text-only stories and optional empty image slots are valid. Never treat
   // an absent image as an external/public URL that must be uploaded.
-  if (refs.some(ref => ref !== "" && !ref.startsWith("asset:") && ref !== "/voice-tests/echo-m-02.wav" && !/^\/objects\/uploads\/[a-f0-9-]+$/i.test(ref))) {
+  if (refs.some(ref => ref !== "" && !ref.startsWith("asset:") && ref !== "/voice-tests/echo-m-02.wav" && !/^\/objects\/(?:uploads|r2)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref))) {
     res.status(400).json({ error: "All images must be stored privately before saving" });
     return;
   }
