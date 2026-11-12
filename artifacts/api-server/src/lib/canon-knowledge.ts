@@ -45,3 +45,23 @@ export function dmCanonCandidates(messages: Array<Record<string, unknown>>, view
   }));
   return privateConversationCandidates(eligible, [viewerId, peerId]);
 }
+
+/** Validates persisted, per-event access metadata before any AI prompt sees it.
+ * Invalid or legacy unscoped entries fail closed.
+ */
+export function readableCanonTimeline(raw: unknown, characterId: string): string {
+  if (!Array.isArray(raw) || !characterId) return "";
+  const events: CanonKnowledge[] = [];
+  for (const item of raw.slice(-100)) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.text !== "string" || row.text.length > 1200 ||
+        !["public","participants","private"].includes(String(row.visibility)) ||
+        !Array.isArray(row.witnessIds) ||
+        !row.witnessIds.every(value => typeof value === "string")) continue;
+    events.push({ text: row.text, visibility: row.visibility as CanonKnowledge["visibility"],
+      witnessIds: row.witnessIds as string[],
+      audienceIds: Array.isArray(row.audienceIds) ? row.audienceIds.filter((value): value is string => typeof value === "string") : [] });
+  }
+  return knownCanonForCharacter(events, characterId).join("\n").slice(-4000);
+}
