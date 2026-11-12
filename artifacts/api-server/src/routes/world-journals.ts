@@ -105,7 +105,8 @@ router.post("/universe/:universeId/journals/:journalId/archive",async(req,res):P
 // A proposal is only a draft. The AI may suggest text, but never approve or publish it.
 router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<void>=>{
   const p=invalid(req);
-  const b=entrySchema.safeParse({...req.body,sourceType:"ai_suggestion"});
+  const b=entrySchema.safeParse(req.body && typeof req.body==='object' && !Array.isArray(req.body)
+    ? {...req.body,sourceType:'ai_suggestion'} : {});
   if(!p.success||!b.success){res.status(400).json({error:"INVALID_PROPOSAL"});return;}
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
