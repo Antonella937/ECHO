@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "universe": "Blackthorne Academy",
+  "import_status": "draft_only_not_published",
+  "note": "Resolve named characters to IDs in the target universe before import. Do not automatically reveal secrets or infer that every named character knows the same facts.",
+  "entries": [
+    {
+      "title": "The Foundations of Magic",
+      "category": "world_knowledge",
+      "truth_status": "confirmed",
+      "knowledge_scope": "everyone",
+      "known_character_names": [],
+      "keywords": [
+        "magic",
+        "affinity",
+        "discipline",
+        "resonance"
+      ],
+      "content": "Magic is innate and shaped by affinity, discipline and resonance. Each mage has a dominant natural affinity but may learn other disciplines with training. Emotion can amplify or destabilize spells. Magic transforms, redirects or reorganizes existing energy and matter, leaves traces, and no mage can master every discipline.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "Magical Disciplines",
+      "category": "world_knowledge",
+      "truth_status": "confirmed",
+      "knowledge_scope": "everyone",
+      "known_character_names": [],
+      "keywords": [
+        "conjuration",
+        "alchemy",
+        "resonance",
+        "manifestation",
+        "echo magic"
+      ],
+      "content": "Blackthorne recognizes conjuration and defense, alchemy and transmutation, resonant magic, vital and botanical magic, manifestation, perception and divination, elemental magic, threshold magic, bond magic, shadow and concealment, oneiric magic, runic magic and rare echo magic. Different disciplines may be learned beyond a mage's dominant affinity.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "The Four Houses and Magical Traditions",
+      "category": "world_knowledge",
+      "truth_status": "confirmed",
+      "knowledge_scope": "everyone",
+      "known_character_names": [],
+      "keywords": [
+        "Vesperis",
+        "Noctis",
+        "Valtheris",
+        "Verdanth"
+      ],
+      "content": "Vesperis: plum and aged silver, raven and crescent moon; shadows, concealment, manifestation and hidden knowledge. Noctis: midnight blue and silver, moon and star; perception, resonance, dreams and thresholds. Valtheris: burgundy and gold, lion; conjuration, defense, dueling and elemental combat. Verdanth: forest green and bronze, stag; alchemy, transmutation, botany, bonds and runes. Houses are traditions, not restrictions on learning.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "Magical Exhaustion and Resonance Fractures",
+      "category": "world_knowledge",
+      "truth_status": "confirmed",
+      "knowledge_scope": "everyone",
+      "known_character_names": [],
+      "keywords": [
+        "exhaustion",
+        "dissonance",
+        "fracture",
+        "infirmary"
+      ],
+      "content": "Magical exhaustion may cause headaches, trembling, dizziness and minor involuntary magic. Dissonance can distort perception, emotions and time sense. A severe resonance fracture may leave magical scars, memory gaps and uncontrolled manifestations. Elemental, threshold, oneiric, bond, shadow and runic practices each have distinct side effects. Such effects indicate strain, not necessarily greater power. The academy maintains a specialized infirmary.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "Restricted and Forbidden Magic",
+      "category": "world_knowledge",
+      "truth_status": "confirmed",
+      "knowledge_scope": "everyone",
+      "known_character_names": [],
+      "keywords": [
+        "experimental",
+        "restricted",
+        "forbidden",
+        "causality"
+      ],
+      "content": "Experimental magic requires authorized research when safety is unproven. Restricted magic requires special supervision. Forbidden magic includes coercive alteration of will or identity and attempts to rewrite past events. Causality magic manipulates relations between events and possibilities rather than allowing ordinary time travel; its research is strictly restricted.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "Magical Prestige and Social Hierarchy",
+      "category": "world_knowledge",
+      "truth_status": "confirmed",
+      "knowledge_scope": "everyone",
+      "known_character_names": [],
+      "keywords": [
+        "prestige",
+        "dueling",
+        "lineage"
+      ],
+      "content": "Conjuration and defense receive public acclaim; duelists can become celebrities. Alchemy is academically prestigious. Healing is essential but less glamorous. Resonant and everyday enchantments are often underestimated. Manifestation and divination attract suspicion. Old families prize lineage, but social prestige is not a reliable measure of magical ability.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "The Fracture of Aster — Fragmentary Research",
+      "category": "secret",
+      "truth_status": "unknown",
+      "knowledge_scope": "selected",
+      "known_character_names": [
+        "Lucien Moreau",
+        "Theodore Hawthorne",
+        "Elowen Hart"
+      ],
+      "keywords": [
+        "Aster",
+        "fracture",
+        "observatory",
+        "causality"
+      ],
+      "content": "Lucien has encountered inconsistent archival references to a catastrophic observatory experiment called the Fracture of Aster. Theodore has found anomalous old alchemical formulas that may date to the same period. Neither knows the full circumstances, whether the two discoveries are connected, or what truly happened. Elowen Hart possesses more archival knowledge but has not disclosed it. Do not treat speculation as proven history.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    },
+    {
+      "title": "The Lost Fifth Magical Tradition — Unverified Clues",
+      "category": "secret",
+      "truth_status": "unknown",
+      "knowledge_scope": "selected",
+      "known_character_names": [
+        "Lucien Moreau",
+        "Theodore Hawthorne",
+        "Elowen Hart"
+      ],
+      "keywords": [
+        "fifth tradition",
+        "lost magic",
+        "Aster",
+        "astrolabe"
+      ],
+      "content": "Lucien has noticed puzzling gaps in accounts of early magical classifications. Theodore has identified formula structures that fit none of the four recognized house traditions. They suspect a lost fifth magical tradition but have no proof of a fifth house or the tradition's nature. Elowen Hart may recognize the clues but keeps her knowledge private. Other students should not know this theory unless they learn it through the story.",
+      "status": "draft",
+      "source_type": "manual",
+      "requires_human_approval": true
+    }
+  ]
+}
