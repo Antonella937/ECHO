@@ -221,6 +221,17 @@ export function createSupabaseStorageRouter(): IRouter {
       if (media.ownerId !== req.userId! && !voiceAccess.rowCount && !publicationAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
         res.status(404).end(); return;
       }
+      // Opt-in direct R2 delivery: authorization above still runs on every API
+      // request, but the large response body bypasses Render bandwidth.
+      // Keep disabled until R2 GET CORS and Safari/desktop tests pass.
+      if (isR2Path(objectPath) && process.env.ECHO_R2_DIRECT_READS === "true") {
+        const r2 = configuredR2();
+        if (!r2) throw Error("R2_NOT_CONFIGURED");
+        res.setHeader("Cache-Control", "private, no-store");
+        res.setHeader("Referrer-Policy", "no-referrer");
+        res.redirect(302, signR2Request(r2, "GET", objectPath.slice("/objects/".length), 60));
+        return;
+      }
       const response = await fetchStored(objectPath, req.headers.range);
       if (!response.ok) { res.status(response.status === 404 ? 404 : 502).end(); return; }
       res.status(response.status);
