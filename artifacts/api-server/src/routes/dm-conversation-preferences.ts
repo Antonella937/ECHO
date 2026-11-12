@@ -15,6 +15,7 @@ const scope = z.object({ universeId: identifier.default("primary"), characterId:
 const defaults = { style: "natural", responseTiming: "realistic", responseLength: "balanced", autonomousInitiative: true };
 export const dmConversationPreferencesRouter: IRouter = Router();
 dmConversationPreferencesRouter.use("/dm/conversation-preferences", requireAuth);
+dmConversationPreferencesRouter.use("/dm/appearance", requireAuth);
 
 async function ownsCharacter(ownerId: string, universeId: string, characterId: string): Promise<boolean> {
   const [universe] = await db.select({ state: echoUniversesTable.state, archivedAt: echoUniversesTable.archivedAt, deletedAt: echoUniversesTable.deletedAt })
@@ -52,7 +53,7 @@ dmConversationPreferencesRouter.put("/dm/conversation-preferences", async (req, 
     const payload = JSON.stringify(parsed.data.preferences);
     await db.execute(sql`INSERT INTO echo_dm_conversation_preferences (owner_id, universe_id, character_id, preferences)
       VALUES (${req.userId!}, ${universeId}, ${characterId}, ${payload}::jsonb)
-      ON CONFLICT (owner_id, universe_id, character_id) DO UPDATE SET preferences = EXCLUDED.preferences || jsonb_build_object('appearance', COALESCE(echo_dm_conversation_preferences.preferences->'appearance', 'null'::jsonb)), updated_at = now()`);
+      ON CONFLICT (owner_id, universe_id, character_id) DO UPDATE SET preferences = EXCLUDED.preferences || CASE WHEN echo_dm_conversation_preferences.preferences ? 'appearance' THEN jsonb_build_object('appearance', echo_dm_conversation_preferences.preferences->'appearance') ELSE '{}'::jsonb END, updated_at = now()`);
     res.json({ preferences: parsed.data.preferences });
   } catch (error) {
     console.error("DM preferences operation failed", error);
