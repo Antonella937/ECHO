@@ -144,6 +144,35 @@ router.post("/universe/:universeId/journals/:journalId/archive",async(req,res):P
   if(!r.rows.length){res.status(404).json({error:"JOURNAL_NOT_FOUND"});return;}
   res.json(r.rows[0]);
 });
+// Extract from persisted conversations, never from arbitrary client-supplied history.
+// This is owner-triggered and read-only; the proposal remains unapproved.
+router.post("/universe/:universeId/journals/suggest-from-conversation",async(req,res):Promise<void>=>{
+  const p=invalid(req);
+  const b=z.object({characterId:z.string().min(1).max(120),recipientId:z.string().min(1).max(120)}).strict().safeParse(req.body);
+  if(!p.success||!b.success){res.status(400).json({error:"INVALID_CONVERSATION_REQUEST"});return;}
+  const world=await ownedWorld(req.userId!,p.data.universeId);
+  if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
+  if(!validCharacters(world.state,[b.data.characterId,b.data.recipientId])){
+    res.status(404).json({error:"CHARACTER_NOT_FOUND"});return;
+  }
+  const state=world.state as {characters:Array<{id?:string;archived?:boolean}>;messages?:unknown};
+  if(!Array.isArray(state.messages)){res.status(422).json({error:"CONVERSATION_UNAVAILABLE"});return;}
+  const messages=state.messages.filter((m):m is {senderId:string;recipientId:string;text:string;createdAt?:string}=>{
+    if(!m||typeof m!=='object')return false;
+    const v=m as Record<string,unknown>;
+    return typeof v.senderId==='string'&&typeof v.recipientId==='string'&&typeof v.text==='string'&&
+      ((v.senderId===b.data.characterId&&v.recipientId===b.data.recipientId)||
+       (v.senderId===b.data.recipientId&&v.recipientId===b.data.characterId));
+  }).slice(-30);
+  if(messages.length<2){res.status(422).json({error:"NOT_ENOUGH_CONVERSATION"});return;}
+  const excerpt=messages.map(m=>`${m.senderId}: ${m.text.slice(0,500)}`).join('\n').slice(-6000);
+  try{
+    const characters=world.state.characters.filter(ch=>!ch.archived&&ch.id).map(ch=>({id:ch.id!,name:ch.id!}));
+    const candidate=await suggestWorldJournal(excerpt,characters);
+    res.setHeader("Cache-Control","private, no-store");
+    res.json({candidate});
+  }catch{res.status(503).json({error:"JOURNAL_SUGGESTION_UNAVAILABLE"});}
+});
 // Owner-triggered extraction uses free models and never persists or publishes by itself.
 router.post("/universe/:universeId/journals/suggest",async(req,res):Promise<void>=>{
   const p=invalid(req);
