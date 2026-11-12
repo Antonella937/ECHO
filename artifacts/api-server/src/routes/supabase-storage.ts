@@ -228,6 +228,17 @@ export function createSupabaseStorageRouter(): IRouter {
         const value = response.headers.get(header);
         if (value) res.setHeader(header, value);
       }
+      // Diagnose high-bandwidth media without logging private URLs, tokens or owner IDs.
+      // This is upstream Content-Length (when available), not verified bytes sent.
+      const declaredBytes = Number(response.headers.get("content-length"));
+      if (Number.isFinite(declaredBytes) && declaredBytes >= 1_000_000) {
+        req.log.info({
+          mediaBackend: isR2Path(objectPath) ? "r2" : "supabase",
+          mediaBytesDeclared: declaredBytes,
+          partialContent: response.status === 206,
+          mediaKind: (response.headers.get("content-type") ?? "").split(";")[0],
+        }, "Large private media response");
+      }
       if (!response.body) { res.end(); return; }
       const { Readable } = await import("node:stream");
       // The upstream AbortSignal may fire after headers are sent. A bare pipe()
