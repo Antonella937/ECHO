@@ -182,7 +182,7 @@ export function UniverseSelector() {
               <input id="new-universe-username" className={inputCls} value={username} maxLength={31} required disabled={busy} autoCapitalize="none" autoCorrect="off" onChange={e => setUsername(e.target.value)} />
             </Field>
             <Field id="new-universe-context" label={t("Contexto del universo (opcional)")}>
-              <textarea id="new-universe-context" className={`${inputCls} min-h-28 py-3`} value={universeContext} maxLength={500} disabled={busy} onChange={e => setUniverseContext(e.target.value)} placeholder={t("Historia, ambientación, reglas y situación actual del mundo…")} />
+              <textarea id="new-universe-context" className={`${inputCls} min-h-28 py-3`} value={universeContext} maxLength={8000} disabled={busy} onChange={e => setUniverseContext(e.target.value)} placeholder={t("Historia, ambientación, reglas y situación actual del mundo…")} />
             </Field>
             <div className="mt-5 flex gap-2">
               <button type="button" className="h-12 flex-1 rounded-2xl bg-secondary text-sm font-semibold" disabled={busy} onClick={() => setCreating(false)}>{t("Volver")}</button>
