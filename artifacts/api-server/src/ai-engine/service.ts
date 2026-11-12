@@ -169,6 +169,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
+  const journalQuery = [input.situation, ...parsed.data.state.messages.filter(m => m.senderId === input.recipientId && m.recipientId === input.characterId).slice(-2).map(m => m.text), ...parsed.data.state.messages.filter(m => m.senderId === input.recipientId && m.recipientId === input.characterId).slice(-2).map(m => m.text)].join(' ');
+  const approvedJournals = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
+    .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
+  const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext);
 }
