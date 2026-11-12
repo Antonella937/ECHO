@@ -128,6 +128,46 @@ scenesRouter.get("/scenes/:sceneId/canon-candidates", async (req, res) => {
     res.json({ candidates: sceneCanonCandidates(sceneId.data, [...events.rows].reverse()) });
   } catch { res.status(503).json({ error: "CANON_CANDIDATES_UNAVAILABLE" }); }
 });
+// Explicit owner approval is required before a public scene event becomes canon.
+scenesRouter.post("/scenes/:sceneId/canon-candidates/:eventId/approve", async (req, res) => {
+  const parsed = scope.safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  const eventId = id.safeParse(req.params.eventId);
+  if (!parsed.success || !sceneId.success || !eventId.success) {
+    res.status(400).json({ error: "INVALID_CANON_EVENT" }); return;
+  }
+  try {
+    const result = await db.transaction(async tx => {
+      const [universe] = await tx.select().from(echoUniversesTable)
+        .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, parsed.data.universeId)))
+        .for("update").limit(1);
+      if (!universe || universe.archivedAt || universe.deletedAt) return { status: 404, error: "UNIVERSE_NOT_FOUND" };
+      const scene = await tx.execute(sql`SELECT canon FROM echo_scenes WHERE owner_id = ${req.userId!}
+        AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data} LIMIT 1`);
+      if (scene.rows[0]?.canon !== "main") return { status: 404, error: "MAIN_SCENE_NOT_FOUND" };
+      const events = await tx.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId", text,
+        visibility, audience_ids AS "audienceIds", created_at AS "createdAt"
+        FROM echo_scene_events WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}
+        AND scene_id = ${sceneId.data} AND event_id = ${eventId.data} LIMIT 1`);
+      const candidate = sceneCanonCandidates(sceneId.data, events.rows)[0];
+      if (!candidate) return { status: 404, error: "CANON_CANDIDATE_NOT_FOUND" };
+      const setup = (universe.state.creatorSetup ?? {}) as Record<string, unknown>;
+      const timeline = typeof setup.universeTimeline === "string" ? setup.universeTimeline : "";
+      const marker = `[scene:${sceneId.data}:${eventId.data}]`;
+      if (timeline.includes(marker)) return { status: 200, approved: true, duplicate: true };
+      const entry = `${marker} ${candidate.occurredAt}: ${candidate.text}`;
+      const next = timeline ? `${timeline}\n${entry}` : entry;
+      if (next.length > 4000) return { status: 409, error: "UNIVERSE_TIMELINE_FULL" };
+      await tx.update(echoUniversesTable).set({
+        state: { ...universe.state, creatorSetup: { ...setup, universeTimeline: next } },
+        revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date(),
+      }).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, parsed.data.universeId)));
+      return { status: 200, approved: true, duplicate: false };
+    });
+    if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
+    res.json(result);
+  } catch { res.status(503).json({ error: "CANON_APPROVAL_UNAVAILABLE" }); }
+});
 scenesRouter.post("/scenes/events", async (req, res) => {
   const parsed = event.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_SCENE_EVENT" }); return; }
