@@ -1,3 +1,5 @@
+import { useUser } from '@clerk/react';
+import { getActiveUniverseId } from '@/store/persistence';
 import { useEffect, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { useLanguage } from '@/lib/i18n';
@@ -9,21 +11,24 @@ const words:Record<string,[string,string,string,string,string,string,string]> = 
 };
 export function KindroidLinkPanel({characterId}:{characterId:string}) {
  const language=useLanguage();
+ const {user}=useUser();
+ const universeId=user?.id?getActiveUniverseId(user.id):'primary';
  const t=words[language]??words.en;
  const [data,setData]=useState<LinkState>({kinId:'',enabled:false,socialContextEnabled:false});
  const [busy,setBusy]=useState(false);
  const [status,setStatus]=useState('');
+ useEffect(()=>{setData({kinId:'',enabled:false,socialContextEnabled:false});setStatus('');},[characterId,universeId]);
  useEffect(()=>{
    let active=true;
-   void customFetch<LinkState>(`/api/characters/kindroid-link?characterId=${encodeURIComponent(characterId)}&universeId=primary`,{responseType:'json'})
+   void customFetch<LinkState>(`/api/characters/kindroid-link?characterId=${encodeURIComponent(characterId)}&universeId=${encodeURIComponent(universeId)}`,{responseType:'json'})
      .then(v=>{if(active)setData(v);}).catch(()=>{if(active)setStatus('Unavailable');});
    return ()=>{active=false;};
- },[characterId]);
+ },[characterId,universeId]);
  async function save(){
    if(!data.kinId.trim()||busy)return;
    setBusy(true);setStatus('');
    try{
-     await customFetch('/api/characters/kindroid-link',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId,universeId:'primary',kinId:data.kinId.trim(),enabled:data.enabled,socialContextEnabled:data.socialContextEnabled}),responseType:'json'});
+     await customFetch('/api/characters/kindroid-link',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId,universeId,kinId:data.kinId.trim(),enabled:data.enabled,socialContextEnabled:data.socialContextEnabled}),responseType:'json'});
      setStatus(t[4]);
    }catch{setStatus(t[5]);}finally{setBusy(false);}
  }
