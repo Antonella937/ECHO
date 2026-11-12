@@ -125,7 +125,15 @@ scenesRouter.get("/scenes/:sceneId/canon-candidates", async (req, res) => {
       FROM echo_scene_events WHERE owner_id = ${req.userId!}
       AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data}
       ORDER BY created_at DESC LIMIT 100`);
-    res.json({ candidates: sceneCanonCandidates(sceneId.data, [...events.rows].reverse()) });
+    const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, parsed.data.universeId))).limit(1);
+    const setup = (universe?.state.creatorSetup ?? {}) as Record<string, unknown>;
+    const timeline = typeof setup.universeTimeline === "string" ? setup.universeTimeline : "";
+    const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds : [];
+    const candidates = sceneCanonCandidates(sceneId.data, [...events.rows].reverse()).filter(item =>
+      !timeline.includes(`[scene:${sceneId.data}:${item.sourceId}]`) &&
+      !dismissed.includes(`scene:${sceneId.data}:${item.sourceId}`));
+    res.json({ candidates });
   } catch { res.status(503).json({ error: "CANON_CANDIDATES_UNAVAILABLE" }); }
 });
 // Explicit owner approval is required before a public scene event becomes canon.
