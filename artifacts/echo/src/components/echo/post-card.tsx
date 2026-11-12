@@ -71,6 +71,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         <div className="min-w-0 flex-1 leading-tight">
           <Link href={`/profile/${author.id}`} className="inline-flex items-center gap-1 text-[14.5px] font-semibold">{author.handle}<VerifiedBadge account={author} /></Link>
           {collaborators.length > 0 && <p className="text-xs text-muted-foreground">{t("Con")} {collaborators.map((c, i) => c && <span key={c.id}><Link href={`/profile/${c.id}`} className="font-semibold">@{c.handle}</Link>{i < collaborators.length - 1 ? ', ' : ''}</span>)}</p>}
+          {post.musicClip && <div className="mt-0.5 max-w-full"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.musicClip.artist} inline source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
           {post.location && <Link href={`/search?location=${encodeURIComponent(post.location)}`} className="block truncate text-xs text-muted-foreground" data-testid={`link-post-location-${post.id}`}>{post.location}</Link>}
         </div>
         {post.pinned && <Pin className="h-4 w-4 text-primary" strokeWidth={1.8} aria-label={t("Fijada")} data-testid={`status-post-pinned-${post.id}`} />}
@@ -93,7 +94,6 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
               </span>
             )}
           />
-          {post.musicClip && <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[min(75%,280px)]"><div className="pointer-events-auto"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.musicClip.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div></div>}
           {tagged.length > 0 && <button type="button" onClick={() => setShowPhotoTags(v => !v)} aria-label={t("Con")} aria-expanded={showPhotoTags} className="absolute bottom-3 left-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white shadow-md" data-testid={`button-photo-tags-${post.id}`}><UserRound className="h-4 w-4" /></button>}
           {showPhotoTags && tagged.length > 0 && <div className="absolute bottom-14 left-3 z-10 max-w-[85%] rounded-xl bg-black/80 p-2 text-white shadow-lg" data-testid={`overlay-photo-tags-${post.id}`}>
             <p className="mb-1 text-[11px] opacity-75">{t("Con")}</p>
@@ -102,7 +102,6 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
         </div>
       )}
 
-      {media.length === 0 && post.musicClip && <div className="px-3 pt-2"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.musicClip.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div>}
 
       {invitedMe && <div className="mx-4 my-3 rounded-xl border border-border bg-secondary/50 p-3 text-sm">
         <p className="mb-2 font-medium">{collaborationLabels[0]}</p>
