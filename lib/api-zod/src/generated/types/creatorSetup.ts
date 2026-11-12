@@ -8,7 +8,7 @@
 import type { CreatorSetupPlan } from './creatorSetupPlan';
 
 export interface CreatorSetup {
-  /** @maxLength 500 */
+  /** @maxLength 8000 */
   universeDescription?: string;
   plan: CreatorSetupPlan;
   /**
