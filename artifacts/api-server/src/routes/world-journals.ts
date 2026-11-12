@@ -165,7 +165,9 @@ router.post("/universe/:universeId/journals/suggest-from-conversation",async(req
       (!Array.isArray(v.hiddenForIds)||!v.hiddenForIds.includes(b.data.recipientId))&&
       ((v.senderId===b.data.characterId&&v.recipientId===b.data.recipientId)||
        (v.senderId===b.data.recipientId&&v.recipientId===b.data.characterId));
-  }).slice(-30);
+  });
+  // Select the most recent matching thread before limiting history; otherwise
+  // messages from other threads could crowd out the relevant conversation.
   const latestThread=messages[messages.length-1]?.threadId;
   const sameThread=messages.filter(m=>m.threadId===latestThread).slice(-30);
   if(sameThread.length<2){res.status(422).json({error:"NOT_ENOUGH_CONVERSATION"});return;}
