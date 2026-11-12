@@ -55,10 +55,14 @@ export function readableCanonTimeline(raw: unknown, characterId: string): string
   for (const item of raw.slice(-100)) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
-    if (typeof row.text !== "string" || row.text.length > 1200 ||
+    if (typeof row.text !== "string" || !row.text.trim() || row.text.length > 1200 ||
         !["public","participants","private"].includes(String(row.visibility)) ||
-        !Array.isArray(row.witnessIds) ||
-        !row.witnessIds.every(value => typeof value === "string")) continue;
+        !Array.isArray(row.witnessIds) || row.witnessIds.length > 31 ||
+        !row.witnessIds.every(value => typeof value === "string" && value.length > 0 && value.length <= 120) ||
+        (row.visibility !== "public" && row.witnessIds.length === 0) ||
+        (row.audienceIds !== undefined &&
+          (!Array.isArray(row.audienceIds) ||
+           !row.audienceIds.every(value => typeof value === "string" && value.length > 0 && value.length <= 120)))) continue;
     events.push({ text: row.text, visibility: row.visibility as CanonKnowledge["visibility"],
       witnessIds: row.witnessIds as string[],
       audienceIds: Array.isArray(row.audienceIds) ? row.audienceIds.filter((value): value is string => typeof value === "string") : [] });
