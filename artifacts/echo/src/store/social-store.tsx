@@ -99,8 +99,17 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
     }, undefined, mediaUniverseId);
     coordinator.current = engine;
     void engine.initialize();
-    const refresh = () => { if (document.visibilityState !== 'hidden') void engine.sync(); };
-    // Avoid downloading the entire universe every five seconds; focus/visibility still refresh immediately.
+    // Focus, visibility and online events can fire together on mobile. Coalesce
+    // them so one return to the app cannot trigger several revision requests.
+    let lastRefresh = 0;
+    const refresh = () => {
+      if (document.visibilityState === 'hidden' || !navigator.onLine) return;
+      const now = Date.now();
+      if (now - lastRefresh < 15000) return;
+      lastRefresh = now;
+      void engine.sync();
+    };
+    // Poll a small revision token; download the universe only when it changed.
     const timer = window.setInterval(refresh, 20000);
     window.addEventListener('online', refresh);
     window.addEventListener('focus', refresh);
