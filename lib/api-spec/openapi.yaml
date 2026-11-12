@@ -493,6 +493,7 @@ components:
         expectedRevision: { type: integer, minimum: 1 }
         name: { type: string, minLength: 1, maxLength: 60 }
         description: { type: string, maxLength: 8000 }
+        timeline: { type: string, maxLength: 4000 }
         confirmationText: { type: string, maxLength: 80 }
     UniverseManagementResult:
       type: object
@@ -512,6 +513,7 @@ components:
         characterCount: { type: integer, minimum: 0 }
         current: { type: boolean }
         description: { type: string }
+        timeline: { type: string }
         archived: { type: boolean }
     CreatorUniverseInput:
       type: object
@@ -669,6 +671,7 @@ components:
       required: [plan, universeName, completedAt]
       properties:
         universeDescription: { type: string, maxLength: 8000 }
+        universeTimeline: { type: string, maxLength: 4000 }
         plan: { type: string, enum: [free, creator] }
         universeName: { type: string, minLength: 1, maxLength: 60 }
         completedAt: { type: string, format: date-time }
