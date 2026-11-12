@@ -104,7 +104,7 @@ const appearance = z.object({
   background:z.enum(["none","dark","rose","violet","blue","photo"]),
   opacity:z.number().int().min(0).max(100),
   layout:z.enum(["chat","narrative"]),
-  image:z.string().regex(/^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i).optional(),
+  image:z.string().regex(new RegExp("^/objects/uploads/[0-9a-f-]{36}$","i")).optional(),
 }).strict().refine(value=>value.background!=="photo" || !!value.image);
 const defaultAppearance={background:"none",opacity:35,layout:"chat"};
 dmConversationPreferencesRouter.get("/dm/appearance", async(req,res)=>{
