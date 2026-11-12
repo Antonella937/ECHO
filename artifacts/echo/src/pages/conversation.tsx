@@ -1,3 +1,4 @@
+import { DmCanonReview } from '@/components/echo/dm-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
 import { useConversationText } from '@/lib/conversation-translations';
@@ -358,7 +359,8 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
+      {id && <DmCanonReview key={id} universeId={getActiveUniverseId(user?.id ?? '')} peerId={id} />}
+    <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
