@@ -157,15 +157,19 @@ router.post("/universe/:universeId/journals/suggest-from-conversation",async(req
   }
   const state=world.state as {characters:Array<{id?:string;archived?:boolean}>;messages?:unknown};
   if(!Array.isArray(state.messages)){res.status(422).json({error:"CONVERSATION_UNAVAILABLE"});return;}
-  const messages=state.messages.filter((m):m is {senderId:string;recipientId:string;text:string;createdAt?:string}=>{
+  const messages=state.messages.filter((m):m is {senderId:string;recipientId:string;text:string;threadId:string;hiddenForIds?:string[]}=>{
     if(!m||typeof m!=='object')return false;
     const v=m as Record<string,unknown>;
-    return typeof v.senderId==='string'&&typeof v.recipientId==='string'&&typeof v.text==='string'&&
+    return typeof v.senderId==='string'&&typeof v.recipientId==='string'&&typeof v.threadId==='string'&&typeof v.text==='string'&&
+      (!Array.isArray(v.hiddenForIds)||!v.hiddenForIds.includes(b.data.characterId))&&
+      (!Array.isArray(v.hiddenForIds)||!v.hiddenForIds.includes(b.data.recipientId))&&
       ((v.senderId===b.data.characterId&&v.recipientId===b.data.recipientId)||
        (v.senderId===b.data.recipientId&&v.recipientId===b.data.characterId));
   }).slice(-30);
-  if(messages.length<2){res.status(422).json({error:"NOT_ENOUGH_CONVERSATION"});return;}
-  const excerpt=messages.map(m=>`${m.senderId}: ${m.text.slice(0,500)}`).join('\n').slice(-6000);
+  const latestThread=messages[messages.length-1]?.threadId;
+  const sameThread=messages.filter(m=>m.threadId===latestThread).slice(-30);
+  if(sameThread.length<2){res.status(422).json({error:"NOT_ENOUGH_CONVERSATION"});return;}
+  const excerpt=sameThread.map(m=>`${m.senderId}: ${m.text.slice(0,500)}`).join('\n').slice(-6000);
   try{
     const characters=world.state.characters.filter(ch=>!ch.archived&&ch.id).map(ch=>({id:ch.id!,name:ch.id!}));
     const candidate=await suggestWorldJournal(excerpt,characters);
