@@ -70,7 +70,7 @@ export function WorldJournals({ universeId, characters }: {
         <p className="text-xs text-muted-foreground">{e.category} · {e.status} · {e.knowledge_scope}</p>
         <p className="line-clamp-3 whitespace-pre-wrap text-xs">{e.content}</p>
         <div className="flex gap-2">
-          <button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>edit(e)}>Editar</button>
+          {e.status!=='archived'&&<button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>edit(e)}>Editar</button>}
           {e.status!=='archived'&&<button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>void archive(e.id)}>Archivar</button>}
           {e.status==='draft'&&<button type="button" className="min-h-11 rounded-lg bg-primary px-3 text-xs text-primary-foreground" disabled={busy} onClick={()=>void approve(e.id)}>Aprobar</button>}
         </div>
