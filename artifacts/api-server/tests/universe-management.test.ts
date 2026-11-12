@@ -78,6 +78,22 @@ test("owner edits name/description persistently without changing social content 
   assert.equal(saved.revision, 2);
   assert.deepEqual((await row("studio")).state, state("Studio"));
 });
+test("universe chronology persists independently and remains owner/universe scoped", async () => {
+  const otherBefore = await row("studio");
+  const response = await operation("edit", {
+    name: "Primary", description: "Original", timeline: "Term begins; students arrive.",
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await row()).state.creatorSetup?.universeTimeline, "Term begins; students arrive.");
+  assert.deepEqual((await row("studio")).state, otherBefore.state);
+  const updated = await fetch(`${base}/creator/universes/primary/management`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", "x-fixture-owner": owner },
+    body: JSON.stringify({ action: "edit", expectedRevision: 2, name: "Primary", description: "Updated lore" }),
+  });
+  assert.equal(updated.status, 200);
+  assert.equal((await row()).state.creatorSetup?.universeTimeline, "Term begins; students arrive.");
+});
 test("editing legacy metadata creates a complete valid setup without altering content", async () => {
   const legacy = { ...state("Legacy"), creatorSetup: undefined };
   await db.update(echoUniversesTable).set({ state: legacy }).where(scope("primary"));
@@ -93,7 +109,7 @@ test("foreign owner and nonexistent universe are uniformly 404", async () => {
   assert.equal((await row("studio")).revision, 1);
 });
 test("invalid values and client owner spoofing are rejected", async () => {
-  for (const data of [{ name: "" }, { name: "x".repeat(61) }, { name: "Valid", ownerId: other }, { name: "Valid", description: "x".repeat(501) }]) {
+  for (const data of [{ name: "" }, { name: "x".repeat(61) }, { name: "Valid", ownerId: other }, { name: "Valid", description: "x".repeat(8001), timeline: "x".repeat(4001) }]) {
     assert.equal((await operation("edit", data)).status, 400);
   }
 });
