@@ -23,7 +23,11 @@ async function ownedWorld(ownerId: string, universeId: string) {
   const r = await db.execute(sql`SELECT state FROM echo_universes
     WHERE owner_id=${ownerId} AND universe_id=${universeId}
     AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1`);
-  return r.rows[0] as { state?: { characters?: Array<{id?:string;archived?:boolean}> } } | undefined;
+  const row = r.rows[0] as { state?: unknown } | undefined;
+  if (!row || !row.state || typeof row.state !== 'object' || Array.isArray(row.state)) return undefined;
+  const state = row.state as { characters?: unknown };
+  if (!Array.isArray(state.characters)) return undefined;
+  return row as { state: { characters: Array<{id?:string;archived?:boolean}> } };
 }
 function validAudience(state: { characters?: Array<{id?:string;archived?:boolean}> } | undefined,
   entry: z.infer<typeof entrySchema>) {
