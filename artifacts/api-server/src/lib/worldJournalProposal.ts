@@ -43,6 +43,6 @@ export async function suggestWorldJournal(source: string, characters: Array<{id:
     entry.knownCharacterIds.some(id=>!ids.has(id)) ||
     (entry.knowledgeScope==='selected' && !entry.knownCharacterIds.length) ||
     (entry.knowledgeScope!=='selected' && entry.knownCharacterIds.length>0) ||
-    (entry.category==='secret' && entry.knowledgeScope==='everyone')) throw Error('INVALID_JOURNAL_SUGGESTION');
+    (entry.category==='secret' && entry.knowledgeScope!=='selected' && entry.knowledgeScope!=='nobody')) throw Error('INVALID_JOURNAL_SUGGESTION');
   return entry;
 }
