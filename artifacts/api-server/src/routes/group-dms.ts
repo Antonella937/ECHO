@@ -1,3 +1,4 @@
+import { privateConversationCandidates } from "../lib/canon-knowledge";
 import { runGroupAutonomyOnce } from "../autonomy/group-executor";
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
@@ -74,6 +75,26 @@ router.get("/group-dms/:groupId/messages", async (req, res) => {
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND group_id = ${groupId}
     ORDER BY created_at DESC LIMIT 100`);
   res.json({ messages: [...messages.rows].reverse() });
+});
+// Review-only suggestions: group conversation events are never published as global canon.
+router.get("/group-dms/:groupId/canon-candidates", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const groupId = id.safeParse(req.params.groupId);
+  if (!parsed.success || !groupId.success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
+  const { universeId, actorId } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  try {
+    const groups = await db.execute(sql`SELECT participant_ids AS "participantIds" FROM echo_group_conversations
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId.data}
+      AND participant_ids ? ${actorId} LIMIT 1`);
+    const members = groups.rows[0]?.participantIds;
+    if (!Array.isArray(members) || !members.includes(actorId)) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+    const messages = await db.execute(sql`SELECT id, sender_id AS "senderId", body AS text,
+      created_at AS "createdAt" FROM echo_group_messages WHERE owner_id=${req.userId!}
+      AND universe_id=${universeId} AND group_id=${groupId.data}
+      ORDER BY created_at DESC LIMIT 100`);
+    res.json({ candidates: privateConversationCandidates([...messages.rows].reverse(), members.filter((x): x is string => typeof x === "string")) });
+  } catch { res.status(503).json({ error: "GROUP_CANON_CANDIDATES_UNAVAILABLE" }); }
 });
 router.post("/group-dms/:groupId/messages", async (req, res) => {
   const parsed = sendBody.safeParse(req.body);
