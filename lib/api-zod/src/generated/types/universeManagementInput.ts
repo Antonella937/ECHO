@@ -18,6 +18,8 @@ export interface UniverseManagementInput {
   name?: string;
   /** @maxLength 8000 */
   description?: string;
+  /** @maxLength 4000 */
+  timeline?: string;
   /** @maxLength 80 */
   confirmationText?: string;
 }
