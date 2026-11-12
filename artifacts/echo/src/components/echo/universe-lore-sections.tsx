@@ -23,7 +23,9 @@ export function parseUniverseLore(raw: string): Lore {
   matches.forEach((match, index) => {
     const key = match[1] as SectionKey;
     const end = index + 1 < matches.length ? matches[index + 1].index : raw.length;
-    result[key] = raw.slice(match.index! + match[0].length, end).replace(/^\n/, '').replace(/\n\n$/, '');
+    const content = raw.slice(match.index! + match[0].length, end).replace(/^\n/, '');
+    // Remove only the separator before the NEXT section. Never trim what the user is typing.
+    result[key] = index + 1 < matches.length && content.endsWith('\n\n') ? content.slice(0, -2) : content;
   });
   return result;
 }
@@ -48,7 +50,15 @@ export function UniverseLoreSections({ value, onChange, disabled, prefix }: {
         value={lore[section.key]} disabled={disabled}
         onChange={event => {
           const next = serializeUniverseLore({ ...lore, [section.key]: event.target.value });
-          if (next.length <= 8000) onChange(next);
+          if (next.length <= 8000) {
+            onChange(next);
+          } else {
+            // Let the user edit up to the remaining capacity rather than silently freezing the field.
+            const other = serializeUniverseLore({ ...lore, [section.key]: '' });
+            const allowance = Math.max(0, 8000 - other.length - header(section.key).length - 3);
+            const limited = serializeUniverseLore({ ...lore, [section.key]: event.target.value.slice(0, allowance) });
+            if (limited.length <= 8000) onChange(limited);
+          }
         }} />
     </Field>)}
     <p className="text-xs text-muted-foreground">{value.length} / 8000</p>
