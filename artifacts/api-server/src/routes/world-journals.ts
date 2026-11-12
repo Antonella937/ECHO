@@ -82,6 +82,33 @@ router.post("/universe/:universeId/journals/:journalId/approve",async(req,res):P
   if(!r.rows.length){res.status(404).json({error:"DRAFT_NOT_FOUND"});return;}
   res.json(r.rows[0]);
 });
+router.post("/universe/:universeId/journals/:journalId/archive",async(req,res):Promise<void>=>{
+  const p=invalid(req);
+  if(!p.success||!z.string().uuid().safeParse(req.params.journalId).success){res.status(400).json({error:"INVALID_JOURNAL"});return;}
+  if(!await ownedWorld(req.userId!,p.data.universeId)){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
+  const r=await db.execute(sql`UPDATE echo_world_journals SET status='archived',
+    updated_at=now() WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
+    AND universe_id=${p.data.universeId} RETURNING id,status`);
+  if(!r.rows.length){res.status(404).json({error:"JOURNAL_NOT_FOUND"});return;}
+  res.json(r.rows[0]);
+});
+// A proposal is only a draft. The AI may suggest text, but never approve or publish it.
+router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<void>=>{
+  const p=invalid(req);
+  const b=entrySchema.safeParse({...req.body,sourceType:"ai_suggestion"});
+  if(!p.success||!b.success){res.status(400).json({error:"INVALID_PROPOSAL"});return;}
+  const world=await ownedWorld(req.userId!,p.data.universeId);
+  if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
+  if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
+  const e=b.data;
+  const r=await db.execute(sql`INSERT INTO echo_world_journals
+    (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,known_character_ids,source_type,created_by,status)
+    VALUES (${req.userId!},${p.data.universeId},${e.title},${e.content},${e.category},
+    ${e.truthStatus},${sql`ARRAY[${sql.join(e.keywords.map(x=>sql`${x}`),sql`,`)}]::text[]`},
+    ${e.knowledgeScope},${sql`ARRAY[${sql.join(e.knownCharacterIds.map(x=>sql`${x}`),sql`,`)}]::text[]`},
+    'ai_suggestion',${req.userId!},'draft') RETURNING id,status`);
+  res.status(201).json(r.rows[0]);
+});
 router.get("/universe/:universeId/journals/knowledge/:characterId",async(req,res):Promise<void>=>{
   const p=invalid(req), characterId=req.params.characterId;
   if(!p.success||!characterId||characterId.length>120){res.status(400).json({error:"INVALID_REQUEST"});return;}
