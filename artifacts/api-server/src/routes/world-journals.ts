@@ -64,6 +64,11 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
+  if((b.data.knowledgeScope==='selected' && b.data.knownCharacterIds.length===0) ||
+     (b.data.knowledgeScope!=='selected' && b.data.knownCharacterIds.length>0) ||
+     (b.data.category==='secret' && b.data.knowledgeScope==='everyone')){
+    res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
+  }
   const e=b.data;
   const r=await db.execute(sql`UPDATE echo_world_journals SET title=${e.title},content=${e.content},
     category=${e.category},truth_status=${e.truthStatus},
@@ -105,6 +110,11 @@ router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<vo
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
+  if((b.data.knowledgeScope==='selected' && b.data.knownCharacterIds.length===0) ||
+     (b.data.knowledgeScope!=='selected' && b.data.knownCharacterIds.length>0) ||
+     (b.data.category==='secret' && b.data.knowledgeScope==='everyone')){
+    res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
+  }
   const e=b.data;
   const r=await db.execute(sql`INSERT INTO echo_world_journals
     (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,known_character_ids,source_type,created_by,status)
