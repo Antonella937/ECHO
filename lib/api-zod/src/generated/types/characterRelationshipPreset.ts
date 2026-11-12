@@ -20,5 +20,8 @@ export const CharacterRelationshipPreset = {
   partner: 'partner',
   ex: 'ex',
   rival: 'rival',
+  former_friend: 'former_friend',
+  trusted_ally: 'trusted_ally',
+  distrust: 'distrust',
   custom: 'custom',
 } as const;
