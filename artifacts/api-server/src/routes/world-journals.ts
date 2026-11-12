@@ -91,6 +91,7 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
     keywords=${textArray(e.keywords)},
     knowledge_scope=${e.knowledgeScope},
     known_character_ids=${textArray(e.knownCharacterIds)},
+    source_type=${e.sourceType},
     status='draft',approved_by=NULL,approved_at=NULL,updated_at=now()
     WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
     AND universe_id=${p.data.universeId} AND status <> 'archived' RETURNING id,status`);
