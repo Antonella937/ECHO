@@ -26,6 +26,6 @@ export async function relevantWorldJournals(ownerId: string, universeId: string,
     const haystack=[title,...keywords,content].join(' ').toLocaleLowerCase();
     const score=terms.reduce((sum,t)=>sum+(haystack.includes(t)?1:0),0);
     return {title,content,truthStatus:String(row.truth_status??'unknown'),score};
-  }).filter(e=>e.score>0).sort((a,b)=>b.score-a.score).slice(0,5)
+  }).filter(e=>e.score>0 || terms.length===0).sort((a,b)=>b.score-a.score).slice(0,5)
     .map(({title,content,truthStatus})=>({title,content,truthStatus}));
 }
