@@ -24,3 +24,21 @@ test('selected scope requires an audience; nobody scope requires an empty list',
 test('ordinary world lore may be public without selected characters', () => {
   assert.equal(validJournalAudience({ category: 'world_knowledge', knowledgeScope: 'everyone', knownCharacterIds: [] }, characters), true);
 });
+
+test('approval must reject a character removed after the draft was created', () => {
+  const draft = { ...base, knownCharacterIds: ['lucien'] };
+  assert.equal(validJournalAudience(draft, characters), true);
+  assert.equal(validJournalAudience(draft, ['ophelia', 'ezra']), false);
+});
+test('private entries remain private even when no characters are active', () => {
+  assert.equal(validJournalAudience({ ...base, knowledgeScope: 'nobody', knownCharacterIds: [] }, []), true);
+  assert.equal(validJournalAudience(base, []), false);
+});
+test('public shared memories require no explicit audience list', () => {
+  assert.equal(validJournalAudience({
+    category: 'shared_memory', knowledgeScope: 'everyone', knownCharacterIds: []
+  }, characters), true);
+  assert.equal(validJournalAudience({
+    category: 'shared_memory', knowledgeScope: 'everyone', knownCharacterIds: ['ezra']
+  }, characters), false);
+});
