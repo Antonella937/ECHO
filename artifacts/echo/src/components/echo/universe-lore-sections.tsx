@@ -18,12 +18,12 @@ export function parseUniverseLore(raw: string): Lore {
   const marker = /\[\[ECHO_LORE:(history|setting|rules|factions|conflicts)\]\]/g;
   const matches = Array.from(raw.matchAll(marker));
   if (!matches.length || matches[0].index !== 0) {
-    result.history = (matches.length ? raw.slice(0, matches[0].index) : raw).trim();
+    result.history = matches.length ? raw.slice(0, matches[0].index).trimEnd() : raw;
   }
   matches.forEach((match, index) => {
     const key = match[1] as SectionKey;
     const end = index + 1 < matches.length ? matches[index + 1].index : raw.length;
-    result[key] = raw.slice(match.index! + match[0].length, end).trim();
+    result[key] = raw.slice(match.index! + match[0].length, end).replace(/^\n/, '').replace(/\n\n$/, '');
   });
   return result;
 }
