@@ -6,6 +6,8 @@ import { db } from "@workspace/db";
  */
 export async function relevantWorldJournals(ownerId: string, universeId: string, characterId: string, query: string) {
   if (!ownerId || !universeId || !characterId) return [];
+  // Limit recall for blank prompts and prevent unexpectedly large text processing.
+  query = typeof query === 'string' ? query.slice(0,4000) : '';
   const rows = await db.execute(sql`SELECT title,content,truth_status,keywords,updated_at
     FROM echo_world_journals WHERE owner_id=${ownerId} AND universe_id=${universeId}
     AND status='published'
