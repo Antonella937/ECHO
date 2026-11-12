@@ -93,7 +93,7 @@ export function PostCard({ post, onCommentClick, eager }: Props) {
               </span>
             )}
           />
-          {post.musicClip && <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[min(75%,280px)]"><div className="pointer-events-auto"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.music?.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div></div>}
+          {post.musicClip && <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[min(75%,280px)]"><div className="pointer-events-auto"><MusicClipPlayer clip={post.musicClip} compact autoPlay artist={post.musicClip.artist} source={{ universeId, surface: 'post', contentId: post.id, viewerUniverseId: universeId, viewerCharacterId: me.id }} /></div></div>}
           {tagged.length > 0 && <button type="button" onClick={() => setShowPhotoTags(v => !v)} aria-label={t("Con")} aria-expanded={showPhotoTags} className="absolute bottom-3 left-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white shadow-md" data-testid={`button-photo-tags-${post.id}`}><UserRound className="h-4 w-4" /></button>}
           {showPhotoTags && tagged.length > 0 && <div className="absolute bottom-14 left-3 z-10 max-w-[85%] rounded-xl bg-black/80 p-2 text-white shadow-lg" data-testid={`overlay-photo-tags-${post.id}`}>
             <p className="mb-1 text-[11px] opacity-75">{t("Con")}</p>
