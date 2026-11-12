@@ -12,7 +12,7 @@ const words: Record<string,[string,string,string,string,string,string]> = {
  ja:['チャットの外観','背景','透明度','背景なし','ダーク','保存'],
  zh:['聊天外观','背景','透明度','无背景','深色','保存'],
 };
-export type DmAppearance={background:string;opacity:number;image?:string};
+export type DmAppearance={background:string;opacity:number;image?:string;layout?:'chat'|'narrative'};
 const choices=['none','dark','rose','violet','blue'] as const;
 const gradients:Record<string,string>={
  dark:'linear-gradient(145deg,#14101f,#33283c)',rose:'linear-gradient(145deg,#4b283c,#ac668d)',
@@ -22,7 +22,7 @@ export function readDmAppearance(key:string):DmAppearance{
  try{
   const raw=JSON.parse(localStorage.getItem(key)??'null') as Partial<DmAppearance>|null;
   return {background:(choices.includes(raw?.background as typeof choices[number])||(raw?.background==='photo'&&typeof raw.image==='string'&&raw.image.startsWith('data:image/')))?raw!.background!:'none',
-   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&raw.image.startsWith('data:image/')?raw.image:undefined};
+   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&raw.image.startsWith('data:image/')?raw.image:undefined,layout:raw?.layout==='narrative'?'narrative':'chat'};
  }catch{return {background:'none',opacity:35};}
 }
 export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void}){
@@ -51,6 +51,9 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    </label>
    {uploadError&&<p role="alert" className="text-xs text-destructive">{lang==='es'?'Imagen demasiado grande o no se pudo guardar (máximo 2 MB).':'Image too large or could not be saved (max 2 MB).'}</p>}
    {draft.image&&<button type="button" onClick={()=>setDraft(old=>({...old,image:undefined,background:'none'}))} className="mt-2 block text-xs underline">{lang==='es'?'Quitar foto':'Remove photo'}</button>}
+   <fieldset className="mt-3"><legend className="text-xs">{lang==='es'?'Presentación':lang==='pt'?'Apresentação':lang==='fr'?'Affichage':lang==='de'?'Darstellung':lang==='it'?'Visualizzazione':lang==='ko'?'표시 방식':lang==='ja'?'表示形式':lang==='zh'?'显示方式':'Display mode'}</legend>
+    <div className="mt-1 flex gap-2">{(['chat','narrative'] as const).map(layout=><button key={layout} type="button" aria-pressed={(draft.layout??'chat')===layout} onClick={()=>setDraft(old=>({...old,layout}))} className={`rounded-lg border px-3 py-2 text-xs ${(draft.layout??'chat')===layout?'border-primary bg-primary/15':'border-border'}`}>{layout==='chat'?(lang==='es'?'Chat':lang==='ko'?'채팅':lang==='ja'?'チャット':lang==='zh'?'聊天':'Chat'):(lang==='es'?'Narrativa':lang==='pt'?'Narrativa':lang==='fr'?'Narratif':lang==='de'?'Erzählung':lang==='it'?'Narrativa':lang==='ko'?'서술형':lang==='ja'?'物語形式':lang==='zh'?'叙事':'Narrative')}</button>)}</div>
+   </fieldset>
    <label className="mt-3 block text-xs">{t[2]}: {draft.opacity}%
     <input type="range" min={0} max={100} value={draft.opacity} onChange={e=>setDraft(old=>({...old,opacity:Number(e.target.value)}))} className="mt-2 w-full"/>
    </label>
