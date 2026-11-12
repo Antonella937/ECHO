@@ -45,6 +45,18 @@ kindroidLinksRouter.put('/characters/kindroid-link',async(req,res)=>{
   if(!p.success){res.status(400).json({error:'INVALID_KINDROID_LINK'});return;}
   if(!await authorized(req.userId!,p.data.universeId,p.data.characterId)){res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;}
   try{
+    // A Kindroid slot is a single external conversation memory. Never enable it
+    // for two active ECHO characters, even across separate universes.
+    if(p.data.enabled){
+      const collisions=await db.execute(sql`SELECT universe_id,character_id FROM echo_kindroid_character_links
+        WHERE owner_id=${req.userId!} AND kin_id=${p.data.kinId} AND enabled=true
+        AND NOT(universe_id=${p.data.universeId} AND character_id=${p.data.characterId})
+        LIMIT 1`);
+      if(collisions.rows.length){
+        res.status(409).json({error:'KINDROID_SLOT_ALREADY_CONNECTED',universeId:collisions.rows[0].universe_id});
+        return;
+      }
+    }
     await db.execute(sql`INSERT INTO echo_kindroid_character_links (owner_id,universe_id,character_id,kin_id,enabled,social_context_enabled)
       VALUES (${req.userId!},${p.data.universeId},${p.data.characterId},${p.data.kinId},${p.data.enabled},${p.data.socialContextEnabled})
       ON CONFLICT (owner_id,universe_id,character_id)
