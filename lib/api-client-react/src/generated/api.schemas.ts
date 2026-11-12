@@ -152,8 +152,10 @@ export interface UniverseManagementInput {
      * @maxLength 60
      */
   name?: string;
-  /** @maxLength 500 */
+  /** @maxLength 8000 */
   description?: string;
+  /** @maxLength 4000 */
+  timeline?: string;
   /** @maxLength 80 */
   confirmationText?: string;
 }
@@ -175,6 +177,7 @@ export interface CreatorUniverseSummary {
   characterCount: number;
   current: boolean;
   description?: string;
+  timeline?: string;
   archived?: boolean;
 }
 
@@ -230,8 +233,10 @@ export const CreatorSetupPlan = {
 } as const;
 
 export interface CreatorSetup {
-  /** @maxLength 500 */
+  /** @maxLength 8000 */
   universeDescription?: string;
+  /** @maxLength 4000 */
+  universeTimeline?: string;
   plan: CreatorSetupPlan;
   /**
      * @minLength 1
