@@ -160,10 +160,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
             .filter(m => kindroidMemoryAllowed(m, 'nela'))
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
-          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
-            .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
-            .catch(() => [] as string[]); // Migration may not be applied yet; never fall back to unscoped data.
-          socialContext = [...posts,...comments,...older,...seenStories,...memories,...journalFacts].join('\n').slice(0,5000);
+          socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
         }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
@@ -182,6 +179,22 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   const approvedJournals = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
     .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
   const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
+  // Kindroid's provider receives its context when constructed, unlike the native provider.
+  // Add the same scoped knowledge without including other characters' private dossiers.
+  if (selectedProvider !== dependencies.provider && journalContext && input.situation === 'dm') {
+    const thread = parsed.data.state.messages.filter(m =>
+      (m.senderId === 'nela' && m.recipientId === input.characterId) ||
+      (m.senderId === input.characterId && m.recipientId === 'nela'))
+      .sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+    const newest = thread[0];
+    const links = await db.execute(sql`SELECT kin_id,social_context_enabled FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${input.universeId ?? 'primary'}
+      AND character_id=${input.characterId} AND enabled=true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (newest?.senderId === 'nela' && typeof kinId === 'string' && kinId) {
+      selectedProvider = kindroidDmProvider(newest.text, kinId, journalContext.slice(0,3200));
+    }
+  }
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
     new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext);
 }
