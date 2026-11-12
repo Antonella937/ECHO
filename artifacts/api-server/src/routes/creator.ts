@@ -1,3 +1,4 @@
+import { dmCanonCandidates } from "../lib/canon-knowledge";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
 import { db, echoMediaTable } from "@workspace/db";
@@ -14,7 +15,7 @@ import {
   MAX_AUTONOMY_RESERVE_PERCENT,
 } from "../lib/ai-usage";
 import {
-  createAdditionalUniverse, creatorEntitlements, creatorCapacity, listUniverses, StructuralLimitError,
+  createAdditionalUniverse, creatorEntitlements, creatorCapacity, listUniverses, StructuralLimitError, readUniverse,
 } from "../lib/universeRepository";
 import { universeAccountError } from "../lib/universeValidation";
 import { SaveUniverseBody } from "@workspace/api-zod";
@@ -222,6 +223,27 @@ router.post("/creator/universes", async (req, res): Promise<void> => {
     }
     throw error;
   }
+});
+
+// DM review is owner-scoped, universe-scoped and bound to the active identity.
+router.get("/creator/universes/:universeId/dm-canon-candidates/:peerId", async (req, res) => {
+  const universeId = z.string().min(1).max(120).safeParse(req.params.universeId);
+  const peerId = z.string().min(1).max(120).safeParse(req.params.peerId);
+  if (!universeId.success || !peerId.success) { res.status(400).json({ error: "INVALID_DM_SCOPE" }); return; }
+  try {
+    const universe = await readUniverse(req.userId!, universeId.data);
+    const state = universe.state;
+    if (!state) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
+    const viewerId = state.currentCharacterId;
+    if (typeof viewerId !== "string" || viewerId === peerId.data ||
+      !Array.isArray(state.characters) ||
+      !state.characters.some((character: {id?:unknown;archived?:unknown}) => character.id === viewerId && character.archived !== true) ||
+      !state.characters.some((character: {id?:unknown;archived?:unknown}) => character.id === peerId.data && character.archived !== true)) {
+      res.status(403).json({ error: "DM_VIEWER_NOT_ALLOWED" }); return;
+    }
+    const messages = Array.isArray(state.messages) ? state.messages : [];
+    res.json({ candidates: dmCanonCandidates(messages, viewerId, peerId.data) });
+  } catch { res.status(503).json({ error: "DM_CANON_CANDIDATES_UNAVAILABLE" }); }
 });
 
 return router;
