@@ -1,3 +1,4 @@
+import { checkWorldJournalAfterDm } from "../lib/worldJournalAuto";
 import { triggerImmediateDmReply } from "../autonomy/runtime";
 import {
   GetUniverseResponse,
@@ -694,6 +695,8 @@ router.put("/universe", async (req, res): Promise<void> => {
       message.recipientId !== message.senderId && message.text.trim().length > 0 &&
       !message.hiddenForIds?.includes(message.recipientId));
     for (const message of incoming) {
+      void checkWorldJournalAfterDm(req.userId!, universeId, message.threadId,
+        enrichedState.messages, enrichedState.characters);
       void triggerImmediateDmReply(req.userId!, universeId, message.recipientId, message.id)
         .catch(error => console.warn("Immediate DM reply failed", { reason: error instanceof Error ? error.message.slice(0,80) : "UNKNOWN" }));
     }
