@@ -163,7 +163,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
             .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
             .catch(() => [] as string[]);
-          socialContext = [...posts,...comments,...older,...seenStories,...memories,...journalFacts].join('\n').slice(0,5000);
+          const reservedJournalContext = journalFacts.join('\n').slice(0,2200);
+          const socialBudget = Math.max(0, 5000 - reservedJournalContext.length - 1);
+          const socialPart = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,socialBudget);
+          socialContext = [reservedJournalContext,socialPart].filter(Boolean).join('\n');
         }
         // World knowledge is independent of the optional social-context toggle.
         // Restrict it to approved entries visible to this exact character.
