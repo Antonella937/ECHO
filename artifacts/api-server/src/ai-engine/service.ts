@@ -9,6 +9,7 @@ import { clerkClient } from '@clerk/express';
 import { kindroidDmProvider } from './kindroid';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
+import { relevantWorldJournals } from '../lib/worldJournalRecall';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -159,12 +160,38 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
             .filter(m => kindroidMemoryAllowed(m, 'nela'))
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
-          socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
+          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
+            .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
+            .catch(() => [] as string[]);
+          const reservedJournalContext = journalFacts.join('\n').slice(0,2200);
+          const socialBudget = Math.max(0, 5000 - reservedJournalContext.length - 1);
+          const socialPart = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,socialBudget);
+          socialContext = [reservedJournalContext,socialPart].filter(Boolean).join('\n');
+        }
+        // World knowledge is independent of the optional social-context toggle.
+        // Restrict it to approved entries visible to this exact character.
+        if (links.rows[0]?.social_context_enabled !== true) {
+          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
+            .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
+          socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,3200);
         }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
     }
   }
+  const journalQuery = [
+    parsed.data.state.posts.find(p => p.id === input.postId)?.caption,
+    parsed.data.state.stories.find(s => s.id === input.storyId)?.caption,
+    parsed.data.state.messages.find(m => m.id === input.messageId)?.text,
+    ...parsed.data.state.messages.filter(m =>
+      (m.senderId === input.recipientId && m.recipientId === input.characterId) ||
+      (m.senderId === input.characterId && m.recipientId === input.recipientId))
+      .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+      .slice(0,3).map(m => m.text),
+  ].filter(Boolean).join(' ');
+  const approvedJournals = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
+    .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
+  const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext);
 }

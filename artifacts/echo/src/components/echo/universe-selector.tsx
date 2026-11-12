@@ -1,4 +1,5 @@
 import { UniverseLoreSections } from './universe-lore-sections';
+import { WorldJournals } from './world-journals';
 import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Check, ChevronRight, Layers, Plus } from 'lucide-react';
@@ -90,7 +91,7 @@ export function UniverseSelector() {
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
       <Sheet open={open} onClose={close} title={t(management ? 'Gestionar universo' : creating ? 'Crear universo' : 'Tus universos')} testId="sheet-universes">
-        {management ? <UniverseManagementForm key={`${management.universe.universeId}:${management.action}:${management.universe.revision}`}
+        {management ? <><UniverseManagementForm key={`${management.universe.universeId}:${management.action}:${management.universe.revision}`}
           universe={management.universe} action={management.action} busy={busy}
           cancel={() => { setManagement(null); setError(null); }}
           submit={data => void run(async () => {
@@ -106,7 +107,10 @@ export function UniverseSelector() {
             }
             setManagement(null);
             await Promise.all([list.refetch(), account.refetch()]);
-          })} /> : !creating ? (
+          })} />
+          {management.action === 'edit' && management.universe.universeId === activeId &&
+            <WorldJournals universeId={activeId} characters={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />}
+        </> : !creating ? (
           <div className="space-y-3">
             {list.isLoading && <p role="status" className="text-sm text-muted-foreground">{t("Cargando universos…")}</p>}
             {list.isError && <div role="alert" className="text-sm text-destructive">

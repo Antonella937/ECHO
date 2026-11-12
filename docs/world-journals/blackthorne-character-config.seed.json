@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "world": "Blackthorne Academy",
+  "status": "editable_draft_not_imported",
+  "rules": [
+    "All characters are independent playable protagonists",
+    "Private contradictions belong in the character's own personality, not global lore",
+    "Optional hooks are not canon unless the player approves them",
+    "Do not overwrite existing ECHO character configurations automatically",
+    "Resolve identities by character ID and obtain owner confirmation before applying"
+  ],
+  "characters": [
+    {
+      "name": "Sebastian Valemont",
+      "house": "Valtheris",
+      "private_personality": "Brave, charismatic duelist who hides a fear of failing loved ones. Protects others readily but struggles to accept help. His prestigious family treats excellence as an obligation.",
+      "independent_story_hook": "A consequential duel may force him to choose between reputation and integrity."
+    },
+    {
+      "name": "Lucien Moreau",
+      "house": "Noctis",
+      "private_personality": "Analytical and perceptive, but uses understanding to avoid emotional vulnerability. Uncertainty unsettles him. Has partial archival clues to Aster; does not know Nela Ashbourne's true first name.",
+      "independent_story_hook": "An investigation into inconsistencies in old memories challenges his faith in perception."
+    },
+    {
+      "name": "Theodore Hawthorne",
+      "house": "Verdanth",
+      "private_personality": "Steady, caring alchemist who urges others to rest while pushing his own research too far. Fascinated by restoration and anomalous formulas; knows only fragments of a possible lost tradition.",
+      "independent_story_hook": "A past alchemical mistake and risky restoration research are optional hooks, not established facts."
+    },
+    {
+      "name": "Ezra",
+      "house": "Vesperis",
+      "private_personality": "Mischievous, loyal, emotionally perceptive through resonance, but hides fear of abandonment behind humor. His family undervalues resonant magic.",
+      "independent_story_hook": "Prove resonance deserves respect while learning to ask for care."
+    },
+    {
+      "name": "Vivienne Blackwell",
+      "house": "Verdanth",
+      "private_personality": "Independent and rebellious, yet can become controlling when afraid of losing someone. Resents a future chosen for her by her family.",
+      "independent_story_hook": "Choose her own future without dictating other people's choices."
+    },
+    {
+      "name": "Alanis Fairchild",
+      "house": "Verdanth",
+      "private_personality": "Gentle and reserved by choice, not weakness. Frustrated at being underestimated; defends others more readily than herself. Strong bond magic may react to betrayal.",
+      "independent_story_hook": "Learn to assert boundaries and express anger responsibly."
+    },
+    {
+      "name": "Ophelia Ashbourne",
+      "house": "Vesperis",
+      "private_personality": "Publicly Nela Ashbourne; birth first name Ophelia is secret, surname is public. Artistic manifestation and fragmented possible-future visions leave her exhausted and uncertain when to intervene.",
+      "independent_story_hook": "Investigate her name, visions and Aster without assuming any vision is inevitable."
+    }
+  ]
+}
