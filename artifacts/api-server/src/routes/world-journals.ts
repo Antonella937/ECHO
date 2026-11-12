@@ -28,6 +28,11 @@ function validCharacters(state: { characters?: Array<{id?:string;archived?:boole
   const allowed = new Set((state?.characters ?? []).filter(c => !c.archived).map(c => c.id));
   return ids.every(id => allowed.has(id));
 }
+function journalAudienceIsValid(entry: z.infer<typeof entrySchema>) {
+  return (entry.knowledgeScope !== 'selected' || entry.knownCharacterIds.length > 0)
+    && (entry.knowledgeScope === 'selected' || entry.knownCharacterIds.length === 0)
+    && (entry.category !== 'secret' || entry.knowledgeScope !== 'everyone');
+}
 function invalid(req: {params:unknown}) { return params.safeParse(req.params); }
 router.get("/universe/:universeId/journals", async (req,res):Promise<void> => {
   const p=invalid(req); if(!p.success){res.status(400).json({error:"INVALID_UNIVERSE_ID"});return;}
@@ -44,9 +49,7 @@ router.post("/universe/:universeId/journals", async(req,res):Promise<void>=>{
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
-  if((b.data.knowledgeScope==='selected' && b.data.knownCharacterIds.length===0) ||
-     (b.data.knowledgeScope!=='selected' && b.data.knownCharacterIds.length>0) ||
-     (b.data.category==='secret' && b.data.knowledgeScope==='everyone')){
+  if(!journalAudienceIsValid(b.data)){
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
@@ -64,9 +67,7 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
-  if((b.data.knowledgeScope==='selected' && b.data.knownCharacterIds.length===0) ||
-     (b.data.knowledgeScope!=='selected' && b.data.knownCharacterIds.length>0) ||
-     (b.data.category==='secret' && b.data.knowledgeScope==='everyone')){
+  if(!journalAudienceIsValid(b.data)){
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
@@ -111,9 +112,7 @@ router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<vo
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
-  if((b.data.knowledgeScope==='selected' && b.data.knownCharacterIds.length===0) ||
-     (b.data.knowledgeScope!=='selected' && b.data.knownCharacterIds.length>0) ||
-     (b.data.category==='secret' && b.data.knowledgeScope==='everyone')){
+  if(!journalAudienceIsValid(b.data)){
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
