@@ -47,3 +47,24 @@ test("AI recall excludes private events outside character knowledge", () => {
   assert.doesNotMatch(ezra, /confession|legacy/);
   assert.equal(readableCanonTimeline(events, "stranger"), "Everyone saw the concert.");
 });
+
+test("persisted event permissions survive JSON roundtrip without leaking", () => {
+  const saved = JSON.stringify([
+    {sourceKey:"dm:ezra:ophelia:m1",text:"A secret promise was made.",visibility:"participants",witnessIds:["ezra","ophelia"]},
+    {sourceKey:"group:g1:m2",text:"The group planned their escape.",visibility:"participants",witnessIds:["ezra","ophelia","lucien"]},
+    {sourceKey:"scene:s1:m3",text:"The gates opened for everyone.",visibility:"public",witnessIds:[]},
+  ]);
+  const restored: unknown = JSON.parse(saved);
+  assert.match(readableCanonTimeline(restored,"lucien"),/group planned|gates opened/);
+  assert.doesNotMatch(readableCanonTimeline(restored,"lucien"),/secret promise/);
+  assert.equal(readableCanonTimeline(restored,"outsider"),"The gates opened for everyone.");
+});
+test("malformed private event metadata is excluded from AI context", () => {
+  const malformed = [
+    {text:"Unknown private secret.",visibility:"private",witnessIds:[]},
+    {text:"Another private secret.",visibility:"participants",witnessIds:"ezra"},
+    {text:"A third private secret.",visibility:"private",witnessIds:[42]},
+    {text:"A fourth private secret.",visibility:"private",witnessIds:["ezra"],audienceIds:"everyone"},
+  ];
+  assert.equal(readableCanonTimeline(malformed,"ezra"),"");
+});
