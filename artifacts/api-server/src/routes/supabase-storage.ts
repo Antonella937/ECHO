@@ -170,7 +170,10 @@ export function createSupabaseStorageRouter(): IRouter {
   });
 
   router.get("/storage/objects/*objectPath", requireAuth, async (req, res) => {
-    res.setHeader("Cache-Control", "private, no-store");
+    // Allow short-lived browser-only caching of immutable, authenticated media.
+    // Never cache in shared CDNs; access changes can take up to 60s to expire locally.
+    res.setHeader("Cache-Control", "private, max-age=60, must-revalidate");
+    res.setHeader("Vary", "Cookie, Authorization");
     res.setHeader("X-Content-Type-Options", "nosniff");
     const raw = req.params.objectPath;
     const objectPath = `/objects/${Array.isArray(raw) ? raw.join("/") : raw}`;
