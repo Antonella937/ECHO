@@ -1,3 +1,4 @@
+import { DmAppearanceSettings, readDmAppearance, dmBackgroundStyle } from '@/components/echo/dm-appearance';
 import { DmCanonReview } from '@/components/echo/dm-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
@@ -48,6 +49,9 @@ export default function ConversationPage() {
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
+  const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
+  const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
+  useEffect(()=>setAppearance(readDmAppearance(appearanceKey)),[appearanceKey]);
   const { me, character, actions, state } = useSocial();
   const other = character(id);
   const messages = useThreadMessages(id);
@@ -312,9 +316,10 @@ export default function ConversationPage() {
           <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="ml-auto tap flex h-11 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-primary hover:bg-primary/20" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
+      <div className="relative z-40 flex justify-end px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div style={{...dmBackgroundStyle(appearance),backgroundColor:appearance.background==='none'?undefined:`color-mix(in srgb, var(--background) ${100-appearance.opacity}%, transparent)`,backgroundSize:'cover'}} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
