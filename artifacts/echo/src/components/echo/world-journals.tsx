@@ -29,6 +29,15 @@ export function WorldJournals({ universeId, characters }: {
     const data=await customFetch<{entries:Entry[]}>(url,{responseType:'json'});
     setEntries(data.entries);
   };
+  // A universe switch must never briefly show the previous world's private entries.
+  useEffect(()=>{
+    setEntries([]);
+    setDraft(empty());
+    setEditing(null);
+    setKeywordInput('');
+    setError('');
+    setOpened(false);
+  },[universeId]);
   useEffect(()=>{ if(!opened)return; let active=true;
     void customFetch<{entries:Entry[]}>(url,{responseType:'json'})
       .then(data=>{if(active)setEntries(data.entries);})
