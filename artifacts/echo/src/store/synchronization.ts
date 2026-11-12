@@ -51,19 +51,20 @@ export class UniverseSync {
     private universeId = 'primary',
   ) {}
 
+  private recoveryOwner() { return this.universeId === 'primary' ? this.owner : `${this.owner}:universe:${this.universeId}`; }
   private emit() { if (!this.stopped) this.publish({ ...this.view }); }
   stop() { this.stopped = true; }
   private backup() {
     if (!this.view.state) return this.disk;
     const recovery = structuredClone({ base: this.base, state: this.view.state });
-    this.disk = this.disk.catch(() => undefined).then(() => this.io.saveRecovery(this.owner, recovery));
+    this.disk = this.disk.catch(() => undefined).then(() => this.io.saveRecovery(this.recoveryOwner(), recovery));
     return this.disk;
   }
   async initialize() {
     this.view.busy = true; this.view.error = null; this.emit();
     try {
       const [remote, recovery, legacy] = await Promise.all([
-        this.io.loadUniverse(this.universeId), this.io.loadRecovery(this.owner), this.io.loadLegacyState(),
+        this.io.loadUniverse(this.universeId), this.io.loadRecovery(this.recoveryOwner()), this.universeId === 'primary' ? this.io.loadLegacyState() : Promise.resolve(null),
       ]);
       if (this.stopped) return;
       this.remoteRevision = remote.revision;
