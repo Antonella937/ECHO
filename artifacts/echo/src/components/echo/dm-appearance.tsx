@@ -1,0 +1,58 @@
+import { useEffect, useState } from 'react';
+import { useLanguage } from '@/lib/i18n';
+
+const words: Record<string,[string,string,string,string,string,string]> = {
+ es:['Apariencia del chat','Fondo','Transparencia','Sin fondo','Oscuro','Guardar'],
+ en:['Chat appearance','Background','Transparency','No background','Dark','Save'],
+ pt:['Aparência do chat','Fundo','Transparência','Sem fundo','Escuro','Salvar'],
+ fr:['Apparence du chat','Fond','Transparence','Sans fond','Sombre','Enregistrer'],
+ de:['Chat-Darstellung','Hintergrund','Transparenz','Kein Hintergrund','Dunkel','Speichern'],
+ it:['Aspetto chat','Sfondo','Trasparenza','Nessuno sfondo','Scuro','Salva'],
+ ko:['채팅 모양','배경','투명도','배경 없음','어두움','저장'],
+ ja:['チャットの外観','背景','透明度','背景なし','ダーク','保存'],
+ zh:['聊天外观','背景','透明度','无背景','深色','保存'],
+};
+export type DmAppearance={background:string;opacity:number};
+const choices=['none','dark','rose','violet','blue'] as const;
+const gradients:Record<string,string>={
+ dark:'linear-gradient(145deg,#14101f,#33283c)',rose:'linear-gradient(145deg,#4b283c,#ac668d)',
+ violet:'linear-gradient(145deg,#282044,#755d9c)',blue:'linear-gradient(145deg,#192b3d,#48778d)',
+};
+export function readDmAppearance(key:string):DmAppearance{
+ try{
+  const raw=JSON.parse(localStorage.getItem(key)??'null') as Partial<DmAppearance>|null;
+  return {background:choices.includes(raw?.background as typeof choices[number])?raw!.background!:'none',
+   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35};
+ }catch{return {background:'none',opacity:35};}
+}
+export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void}){
+ const lang=useLanguage();const t=words[lang]??words.en;
+ const [open,setOpen]=useState(false);
+ const [draft,setDraft]=useState(value);
+ useEffect(()=>setDraft(value),[value]);
+ return <div className="relative">
+  <button type="button" onClick={()=>setOpen(v=>!v)} className="rounded-full border border-border px-3 py-2 text-xs" aria-expanded={open}>{t[0]}</button>
+  {open&&<section className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-background p-3 shadow-xl">
+   <p className="mb-2 text-xs font-medium">{t[1]}</p>
+   <div className="flex flex-wrap gap-2">{choices.map(choice=><button type="button" key={choice}
+    aria-label={choice==='none'?t[3]:choice==='dark'?t[4]:choice}
+    aria-pressed={draft.background===choice}
+    onClick={()=>setDraft(old=>({...old,background:choice}))}
+    style={{background:gradients[choice]??'var(--background)'}}
+    className={`h-9 w-9 rounded-full border-2 ${draft.background===choice?'border-primary':'border-border'}`}/>)}</div>
+   <label className="mt-3 block text-xs">{t[2]}: {draft.opacity}%
+    <input type="range" min={0} max={100} value={draft.opacity} onChange={e=>setDraft(old=>({...old,opacity:Number(e.target.value)}))} className="mt-2 w-full"/>
+   </label>
+   <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" onClick={()=>{
+    try{localStorage.setItem(storageKey,JSON.stringify(draft));}catch{/* private browsing */}
+    onChange(draft);setOpen(false);
+   }}>{t[5]}</button>
+  </section>}
+ </div>;
+}
+export function dmBackgroundStyle(value:DmAppearance){
+ return value.background==='none'?{}:{
+  backgroundImage:gradients[value.background],
+  backgroundBlendMode:'normal' as const,
+ };
+}
