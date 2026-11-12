@@ -33,7 +33,7 @@ dmConversationPreferencesRouter.get("/dm/conversation-preferences", async (req, 
     if (!await ownsCharacter(req.userId!, universeId, characterId)) { res.status(403).json({ error: "CHARACTER_NOT_ACCESSIBLE" }); return; }
     const result = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND character_id = ${characterId} LIMIT 1`);
     const saved = result.rows[0]?.preferences;
-    const valid = preferences.safeParse(saved);
+    const valid = preferences.safeParse(saved && typeof saved === "object" ? Object.fromEntries(Object.entries(saved).filter(([key]) => key !== "appearance")) : saved);
     if (valid.success) { res.json({ preferences: valid.data, inherited: false }); return; }
     res.json({ preferences: defaults, inherited: false });
   } catch (error) {
@@ -52,7 +52,7 @@ dmConversationPreferencesRouter.put("/dm/conversation-preferences", async (req, 
     const payload = JSON.stringify(parsed.data.preferences);
     await db.execute(sql`INSERT INTO echo_dm_conversation_preferences (owner_id, universe_id, character_id, preferences)
       VALUES (${req.userId!}, ${universeId}, ${characterId}, ${payload}::jsonb)
-      ON CONFLICT (owner_id, universe_id, character_id) DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = now()`);
+      ON CONFLICT (owner_id, universe_id, character_id) DO UPDATE SET preferences = EXCLUDED.preferences || jsonb_build_object('appearance', COALESCE(echo_dm_conversation_preferences.preferences->'appearance', 'null'::jsonb)), updated_at = now()`);
     res.json({ preferences: parsed.data.preferences });
   } catch (error) {
     console.error("DM preferences operation failed", error);
