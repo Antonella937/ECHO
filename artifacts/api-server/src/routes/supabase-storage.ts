@@ -194,7 +194,7 @@ export function createSupabaseStorageRouter(): IRouter {
            ))) LIMIT 1`,
         [objectPath,media.ownerId,req.userId],
       );
-      if (!voiceAccess.rowCount && !publicationAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
+      if (media.ownerId !== req.userId! && !voiceAccess.rowCount && !publicationAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
         res.status(404).end(); return;
       }
       const { base, key } = config();
