@@ -39,12 +39,14 @@ export function WorldJournals({ universeId, characters }: {
     setEditing(null);
     setKeywordInput('');
     setError('');
+    setBusy(false);
     setOpened(false);
   },[universeId]);
   useEffect(()=>{ if(!opened)return; let active=true;
     void customFetch<{entries:Entry[]}>(url,{responseType:'json'})
       .then(data=>{if(active && currentUniverseRef.current===universeId)setEntries(data.entries);})
-      .catch(e=>{if(active)setError(e instanceof Error?e.message:'No se pudieron cargar los Journals');});
+      .catch(e=>{if(active && currentUniverseRef.current===universeId)
+        setError(e instanceof Error?e.message:'No se pudieron cargar los Journals');});
     return()=>{active=false;};
   },[opened,url]);
   const save=async()=>{
@@ -63,14 +65,21 @@ export function WorldJournals({ universeId, characters }: {
     finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
   };
   const approve=async(id:string)=>{
+    const requestedUniverse=universeId;
     setBusy(true);setError('');
     try{await customFetch(`${url}/${id}/approve`,{method:'POST',responseType:'json'});await load();}
-    catch(e){setError(e instanceof Error?e.message:'No se pudo aprobar');}
-    finally{setBusy(false);}
+    catch(e){if(currentUniverseRef.current===requestedUniverse)
+      setError(e instanceof Error?e.message:'No se pudo aprobar');}
+    finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
   };
-  const archive=async(id:string)=>{setBusy(true);setError('');try{
-    await customFetch(`${url}/${id}/archive`,{method:'POST',responseType:'json'});await load();
-  }catch(e){setError(e instanceof Error?e.message:'No se pudo archivar');}finally{setBusy(false);}};
+  const archive=async(id:string)=>{
+    const requestedUniverse=universeId;
+    setBusy(true);setError('');
+    try{await customFetch(`${url}/${id}/archive`,{method:'POST',responseType:'json'});await load();}
+    catch(e){if(currentUniverseRef.current===requestedUniverse)
+      setError(e instanceof Error?e.message:'No se pudo archivar');}
+    finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
+  };
   const edit=(e:Entry)=>{
     setEditing(e.id);setKeywordInput(e.keywords.join(', '));setDraft({title:e.title,content:e.content,category:e.category,
       truthStatus:e.truth_status,knowledgeScope:e.knowledge_scope,
