@@ -319,7 +319,7 @@ export default function ConversationPage() {
       <div className="relative z-40 flex justify-end px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div style={{...dmBackgroundStyle(appearance),backgroundColor:appearance.background==='none'?undefined:`color-mix(in srgb, var(--background) ${100-appearance.opacity}%, transparent)`,backgroundSize:'cover'}} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div style={{...dmBackgroundStyle(appearance),backgroundColor:appearance.background==='none'?undefined:'var(--background)',backgroundSize:'cover'}} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
@@ -662,7 +662,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           <p
             className={cn(
               'min-w-0 max-w-[92%] sm:max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug',
-              mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-secondary text-foreground',
+              mine ? 'rounded-br-md bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/40' : 'rounded-bl-md bg-card text-card-foreground shadow-lg ring-1 ring-border',
             )}
           >
             <SocialText text={visibleText} />
@@ -720,7 +720,7 @@ function Bubble({ m, mine, meId, otherId, showTime, state, quoted, names, isLast
           ))}
         </div>
       )}
-      {m.editedAt && <span className="mt-0.5 text-[10px] text-muted-foreground">{t('Editado')}</span>}
+      <span className="mt-0.5 rounded-full bg-background/75 px-2 py-0.5 text-[10px] text-foreground/80 backdrop-blur-sm" title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}{m.editedAt ? ` · ${t('Editado')}` : ''}</span>
       {mine && isLastMine && (
         <span className="mt-0.5 text-[11px] text-muted-foreground" data-testid={`status-read-${m.id}`}>{t(m.readBy.includes(otherId) ? 'Visto' : 'Enviado')}</span>
       )}
