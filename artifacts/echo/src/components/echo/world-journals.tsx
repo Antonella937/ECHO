@@ -20,6 +20,7 @@ export function WorldJournals({ universeId, characters }: {
   const [entries,setEntries]=useState<Entry[]>([]);
   const [draft,setDraft]=useState<Draft>(empty);
   const [editing,setEditing]=useState<string|null>(null);
+  const [keywordInput,setKeywordInput]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [opened,setOpened]=useState(false);
@@ -38,10 +39,10 @@ export function WorldJournals({ universeId, characters }: {
     setBusy(true);setError('');
     try {
       await customFetch(editing?`${url}/${editing}`:url,{
-        method:editing?'PUT':'POST',body:JSON.stringify(draft),
+        method:editing?'PUT':'POST',body:JSON.stringify({...draft,keywords:keywordInput.split(',').map(x=>x.trim()).filter(Boolean)}),
         headers:{'Content-Type':'application/json'},responseType:'json'
       });
-      setEditing(null);setDraft(empty());await load();
+      setEditing(null);setDraft(empty());setKeywordInput('');await load();
     }catch(e){setError(e instanceof Error?e.message:'Error al guardar');}
     finally{setBusy(false);}
   };
@@ -55,7 +56,7 @@ export function WorldJournals({ universeId, characters }: {
     await customFetch(`${url}/${id}/archive`,{method:'POST',responseType:'json'});await load();
   }catch(e){setError(e instanceof Error?e.message:'No se pudo archivar');}finally{setBusy(false);}};
   const edit=(e:Entry)=>{
-    setEditing(e.id);setDraft({title:e.title,content:e.content,category:e.category,
+    setEditing(e.id);setKeywordInput(e.keywords.join(', '));setDraft({title:e.title,content:e.content,category:e.category,
       truthStatus:e.truth_status,knowledgeScope:e.knowledge_scope,
       knownCharacterIds:e.known_character_ids,keywords:e.keywords,sourceType:e.source_type});
   };
@@ -116,13 +117,13 @@ export function WorldJournals({ universeId, characters }: {
           </label>)}
         </fieldset>}
         <label className="block text-xs">Palabras clave (separadas por coma)
-          <input className="mt-1 w-full rounded-xl border border-border bg-background p-3" value={draft.keywords.join(', ')}
-            onChange={e=>setDraft(v=>({...v,keywords:e.target.value.split(',').map(x=>x.trim()).filter(Boolean)}))}/>
+          <input className="mt-1 w-full rounded-xl border border-border bg-background p-3" value={keywordInput}
+            onChange={e=>setKeywordInput(e.target.value)}/>
         </label>
         <div className="flex gap-2">
           <button type="button" className="min-h-11 flex-1 rounded-xl bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
             disabled={busy||!draft.title.trim()||!draft.content.trim()||(draft.knowledgeScope==='selected'&&!draft.knownCharacterIds.length)} onClick={()=>void save()}>Guardar borrador</button>
-          {editing&&<button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" onClick={()=>{setEditing(null);setDraft(empty());}}>Cancelar</button>}
+          {editing&&<button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" onClick={()=>{setEditing(null);setDraft(empty());setKeywordInput('');}}>Cancelar</button>}
         </div>
       </div>
     </>}
