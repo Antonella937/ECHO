@@ -51,8 +51,12 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
  </div>;
 }
 export function dmBackgroundStyle(value:DmAppearance){
- return value.background==='none'?{}:{
-  backgroundImage:gradients[value.background],
-  backgroundBlendMode:'normal' as const,
+ if(value.background==='none') return {};
+ const colors:Record<string,[string,string]>={
+  dark:['#14101f','#33283c'],rose:['#4b283c','#ac668d'],
+  violet:['#282044','#755d9c'],blue:['#192b3d','#48778d'],
  };
+ const [a,b]=colors[value.background]??colors.dark;
+ const opacity=Math.max(0,Math.min(100,value.opacity));
+ return {backgroundImage:`linear-gradient(145deg,color-mix(in srgb,${a} ${opacity}%,transparent),color-mix(in srgb,${b} ${opacity}%,transparent))`};
 }
