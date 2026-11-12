@@ -130,7 +130,7 @@ scenesRouter.get("/scenes/:sceneId/canon-candidates", async (req, res) => {
 });
 // Explicit owner approval is required before a public scene event becomes canon.
 scenesRouter.post("/scenes/:sceneId/canon-candidates/:eventId/approve", async (req, res) => {
-  const parsed = scope.safeParse(req.body);
+  const parsed = scope.extend({ text: z.string().trim().min(1).max(1200).optional() }).strict().safeParse(req.body);
   const sceneId = id.safeParse(req.params.sceneId);
   const eventId = id.safeParse(req.params.eventId);
   if (!parsed.success || !sceneId.success || !eventId.success) {
@@ -155,7 +155,7 @@ scenesRouter.post("/scenes/:sceneId/canon-candidates/:eventId/approve", async (r
       const timeline = typeof setup.universeTimeline === "string" ? setup.universeTimeline : "";
       const marker = `[scene:${sceneId.data}:${eventId.data}]`;
       if (timeline.includes(marker)) return { status: 200, approved: true, duplicate: true };
-      const entry = `${marker} ${candidate.occurredAt}: ${candidate.text}`;
+      const entry = `${marker} ${candidate.occurredAt}: ${parsed.data.text ?? candidate.text}`;
       const next = timeline ? `${timeline}\n${entry}` : entry;
       if (next.length > 4000) return { status: 409, error: "UNIVERSE_TIMELINE_FULL" };
       await tx.update(echoUniversesTable).set({
@@ -167,6 +167,41 @@ scenesRouter.post("/scenes/:sceneId/canon-candidates/:eventId/approve", async (r
     if ("error" in result) { res.status(result.status).json({ error: result.error }); return; }
     res.json(result);
   } catch { res.status(503).json({ error: "CANON_APPROVAL_UNAVAILABLE" }); }
+});
+// Dismissed proposals remain excluded across reloads for this universe.
+scenesRouter.post("/scenes/:sceneId/canon-candidates/:eventId/dismiss", async (req, res) => {
+  const parsed = scope.strict().safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  const eventId = id.safeParse(req.params.eventId);
+  if (!parsed.success || !sceneId.success || !eventId.success) { res.status(400).json({ error: "INVALID_CANON_EVENT" }); return; }
+  try {
+    const result = await db.transaction(async tx => {
+      const [universe] = await tx.select().from(echoUniversesTable)
+        .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, parsed.data.universeId)))
+        .for("update").limit(1);
+      if (!universe || universe.archivedAt || universe.deletedAt) return false;
+      const scene = await tx.execute(sql`SELECT canon FROM echo_scenes WHERE owner_id=${req.userId!}
+        AND universe_id=${parsed.data.universeId} AND scene_id=${sceneId.data} LIMIT 1`);
+      if (scene.rows[0]?.canon !== "main") return false;
+      const events = await tx.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId", text, visibility,
+        audience_ids AS "audienceIds", created_at AS "createdAt" FROM echo_scene_events
+        WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND scene_id=${sceneId.data} AND event_id=${eventId.data} LIMIT 1`);
+      if (!sceneCanonCandidates(sceneId.data, events.rows).length) return false;
+      const setup = (universe.state.creatorSetup ?? {}) as Record<string, unknown>;
+      const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds.filter((v): v is string => typeof v === "string") : [];
+      const marker = `scene:${sceneId.data}:${eventId.data}`;
+      if (!dismissed.includes(marker)) {
+        await tx.update(echoUniversesTable).set({
+          state: { ...universe.state, creatorSetup: { ...setup, dismissedCanonEventIds: [...dismissed.slice(-999), marker] } },
+          revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date(),
+        }).where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, parsed.data.universeId)));
+      }
+      return true;
+    });
+    if (!result) { res.status(404).json({ error: "CANON_CANDIDATE_NOT_FOUND" }); return; }
+    res.json({ dismissed: true });
+  } catch { res.status(503).json({ error: "CANON_DISMISS_UNAVAILABLE" }); }
 });
 scenesRouter.post("/scenes/events", async (req, res) => {
   const parsed = event.safeParse(req.body);
