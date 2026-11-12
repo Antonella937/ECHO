@@ -169,7 +169,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
-  const journalQuery = [input.situation, ...parsed.data.state.messages.filter(m => m.senderId === input.recipientId && m.recipientId === input.characterId).slice(-2).map(m => m.text), ...parsed.data.state.messages.filter(m => m.senderId === input.recipientId && m.recipientId === input.characterId).slice(-2).map(m => m.text)].join(' ');
+  const journalQuery = [
+    parsed.data.state.posts.find(p => p.id === input.postId)?.caption,
+    parsed.data.state.stories.find(s => s.id === input.storyId)?.caption,
+    parsed.data.state.messages.find(m => m.id === input.messageId)?.text,
+    ...parsed.data.state.messages.filter(m =>
+      (m.senderId === input.recipientId && m.recipientId === input.characterId) ||
+      (m.senderId === input.characterId && m.recipientId === input.recipientId))
+      .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+      .slice(0,3).map(m => m.text),
+  ].filter(Boolean).join(' ');
   const approvedJournals = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
     .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
   const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
