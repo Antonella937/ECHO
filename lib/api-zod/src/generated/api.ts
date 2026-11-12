@@ -893,7 +893,7 @@ export const getUniverseResponseStateOneHighlightsMax = 200;
 
 export const getUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
-export const getUniverseResponseStateOneCreatorSetupUniverseDescriptionMax = 8000;
+export const getUniverseResponseStateOneCreatorSetupUniverseDescriptionMax = 100000;
 
 export const getUniverseResponseStateOneCreatorSetupUniverseNameMax = 60;
 
@@ -1440,7 +1440,7 @@ export const saveUniverseBodyStateHighlightsMax = 200;
 
 export const saveUniverseBodyStateAccountCatalogVersionMin = 0;
 
-export const saveUniverseBodyStateCreatorSetupUniverseDescriptionMax = 8000;
+export const saveUniverseBodyStateCreatorSetupUniverseDescriptionMax = 100000;
 
 export const saveUniverseBodyStateCreatorSetupUniverseNameMax = 60;
 
@@ -1975,7 +1975,7 @@ export const saveUniverseResponseStateOneHighlightsMax = 200;
 
 export const saveUniverseResponseStateOneAccountCatalogVersionMin = 0;
 
-export const saveUniverseResponseStateOneCreatorSetupUniverseDescriptionMax = 8000;
+export const saveUniverseResponseStateOneCreatorSetupUniverseDescriptionMax = 100000;
 
 export const saveUniverseResponseStateOneCreatorSetupUniverseNameMax = 60;
 
@@ -2558,7 +2558,7 @@ export const verifyUniverseResponseOneStateOneHighlightsMax = 200;
 
 export const verifyUniverseResponseOneStateOneAccountCatalogVersionMin = 0;
 
-export const verifyUniverseResponseOneStateOneCreatorSetupUniverseDescriptionMax = 8000;
+export const verifyUniverseResponseOneStateOneCreatorSetupUniverseDescriptionMax = 100000;
 
 export const verifyUniverseResponseOneStateOneCreatorSetupUniverseNameMax = 60;
 
@@ -3418,7 +3418,7 @@ export const createCreatorUniverseBodyStateHighlightsMax = 200;
 
 export const createCreatorUniverseBodyStateAccountCatalogVersionMin = 0;
 
-export const createCreatorUniverseBodyStateCreatorSetupUniverseDescriptionMax = 8000;
+export const createCreatorUniverseBodyStateCreatorSetupUniverseDescriptionMax = 100000;
 
 export const createCreatorUniverseBodyStateCreatorSetupUniverseNameMax = 60;
 
@@ -3952,7 +3952,7 @@ export const createCreatorUniverseResponseStateHighlightsMax = 200;
 
 export const createCreatorUniverseResponseStateAccountCatalogVersionMin = 0;
 
-export const createCreatorUniverseResponseStateCreatorSetupUniverseDescriptionMax = 8000;
+export const createCreatorUniverseResponseStateCreatorSetupUniverseDescriptionMax = 100000;
 
 export const createCreatorUniverseResponseStateCreatorSetupUniverseNameMax = 60;
 
