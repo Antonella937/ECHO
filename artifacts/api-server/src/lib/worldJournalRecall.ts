@@ -8,7 +8,13 @@ export async function relevantWorldJournals(ownerId: string, universeId: string,
   if (!ownerId || !universeId || !characterId) return [];
   const rows = await db.execute(sql`SELECT title,content,truth_status,keywords,updated_at
     FROM echo_world_journals WHERE owner_id=${ownerId} AND universe_id=${universeId}
-    AND status='published' AND (knowledge_scope='everyone'
+    AND status='published'
+    AND EXISTS (SELECT 1 FROM echo_universes u WHERE u.owner_id=${ownerId}
+      AND u.universe_id=${universeId} AND u.archived_at IS NULL AND u.deleted_at IS NULL
+      AND EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(u.state->'characters')='array'
+        THEN u.state->'characters' ELSE '[]'::jsonb END) ch
+        WHERE ch->>'id'=${characterId} AND COALESCE((ch->>'archived')::boolean,false)=false))
+    AND (knowledge_scope='everyone'
       OR (knowledge_scope='selected' AND ${characterId}=ANY(known_character_ids)))
     ORDER BY updated_at DESC LIMIT 200`);
   const terms = [...new Set((query.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []))]
