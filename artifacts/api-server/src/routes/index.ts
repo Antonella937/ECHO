@@ -9,6 +9,7 @@ import paddleBillingRouter from "./paddle-billing";
 import mercadoPagoBillingRouter from "./mercadopago-billing";
 import supportRouter from "./support";
 import universeRouter from "./universe";
+import worldJournalsRouter from "./world-journals";
 import universeSharingRouter from "./universe-sharing";
 import { createSupabaseStorageRouter } from "./supabase-storage";
 import charactersRouter from "./characters";
@@ -47,6 +48,7 @@ router.use(paddleBillingRouter);
 router.use(mercadoPagoBillingRouter);
 router.use(supportRouter);
 router.use(universeRouter);
+router.use(worldJournalsRouter);
 router.use(universeSharingRouter);
 // Never silently fall back to the retired Replit object-storage sidecar.
 // Supabase reports STORAGE_UNAVAILABLE when its credentials are missing.
