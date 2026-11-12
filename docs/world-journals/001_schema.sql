@@ -1,7 +1,8 @@
 -- ECHO World Journals: additive schema, no existing universe data changed.
 CREATE TABLE IF NOT EXISTS echo_world_journals (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- universe_id uuid NOT NULL,
+ owner_id text NOT NULL,
+ universe_id text NOT NULL,
  title text NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 180),
  content text NOT NULL CHECK (length(trim(content)) > 0),
  category text NOT NULL CHECK (category IN ('world_knowledge','shared_memory','secret')),
@@ -20,7 +21,7 @@ CREATE TABLE IF NOT EXISTS echo_world_journals (
  updated_at timestamptz NOT NULL DEFAULT now(),
  CONSTRAINT journal_published_requires_approval CHECK (status <> 'published' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
 );
-CREATE INDEX IF NOT EXISTS idx_echo_world_journals_universe_status ON echo_world_journals(universe_id,status);
+CREATE INDEX IF NOT EXISTS idx_echo_world_journals_universe_status ON echo_world_journals(owner_id,universe_id,status);
 CREATE INDEX IF NOT EXISTS idx_echo_world_journals_keywords ON echo_world_journals USING gin(keywords);
 CREATE INDEX IF NOT EXISTS idx_echo_world_journals_known ON echo_world_journals USING gin(known_character_ids);
 -- Security requirements for API integration:
