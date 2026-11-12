@@ -202,9 +202,13 @@ router.post("/universe/:universeId/journals/check-conversation",async(req,res):P
   const last=thread[thread.length-1];
   if(thread.length<4||!last){res.json({created:false,reason:"NOT_ENOUGH_CONVERSATION"});return;}
   const marker='dm:'+b.data.threadId+':'+last.id;
+  // Limit model calls per thread even when many new messages arrive.
   const existing=await db.execute(sql`SELECT id FROM echo_world_journals WHERE owner_id=${req.userId!}
-    AND universe_id=${p.data.universeId} AND source_reference=${marker} LIMIT 1`);
-  if(existing.rows.length){res.json({created:false,reason:"ALREADY_CHECKED"});return;}
+    AND universe_id=${p.data.universeId}
+    AND (source_reference=${marker} OR
+      (source_reference LIKE ${'dm:'+b.data.threadId+':%'} AND created_at > now() - interval '6 hours'))
+    LIMIT 1`);
+  if(existing.rows.length){res.json({created:false,reason:"RECENT_PROPOSAL"});return;}
   const excerpt=thread.map(m=>`${m.senderId}: ${m.text.slice(0,300)}`).join('\n').slice(-6000);
   try {
     const characters=state.characters.filter(ch=>!ch.archived&&ch.id).map(ch=>({id:ch.id!,name:ch.name||ch.id!}));
