@@ -18,6 +18,7 @@ export function WorldJournals({ universeId, characters }: {
   universeId: string; characters: Array<{id:string;name:string}>;
 }) {
   const [entries,setEntries]=useState<Entry[]>([]);
+  const [entriesUniverse,setEntriesUniverse]=useState(universeId);
   const currentUniverseRef=useRef(universeId);
   currentUniverseRef.current=universeId;
   const [draft,setDraft]=useState<Draft>(empty);
@@ -30,11 +31,14 @@ export function WorldJournals({ universeId, characters }: {
   const load=async()=> {
     const requestedUniverse=universeId;
     const data=await customFetch<{entries:Entry[]}>(url,{responseType:'json'});
-    if(currentUniverseRef.current===requestedUniverse) setEntries(data.entries);
+    if(currentUniverseRef.current===requestedUniverse){
+      setEntries(data.entries);setEntriesUniverse(requestedUniverse);
+    }
   };
   // A universe switch must never briefly show the previous world's private entries.
   useEffect(()=>{
     setEntries([]);
+    setEntriesUniverse(universeId);
     setDraft(empty());
     setEditing(null);
     setKeywordInput('');
@@ -44,7 +48,9 @@ export function WorldJournals({ universeId, characters }: {
   },[universeId]);
   useEffect(()=>{ if(!opened)return; let active=true;
     void customFetch<{entries:Entry[]}>(url,{responseType:'json'})
-      .then(data=>{if(active && currentUniverseRef.current===universeId)setEntries(data.entries);})
+      .then(data=>{if(active && currentUniverseRef.current===universeId){
+        setEntries(data.entries);setEntriesUniverse(universeId);
+      }})
       .catch(e=>{if(active && currentUniverseRef.current===universeId)
         setError(e instanceof Error?e.message:'No se pudieron cargar los Journals');});
     return()=>{active=false;};
@@ -91,7 +97,7 @@ export function WorldJournals({ universeId, characters }: {
     {opened&&<>
       <p className="text-xs text-muted-foreground">Conocimiento general, recuerdos y secretos. Las entradas nuevas se guardan como borrador; solo se publican al aprobarlas.</p>
       {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
-      {entries.map(e=><div key={e.id} className="space-y-1 rounded-xl bg-secondary/40 p-3">
+      {entriesUniverse===universeId&&entries.map(e=><div key={e.id} className="space-y-1 rounded-xl bg-secondary/40 p-3">
         <div className="text-sm font-semibold">{e.title}</div>
         <p className="text-xs text-muted-foreground">{e.category} · {e.status} · {e.knowledge_scope}</p>
         <p className="line-clamp-3 whitespace-pre-wrap text-xs">{e.content}</p>
