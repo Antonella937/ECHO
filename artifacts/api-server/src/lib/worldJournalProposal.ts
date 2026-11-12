@@ -33,6 +33,12 @@ export async function suggestWorldJournal(source: string, characters: Array<{id:
   const entry=parseCandidate(result.text);
   if (entry===null) return null;
   const ids=new Set(characters.map(c=>c.id));
+  // AI cannot grant itself broad knowledge. Owner must explicitly change visibility
+  // in the editor before approval, preventing accidental secret disclosure.
+  if (entry.knowledgeScope==='everyone') {
+    entry.knowledgeScope='nobody';
+    entry.knownCharacterIds=[];
+  }
   if (entry.knownCharacterIds.length!==new Set(entry.knownCharacterIds).size ||
     entry.knownCharacterIds.some(id=>!ids.has(id)) ||
     (entry.knowledgeScope==='selected' && !entry.knownCharacterIds.length) ||
