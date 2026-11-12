@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 
 type Entry = {
@@ -18,6 +18,8 @@ export function WorldJournals({ universeId, characters }: {
   universeId: string; characters: Array<{id:string;name:string}>;
 }) {
   const [entries,setEntries]=useState<Entry[]>([]);
+  const currentUniverseRef=useRef(universeId);
+  currentUniverseRef.current=universeId;
   const [draft,setDraft]=useState<Draft>(empty);
   const [editing,setEditing]=useState<string|null>(null);
   const [keywordInput,setKeywordInput]=useState('');
@@ -26,8 +28,9 @@ export function WorldJournals({ universeId, characters }: {
   const [opened,setOpened]=useState(false);
   const url=`/api/universe/${encodeURIComponent(universeId)}/journals`;
   const load=async()=> {
+    const requestedUniverse=universeId;
     const data=await customFetch<{entries:Entry[]}>(url,{responseType:'json'});
-    setEntries(data.entries);
+    if(currentUniverseRef.current===requestedUniverse) setEntries(data.entries);
   };
   // A universe switch must never briefly show the previous world's private entries.
   useEffect(()=>{
@@ -40,7 +43,7 @@ export function WorldJournals({ universeId, characters }: {
   },[universeId]);
   useEffect(()=>{ if(!opened)return; let active=true;
     void customFetch<{entries:Entry[]}>(url,{responseType:'json'})
-      .then(data=>{if(active)setEntries(data.entries);})
+      .then(data=>{if(active && currentUniverseRef.current===universeId)setEntries(data.entries);})
       .catch(e=>{if(active)setError(e instanceof Error?e.message:'No se pudieron cargar los Journals');});
     return()=>{active=false;};
   },[opened,url]);
