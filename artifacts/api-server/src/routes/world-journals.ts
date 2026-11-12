@@ -77,7 +77,7 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
     known_character_ids=${sql`ARRAY[${sql.join(e.knownCharacterIds.map(x=>sql`${x}`),sql`,`)}]::text[]`},
     status='draft',approved_by=NULL,approved_at=NULL,updated_at=now()
     WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
-    AND universe_id=${p.data.universeId} RETURNING id,status`);
+    AND universe_id=${p.data.universeId} AND status <> 'archived' RETURNING id,status`);
   if(!r.rows.length){res.status(404).json({error:"JOURNAL_NOT_FOUND"});return;}
   res.json(r.rows[0]);
 });
