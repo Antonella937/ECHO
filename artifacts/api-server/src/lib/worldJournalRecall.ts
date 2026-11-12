@@ -16,7 +16,7 @@ export async function relevantWorldJournals(ownerId: string, universeId: string,
       AND EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(u.state->'characters')='array'
         THEN u.state->'characters' ELSE '[]'::jsonb END) ch
         WHERE jsonb_typeof(ch)='object' AND ch->>'id'=${characterId}
-        AND (ch->>'archived' IS NULL OR ch->>'archived'='false')))
+        AND (NOT (ch ? 'archived') OR ch->'archived' = 'false'::jsonb)))
     AND ((knowledge_scope='everyone' AND category <> 'secret')
       OR (knowledge_scope='selected' AND ${characterId}=ANY(known_character_ids)))
     ORDER BY updated_at DESC LIMIT 200`);
