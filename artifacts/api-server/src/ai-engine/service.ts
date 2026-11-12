@@ -165,6 +165,13 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .catch(() => [] as string[]);
           socialContext = [...posts,...comments,...older,...seenStories,...memories,...journalFacts].join('\n').slice(0,5000);
         }
+        // World knowledge is independent of the optional social-context toggle.
+        // Restrict it to approved entries visible to this exact character.
+        if (links.rows[0]?.social_context_enabled !== true) {
+          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
+            .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
+          socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,3200);
+        }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
     }
