@@ -64,3 +64,19 @@ kindroidLinksRouter.put('/characters/kindroid-link',async(req,res)=>{
     res.json({kinId:p.data.kinId,enabled:p.data.enabled,socialContextEnabled:p.data.socialContextEnabled});
   }catch{res.status(503).json({error:'KINDROID_LINK_UNAVAILABLE'});}
 });
+
+/** Disconnect only the external Kindroid adapter. The ECHO character, social
+ * state, relationships, messages and memories remain untouched. */
+kindroidLinksRouter.delete('/characters/kindroid-link',async(req,res)=>{
+  res.setHeader('Cache-Control','private, no-store');
+  const p=scope.strict().safeParse(req.body);
+  if(!p.success){res.status(400).json({error:'INVALID_QUERY'});return;}
+  try{
+    if(!await authorized(req.userId!,p.data.universeId,p.data.characterId)){
+      res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;
+    }
+    await db.execute(sql`DELETE FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${p.data.universeId} AND character_id=${p.data.characterId}`);
+    res.json({kinId:'',enabled:false,socialContextEnabled:false,disconnected:true});
+  }catch{res.status(503).json({error:'KINDROID_DISCONNECT_UNAVAILABLE'});}
+});
