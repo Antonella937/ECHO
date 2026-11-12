@@ -68,3 +68,21 @@ test("malformed private event metadata is excluded from AI context", () => {
   ];
   assert.equal(readableCanonTimeline(malformed,"ezra"),"");
 });
+
+test("explicit audience restriction overrides public visibility", () => {
+  const events = [
+    {text:"Restricted ceremony.",visibility:"public",witnessIds:[],audienceIds:["ophelia"]},
+    {text:"Public celebration.",visibility:"public",witnessIds:[]},
+  ];
+  assert.equal(readableCanonTimeline(events,"ezra"),"Public celebration.");
+  assert.match(readableCanonTimeline(events,"ophelia"),/Restricted ceremony/);
+});
+test("DM proposals exclude messages hidden from either participant", () => {
+  const text="The entire corridor suddenly filled with violet smoke, and everyone escaped outside.";
+  const rows=[
+    {id:"hidden-peer",senderId:"ezra",recipientId:"ophelia",text,hiddenForIds:["ophelia"]},
+    {id:"hidden-self",senderId:"ezra",recipientId:"ophelia",text,hiddenForIds:["ezra"]},
+    {id:"visible",senderId:"ezra",recipientId:"ophelia",text},
+  ];
+  assert.deepEqual(dmCanonCandidates(rows,"ezra","ophelia").map(x=>x.sourceId),["visible"]);
+});
