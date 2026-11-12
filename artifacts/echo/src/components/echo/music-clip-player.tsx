@@ -4,7 +4,7 @@ import { customFetch } from '@workspace/api-client-react';
 import type { MusicClip } from '@/domain/types';
 
 /** Streams authorized library clips without exposing private storage URLs. */
-export function MusicClipPlayer({ clip, compact = false, autoPlay = false, source, libraryPreview = false, artist }: { clip: MusicClip; compact?: boolean; autoPlay?: boolean; libraryPreview?: boolean; artist?: string; source?: { universeId: string; surface: 'post' | 'story'; contentId: string; viewerUniverseId?: string; viewerCharacterId?: string } }) {
+export function MusicClipPlayer({ clip, compact = false, autoPlay = false, source, libraryPreview = false, artist, inline = false }: { clip: MusicClip; compact?: boolean; autoPlay?: boolean; libraryPreview?: boolean; artist?: string; inline?: boolean; source?: { universeId: string; surface: 'post' | 'story'; contentId: string; viewerUniverseId?: string; viewerCharacterId?: string } }) {
   const audio = useRef<HTMLAudioElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const [src, setSrc] = useState('');
@@ -19,7 +19,10 @@ export function MusicClipPlayer({ clip, compact = false, autoPlay = false, sourc
     void customFetch<Blob>(endpoint, { responseType: 'blob' })
       .then(blob => {
         if (!active) return;
-        if (!blob.type.startsWith('audio/')) throw new Error('Formato de audio no compatible');
+        if (!blob.size) throw new Error('Audio vacío');
+        // Private object storage can return valid MP3 bytes as application/octet-stream.
+        // Let the browser decode the bytes instead of rejecting by metadata alone.
+        if (blob.type && !blob.type.startsWith('audio/') && blob.type !== 'application/octet-stream') throw new Error('Formato de audio no compatible');
         url = URL.createObjectURL(blob);
         setSrc(url);
       }).catch(() => { if (active) setError('Audio no disponible'); });
@@ -56,13 +59,13 @@ export function MusicClipPlayer({ clip, compact = false, autoPlay = false, sourc
     }
     try { await audio.current.play(); } catch { setError('Tocá de nuevo para reproducir'); }
   };
-  return <div ref={container} className={`flex min-w-0 items-center gap-2 text-white ${compact ? 'rounded-full bg-black/55 px-3 py-1.5 backdrop-blur-md' : 'rounded-xl bg-black/65 px-3 py-2 text-sm backdrop-blur'}`}>
+  return <div ref={container} className={`flex min-w-0 items-center gap-1.5 ${inline ? 'max-w-full text-muted-foreground' : 'text-white'} ${inline ? 'text-xs' : compact ? 'rounded-full bg-black/55 px-3 py-1.5 backdrop-blur-md' : 'rounded-xl bg-black/65 px-3 py-2 text-sm backdrop-blur'}`}>
     <Music2 className="h-3.5 w-3.5 shrink-0 opacity-80" />
     <span className="min-w-0 flex-1 leading-tight">
-      <span className="block truncate text-[11px] font-semibold">{clip.title}</span>
-      {artist && <span className="block truncate text-[10px] text-white/70">{artist}</span>}
+      <span className={`block truncate ${inline ? "text-[11px] font-normal" : "text-[11px] font-semibold"}`}>{artist && inline ? `${artist} · ${clip.title}` : clip.title}</span>
+      {artist && !inline && <span className="block truncate text-[10px] text-white/70">{artist}</span>}
     </span>
-    {error ? <span className="max-w-20 text-[10px] text-red-200">{error}</span> : <button type="button" disabled={!src} onClick={() => void toggle()} aria-label={playing ? 'Pausar música' : 'Reproducir música'} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/15 disabled:opacity-40">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>}
+    {error ? <span className="max-w-20 text-[10px] text-red-200">{error}</span> : <button type="button" disabled={!src} onClick={() => void toggle()} aria-label={playing ? 'Pausar música' : 'Reproducir música'} className={inline ? 'grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-40' : 'grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/15 disabled:opacity-40'}>{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>}
     <audio ref={audio} src={src || undefined} preload="metadata" onLoadedMetadata={e => { e.currentTarget.currentTime = Math.min(clip.startSeconds, Math.max(0, e.currentTarget.duration - 0.1)); }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={e => { if (e.currentTarget.currentTime >= clip.startSeconds + clip.clipSeconds) e.currentTarget.pause(); }} onEnded={() => setPlaying(false)} />
   </div>;
 }
