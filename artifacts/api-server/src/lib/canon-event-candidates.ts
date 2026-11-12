@@ -37,5 +37,8 @@ export function looksLikeNarrativeEvent(text: string): boolean {
   // Keep this language-agnostic: do not use English/Spanish keyword lists to
   // decide whether a user-written event in another supported language is eligible.
   const words = normalized.split(/\s+/u).filter(Boolean);
-  return words.length >= 7 && /[.!?。！？]/u.test(normalized);
+  // CJK narratives often have no whitespace. Count Han/Hiragana/Katakana/Hangul
+  // characters instead of assuming a space-delimited language.
+  const cjkCount = (normalized.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) ?? []).length;
+  return (words.length >= 7 || cjkCount >= 18) && /[.!?。！？]/u.test(normalized);
 }
