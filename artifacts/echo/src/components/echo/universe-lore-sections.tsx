@@ -30,7 +30,7 @@ export function parseUniverseLore(raw: string): Lore {
 
 export function serializeUniverseLore(lore: Lore): string {
   return sections.filter(section => lore[section.key].length > 0)
-    .map(section => `${header(section.key)}\n${lore[section.key].trim()}`).join('\n\n');
+    .map(section => `${header(section.key)}\n${lore[section.key]}`).join('\n\n');
 }
 
 export function UniverseLoreSections({ value, onChange, disabled, prefix }: {
