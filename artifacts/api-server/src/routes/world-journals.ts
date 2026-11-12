@@ -26,7 +26,9 @@ async function ownedWorld(ownerId: string, universeId: string) {
   const row = r.rows[0] as { state?: unknown } | undefined;
   if (!row || !row.state || typeof row.state !== 'object' || Array.isArray(row.state)) return undefined;
   const state = row.state as { characters?: unknown };
-  if (!Array.isArray(state.characters)) return undefined;
+  if (!Array.isArray(state.characters) || !state.characters.every(c =>
+    c !== null && typeof c === 'object' && !Array.isArray(c)
+    && typeof (c as {id?:unknown}).id === 'string')) return undefined;
   return row as { state: { characters: Array<{id?:string;archived?:boolean}> } };
 }
 function validAudience(state: { characters?: Array<{id?:string;archived?:boolean}> } | undefined,
