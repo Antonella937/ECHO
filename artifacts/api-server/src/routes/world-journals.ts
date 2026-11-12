@@ -107,12 +107,19 @@ router.post("/universe/:universeId/journals/:journalId/approve",async(req,res):P
     AND owner_id=${req.userId!} AND universe_id=${p.data.universeId}
     AND status='draft' LIMIT 1`);
   if(!draft.rows.length){res.status(404).json({error:"DRAFT_NOT_FOUND"});return;}
-  const audience=draft.rows[0] as {category:string;knowledge_scope:string;known_character_ids:string[]};
-  const ids=Array.isArray(audience.known_character_ids)?audience.known_character_ids:[];
-  if(!validCharacters(world.state,ids) || !validJournalAudience({
-    category:audience.category,knowledgeScope:audience.knowledge_scope,
-    knownCharacterIds:ids
-  },(world.state.characters??[]).filter(ch=>!ch.archived).map(ch=>ch.id!))){
+  const audience=draft.rows[0] as {category:unknown;knowledge_scope:unknown;known_character_ids:unknown};
+  const ids=audience.known_character_ids;
+  const category=audience.category;
+  const scope=audience.knowledge_scope;
+  if(!Array.isArray(ids) || !ids.every((id):id is string=>typeof id==='string')
+    || !['world_knowledge','shared_memory','secret'].includes(String(category))
+    || !['everyone','selected','nobody'].includes(String(scope))
+    || !validCharacters(world.state,ids)
+    || !validJournalAudience({
+      category:category as 'world_knowledge'|'shared_memory'|'secret',
+      knowledgeScope:scope as 'everyone'|'selected'|'nobody',
+      knownCharacterIds:ids
+    },world.state.characters.filter(ch=>!ch.archived).map(ch=>ch.id!))){
     res.status(409).json({error:"JOURNAL_AUDIENCE_CHANGED"});return;
   }
   const r=await db.execute(sql`UPDATE echo_world_journals SET status='published',
