@@ -45,7 +45,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
   if (count <= 1) {
     return (
       <div className="relative w-full overflow-hidden bg-card sm:rounded-[22px]"><button onClick={onTap} className="relative block w-full overflow-hidden" aria-label="Doble toque para indicar que te gusta" data-testid={`button-image-${postId}`}>
-        <GracefulImage key={resolveMedia(media[0]?.url ?? '')} src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} draggable={false} containerClassName={`w-full ${fit ? '' : 'aspect-[4/5]'}`} containerStyle={fittedAspect(media[0]?.id ?? '')} onLoad={event => rememberRatio(media[0]?.id ?? '', event.currentTarget)} className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={<span className="absolute inset-0 animate-pulse bg-card" />} errorFallback={imageFallback} data-testid={`img-post-${postId}`} />
+        <GracefulImage key={resolveMedia(media[0]?.url ?? '')} src={resolveMedia(media[0]?.url ?? '')} alt={alt} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} draggable={false} containerClassName={`w-full ${fit && imageRatios[media[0]?.id ?? ''] ? '' : 'aspect-[4/5]'}`} containerStyle={fittedAspect(media[0]?.id ?? '')} onLoad={event => rememberRatio(media[0]?.id ?? '', event.currentTarget)} className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={<span className="absolute inset-0 animate-pulse bg-card" />} errorFallback={imageFallback} data-testid={`img-post-${postId}`} />
         {overlay}
       </button><button type="button" onClick={() => setFit(v => !v)} aria-label={fit ? "Ampliar foto" : "Ver foto completa"} title={fit ? "Ampliar foto" : "Ver foto completa"} className="absolute bottom-3 right-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white" data-testid={`button-post-fit-${postId}`}>{fit ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
     );
@@ -96,7 +96,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
                 data-testid={`video-post-${postId}-${i}`}
               />
             ) : (
-              <GracefulImage key={resolveMedia(m.url)} src={resolveMedia(m.url)} alt={`${alt} · foto ${i + 1} de ${count}`} loading={eager && i === 0 ? 'eager' : 'lazy'} draggable={false} containerClassName={`w-full ${fit ? '' : 'aspect-[4/5]'}`} containerStyle={fittedAspect(m.id)} onLoad={event => rememberRatio(m.id, event.currentTarget)} className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={imageFallback} data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`} />
+              <GracefulImage key={resolveMedia(m.url)} src={resolveMedia(m.url)} alt={`${alt} · foto ${i + 1} de ${count}`} loading={eager && i === 0 ? 'eager' : 'lazy'} draggable={false} containerClassName={`w-full ${fit && imageRatios[m.id] ? '' : 'aspect-[4/5]'}`} containerStyle={fittedAspect(m.id)} onLoad={event => rememberRatio(m.id, event.currentTarget)} className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={imageFallback} data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`} />
             )}
           </div>
         ))}
