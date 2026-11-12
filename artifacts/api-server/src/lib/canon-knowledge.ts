@@ -38,7 +38,7 @@ export function dmCanonCandidates(messages: Array<Record<string, unknown>>, view
     const hidden = message.hiddenForIds;
     return ((sender === viewerId && recipient === peerId) ||
       (sender === peerId && recipient === viewerId)) &&
-      (!Array.isArray(hidden) || !hidden.includes(viewerId));
+      (!Array.isArray(hidden) || (!hidden.includes(viewerId) && !hidden.includes(peerId)));
   }).map(message => ({
     id: message.id, senderId: message.senderId,
     text: message.text ?? message.body, createdAt: message.createdAt,
