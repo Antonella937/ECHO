@@ -98,7 +98,16 @@ router.get("/group-dms/:groupId/canon-candidates", async (req, res) => {
       created_at AS "createdAt" FROM echo_group_messages WHERE owner_id=${req.userId!}
       AND universe_id=${universeId} AND group_id=${groupId.data}
       ORDER BY created_at DESC LIMIT 100`);
-    res.json({ candidates: privateConversationCandidates([...messages.rows].reverse(), members.filter((x): x is string => typeof x === "string")) });
+    const setup = (identity?.state?.creatorSetup ?? {}) as Record<string,unknown>;
+    const entries = Array.isArray(setup.canonKnowledgeEvents) ? setup.canonKnowledgeEvents : [];
+    const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds : [];
+    const candidates = privateConversationCandidates([...messages.rows].reverse(), members.filter((x): x is string => typeof x === "string"))
+      .filter(candidate => {
+        const key = `group:${groupId.data}:${candidate.sourceId}`;
+        return !dismissed.includes(key) && !entries.some(row =>
+          row && typeof row==="object" && (row as Record<string,unknown>).sourceKey===key);
+      });
+    res.json({ candidates });
   } catch { res.status(503).json({ error: "GROUP_CANON_CANDIDATES_UNAVAILABLE" }); }
 });
 const groupCanonDecision = scope.extend({
