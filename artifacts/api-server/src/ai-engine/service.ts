@@ -9,6 +9,7 @@ import { clerkClient } from '@clerk/express';
 import { kindroidDmProvider } from './kindroid';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
+import { relevantWorldJournals } from '../lib/worldJournalRecall';
 
 /** Owner must come from verified server authentication, never from request JSON. */
 export async function previewForOwner(ownerId: string, input: CharacterDecisionInput, dependencies: {
@@ -159,7 +160,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
             .filter(m => kindroidMemoryAllowed(m, 'nela'))
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
-          socialContext = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,3800);
+          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
+            .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
+            .catch(() => [] as string[]); // Migration may not be applied yet; never fall back to unscoped data.
+          socialContext = [...posts,...comments,...older,...seenStories,...memories,...journalFacts].join('\n').slice(0,5000);
         }
         selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
       }
