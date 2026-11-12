@@ -12,7 +12,7 @@ const words: Record<string,[string,string,string,string,string,string]> = {
  ja:['チャットの外観','背景','透明度','背景なし','ダーク','保存'],
  zh:['聊天外观','背景','透明度','无背景','深色','保存'],
 };
-export type DmAppearance={background:string;opacity:number};
+export type DmAppearance={background:string;opacity:number;image?:string};
 const choices=['none','dark','rose','violet','blue'] as const;
 const gradients:Record<string,string>={
  dark:'linear-gradient(145deg,#14101f,#33283c)',rose:'linear-gradient(145deg,#4b283c,#ac668d)',
@@ -22,12 +22,13 @@ export function readDmAppearance(key:string):DmAppearance{
  try{
   const raw=JSON.parse(localStorage.getItem(key)??'null') as Partial<DmAppearance>|null;
   return {background:choices.includes(raw?.background as typeof choices[number])?raw!.background!:'none',
-   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35};
+   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&raw.image.startsWith('data:image/')?raw.image:undefined};
  }catch{return {background:'none',opacity:35};}
 }
 export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void}){
  const lang=useLanguage();const t=words[lang]??words.en;
  const [open,setOpen]=useState(false);
+ const [uploadError,setUploadError]=useState(false);
  const [draft,setDraft]=useState(value);
  useEffect(()=>setDraft(value),[value]);
  return <div className="relative">
@@ -40,17 +41,27 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
     onClick={()=>setDraft(old=>({...old,background:choice}))}
     style={{background:gradients[choice]??'var(--background)'}}
     className={`h-9 w-9 rounded-full border-2 ${draft.background===choice?'border-primary':'border-border'}`}/>)}</div>
+   <label className="mt-3 block text-xs">{lang==='es'?'Importar foto':lang==='pt'?'Importar foto':lang==='fr'?'Importer une photo':lang==='de'?'Foto importieren':lang==='it'?'Importa foto':lang==='ko'?'사진 가져오기':lang==='ja'?'写真を読み込む':lang==='zh'?'导入照片':'Import photo'}
+    <input className="mt-1 block w-full text-xs" type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{
+     const file=e.target.files?.[0];if(!file)return;
+     if(file.size>2_000_000){setUploadError(true);return;}
+     const reader=new FileReader();reader.onload=()=>{if(typeof reader.result==='string'){setDraft(old=>({...old,background:'photo',image:reader.result as string}));setUploadError(false);}};
+     reader.onerror=()=>setUploadError(true);reader.readAsDataURL(file);
+    }}/>
+   </label>
+   {uploadError&&<p role="alert" className="text-xs text-destructive">{lang==='es'?'Imagen demasiado grande o no se pudo guardar (máximo 2 MB).':'Image too large or could not be saved (max 2 MB).'}</p>}
+   {draft.image&&<button type="button" onClick={()=>setDraft(old=>({...old,image:undefined,background:'none'}))} className="mt-2 block text-xs underline">{lang==='es'?'Quitar foto':'Remove photo'}</button>}
    <label className="mt-3 block text-xs">{t[2]}: {draft.opacity}%
     <input type="range" min={0} max={100} value={draft.opacity} onChange={e=>setDraft(old=>({...old,opacity:Number(e.target.value)}))} className="mt-2 w-full"/>
    </label>
    <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" onClick={()=>{
-    try{localStorage.setItem(storageKey,JSON.stringify(draft));}catch{/* private browsing */}
-    onChange(draft);setOpen(false);
+    try{localStorage.setItem(storageKey,JSON.stringify(draft));onChange(draft);setOpen(false);setUploadError(false);}catch{setUploadError(true);}
    }}>{t[5]}</button>
   </section>}
  </div>;
 }
 export function dmBackgroundStyle(value:DmAppearance){
+ if(value.background==='photo' && value.image?.startsWith('data:image/')) return {backgroundImage:`linear-gradient(rgba(0,0,0,${(100-value.opacity)/130}),rgba(0,0,0,${(100-value.opacity)/130})),url(${JSON.stringify(value.image)})`,backgroundPosition:'center',backgroundSize:'cover',backgroundRepeat:'no-repeat'};
  if(value.background==='none') return {};
  const colors:Record<string,[string,string]>={
   dark:['#14101f','#33283c'],rose:['#4b283c','#ac668d'],
