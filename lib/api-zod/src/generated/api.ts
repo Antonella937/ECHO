@@ -3360,6 +3360,7 @@ export const ManageCreatorUniverseBody = zod.object({
   "expectedRevision": zod.number().int().min(1),
   "name": zod.string().min(1).max(manageCreatorUniverseBodyNameMax).optional(),
   "description": zod.string().max(manageCreatorUniverseBodyDescriptionMax).optional(),
+  "timeline": zod.string().max(4000).optional(),
   "confirmationText": zod.string().max(manageCreatorUniverseBodyConfirmationTextMax).optional()
 })
 
