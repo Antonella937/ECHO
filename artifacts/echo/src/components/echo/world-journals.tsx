@@ -48,15 +48,19 @@ export function WorldJournals({ universeId, characters }: {
     return()=>{active=false;};
   },[opened,url]);
   const save=async()=>{
+    const requestedUniverse=universeId;
     setBusy(true);setError('');
     try {
       await customFetch(editing?`${url}/${editing}`:url,{
         method:editing?'PUT':'POST',body:JSON.stringify({...draft,keywords:keywordInput.split(',').map(x=>x.trim()).filter(Boolean)}),
         headers:{'Content-Type':'application/json'},responseType:'json'
       });
-      setEditing(null);setDraft(empty());setKeywordInput('');await load();
-    }catch(e){setError(e instanceof Error?e.message:'Error al guardar');}
-    finally{setBusy(false);}
+      if(currentUniverseRef.current===requestedUniverse){
+        setEditing(null);setDraft(empty());setKeywordInput('');await load();
+      }
+    }catch(e){if(currentUniverseRef.current===requestedUniverse)
+      setError(e instanceof Error?e.message:'Error al guardar');}
+    finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
   };
   const approve=async(id:string)=>{
     setBusy(true);setError('');
