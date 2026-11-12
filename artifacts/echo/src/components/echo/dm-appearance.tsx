@@ -24,7 +24,7 @@ const gradients:Record<string,string>={
 export function readDmAppearance(key:string):DmAppearance{
  try{
   const raw=JSON.parse(localStorage.getItem(key)??'null') as Partial<DmAppearance>|null;
-  return {background:(choices.includes(raw?.background as typeof choices[number])||(raw?.background==='photo'&&typeof raw.image==='string'&&raw.image.startsWith('data:image/')))?raw!.background!:'none',
+  return {background:(choices.includes(raw?.background as typeof choices[number])||(raw?.background==='photo'&&typeof raw.image==='string'&&(raw.image.startsWith('data:image/')||raw.image.startsWith('/objects/'))))?raw!.background!:'none',
    opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&(raw.image.startsWith('data:image/')||raw.image.startsWith('/objects/'))?raw.image:undefined,layout:raw?.layout==='narrative'?'narrative':'chat'};
  }catch{return {background:'none',opacity:35};}
 }
