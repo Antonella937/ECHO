@@ -8,10 +8,7 @@ export interface CanonEventCandidate {
   occurredAt: string;
   status: "pending";
 }
-export function sceneCanonCandidates(sceneId: string, rows: Array<{
-  eventId: unknown; actorId: unknown; text: unknown; createdAt: unknown;
-  visibility: unknown; audienceIds: unknown;
-}>): CanonEventCandidate[] {
+export function sceneCanonCandidates(sceneId: string, rows: Array<Record<string, unknown>>): CanonEventCandidate[] {
   return rows.filter(row =>
     row.visibility === "public" &&
     typeof row.eventId === "string" &&
