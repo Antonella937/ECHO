@@ -83,7 +83,9 @@ export function WorldJournals({ universeId, characters }: {
           value={draft.content} onChange={e=>setDraft(v=>({...v,content:e.target.value}))}/>
         <label className="block text-xs">Tipo
           <select className="mt-1 w-full rounded-xl border border-border bg-background p-3" value={draft.category}
-            onChange={e=>setDraft(v=>({...v,category:e.target.value as Draft['category']}))}>
+            onChange={e=>setDraft(v=>({...v,category:e.target.value as Draft['category'],
+              knowledgeScope:e.target.value==='secret'?'nobody':v.knowledgeScope,
+              knownCharacterIds:e.target.value==='secret'?[]:v.knownCharacterIds}))}>
             <option value="world_knowledge">Conocimiento del mundo</option>
             <option value="shared_memory">Recuerdo compartido</option>
             <option value="secret">Secreto</option>
@@ -98,8 +100,9 @@ export function WorldJournals({ universeId, characters }: {
         </label>
         <label className="block text-xs">Quién puede saberlo
           <select className="mt-1 w-full rounded-xl border border-border bg-background p-3" value={draft.knowledgeScope}
-            onChange={e=>setDraft(v=>({...v,knowledgeScope:e.target.value as Draft['knowledgeScope']}))}>
-            <option value="everyone">Todos los personajes</option><option value="selected">Solo seleccionados</option>
+            onChange={e=>setDraft(v=>({...v,knowledgeScope:e.target.value as Draft['knowledgeScope'],
+              knownCharacterIds:e.target.value==='selected'?v.knownCharacterIds:[]}))}>
+            {draft.category!=='secret'&&<option value="everyone">Todos los personajes</option>}<option value="selected">Solo seleccionados</option>
             <option value="nobody">Ninguno todavía</option>
           </select>
         </label>
@@ -118,7 +121,7 @@ export function WorldJournals({ universeId, characters }: {
         </label>
         <div className="flex gap-2">
           <button type="button" className="min-h-11 flex-1 rounded-xl bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
-            disabled={busy||!draft.title.trim()||!draft.content.trim()} onClick={()=>void save()}>Guardar borrador</button>
+            disabled={busy||!draft.title.trim()||!draft.content.trim()||(draft.knowledgeScope==='selected'&&!draft.knownCharacterIds.length)} onClick={()=>void save()}>Guardar borrador</button>
           {editing&&<button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" onClick={()=>{setEditing(null);setDraft(empty());}}>Cancelar</button>}
         </div>
       </div>
