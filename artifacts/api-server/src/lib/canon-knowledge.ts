@@ -8,9 +8,13 @@ export type CanonKnowledge = {
   audienceIds?: string[];
 };
 export function knownCanonForCharacter(events: CanonKnowledge[], characterId: string): string[] {
-  return events.filter(event => event.visibility === "public" ||
-    event.witnessIds.includes(characterId) ||
-    (event.audienceIds ?? []).includes(characterId))
+  return events.filter(event => {
+    // An explicitly restricted audience always overrides a public flag.
+    if (event.audienceIds?.length) {
+      return event.audienceIds.includes(characterId) || event.witnessIds.includes(characterId);
+    }
+    return event.visibility === "public" || event.witnessIds.includes(characterId);
+  })
     .map(event => event.text);
 }
 /** Private conversations may produce review candidates but never public canon. */
