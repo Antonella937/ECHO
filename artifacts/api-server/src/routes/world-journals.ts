@@ -3,6 +3,7 @@ import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { validJournalAudience } from "../lib/worldJournalAudience";
 
 const router: IRouter = Router();
 router.use("/universe/:universeId/journals", requireAuth);
@@ -24,14 +25,14 @@ async function ownedWorld(ownerId: string, universeId: string) {
     AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1`);
   return r.rows[0] as { state?: { characters?: Array<{id?:string;archived?:boolean}> } } | undefined;
 }
+function validAudience(state: { characters?: Array<{id?:string;archived?:boolean}> } | undefined,
+  entry: z.infer<typeof entrySchema>) {
+  return validJournalAudience(entry, (state?.characters ?? [])
+    .filter(c => !c.archived && typeof c.id === 'string').map(c => c.id!));
+}
 function validCharacters(state: { characters?: Array<{id?:string;archived?:boolean}> } | undefined, ids: string[]) {
   const allowed = new Set((state?.characters ?? []).filter(c => !c.archived).map(c => c.id));
   return ids.length === new Set(ids).size && ids.every(id => allowed.has(id));
-}
-function journalAudienceIsValid(entry: z.infer<typeof entrySchema>) {
-  return (entry.knowledgeScope !== 'selected' || entry.knownCharacterIds.length > 0)
-    && (entry.knowledgeScope === 'selected' || entry.knownCharacterIds.length === 0)
-    && (entry.category !== 'secret' || entry.knowledgeScope !== 'everyone');
 }
 function invalid(req: {params:unknown}) { return params.safeParse(req.params); }
 router.get("/universe/:universeId/journals", async (req,res):Promise<void> => {
@@ -49,7 +50,7 @@ router.post("/universe/:universeId/journals", async(req,res):Promise<void>=>{
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
-  if(!journalAudienceIsValid(b.data)){
+  if(!validAudience(world.state,b.data)){
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
@@ -67,7 +68,7 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
-  if(!journalAudienceIsValid(b.data)){
+  if(!validAudience(world.state,b.data)){
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
@@ -112,7 +113,7 @@ router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<vo
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   if(!validCharacters(world.state,b.data.knownCharacterIds)){res.status(400).json({error:"UNKNOWN_CHARACTER"});return;}
-  if(!journalAudienceIsValid(b.data)){
+  if(!validAudience(world.state,b.data)){
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
