@@ -1,3 +1,4 @@
+import { sceneCanonCandidates } from "../lib/canon-event-candidates";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -104,6 +105,28 @@ scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
       AND scene_id = ${sceneId.data} AND text <> '' ORDER BY created_at, event_id LIMIT 500`);
     res.json({ events: rows.rows.filter(row => row.visibility === "public" || row.actorId === viewer.data || (Array.isArray(row.audienceIds) ? row.audienceIds.includes(viewer.data) : false) || (row.visibility === "participants" && (!Array.isArray(row.audienceIds) || row.audienceIds.length === 0))) });
   } catch { res.status(503).json({ error: "SCENE_EVENTS_UNAVAILABLE" }); }
+});
+// Owner-only review queue; candidates are not written into canon automatically.
+scenesRouter.get("/scenes/:sceneId/canon-candidates", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE" }); return; }
+  try {
+    if (!await availableCharacters(req.userId!, parsed.data.universeId)) {
+      res.status(403).json({ error: "UNIVERSE_NOT_ACCESSIBLE" }); return;
+    }
+    const scene = await db.execute(sql`SELECT canon FROM echo_scenes
+      WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}
+      AND scene_id = ${sceneId.data} LIMIT 1`);
+    if (!scene.rows.length) { res.status(404).json({ error: "SCENE_NOT_FOUND" }); return; }
+    if (scene.rows[0].canon !== "main") { res.json({ candidates: [] }); return; }
+    const events = await db.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId",
+      visibility, audience_ids AS "audienceIds", text, created_at AS "createdAt"
+      FROM echo_scene_events WHERE owner_id = ${req.userId!}
+      AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data}
+      ORDER BY created_at DESC LIMIT 100`);
+    res.json({ candidates: sceneCanonCandidates(sceneId.data, [...events.rows].reverse()) });
+  } catch { res.status(503).json({ error: "CANON_CANDIDATES_UNAVAILABLE" }); }
 });
 scenesRouter.post("/scenes/events", async (req, res) => {
   const parsed = event.safeParse(req.body);
