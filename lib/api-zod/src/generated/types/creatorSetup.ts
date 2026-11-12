@@ -10,6 +10,8 @@ import type { CreatorSetupPlan } from './creatorSetupPlan';
 export interface CreatorSetup {
   /** @maxLength 8000 */
   universeDescription?: string;
+  /** @maxLength 4000 */
+  universeTimeline?: string;
   plan: CreatorSetupPlan;
   /**
      * @minLength 1
