@@ -242,7 +242,15 @@ router.get("/creator/universes/:universeId/dm-canon-candidates/:peerId", async (
       res.status(403).json({ error: "DM_VIEWER_NOT_ALLOWED" }); return;
     }
     const messages = Array.isArray(state.messages) ? state.messages : [];
-    res.json({ candidates: dmCanonCandidates(messages, viewerId, peerId.data) });
+    const setup = (state.creatorSetup ?? {}) as Record<string, unknown>;
+    const entries = Array.isArray(setup.canonKnowledgeEvents) ? setup.canonKnowledgeEvents : [];
+    const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds : [];
+    const candidates = dmCanonCandidates(messages, viewerId, peerId.data).filter(item => {
+      const key = `dm:${[viewerId, peerId.data].sort().join(":")}:${item.sourceId}`;
+      return !dismissed.includes(key) && !entries.some(entry =>
+        entry && typeof entry === "object" && (entry as Record<string, unknown>).sourceKey === key);
+    });
+    res.json({ candidates });
   } catch { res.status(503).json({ error: "DM_CANON_CANDIDATES_UNAVAILABLE" }); }
 });
 
@@ -278,7 +286,7 @@ router.post("/creator/universes/:universeId/dm-canon-candidates/:peerId/:message
       const setup = (state.creatorSetup ?? {}) as Record<string, unknown>;
       const entries = Array.isArray(setup.canonKnowledgeEvents) ? setup.canonKnowledgeEvents : [];
       const dismissed = Array.isArray(setup.dismissedCanonEventIds) ? setup.dismissedCanonEventIds : [];
-      const key = `dm:${viewerId}:${peerId.data}:${messageId.data}`;
+      const key = `dm:${[viewerId, peerId.data].sort().join(":")}:${messageId.data}`;
       if (entries.some(item => item && typeof item === "object" && (item as Record<string,unknown>).sourceKey === key) ||
           dismissed.includes(key)) return { status: 200, duplicate: true };
       const nextSetup = decision.data.action === "dismiss"
