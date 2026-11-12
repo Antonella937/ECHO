@@ -26,3 +26,22 @@ export function privateConversationCandidates(rows: Array<Record<string, unknown
     }));
 }
 import { looksLikeNarrativeEvent as localNarrativeFilter } from "./canon-event-candidates";
+
+/** DM proposals are limited to the exact two participants; hidden messages
+ * are not eligible for the review queue. No cross-conversation aggregation.
+ */
+export function dmCanonCandidates(messages: Array<Record<string, unknown>>, viewerId: string, peerId: string) {
+  if (!viewerId || !peerId || viewerId === peerId) return [];
+  const eligible = messages.filter(message => {
+    const sender = message.senderId;
+    const recipient = message.recipientId;
+    const hidden = message.hiddenForIds;
+    return ((sender === viewerId && recipient === peerId) ||
+      (sender === peerId && recipient === viewerId)) &&
+      (!Array.isArray(hidden) || !hidden.includes(viewerId));
+  }).map(message => ({
+    id: message.id, senderId: message.senderId,
+    text: message.text ?? message.body, createdAt: message.createdAt,
+  }));
+  return privateConversationCandidates(eligible, [viewerId, peerId]);
+}
