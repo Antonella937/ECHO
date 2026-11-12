@@ -15,5 +15,6 @@ export interface CreatorUniverseSummary {
   characterCount: number;
   current: boolean;
   description?: string;
+  timeline?: string;
   archived?: boolean;
 }
