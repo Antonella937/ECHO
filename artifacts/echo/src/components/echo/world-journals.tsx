@@ -27,6 +27,7 @@ export function WorldJournals({ universeId, characters }: {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [opened,setOpened]=useState(false);
+  const [excerpt,setExcerpt]=useState('');
   const url=`/api/universe/${encodeURIComponent(universeId)}/journals`;
   const load=async()=> {
     const requestedUniverse=universeId;
@@ -45,6 +46,7 @@ export function WorldJournals({ universeId, characters }: {
     setError('');
     setBusy(false);
     setOpened(false);
+    setExcerpt('');
   },[universeId]);
   useEffect(()=>{ if(!opened)return; let active=true;
     void customFetch<{entries:Entry[]}>(url,{responseType:'json'})
@@ -55,6 +57,22 @@ export function WorldJournals({ universeId, characters }: {
         setError(e instanceof Error?e.message:'No se pudieron cargar los Journals');});
     return()=>{active=false;};
   },[opened,url]);
+  const suggest=async()=>{
+    const requestedUniverse=universeId;
+    setBusy(true);setError('');
+    try{
+      const result=await customFetch<{candidate:Omit<Draft,'sourceType'>|null}>(`${url}/suggest`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({excerpt}),responseType:'json'
+      });
+      if(currentUniverseRef.current!==requestedUniverse)return;
+      if(!result.candidate){setError('No se encontró un recuerdo claro para sugerir.');return;}
+      setDraft({...result.candidate,sourceType:'ai_suggestion'});
+      setEditing(null);setKeywordInput(result.candidate.keywords.join(', '));
+    }catch(e){if(currentUniverseRef.current===requestedUniverse)
+      setError(e instanceof Error?e.message:'No se pudo generar la sugerencia');}
+    finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
+  };
   const save=async()=>{
     const requestedUniverse=universeId;
     setBusy(true);setError('');
@@ -107,6 +125,15 @@ export function WorldJournals({ universeId, characters }: {
           {e.status==='draft'&&<button type="button" className="min-h-11 rounded-lg bg-primary px-3 text-xs text-primary-foreground" disabled={busy} onClick={()=>void approve(e.id)}>Aprobar</button>}
         </div>
       </div>)}
+      <div className="space-y-2 border-t border-border pt-3">
+        <label className="block text-xs">Sugerir Journal con IA (revisá el resultado antes de guardarlo)
+          <textarea aria-label="Fragmento para sugerir Journal" className="mt-1 min-h-24 w-full rounded-xl border border-border bg-background p-3 text-sm"
+            value={excerpt} maxLength={6000} onChange={e=>setExcerpt(e.target.value)}
+            placeholder="Pegá un fragmento de historia o conversación..."/>
+        </label>
+        <button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" disabled={busy||excerpt.trim().length<20}
+          onClick={()=>void suggest()}>Sugerir con IA</button>
+      </div>
       <div className="space-y-2 border-t border-border pt-3">
         <h3 className="text-sm font-semibold">{editing?'Editar Journal':'Nuevo Journal'}</h3>
         <input aria-label="Título del Journal" placeholder="Título" className="w-full rounded-xl border border-border bg-background p-3 text-sm"
