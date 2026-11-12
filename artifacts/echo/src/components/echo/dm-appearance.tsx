@@ -1,3 +1,6 @@
+import { customFetch } from '@workspace/api-client-react';
+import { uploadPrivateImage } from '@/lib/media';
+import { privateMediaUrl } from '@/lib/media-source';
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
 
@@ -22,13 +25,14 @@ export function readDmAppearance(key:string):DmAppearance{
  try{
   const raw=JSON.parse(localStorage.getItem(key)??'null') as Partial<DmAppearance>|null;
   return {background:(choices.includes(raw?.background as typeof choices[number])||(raw?.background==='photo'&&typeof raw.image==='string'&&raw.image.startsWith('data:image/')))?raw!.background!:'none',
-   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&raw.image.startsWith('data:image/')?raw.image:undefined,layout:raw?.layout==='narrative'?'narrative':'chat'};
+   opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&(raw.image.startsWith('data:image/')||raw.image.startsWith('/objects/'))?raw.image:undefined,layout:raw?.layout==='narrative'?'narrative':'chat'};
  }catch{return {background:'none',opacity:35};}
 }
 export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void}){
  const lang=useLanguage();const t=words[lang]??words.en;
  const [open,setOpen]=useState(false);
  const [uploadError,setUploadError]=useState(false);
+ const [saving,setSaving]=useState(false);
  const [draft,setDraft]=useState(value);
  useEffect(()=>setDraft(value),[value]);
  return <div className="relative">
@@ -57,14 +61,24 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    <label className="mt-3 block text-xs">{t[2]}: {draft.opacity}%
     <input type="range" min={0} max={100} value={draft.opacity} onChange={e=>setDraft(old=>({...old,opacity:Number(e.target.value)}))} className="mt-2 w-full"/>
    </label>
-   <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" onClick={()=>{
-    try{localStorage.setItem(storageKey,JSON.stringify(draft));onChange(draft);setOpen(false);setUploadError(false);}catch{setUploadError(true);}
+   <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" disabled={saving} onClick={async()=>{
+    setSaving(true);setUploadError(false);
+    try{
+     const match=storageKey.match(/^echo:dm-appearance:[^:]+:([^:]+):([^:]+)$/);
+     if(!match)throw Error('Missing conversation');
+     const image=draft.image?.startsWith('data:image/')?await uploadPrivateImage(draft.image):draft.image;
+     const next={...draft,image,layout:draft.layout??'chat'};
+     await customFetch('/api/dm/appearance',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({universeId:match[1],characterId:match[2],appearance:next})});
+     try{localStorage.setItem(storageKey,JSON.stringify(next));}catch{/* server copy is authoritative */}
+     onChange(next);setOpen(false);
+    }catch{setUploadError(true);}finally{setSaving(false);}
    }}>{t[5]}</button>
   </section>}
  </div>;
 }
 export function dmBackgroundStyle(value:DmAppearance){
- if(value.background==='photo' && value.image?.startsWith('data:image/')) return {backgroundImage:`linear-gradient(rgba(0,0,0,${(100-value.opacity)/130}),rgba(0,0,0,${(100-value.opacity)/130})),url(${JSON.stringify(value.image)})`,backgroundPosition:'center',backgroundSize:'cover',backgroundRepeat:'no-repeat'};
+ if(value.background==='photo' && value.image && (value.image.startsWith('data:image/')||value.image.startsWith('/objects/'))) return {backgroundImage:`linear-gradient(rgba(0,0,0,${(100-value.opacity)/130}),rgba(0,0,0,${(100-value.opacity)/130})),url(${JSON.stringify(value.image.startsWith('/objects/')?privateMediaUrl(value.image):value.image)})`,backgroundPosition:'center',backgroundSize:'cover',backgroundRepeat:'no-repeat'};
  if(value.background==='none') return {};
  const colors:Record<string,[string,string]>={
   dark:['#14101f','#33283c'],rose:['#4b283c','#ac668d'],
