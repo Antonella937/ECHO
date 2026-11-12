@@ -51,6 +51,9 @@ export function WorldJournals({ universeId, characters }: {
     catch(e){setError(e instanceof Error?e.message:'No se pudo aprobar');}
     finally{setBusy(false);}
   };
+  const archive=async(id:string)=>{setBusy(true);setError('');try{
+    await customFetch(`${url}/${id}/archive`,{method:'POST',responseType:'json'});await load();
+  }catch(e){setError(e instanceof Error?e.message:'No se pudo archivar');}finally{setBusy(false);}};
   const edit=(e:Entry)=>{
     setEditing(e.id);setDraft({title:e.title,content:e.content,category:e.category,
       truthStatus:e.truth_status,knowledgeScope:e.knowledge_scope,
@@ -68,6 +71,7 @@ export function WorldJournals({ universeId, characters }: {
         <p className="line-clamp-3 whitespace-pre-wrap text-xs">{e.content}</p>
         <div className="flex gap-2">
           <button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>edit(e)}>Editar</button>
+          {e.status!=='archived'&&<button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>void archive(e.id)}>Archivar</button>}
           {e.status==='draft'&&<button type="button" className="min-h-11 rounded-lg bg-primary px-3 text-xs text-primary-foreground" disabled={busy} onClick={()=>void approve(e.id)}>Aprobar</button>}
         </div>
       </div>)}
