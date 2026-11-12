@@ -52,3 +52,21 @@ After real upload/download tests, `ECHO_R2_DIRECT_READS=true` allows authenticat
 Before enabling, update the private bucket CORS policy for the exact beta origin `https://echo-3o2.pages.dev` to allow both `PUT` and `GET` (and `HEAD` if media players require it), with `Content-Type` and `Range` request headers as needed. Verify browser cross-origin redirect handling, audio/video range playback, expired URLs, and authorization revocation behavior on Safari and desktop. Signed GET URLs are short-lived bearer capabilities: do not log, persist, publish or expose them in referrers. The browser's fetched bytes may be held in a session-local blob URL as before.
 
 The flag affects **only newly stored R2 paths**, not legacy Supabase media. Do not remove Supabase until existing media are separately migrated and verified.
+
+### Beta CORS policy for direct reads (replace the original PUT-only policy)
+
+When the gated direct-read feature is ready for a real browser test, use the following policy on `echo-media` (not an additional conflicting rule):
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://echo-3o2.pages.dev"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["Content-Type", "Range"],
+    "ExposeHeaders": ["ETag", "Content-Length", "Content-Range", "Accept-Ranges"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Keep Public Access **disabled**. CORS permits browser access only when a valid presigned URL is presented; it does not make the bucket public. Test a fresh R2 object in both Safari and desktop with the feature flag initially off, then on. Do not change the production feature flag merely to validate syntax.
