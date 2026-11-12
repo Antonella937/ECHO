@@ -162,7 +162,7 @@ export function UniverseSelector() {
             event.preventDefault();
             void run(async () => {
               if (!capacity || !hasCapacity) throw new Error(t('No hay capacidad disponible.'));
-              const data = newUniverseInput({ plan: capacity.plan, universeName: name, displayName, username, bio: '' });
+              const data = newUniverseInput({ plan: capacity.plan === 'free' ? 'free' : 'creator', universeName: name, displayName, username, bio: '' });
               await actions.retrySync();
               if (ownerRef.current !== ownerId) throw new Error('La sesión cambió.');
               const created = await create.mutateAsync({ data });
