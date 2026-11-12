@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { configuredR2, signR2Request } from "../lib/cloudflareR2";
 import { Router, type IRouter } from "express";
 import { db, echoMediaTable, pool } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
@@ -17,7 +18,22 @@ const config = () => {
 const authHeaders = (key: string) => ({ Authorization: `Bearer ${key}`, apikey: key });
 const pathFor = (id: string) => `uploads/${id}`;
 const storageUrl = (base: string, path: string) => `${base}/storage/v1/object/${bucket}/${path}`;
-const validPath = (path: string) => /^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(path);
+const validPath = (path: string) => /^\/objects\/(?:uploads|r2)\/[0-9a-f-]{36}$/i.test(path);
+const isR2Path = (path: string) => path.startsWith("/objects/r2/");
+const useR2 = () => process.env.ECHO_STORAGE_PROVIDER === "r2";
+const fetchStored = (path: string, range?: string) => {
+  if (isR2Path(path)) {
+    const config = configuredR2();
+    if (!config) throw Error("R2_NOT_CONFIGURED");
+    return fetch(signR2Request(config, "GET", path.slice("/objects/".length)), {
+      headers: range ? { Range: range } : undefined, signal: AbortSignal.timeout(30000),
+    });
+  }
+  const { base, key } = config();
+  return fetch(storageUrl(base, path.slice("/objects/".length)), {
+    headers: { ...authHeaders(key), ...(range ? { Range: range } : {}) }, signal: AbortSignal.timeout(30000),
+  });
+};
 
 export function createSupabaseStorageRouter(): IRouter {
   const router: IRouter = Router();
@@ -27,6 +43,17 @@ export function createSupabaseStorageRouter(): IRouter {
       parsed.data.size > mediaLimits[parsed.data.contentType] * 1024 * 1024 ||
       !parsed.data.size) { res.status(400).json({ error: "INVALID_MEDIA" }); return; }
     try {
+      if (useR2()) {
+        const r2 = configuredR2();
+        if (!r2) throw Error("R2_NOT_CONFIGURED");
+        const objectPath = `/objects/r2/${randomUUID()}`;
+        await db.insert(echoMediaTable).values({ ownerId: req.userId!, objectPath });
+        res.json(RequestUploadUrlResponse.parse({
+          uploadURL: signR2Request(r2, "PUT", objectPath.slice("/objects/".length)),
+          objectPath,
+        }));
+        return;
+      }
       const { base, key } = config();
       const path = pathFor(randomUUID());
       const signed = await fetch(`${base}/storage/v1/object/upload/sign/${bucket}/${path}`, {
@@ -82,10 +109,7 @@ export function createSupabaseStorageRouter(): IRouter {
       const [owned] = await db.select().from(echoMediaTable).where(and(
         eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, parsed.data.objectPath))).limit(1);
       if (!owned) { res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
-      const { base, key } = config();
-      const response = await fetch(storageUrl(base, parsed.data.objectPath.slice("/objects/".length)), {
-        headers: { ...authHeaders(key) }, signal: AbortSignal.timeout(15000),
-      });
+      const response = await fetchStored(parsed.data.objectPath);
       if (!response.ok) { res.status(404).json({ error: "UPLOAD_NOT_FOUND" }); return; }
       const mime = (response.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
       const bytes = Buffer.from(await response.arrayBuffer());
@@ -110,10 +134,7 @@ export function createSupabaseStorageRouter(): IRouter {
       const [owned] = await db.select().from(echoMediaTable).where(and(
         eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, objectPath))).limit(1);
       if (!owned) { res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
-      const { base, key } = config();
-      const media = await fetch(storageUrl(base, objectPath.slice("/objects/".length)), {
-        headers: authHeaders(key), signal: AbortSignal.timeout(20000),
-      });
+      const media = await fetchStored(objectPath);
       if (!media.ok) { res.status(502).json({ error: "MEDIA_FETCH_FAILED" }); return; }
       const mime = (media.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
       if (!["audio/mp4", "audio/mpeg", "audio/wav", "audio/webm", "audio/ogg"].includes(mime)) {
@@ -197,11 +218,7 @@ export function createSupabaseStorageRouter(): IRouter {
       if (media.ownerId !== req.userId! && !voiceAccess.rowCount && !publicationAccess.rowCount && !await canReadSocialMedia(req.userId!, media.ownerId, objectPath, source, viewer)) {
         res.status(404).end(); return;
       }
-      const { base, key } = config();
-      const response = await fetch(storageUrl(base, objectPath.slice("/objects/".length)), {
-        headers: { ...authHeaders(key), ...(req.headers.range ? { Range: req.headers.range } : {}) },
-        signal: AbortSignal.timeout(30000),
-      });
+      const response = await fetchStored(objectPath, req.headers.range);
       if (!response.ok) { res.status(response.status === 404 ? 404 : 502).end(); return; }
       res.status(response.status);
       for (const header of ["content-type", "content-length", "content-range", "accept-ranges"]) {
@@ -214,7 +231,7 @@ export function createSupabaseStorageRouter(): IRouter {
       // emits an unhandled Readable error and crashes the entire Node process.
       const { pipeMedia } = await import("../lib/pipeMedia");
       pipeMedia(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), res,
-        error => req.log.warn({ err: error }, "Private Supabase media stream interrupted"));
+        error => req.log.warn({ err: error }, "Private media stream interrupted"));
     } catch { if (!res.headersSent) res.status(503).end(); }
   });
   return router;
