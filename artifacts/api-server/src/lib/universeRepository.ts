@@ -98,9 +98,23 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
           eq(echoUniversesTable.universeId, universeId),
         )).limit(1)
       : [];
-    const canonicalState = creatorSetup
-      ? { ...state, creatorSetup: { ...creatorSetup, plan: entitlements.plan } }
-      : state;
+    // Canon decisions are server-owned. Ordinary client saves must not erase
+    // approved private knowledge or dismissed proposals from their local snapshot.
+    const previousSetup = (current?.state?.creatorSetup ?? {}) as Record<string, unknown>;
+    const serverCanon = {
+      ...(Array.isArray(previousSetup.canonKnowledgeEvents)
+        ? { canonKnowledgeEvents: previousSetup.canonKnowledgeEvents } : {}),
+      ...(Array.isArray(previousSetup.dismissedCanonEventIds)
+        ? { dismissedCanonEventIds: previousSetup.dismissedCanonEventIds } : {}),
+    };
+    const canonicalState = {
+      ...state,
+      creatorSetup: {
+        ...(creatorSetup ?? {}),
+        ...serverCanon,
+        plan: entitlements.plan,
+      },
+    };
     const rows = expectedRevision === 0
       ? await tx.insert(echoUniversesTable)
         .values({ ownerId, universeId, state: canonicalState, revision: 1 })
