@@ -28,3 +28,19 @@ The backend helper `src/lib/cloudflareR2.ts` validates this configuration and ca
 - [ ] Deploy the backend after tests pass, then switch new uploads with an explicit flag.
 
 **Important:** merely adding the four environment variables does not activate R2. Current production upload routes still use Supabase until the provider-aware adapter and migration are completed. This is intentional to avoid breaking ECHO during setup.
+
+## R2 CORS configuration in the Cloudflare bucket Settings
+Set the allowed origin to the exact ECHO website origin (scheme + hostname, no trailing path). If you have both a custom domain and a Render/Vercel frontend, include each actual origin. Example policy, replacing the placeholder:
+```json
+[
+  {
+    "AllowedOrigins": ["https://YOUR-ECHO-FRONTEND.example"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+Keep the bucket's **Public Access disabled**. Do not put R2 API keys in the browser. Cloudflare CORS does not grant public access: only time-limited presigned upload URLs work.
+R2 keys created through the browser use `/objects/r2/<uuid>`, whereas older Supabase keys remain `/objects/uploads/<uuid>`. The API reads each using the corresponding provider. **Do not switch ECHO_STORAGE_PROVIDER to r2 before the CORS policy and integration tests are verified.**
