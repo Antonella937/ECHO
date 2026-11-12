@@ -723,7 +723,7 @@ router.get("/music/clip/:id/audio", async (req, res) => {
     }
     if (track.audioPath.startsWith("generated/")) {
       const jobs = await db.execute(sql`SELECT id FROM echo_music_generation_jobs
-        WHERE id=${track.id}::uuid AND owner_id=${track.ownerId}
+        WHERE owner_id=${track.ownerId}
           AND status='completed' AND audio_path=${track.audioPath} LIMIT 1`);
       if (!jobs.rows.length) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
       const upstream = await fetchPrivateGeneratedMusic(track.audioPath, req.headers.range);
