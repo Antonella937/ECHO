@@ -44,3 +44,11 @@ Set the allowed origin to the exact ECHO website origin (scheme + hostname, no t
 ```
 Keep the bucket's **Public Access disabled**. Do not put R2 API keys in the browser. Cloudflare CORS does not grant public access: only time-limited presigned upload URLs work.
 R2 keys created through the browser use `/objects/r2/<uuid>`, whereas older Supabase keys remain `/objects/uploads/<uuid>`. The API reads each using the corresponding provider. **Do not switch ECHO_STORAGE_PROVIDER to r2 before the CORS policy and integration tests are verified.**
+
+## Optional direct R2 downloads (reduce Render bandwidth)
+
+After real upload/download tests, `ECHO_R2_DIRECT_READS=true` allows authenticated `/api/storage/objects/r2/...` reads to authorize via the API and then redirect to a **60-second presigned R2 GET URL**. The R2 bucket stays private. Legacy Supabase objects continue through the existing authenticated proxy. This is **disabled by default** and should not be enabled until tested.
+
+Before enabling, update the private bucket CORS policy for the exact beta origin `https://echo-3o2.pages.dev` to allow both `PUT` and `GET` (and `HEAD` if media players require it), with `Content-Type` and `Range` request headers as needed. Verify browser cross-origin redirect handling, audio/video range playback, expired URLs, and authorization revocation behavior on Safari and desktop. Signed GET URLs are short-lived bearer capabilities: do not log, persist, publish or expose them in referrers. The browser's fetched bytes may be held in a session-local blob URL as before.
+
+The flag affects **only newly stored R2 paths**, not legacy Supabase media. Do not remove Supabase until existing media are separately migrated and verified.
