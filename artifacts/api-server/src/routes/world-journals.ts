@@ -34,6 +34,12 @@ function validCharacters(state: { characters?: Array<{id?:string;archived?:boole
   const allowed = new Set((state?.characters ?? []).filter(c => !c.archived).map(c => c.id));
   return ids.length === new Set(ids).size && ids.every(id => allowed.has(id));
 }
+/** Empty arrays must not reach sql.join([]), which throws before SQL is sent. */
+function textArray(items: readonly string[]) {
+  return items.length
+    ? sql`ARRAY[${sql.join(items.map(item => sql`${item}`), sql`,`)}]::text[]`
+    : sql`ARRAY[]::text[]`;
+}
 function invalid(req: {params:unknown}) { return params.safeParse(req.params); }
 router.get("/universe/:universeId/journals", async (req,res):Promise<void> => {
   const p=invalid(req); if(!p.success){res.status(400).json({error:"INVALID_UNIVERSE_ID"});return;}
@@ -57,8 +63,8 @@ router.post("/universe/:universeId/journals", async(req,res):Promise<void>=>{
   const r=await db.execute(sql`INSERT INTO echo_world_journals
     (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,known_character_ids,source_type,created_by,status)
     VALUES (${req.userId!},${p.data.universeId},${e.title},${e.content},${e.category},
-    ${e.truthStatus},${sql`ARRAY[${sql.join(e.keywords.map(x=>sql`${x}`),sql`,`)}]::text[]`},
-    ${e.knowledgeScope},${sql`ARRAY[${sql.join(e.knownCharacterIds.map(x=>sql`${x}`),sql`,`)}]::text[]`},
+    ${e.truthStatus},${textArray(e.keywords)},
+    ${e.knowledgeScope},${textArray(e.knownCharacterIds)},
     ${e.sourceType},${req.userId!},'draft') RETURNING id,status`);
   res.status(201).json(r.rows[0]);
 });
@@ -74,9 +80,9 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
   const e=b.data;
   const r=await db.execute(sql`UPDATE echo_world_journals SET title=${e.title},content=${e.content},
     category=${e.category},truth_status=${e.truthStatus},
-    keywords=${sql`ARRAY[${sql.join(e.keywords.map(x=>sql`${x}`),sql`,`)}]::text[]`},
+    keywords=${textArray(e.keywords)},
     knowledge_scope=${e.knowledgeScope},
-    known_character_ids=${sql`ARRAY[${sql.join(e.knownCharacterIds.map(x=>sql`${x}`),sql`,`)}]::text[]`},
+    known_character_ids=${textArray(e.knownCharacterIds)},
     status='draft',approved_by=NULL,approved_at=NULL,updated_at=now()
     WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
     AND universe_id=${p.data.universeId} AND status <> 'archived' RETURNING id,status`);
@@ -120,8 +126,8 @@ router.post("/universe/:universeId/journals/proposals",async(req,res):Promise<vo
   const r=await db.execute(sql`INSERT INTO echo_world_journals
     (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,known_character_ids,source_type,created_by,status)
     VALUES (${req.userId!},${p.data.universeId},${e.title},${e.content},${e.category},
-    ${e.truthStatus},${sql`ARRAY[${sql.join(e.keywords.map(x=>sql`${x}`),sql`,`)}]::text[]`},
-    ${e.knowledgeScope},${sql`ARRAY[${sql.join(e.knownCharacterIds.map(x=>sql`${x}`),sql`,`)}]::text[]`},
+    ${e.truthStatus},${textArray(e.keywords)},
+    ${e.knowledgeScope},${textArray(e.knownCharacterIds)},
     'ai_suggestion',${req.userId!},'draft') RETURNING id,status`);
   res.status(201).json(r.rows[0]);
 });
