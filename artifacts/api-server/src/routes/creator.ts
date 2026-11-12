@@ -275,9 +275,10 @@ router.post("/creator/universes/:universeId/dm-canon-candidates/:peerId/:message
       if (!universe || universe.archivedAt || universe.deletedAt) return { status: 404, error: "UNIVERSE_NOT_FOUND" };
       const state = universe.state;
       const viewerId = state.currentCharacterId;
-      if (!viewerId || viewerId === peerId.data ||
-        !state.characters.some(ch => ch.id === viewerId && !ch.archived) ||
-        !state.characters.some(ch => ch.id === peerId.data && !ch.archived)) {
+      const characters = Array.isArray(state.characters) ? state.characters as Array<{id?: string; archived?: boolean}> : [];
+      if (typeof viewerId !== "string" || viewerId === peerId.data ||
+        !characters.some(ch => ch.id === viewerId && !ch.archived) ||
+        !characters.some(ch => ch.id === peerId.data && !ch.archived)) {
         return { status: 403, error: "DM_VIEWER_NOT_ALLOWED" };
       }
       const candidate = dmCanonCandidates(state.messages as unknown as Array<Record<string,unknown>>, viewerId, peerId.data)
