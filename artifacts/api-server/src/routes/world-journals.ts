@@ -125,8 +125,10 @@ router.post("/universe/:universeId/journals/:journalId/approve",async(req,res):P
   const r=await db.execute(sql`UPDATE echo_world_journals SET status='published',
     approved_by=${req.userId!},approved_at=now(),updated_at=now()
     WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
-    AND universe_id=${p.data.universeId} AND status='draft' RETURNING id,status`);
-  if(!r.rows.length){res.status(404).json({error:"DRAFT_NOT_FOUND"});return;}
+    AND universe_id=${p.data.universeId} AND status='draft'
+    AND category=${category as string} AND knowledge_scope=${scope as string}
+    AND known_character_ids=${textArray(ids)} RETURNING id,status`);
+  if(!r.rows.length){res.status(409).json({error:"JOURNAL_CHANGED_RETRY"});return;}
   res.json(r.rows[0]);
 });
 router.post("/universe/:universeId/journals/:journalId/archive",async(req,res):Promise<void>=>{
