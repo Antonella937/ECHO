@@ -28,6 +28,8 @@ export function WorldJournals({ universeId, characters }: {
   const [error,setError]=useState('');
   const [opened,setOpened]=useState(false);
   const [excerpt,setExcerpt]=useState('');
+  const [conversationA,setConversationA]=useState('');
+  const [conversationB,setConversationB]=useState('');
   const url=`/api/universe/${encodeURIComponent(universeId)}/journals`;
   const load=async()=> {
     const requestedUniverse=universeId;
@@ -47,6 +49,7 @@ export function WorldJournals({ universeId, characters }: {
     setBusy(false);
     setOpened(false);
     setExcerpt('');
+    setConversationA('');setConversationB('');
   },[universeId]);
   useEffect(()=>{ if(!opened)return; let active=true;
     void customFetch<{entries:Entry[]}>(url,{responseType:'json'})
@@ -71,6 +74,22 @@ export function WorldJournals({ universeId, characters }: {
       setEditing(null);setKeywordInput(result.candidate.keywords.join(', '));
     }catch(e){if(currentUniverseRef.current===requestedUniverse)
       setError(e instanceof Error?e.message:'No se pudo generar la sugerencia');}
+    finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
+  };
+  const suggestFromConversation=async()=>{
+    const requestedUniverse=universeId;
+    setBusy(true);setError('');
+    try{
+      const result=await customFetch<{candidate:Omit<Draft,'sourceType'>|null}>(`${url}/suggest-from-conversation`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({characterId:conversationA,recipientId:conversationB}),responseType:'json'
+      });
+      if(currentUniverseRef.current!==requestedUniverse)return;
+      if(!result.candidate){setError('No se encontró un recuerdo claro en esa conversación.');return;}
+      setDraft({...result.candidate,sourceType:'ai_suggestion'});
+      setEditing(null);setKeywordInput(result.candidate.keywords.join(', '));
+    }catch(e){if(currentUniverseRef.current===requestedUniverse)
+      setError(e instanceof Error?e.message:'No se pudo analizar la conversación');}
     finally{if(currentUniverseRef.current===requestedUniverse)setBusy(false);}
   };
   const save=async()=>{
@@ -131,6 +150,20 @@ export function WorldJournals({ universeId, characters }: {
             value={excerpt} maxLength={6000} onChange={e=>setExcerpt(e.target.value)}
             placeholder="Pegá un fragmento de historia o conversación..."/>
         </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs">Primer personaje
+            <select className="mt-1 w-full rounded-xl border border-border bg-background p-2" value={conversationA} onChange={e=>setConversationA(e.target.value)}>
+              <option value="">Seleccionar</option>{characters.map(ch=><option key={ch.id} value={ch.id}>{ch.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs">Segundo personaje
+            <select className="mt-1 w-full rounded-xl border border-border bg-background p-2" value={conversationB} onChange={e=>setConversationB(e.target.value)}>
+              <option value="">Seleccionar</option>{characters.map(ch=><option key={ch.id} value={ch.id}>{ch.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" disabled={busy||!conversationA||!conversationB||conversationA===conversationB}
+          onClick={()=>void suggestFromConversation()}>Sugerir desde conversación</button>
         <button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" disabled={busy||excerpt.trim().length<20}
           onClick={()=>void suggest()}>Sugerir con IA</button>
       </div>
