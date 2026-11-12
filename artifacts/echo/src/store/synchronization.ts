@@ -115,6 +115,7 @@ export class UniverseSync {
     this.emit();
   }
   async importLegacy() {
+    if (this.universeId !== 'primary') return;
     if (this.preparingImport || this.importHash) return;
     await this.sync();
     if (this.view.conflicts.length || this.view.error) return;
