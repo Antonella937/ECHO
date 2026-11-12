@@ -102,12 +102,12 @@ router.post("/universe/:universeId/journals/:journalId/approve",async(req,res):P
   if(!p.success||!z.string().uuid().safeParse(req.params.journalId).success){res.status(400).json({error:"INVALID_JOURNAL"});return;}
   const world=await ownedWorld(req.userId!,p.data.universeId);
   if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
-  const draft=await db.execute(sql`SELECT category,knowledge_scope,known_character_ids
+  const draft=await db.execute(sql`SELECT category,knowledge_scope,known_character_ids,updated_at
     FROM echo_world_journals WHERE id=${req.params.journalId}::uuid
     AND owner_id=${req.userId!} AND universe_id=${p.data.universeId}
     AND status='draft' LIMIT 1`);
   if(!draft.rows.length){res.status(404).json({error:"DRAFT_NOT_FOUND"});return;}
-  const audience=draft.rows[0] as {category:unknown;knowledge_scope:unknown;known_character_ids:unknown};
+  const audience=draft.rows[0] as {category:unknown;knowledge_scope:unknown;known_character_ids:unknown;updated_at:unknown};
   const ids=audience.known_character_ids;
   const category=audience.category;
   const scope=audience.knowledge_scope;
@@ -127,7 +127,8 @@ router.post("/universe/:universeId/journals/:journalId/approve",async(req,res):P
     WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
     AND universe_id=${p.data.universeId} AND status='draft'
     AND category=${category as string} AND knowledge_scope=${scope as string}
-    AND known_character_ids=${textArray(ids)} RETURNING id,status`);
+    AND known_character_ids=${textArray(ids)}
+    AND updated_at=${audience.updated_at as Date} RETURNING id,status`);
   if(!r.rows.length){res.status(409).json({error:"JOURNAL_CHANGED_RETRY"});return;}
   res.json(r.rows[0]);
 });
