@@ -13,12 +13,13 @@ export function UniverseManagementForm({ universe, action, busy, cancel, submit 
   const t = useUniverseText();
   const [name, setName] = useState(universe.name);
   const [description, setDescription] = useState(universe.description ?? '');
+  const [timeline, setTimeline] = useState(universe.timeline ?? '');
   const [confirmation, setConfirmation] = useState('');
   const phrase = `ELIMINAR ${universe.name}`;
   return <form onSubmit={event => {
     event.preventDefault();
     submit({ action, expectedRevision: universe.revision,
-      ...(action === 'edit' ? { name: name.trim(), description: description.trim() } : {}),
+      ...(action === 'edit' ? { name: name.trim(), description: description.trim(), timeline: timeline.trim() } : {}),
       ...(action === 'delete' ? { confirmationText: confirmation } : {}),
     });
   }}>
@@ -28,6 +29,9 @@ export function UniverseManagementForm({ universe, action, busy, cancel, submit 
       </Field>
       <Field id="universe-edit-description" label={t("Contexto del universo (historia, ambientación y reglas)")}>
         <textarea id="universe-edit-description" className={`${inputCls} min-h-24 py-3`} value={description} maxLength={8000} disabled={busy} onChange={event => setDescription(event.target.value)} />
+      </Field>
+      <Field id="universe-edit-timeline" label={t("Cronología del universo (acontecimientos)") }>
+        <textarea id="universe-edit-timeline" className={`${inputCls} min-h-28 py-3`} value={timeline} maxLength={4000} disabled={busy} onChange={event => setTimeline(event.target.value)} placeholder={t("Qué ocurrió, cuándo y qué cambió para los personajes…")} />
       </Field>
       <p className="mt-1 text-xs text-muted-foreground">{t("Este contexto orienta a los personajes del universo. Cada personaje conserva sus propios conocimientos, recuerdos y personalidad. Hasta 8.000 caracteres.")}</p>
     </> : <p className="mb-4 break-words text-sm text-muted-foreground">
