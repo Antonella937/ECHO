@@ -162,6 +162,7 @@ router.get("/creator/universes", async (req, res): Promise<void> => {
     current: universe.universeId === currentId,
     archived: Boolean(universe.archivedAt),
     description: (universe.state.creatorSetup as { universeDescription?: string } | undefined)?.universeDescription ?? "",
+    timeline: (universe.state.creatorSetup as { universeTimeline?: string } | undefined)?.universeTimeline ?? "",
   })));
 });
 
@@ -170,7 +171,8 @@ router.put("/creator/universes/:universeId/management", async (req, res): Promis
     action: z.enum(["edit", "archive", "restore", "delete"]),
     expectedRevision: z.number().int().positive(),
     name: z.string().trim().min(1).max(60).optional(),
-    description: z.string().max(500).optional(),
+    description: z.string().max(8000).optional(),
+    timeline: z.string().max(4000).optional(),
     confirmationText: z.string().max(80).optional(),
   }).strict().safeParse(req.body);
   if (!input.success || typeof req.params.universeId !== "string" || req.params.universeId.length > 80) {
