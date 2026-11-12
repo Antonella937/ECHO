@@ -56,6 +56,7 @@ export async function manageUniverse(ownerId: string, universeId: string, input:
           plan: entitlement?.plan ?? (setup?.plan === "creator" ? "creator" : "free"),
           completedAt: typeof setup?.completedAt === "string" ? setup.completedAt : new Date().toISOString(),
           universeName: input.name!.trim(), universeDescription: input.description?.trim() ?? "",
+          universeTimeline: input.timeline?.trim() ?? (typeof setup?.universeTimeline === "string" ? setup.universeTimeline : ""),
         } }
         : row.state,
       archivedAt,
