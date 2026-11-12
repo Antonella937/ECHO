@@ -179,6 +179,48 @@ router.post("/universe/:universeId/journals/suggest-from-conversation",async(req
     res.json({candidate});
   }catch{res.status(503).json({error:"JOURNAL_SUGGESTION_UNAVAILABLE"});}
 });
+// Generate at most one private, unapproved suggestion from a recent DM thread.
+// The owner opts in to this lightweight check; repeated checks do not spend model
+// credits when the conversation has not changed.
+router.post("/universe/:universeId/journals/check-conversation",async(req,res):Promise<void>=>{
+  const p=invalid(req);
+  const b=z.object({threadId:z.string().min(1).max(120)}).strict().safeParse(req.body);
+  if(!p.success||!b.success){res.status(400).json({error:"INVALID_CONVERSATION_REQUEST"});return;}
+  const world=await ownedWorld(req.userId!,p.data.universeId);
+  if(!world){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
+  const state=world.state as {characters:Array<{id?:string;name?:string;archived?:boolean}>;messages?:unknown};
+  if(!Array.isArray(state.messages)){res.status(422).json({error:"CONVERSATION_UNAVAILABLE"});return;}
+  const active=new Set(state.characters.filter(ch=>!ch.archived).map(ch=>ch.id));
+  const thread=state.messages.filter((m):m is {id:string;threadId:string;senderId:string;recipientId:string;text:string}=>{
+    if(!m||typeof m!=='object')return false;
+    const v=m as Record<string,unknown>;
+    return v.threadId===b.data.threadId&&typeof v.id==='string'&&typeof v.senderId==='string'&&
+      typeof v.recipientId==='string'&&typeof v.text==='string'&&
+      active.has(v.senderId)&&active.has(v.recipientId)&&
+      (!Array.isArray(v.hiddenForIds)||v.hiddenForIds.length===0);
+  }).slice(-20);
+  const last=thread[thread.length-1];
+  if(thread.length<4||!last){res.json({created:false,reason:"NOT_ENOUGH_CONVERSATION"});return;}
+  const marker='dm:'+b.data.threadId+':'+last.id;
+  const existing=await db.execute(sql`SELECT id FROM echo_world_journals WHERE owner_id=${req.userId!}
+    AND universe_id=${p.data.universeId} AND source_reference=${marker} LIMIT 1`);
+  if(existing.rows.length){res.json({created:false,reason:"ALREADY_CHECKED"});return;}
+  const excerpt=thread.map(m=>`${m.senderId}: ${m.text.slice(0,300)}`).join('\n').slice(-6000);
+  try {
+    const characters=state.characters.filter(ch=>!ch.archived&&ch.id).map(ch=>({id:ch.id!,name:ch.name||ch.id!}));
+    const candidate=await suggestWorldJournal(excerpt,characters);
+    if(!candidate){res.json({created:false,reason:"NO_DURABLE_FACT"});return;}
+    // Never let AI publish or grant general visibility without owner approval.
+    const r=await db.execute(sql`INSERT INTO echo_world_journals
+      (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,
+       known_character_ids,source_type,source_reference,created_by,status)
+      VALUES (${req.userId!},${p.data.universeId},${candidate.title},${candidate.content},
+       ${candidate.category},${candidate.truthStatus},${textArray(candidate.keywords)},
+       'nobody',ARRAY[]::text[],'ai_suggestion',${marker},${req.userId!},'draft')
+      RETURNING id`);
+    res.status(201).json({created:true,id:r.rows[0]?.id});
+  } catch {res.status(503).json({error:"JOURNAL_SUGGESTION_UNAVAILABLE"});}
+});
 // Owner-triggered extraction uses free models and never persists or publishes by itself.
 router.post("/universe/:universeId/journals/suggest",async(req,res):Promise<void>=>{
   const p=invalid(req);
