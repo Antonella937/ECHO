@@ -83,6 +83,11 @@ router.get("/group-dms/:groupId/canon-candidates", async (req, res) => {
   if (!parsed.success || !groupId.success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
   const { universeId, actorId } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const [identity] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+    .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId))).limit(1);
+  if ((identity?.state as { currentCharacterId?: string } | null)?.currentCharacterId !== actorId) {
+    res.status(403).json({ error: "GROUP_VIEWER_IDENTITY_MISMATCH" }); return;
+  }
   try {
     const groups = await db.execute(sql`SELECT participant_ids AS "participantIds" FROM echo_group_conversations
       WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId.data}
