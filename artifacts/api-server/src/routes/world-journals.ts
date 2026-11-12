@@ -28,7 +28,8 @@ async function ownedWorld(ownerId: string, universeId: string) {
   const state = row.state as { characters?: unknown };
   if (!Array.isArray(state.characters) || !state.characters.every(c =>
     c !== null && typeof c === 'object' && !Array.isArray(c)
-    && typeof (c as {id?:unknown}).id === 'string')) return undefined;
+    && typeof (c as {id?:unknown}).id === 'string'
+    && (c as {id:string}).id.length > 0)) return undefined;
   return row as { state: { characters: Array<{id?:string;archived?:boolean}> } };
 }
 function validAudience(state: { characters?: Array<{id?:string;archived?:boolean}> } | undefined,
