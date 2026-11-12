@@ -1,3 +1,4 @@
+import { GroupCanonReview } from '@/components/echo/group-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -426,6 +427,7 @@ export default function GroupConversationPage() {
         }} />
       </div>}
     </div>
+    {group && id && group.participantIds.includes(me.id) && <GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} />}
     <form onSubmit={send} className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Adjuntar archivos" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Paperclip className="h-5 w-5" /></button>
