@@ -1,3 +1,4 @@
+import { UniverseLoreSections } from './universe-lore-sections';
 import { useState } from 'react';
 import type { CreatorUniverseSummary, UniverseManagementInput } from '@workspace/api-client-react';
 import { Field, inputCls } from './field';
@@ -27,9 +28,7 @@ export function UniverseManagementForm({ universe, action, busy, cancel, submit 
       <Field id="universe-edit-name" label={t("Nombre del universo")}>
         <input id="universe-edit-name" className={inputCls} value={name} maxLength={60} required disabled={busy} onChange={event => setName(event.target.value)} />
       </Field>
-      <Field id="universe-edit-description" label={t("Contexto del universo (historia, ambientación y reglas)")}>
-        <textarea id="universe-edit-description" className={`${inputCls} min-h-24 py-3`} value={description} maxLength={8000} disabled={busy} onChange={event => setDescription(event.target.value)} />
-      </Field>
+      <UniverseLoreSections prefix="universe-edit-lore" value={description} onChange={setDescription} disabled={busy} />
       <Field id="universe-edit-timeline" label={t("Cronología del universo (acontecimientos)") }>
         <textarea id="universe-edit-timeline" className={`${inputCls} min-h-28 py-3`} value={timeline} maxLength={4000} disabled={busy} onChange={event => setTimeline(event.target.value)} placeholder={t("Qué ocurrió, cuándo y qué cambió para los personajes…")} />
       </Field>
