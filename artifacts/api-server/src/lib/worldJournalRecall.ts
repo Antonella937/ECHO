@@ -14,7 +14,7 @@ export async function relevantWorldJournals(ownerId: string, universeId: string,
       AND EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(u.state->'characters')='array'
         THEN u.state->'characters' ELSE '[]'::jsonb END) ch
         WHERE ch->>'id'=${characterId} AND COALESCE((ch->>'archived')::boolean,false)=false))
-    AND (knowledge_scope='everyone'
+    AND ((knowledge_scope='everyone' AND category <> 'secret')
       OR (knowledge_scope='selected' AND ${characterId}=ANY(known_character_ids)))
     ORDER BY updated_at DESC LIMIT 200`);
   const terms = [...new Set((query.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []))]
