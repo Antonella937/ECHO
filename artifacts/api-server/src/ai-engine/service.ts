@@ -81,9 +81,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   let selectedProvider = dependencies.provider;
   // Linked characters use their own Kindroid voice for public text too.
   // ECHO still selects the opportunity and validates the draft before execution.
-  if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
-      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      dependencies.liveDmReply === true &&
+  if (dependencies.liveDmReply === true &&
       (input.situation === 'comment' || input.situation === 'post')) {
     const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
@@ -104,9 +102,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
-  if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
-      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      dependencies.liveDmReply === true && input.situation === 'dm' &&
+  if (dependencies.liveDmReply === true && input.situation === 'dm' &&
       !!input.recipientId && input.recipientId !== input.characterId) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
@@ -205,6 +201,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         }
         selectedProvider = kindroidDmProvider(outgoingPrompt, kinId, socialContext);
       }
+    }
+  }
+  // Fail closed: linked characters must never fall back to ECHO's text provider.
+  // A missing link, invalid situation, or unavailable Kindroid stops generation.
+  if (dependencies.liveDmReply === true) {
+    const linkCheck = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    if (linkCheck.rows.length && selectedProvider.name !== 'kindroid') {
+      throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
     }
   }
   const journalQuery = [
