@@ -417,7 +417,7 @@ export async function runAutonomyLiveCycle(
       preview = await previewForOwner(ownerId, decisionInput, {
         read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
         vision: (id, state, input) => visionService.loadContext(id, state, input),
-        liveDmReply: dependencies.lane === 'dm' && opportunity.situation === 'dm',
+        liveDmReply: true, // All live text actions use linked Kindroid, not just DM replies.
       });
     } finally {
       activeDmTyping.delete(typingId);
