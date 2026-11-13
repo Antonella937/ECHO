@@ -12,7 +12,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { Clapperboard, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -366,6 +366,17 @@ export default function ConversationPage() {
               listening={listeningId === m.id}
               onListen={() => void listenToMessage(m.id)}
               onRequestVoice={() => requestVoiceReply(m)}
+              onCreateScene={() => {
+                const history = messages.slice(Math.max(0, i - 11), i + 1).map(item => ({
+                  sender: item.senderId === me.id ? me.name : other.name,
+                  text: item.text.slice(0, 1200),
+                }));
+                sessionStorage.setItem('echo:scene-from-dm', JSON.stringify({
+                  universeId: user?.id ? getActiveUniverseId(user.id) : 'primary',
+                  messageId: m.id, peerId: other.id, peerName: other.name, history,
+                }));
+                navigate('/scenes?fromDm=1');
+              }}
               onReply={() => setQuoteId(m.id)}
               onSave={() => { try { actions.toggleSaveMessage(m.id); } catch (e) { setError((e as Error).message); } }}
               onEdit={(value) => { try { actions.editMessage(m.id, value); } catch (e) { setError((e as Error).message); } }}
@@ -566,10 +577,10 @@ function summarize(m: Message, t: (key: string) => string): string {
   return t('Mensaje');
 }
 
-function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
+function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names, isLastMine, reacting, onToggleReacting, onReact, onReply, onCreateScene, onJump, hiding, onToggleHiding, onHide, canListen, listening, onListen, onRequestVoice, onSave, onEdit, onApplyTweak, universeId }: {
   m: Message; layout: 'chat' | 'narrative'; mine: boolean; meId: string; otherId: string; showTime: boolean; state: ReturnType<typeof useSocial>['state'];
   quoted: Message | null | undefined; names: Record<string, string>; isLastMine: boolean; reacting: boolean;
-  onToggleReacting(): void; onReact(v: string): void; onReply(): void; onJump(id: string): void;
+  onToggleReacting(): void; onReact(v: string): void; onReply(): void; onCreateScene(): void; onJump(id: string): void;
   hiding: boolean; onToggleHiding(): void; onHide(): void;
   canListen: boolean; listening: boolean; onListen(): void; onRequestVoice(): void;
   onSave(): void; onEdit(value: string): void;
@@ -695,6 +706,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
         )}
         <span className="flex max-w-full shrink-0 flex-wrap gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
           {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
+          <button type="button" onClick={onCreateScene} aria-label={t("Crear escena desde aquí")} title={t("Crear escena desde aquí")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-scene-${m.id}`}><Clapperboard className="h-4 w-4" /></button>
           <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
           <button type="button" onClick={onSave} aria-label={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} title={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-save-${m.id}`}><Bookmark className={cn('h-4 w-4', m.savedByIds?.includes(meId) && 'fill-primary text-primary')} /></button>
@@ -708,6 +720,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
           {canListen && <button type="button" disabled={listening} onClick={() => { setMenuOpen(false); onListen(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Escuchar con su voz")}</button>}
           {!mine && <button type="button" onClick={() => { setMenuOpen(false); onRequestVoice(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Pedir respuesta en audio")}</button>}
           <button type="button" onClick={() => { setMenuOpen(false); onReply(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Responder")}</button>
+          <button type="button" onClick={() => { setMenuOpen(false); onCreateScene(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs" data-testid={`create-scene-from-${m.id}`}>{t("Crear escena desde aquí")}</button>
           <button type="button" onClick={() => { setMenuOpen(false); onToggleReacting(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Reaccionar")}</button>
           <button type="button" onClick={() => { setMenuOpen(false); onSave(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')}</button>
           {!mine && m.origin !== 'user' && <button type="button" onClick={() => { setMenuOpen(false); setTweakOpen(true); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t('Ajustar con IA')}</button>}
