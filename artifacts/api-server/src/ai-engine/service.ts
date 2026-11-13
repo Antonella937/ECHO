@@ -79,7 +79,6 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Linked Kin IDs are stored server-side, never exposed to the client.
   // Only the founder's direct incoming DM lane is routed; social actions stay native.
   let selectedProvider = dependencies.provider;
-  const primaryRecipientId = parsed.data.state.primaryCharacterId;
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       dependencies.liveDmReply === true && input.situation === 'dm' &&
