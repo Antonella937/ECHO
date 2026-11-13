@@ -51,6 +51,10 @@ export default function ConversationPage() {
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
   const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
   const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
+  const resolveWallpaper = useMediaResolver();
+  const wallpaperAppearance = appearance.background === 'photo' && appearance.image
+    ? { ...appearance, image: resolveWallpaper(appearance.image) }
+    : appearance;
   useEffect(()=>{
     setAppearance(readDmAppearance(appearanceKey));
     if(!user?.id || !id)return;
@@ -329,7 +333,7 @@ export default function ConversationPage() {
       <div className="relative z-40 flex justify-end px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div style={{...dmBackgroundStyle(appearance),backgroundColor:appearance.background==='none'?undefined:'var(--background)',backgroundSize:'cover'}} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div style={{...dmBackgroundStyle(wallpaperAppearance),backgroundColor:appearance.background==='none'?undefined:'var(--background)',backgroundSize:'cover'}} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
