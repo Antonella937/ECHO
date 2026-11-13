@@ -1,4 +1,4 @@
-const CACHE = 'echo-shell-brand01-v2';
+const CACHE = 'echo-shell-sessionfix-v3';
 const ROOT = new URL('./', self.location.href);
 const shell = ['.', 'manifest.webmanifest', 'icon.svg', 'icon-maskable.svg'];
 
@@ -45,13 +45,20 @@ self.addEventListener('fetch', (event) => {
   if (!['script', 'style', 'image', 'font'].includes(request.destination)) return;
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(request);
-      if (cached) return cached;
-      const response = await fetch(request);
-      if (response.ok && response.type === 'basic') {
-        await cache.put(request, response.clone());
+      // JS/CSS must be network-first: a stale app shell can keep an old
+      // Clerk configuration after a deploy while the API is already updated.
+      // Offline fallback is retained without clearing browser/session storage.
+      try {
+        const response = await fetch(request);
+        if (response.ok && response.type === 'basic') {
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        throw error;
       }
-      return response;
     }),
   );
 });
