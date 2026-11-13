@@ -59,7 +59,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ai_id: kinId,
-            message: '[ECHO story interaction — visible story only, not a direct message. Based on your own personality and relationship, choose whether to simply view it, like it, or react. Reply with exactly one token: VIEW, LIKE, LAUGH, SURPRISE, or FIRE. Do not write a message; a separate private conversation handles story replies.]\\n' + storyContext.slice(0, 800),
+            message: '[ECHO story interaction — visible story only, not a direct message. Based on your own personality and relationship, choose whether to simply view it, like it, or react. Reply with exactly one token: VIEW, LIKE, LAUGH, SURPRISE, or FIRE. Do not write a message; a separate private conversation handles story replies.]\n' + storyContext.slice(0, 800),
             stream: false,
           }),
         });
@@ -72,9 +72,9 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const raw = (await response.text()).trim();
-      const choice = raw.match(/^(?:["'\\s]*)?(VIEW|LIKE|LAUGH|SURPRISE|FIRE)(?:["'\\s.!]*)?$/i)?.[1]?.toUpperCase();
-      if (!choice) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
-      const reaction = { LIKE: '❤', LAUGH: '😂', SURPRISE: '😮', FIRE: '🔥' }[choice] ?? null;
+      const choice = raw.replace(/^[\\s"'.,!]+|[\\s"'.,!]+$/g, '').toUpperCase();
+      if (!['VIEW', 'LIKE', 'LAUGH', 'SURPRISE', 'FIRE'].includes(choice)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+      const reaction = ({ LIKE: '❤', LAUGH: '😂', SURPRISE: '😮', FIRE: '🔥' } as Record<string, string>)[choice] ?? null;
       const decision = JSON.stringify({
         action: reaction ? 'react' : 'none', situation: 'story_reaction', text: null,
         reaction, reason: 'Kindroid story choice', suggestedDelayMinutes: 0,
