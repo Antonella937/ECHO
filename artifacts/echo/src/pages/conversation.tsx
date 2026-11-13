@@ -73,6 +73,16 @@ export default function ConversationPage() {
   const back = () => navigate('/messages');
   const [text, setText] = useState('');
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // Expand the DM composer as the user types, including on iOS with the keyboard open.
+  useEffect(() => {
+    const input = composerRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    const maxHeight = Math.min(240, Math.max(120, window.innerHeight * 0.32));
+    input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
+    input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [text]);
+
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
@@ -525,7 +535,7 @@ export default function ConversationPage() {
               placeholder={`${t("Escribir como")} ${me.name.split(' ')[0]}…`}
               rows={1}
               maxLength={10000}
-              className="max-h-36 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-2xl border border-input bg-card px-5 py-3 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
+              className="min-h-12 min-w-0 flex-1 resize-none overflow-hidden rounded-2xl border border-input bg-card px-5 py-3 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
               aria-label={`${t("Mensaje para")} ${other.name}`}
               data-testid="input-message"
             />
