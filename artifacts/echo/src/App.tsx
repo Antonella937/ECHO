@@ -437,7 +437,14 @@ function AuthenticatedExperience() {
   }, [isLoaded, isSignedIn, user?.id, universeQuery.data?.state, legacyCheckAttempt]);
 
   if (!isLoaded) return <EchoSplash />;
-  if (!isSignedIn || !user) return <LandingPage />;
+  if (!isSignedIn || !user) {
+    // Installed iOS/Android PWAs have their own browser storage. If Clerk's
+    // session expires, keep the user inside ECHO and offer sign-in directly,
+    // rather than showing onboarding and suggesting a new universe.
+    const installed = window.matchMedia('(display-mode: standalone)').matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    return installed ? <SignInPage /> : <LandingPage />;
+  }
   if (universeQuery.isError) {
     const failure = universeQuery.error as { data?: { error?: string }; message?: string } | null;
     const betaError = failure?.data?.error;
