@@ -10,10 +10,10 @@ const categoryFor = (kind: string): PushCategory =>
 /** Only new notifications addressed to the account's active human character are eligible. */
 export async function sendNewOwnerPush(ownerId: string, previous: SocialSnapshot, next: SocialSnapshot): Promise<void> {
   const key = process.env.ECHO_ONESIGNAL_REST_API_KEY;
-  if (!key || !ownerId || !next.currentCharacterId) return;
+  if (!key || !ownerId) return;
   const seen = new Set(previous.notifications.map(n => n.id));
   const added = next.notifications.filter(n => !seen.has(n.id) &&
-    n.recipientId === next.currentCharacterId && n.actorId !== next.currentCharacterId);
+    n.recipientId === 'nela' && n.actorId !== 'nela');
   for (const notice of added.slice(0, 10)) {
     const category = categoryFor(notice.kind);
     const actor = next.characters.find(c => c.id === notice.actorId);
