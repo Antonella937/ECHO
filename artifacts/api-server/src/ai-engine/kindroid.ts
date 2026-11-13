@@ -1,7 +1,7 @@
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 
 /** Private, opt-in Kindroid DM adapter. No profile changes, chat breaks, or social autonomy. */
-export function kindroidDmProvider(message: string, kinId: string, socialContext = '', request: typeof fetch = fetch): TextProvider {
+export function kindroidDmProvider(message: string, kinId: string, socialContext = '', request: typeof fetch = fetch, situation: 'dm' | 'comment' | 'post' = 'dm'): TextProvider {
   return {
     name: 'kindroid',
     async complete(input) {
@@ -30,7 +30,7 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       const reply = (await response.text()).trim();
       if (!reply || reply.startsWith('<<ERROR>>') || reply.startsWith('<<HTTP_ERROR>>')) throw new EngineError('KINDROID_GENERATION_FAILED', 502);
       const decision = JSON.stringify({
-        action: 'draft', situation: 'dm', text: reply.slice(0, 2000), reason: 'Kindroid DM response',
+        action: 'draft', situation, text: reply.slice(0, situation === 'dm' ? 2000 : situation === 'post' ? 600 : 1000), reason: 'Kindroid character text',
         suggestedDelayMinutes: 0, galleryPhotoId: null, reaction: null, contextSections: [],
       });
       input.validate?.(decision);
