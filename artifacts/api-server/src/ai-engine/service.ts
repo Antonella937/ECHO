@@ -5,7 +5,7 @@ import type { VisionContext } from '../vision/contracts';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
-import { kindroidDmProvider } from './kindroid';
+import { kindroidDmProvider, kindroidStoryDecisionProvider } from './kindroid';
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
@@ -213,38 +213,37 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
-  // Non-text social actions need no generative AI. The opportunity policy has
-  // already checked visibility, follow relationships, cooldowns and repeat caps.
-  // Avoid charging text-model budget merely to return a fixed like or a story
-  // view. For story_reaction, a no-op decision still records a permitted view
-  // through the autonomy executor; it must not invent an emoji reaction.
+  // For the founder's linked characters, Kindroid chooses whether to view,
+  // like or react to a visible story. Never substitute local random choices.
   if (dependencies.liveDmReply === true &&
-      ['like_post', 'like_comment', 'story_reaction'].includes(input.situation)) {
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      input.situation === 'story_reaction') {
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    const story = parsed.data.state.stories.find(item => item.id === input.storyId);
+    if (!story || !canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId) ||
+        !parsed.data.state.follows[input.characterId]?.includes(story.authorId)) {
+      throw new EngineError('STORY_NOT_VISIBLE', 403);
+    }
+    const author = parsed.data.state.characters.find(item => item.id === story.authorId);
+    const relation = actor?.configuration?.relationships?.find(item => item.targetId === story.authorId);
+    selectedProvider = kindroidStoryDecisionProvider(kinId,
+      `Author: ${(author?.name ?? 'someone').slice(0,80)}. Relationship: ${relation?.preset ?? 'unspecified'}. Caption: ${(story.caption ?? '').slice(0,500)}`);
+  }
+  // Likes do not require generated prose. Story interactions above are
+  // Kindroid-driven and must not be replaced by a local random decision.
+  if (dependencies.liveDmReply === true &&
+      ['like_post', 'like_comment'].includes(input.situation)) {
     const situation = input.situation;
     selectedProvider = {
       name: 'echo-nontext-policy',
       async complete(request) {
-        // Stories can be watched silently, liked with a heart, or reacted to
-        // with an emoji. Private text replies are handled separately by the DM
-        // lane using the character's Kindroid voice and normal permissions.
-        const social = actor?.configuration?.social;
-        const story = input.storyId ? parsed.data.state.stories.find(item => item.id === input.storyId) : undefined;
-        const relationship = actor?.configuration?.relationships?.find(item => item.targetId === story?.authorId);
-        // Quiet or less sociable characters mostly watch. Closer connections
-        // are more likely to react, without overriding visibility or privacy.
-        let reactChance = social?.sociability === 'high' ? 0.52 : social?.sociability === 'low' ? 0.18 : 0.34;
-        if (social?.spontaneity === 'high') reactChance += 0.09;
-        if (social?.allowSilence) reactChance -= 0.08;
-        if (relationship?.preset === 'close_friend' || relationship?.preset === 'partner') reactChance += 0.12;
-        reactChance = Math.max(0.08, Math.min(0.7, reactChance));
-        const storyReaction = situation === 'story_reaction' && Math.random() < reactChance;
-        const emojiRoll = Math.random();
-        const emoji = storyReaction ? (emojiRoll < 0.55 ? '❤' : emojiRoll < 0.73 ? '😂' : emojiRoll < 0.88 ? '😮' : '🔥') : null;
-        const decision = JSON.stringify({
-          action: situation === 'story_reaction' ? (storyReaction ? 'react' : 'none') : 'like',
-          situation, text: null, reaction: emoji, reason: 'Eligible non-text social action',
-          suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [],
-        });
+        const decision = JSON.stringify({ action: 'like', situation, text: null,
+          reaction: null, reason: 'Eligible non-text social action',
+          suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [] });
         request.validate?.(decision);
         return { text: decision, model: 'echo-nontext-policy', usage: unknownUsage(), attempts: [] };
       },
