@@ -53,7 +53,7 @@ export default function ConversationPage() {
   const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
   const resolveWallpaper = useMediaResolver();
   const wallpaperAppearance = appearance.background === 'photo' && appearance.image
-    ? { ...appearance, image: resolveWallpaper(appearance.image) }
+    ? (() => { const image = resolveWallpaper(appearance.image); return image ? { ...appearance, image } : { ...appearance, background: 'none' as const }; })()
     : appearance;
   useEffect(()=>{
     setAppearance(readDmAppearance(appearanceKey));
