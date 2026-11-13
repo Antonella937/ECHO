@@ -313,8 +313,9 @@ export default function ConversationPage() {
   }, [id, messages.length]);
 
   return (
-    <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 pt-safe backdrop-blur-xl">
+    <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
+      {appearance.background !== "none" && <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{...dmBackgroundStyle(wallpaperAppearance),backgroundPosition:"center",backgroundSize:"cover"}} />}
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/45 pt-safe backdrop-blur-md">
         <div className="flex h-16 items-center gap-2 px-2">
           <button onClick={back} aria-label={t("Volver")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
             <ChevronLeft className="h-6 w-6" strokeWidth={1.6} />
@@ -333,7 +334,7 @@ export default function ConversationPage() {
       <div className="relative z-40 flex justify-end px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div style={{...dmBackgroundStyle(wallpaperAppearance),backgroundColor:appearance.background==='none'?undefined:'var(--background)',backgroundSize:'cover'}} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
@@ -379,7 +380,7 @@ export default function ConversationPage() {
       </div>
 
       {id && <DmCanonReview key={id} universeId={getActiveUniverseId(user?.id ?? '')} peerId={id} />}
-    <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/90 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
+    <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/45 px-3 pb-safe pt-2 backdrop-blur-md" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
