@@ -99,7 +99,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const prompt = input.situation === 'comment'
         ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
         : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
-      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
+      if (input.situation === 'post' || targetPost) {
+        selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
+      }
     }
   }
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
