@@ -58,7 +58,7 @@ export function readDmAppearance(key:string):DmAppearance{
 export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void}){
  const lang=useLanguage();const t=words[lang]??words.en;
  const [open,setOpen]=useState(false);
- const [uploadError,setUploadError]=useState(false);
+ const [uploadError,setUploadError]=useState('');
  const [saving,setSaving]=useState(false);
  const [processing,setProcessing]=useState(false);
  const [draft,setDraft]=useState(value);
@@ -76,12 +76,12 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    <label className="mt-3 block text-xs">{lang==='es'?'Importar foto':lang==='pt'?'Importar foto':lang==='fr'?'Importer une photo':lang==='de'?'Foto importieren':lang==='it'?'Importa foto':lang==='ko'?'사진 가져오기':lang==='ja'?'写真を読み込む':lang==='zh'?'导入照片':'Import photo'}
     <input className="mt-1 block w-full text-xs" type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{
      const file=e.target.files?.[0];if(!file)return;
-     setProcessing(true);setUploadError(false);
-     void optimizeDmBackground(file).then(image=>{setDraft(old=>({...old,background:'photo',image}));setUploadError(false);}).catch(()=>setUploadError(true)).finally(()=>setProcessing(false));
+     setProcessing(true);setUploadError('');
+     void optimizeDmBackground(file).then(image=>{setDraft(old=>({...old,background:'photo',image}));setUploadError('');}).catch(error=>setUploadError(error instanceof Error?error.message:'No se pudo procesar la imagen')).finally(()=>setProcessing(false));
     }}/>
    </label>
    {processing&&<p role="status" className="text-xs">{lang==='es'?'Optimizando foto…':'Optimizing photo…'}</p>}
-   {uploadError&&<p role="alert" className="text-xs text-destructive">{lang==='es'?'No se pudo procesar o guardar la foto. Probá con otra imagen.':'Could not process or save the photo. Try another image.'}</p>}
+   {uploadError&&<p role="alert" className="text-xs text-destructive">{uploadError}</p>}
    {draft.image&&<button type="button" onClick={()=>setDraft(old=>({...old,image:undefined,background:'none'}))} className="mt-2 block text-xs underline">{lang==='es'?'Quitar foto':'Remove photo'}</button>}
    <fieldset className="mt-3"><legend className="text-xs">{lang==='es'?'Presentación':lang==='pt'?'Apresentação':lang==='fr'?'Affichage':lang==='de'?'Darstellung':lang==='it'?'Visualizzazione':lang==='ko'?'표시 방식':lang==='ja'?'表示形式':lang==='zh'?'显示方式':'Display mode'}</legend>
     <div className="mt-1 flex gap-2">{(['chat','narrative'] as const).map(layout=><button key={layout} type="button" aria-pressed={(draft.layout??'chat')===layout} onClick={()=>setDraft(old=>({...old,layout}))} className={`rounded-lg border px-3 py-2 text-xs ${(draft.layout??'chat')===layout?'border-primary bg-primary/15':'border-border'}`}>{layout==='chat'?(lang==='es'?'Chat':lang==='ko'?'채팅':lang==='ja'?'チャット':lang==='zh'?'聊天':'Chat'):(lang==='es'?'Narrativa':lang==='pt'?'Narrativa':lang==='fr'?'Narratif':lang==='de'?'Erzählung':lang==='it'?'Narrativa':lang==='ko'?'서술형':lang==='ja'?'物語形式':lang==='zh'?'叙事':'Narrative')}</button>)}</div>
@@ -90,17 +90,22 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
     <input type="range" min={0} max={100} value={draft.opacity} onChange={e=>setDraft(old=>({...old,opacity:Number(e.target.value)}))} className="mt-2 w-full"/>
    </label>
    <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" disabled={saving||processing} onClick={async()=>{
-    setSaving(true);setUploadError(false);
+    setSaving(true);setUploadError('');
     try{
      const match=storageKey.match(/^echo:dm-appearance:[^:]+:([^:]+):([^:]+)$/);
      if(!match)throw Error('Missing conversation');
-     const image=draft.image?.startsWith('data:image/')?await uploadPrivateImage(draft.image):draft.image;
+     let image=draft.image;
+     if(image?.startsWith('data:image/')){
+      try{image=await uploadPrivateImage(image);}catch(error){throw new Error(`Error al subir la foto: ${error instanceof Error?error.message:'no se pudo conectar con el almacenamiento'}`);}
+     }
      const next={...draft,image,layout:draft.layout??'chat'};
-     await customFetch('/api/dm/appearance',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({universeId:match[1],characterId:match[2],appearance:next})});
+     try{
+      await customFetch('/api/dm/appearance',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({universeId:match[1],characterId:match[2],appearance:next})});
+     }catch(error){throw new Error(`Error al guardar el fondo del chat: ${error instanceof Error?error.message:'el servidor rechazó la configuración'}`); }
      try{localStorage.setItem(storageKey,JSON.stringify(next));}catch{/* server copy is authoritative */}
      onChange(next);setOpen(false);
-    }catch{setUploadError(true);}finally{setSaving(false);}
+    }catch(error){setUploadError(error instanceof Error?error.message:'No se pudo guardar el fondo');}finally{setSaving(false);}
    }}>{t[5]}</button>
   </section>}
  </div>;
