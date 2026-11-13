@@ -186,6 +186,8 @@ export function chooseAutonomyOpportunity(input: {
   maxActionsPerDay?: number;
   lane?: "dm" | "social";
   dmFrequency?: "rarely" | "sometimes" | "frequently";
+  /** Recipients allowed by server-side mutual DM permissions. */
+  allowedDmRecipientIds?: ReadonlySet<string>;
 }): Opportunity {
   const { state, character } = input;
   const now = input.now ?? new Date();
@@ -210,6 +212,7 @@ export function chooseAutonomyOpportunity(input: {
   const incoming = [...state.messages]
     .filter((message) => message.recipientId === character.id &&
       message.senderId !== character.id &&
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(message.senderId)) &&
       !message.hiddenForIds?.includes(character.id) &&
       !!message.text.trim() &&
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
@@ -244,6 +247,7 @@ export function chooseAutonomyOpportunity(input: {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = prioritizeHumanAccount([...state.stories].reverse(), state, story => story.authorId, random).find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(story.authorId)) &&
       (character.configuration?.relationships?.some(relation => relation.targetId === story.authorId) ||
         hasDmThread(state, character.id, story.authorId)) &&
       canCharacterViewCloseFriendsStory(state, story, character.id) &&
@@ -275,6 +279,7 @@ export function chooseAutonomyOpportunity(input: {
       input.dmFrequency === "rarely" ? 0.015 : 0.06;
     if (random() < outreachChance) {
       const recipients = availableTargets(state, character).filter(candidate =>
+        (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(candidate.id)) &&
         !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
       if (recipients.length) {
         const prioritized = prioritizeHumanAccount(recipients, state, recipient => recipient.id, random);
