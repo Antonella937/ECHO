@@ -79,6 +79,29 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Linked Kin IDs are stored server-side, never exposed to the client.
   // Only the founder's direct incoming DM lane is routed; social actions stay native.
   let selectedProvider = dependencies.provider;
+  // Linked characters use their own Kindroid voice for public text too.
+  // ECHO still selects the opportunity and validates the draft before execution.
+  if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      dependencies.liveDmReply === true &&
+      (input.situation === 'comment' || input.situation === 'post')) {
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId === 'string' && kinId.length > 0) {
+      const targetPost = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
+      const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
+      // Do not pass private messages, hidden stories, or unrelated account data.
+      const publicContext = targetPost
+        ? `Visible feed post: ${targetPost.caption.slice(0, 500)}${targetComment ? '\\nVisible comment: ' + targetComment.text.slice(0, 300) : ''}`
+        : '';
+      const prompt = input.situation === 'comment'
+        ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\\n' + publicContext : ''}`
+        : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
+      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
+    }
+  }
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       dependencies.liveDmReply === true && input.situation === 'dm' &&
