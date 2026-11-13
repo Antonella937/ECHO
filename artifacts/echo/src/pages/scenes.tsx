@@ -33,6 +33,24 @@ export default function ScenesPage() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [showCreate,setShowCreate] = useState(false);
+  const [sourceMessage, setSourceMessage] = useState<{messageId:string;peerName:string}|null>(null);
+  useEffect(() => {
+    if (!user?.id || new URLSearchParams(window.location.search).get('fromDm') !== '1') return;
+    try {
+      const raw = sessionStorage.getItem('echo:scene-from-dm');
+      if (!raw) return;
+      const origin = JSON.parse(raw) as {universeId:string;messageId:string;peerId:string;peerName:string;history:{sender:string;text:string}[]};
+      if (origin.universeId !== universeId || !state.characters.some(c => c.id === origin.peerId)) return;
+      setSourceMessage({messageId:origin.messageId,peerName:origin.peerName});
+      setParticipants([origin.peerId]);
+      setTitle(es ? `Continuación con ${origin.peerName}` : `Continuing with ${origin.peerName}`);
+      const context = origin.history.map(entry => `${entry.sender}: ${entry.text}`).join('\n');
+      setPremise(`Continue naturally from the following DM conversation, ending at message ${origin.messageId}. This is background context, not dialogue to replay. Preserve established events and character relationships; do not assume additional participants witnessed the private messages.\n\n${context}`.slice(0, 4000));
+      setShowCreate(true);
+      sessionStorage.removeItem('echo:scene-from-dm');
+      window.history.replaceState(null, '', '/scenes');
+    } catch { /* Invalid or expired handoff: normal scene creation remains available. */ }
+  }, [user?.id, universeId]);
   const characters = state.characters.filter(c => !c.archived && c.id !== me.id);
   const refresh = async () => {
     const result = await customFetch<{scenes:Scene[]}>(`/api/scenes?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json',cache:'no-store'});
@@ -60,7 +78,7 @@ export default function ScenesPage() {
     finally{setBusy(false)}
   };
   const create = async (e:FormEvent) => {e.preventDefault();if(!participants.length)return;setBusy(true);setError('');
-    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);setShowCreate(false);}
+    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);setSourceMessage(null);setShowCreate(false);}
     catch{setError(es?'No se pudo crear la escena.':'Could not create scene.')}finally{setBusy(false)}
   };
   const send = async (e:FormEvent) => {e.preventDefault();if(!selected||!message.trim())return;setBusy(true);setError('');
