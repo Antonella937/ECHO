@@ -119,9 +119,13 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       // fabricate an incoming human message just to make Kindroid respond.
       const isDirectReply = newest?.senderId === recipientId && typeof newest.text === 'string' && !!newest.text.trim();
       if (isDirectReply || dependencies.liveDmReply) {
-        const outgoingPrompt = isDirectReply
-          ? newest!.text
-          : `[ECHO autonomous DM: You have decided to reach out to ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
+        const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
+          story.id === input.storyId && story.authorId === recipientId && story.seenBy.includes(input.characterId)) : undefined;
+        const outgoingPrompt = storyForReply
+          ? `[ECHO private story reply: You viewed a story by ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
+          : isDirectReply
+            ? newest!.text
+            : `[ECHO autonomous DM: You have decided to reach out to ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
@@ -152,12 +156,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // Recover older public posts on demand from persisted ECHO history.
           // The author must be followed by the actor (or be the actor); never
           // retrieve private messages, restricted stories, or unrelated accounts.
-          const terms = new Set((newest.text.toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
+          const terms = new Set(((newest?.text ?? '').toLocaleLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [])
             .filter(t => !['what','have','your','with','this','that','about','latest','post','posted','viste','publicacion','publicaste','sobre','esto','esta','para','como'].includes(t)));
           const visibleAuthorIds = new Set([input.characterId, ...(parsed.data.state.follows[input.characterId] ?? [])]);
           const recentIds = new Set((data.recentSocial?.posts ?? []).map(p => p.id));
           // Old posts remain browsable on explicit request; they are not spontaneous memories.
-          const asksAboutPost = /\b(post|posts|posted|posting|publication|picture|photo|painting|drawing|sketch|artwork|feed|publicaci[oó]n|publicaciones|publicaste|subiste|foto|pintura|dibujo|boceto|perfil)\b/i.test(newest.text);
+          const asksAboutPost = /\b(post|posts|posted|posting|publication|picture|photo|painting|drawing|sketch|artwork|feed|publicaci[oó]n|publicaciones|publicaste|subiste|foto|pintura|dibujo|boceto|perfil)\b/i.test(newest?.text ?? '');
           const older = asksAboutPost && terms.size ? freshState.posts
             .filter(p => visibleAuthorIds.has(p.authorId) && !recentIds.has(p.id))
             .map(p => {
