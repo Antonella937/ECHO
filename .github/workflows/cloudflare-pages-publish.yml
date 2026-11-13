@@ -1,0 +1,55 @@
+name: ECHO frontend — build on GitHub and publish to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'artifacts/echo/**'
+      - 'lib/**'
+      - 'packages/**'
+      - 'attached_assets/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/cloudflare-pages-publish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: echo-pages-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CF_READY: ${{ secrets.ECHO_CLOUDFLARE_API_TOKEN != '' && secrets.ECHO_CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck ECHO frontend
+        run: pnpm --filter @workspace/echo run typecheck
+      - name: Build ECHO frontend on GitHub
+        run: pnpm --filter @workspace/echo run build
+      - name: Verify compiled frontend
+        run: test -s artifacts/echo/dist/public/index.html
+      - name: Publish prebuilt assets to Cloudflare Pages (only when configured)
+        if: ${{ env.CF_READY == 'true' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ECHO_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.ECHO_CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm dlx wrangler@3 pages deploy artifacts/echo/dist/public --project-name=echo-3o2 --branch=main
+      - name: Cloudflare deployment not configured
+        if: ${{ env.CF_READY != 'true' }}
+        run: echo "Build verified. Add Cloudflare credentials as GitHub Actions secrets to enable publishing."
