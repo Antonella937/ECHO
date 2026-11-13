@@ -345,10 +345,11 @@ export function chooseAutonomyOpportunity(input: {
         relevantAuthor(parent.authorId) &&
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
-  // A story the character already viewed is more relevant for a later
-  // reaction than an unseen story. Never react twice to the same story.
-  const targetStory = prioritizeHumanAccount([...state.stories].sort((a, b) => Number(b.seenBy.includes(character.id)) - Number(a.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, story => story.authorId, random)
-    .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
+  // The zero-cost story policy records a view, not a generated reaction.
+  // Target only unseen stories, otherwise already-seen stories repeatedly
+  // consume the opportunity without producing any visible change.
+  const targetStory = prioritizeHumanAccount([...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, story => story.authorId, random)
+    .find(item => !item.seenBy.includes(character.id) && recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
