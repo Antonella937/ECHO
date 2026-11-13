@@ -6,6 +6,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
 import { kindroidDmProvider } from './kindroid';
+import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
 import { relevantWorldJournals } from '../lib/worldJournalRecall';
@@ -92,7 +93,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
       // Do not pass private messages, hidden stories, or unrelated account data.
       const publicContext = targetPost
-        ? `Visible feed post: ${(targetPost.caption ?? '').slice(0, 500)}${targetComment ? '\nVisible comment: ' + targetComment.text.slice(0, 300) : ''}`
+        ? `Visible feed post: ${(targetPost.caption ?? '').slice(0, 500)}${targetComment ? '\nReplying to comment by ' + (parsed.data.state.characters.find(c => c.id === targetComment.authorId)?.name ?? 'another person') + ': ' + targetComment.text.slice(0, 300) : ''}`
         : '';
       const prompt = input.situation === 'comment'
         ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
@@ -120,7 +121,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const isDirectReply = newest?.senderId === recipientId && typeof newest.text === 'string' && !!newest.text.trim();
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
-          story.id === input.storyId && story.authorId === recipientId && story.seenBy.includes(input.characterId)) : undefined;
+          story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
         const outgoingPrompt = storyForReply
           ? `[ECHO private story reply: You viewed a story by ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
           : isDirectReply
