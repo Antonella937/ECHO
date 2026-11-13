@@ -337,6 +337,26 @@ function ProtectedRouter() {
   );
 }
 
+function SessionLoadingFallback() {
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStalled(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  if (!stalled) return <EchoSplash />;
+  return (
+    <main className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center text-foreground">
+      <div className="max-w-sm space-y-4">
+        <div className="wordmark text-3xl">ECHO</div>
+        <p>La sesión está tardando en cargar. Tus universos siguen guardados.</p>
+        <button className="rounded-xl border border-border px-5 py-3" onClick={() => window.location.reload()}>
+          Reintentar conexión
+        </button>
+      </div>
+    </main>
+  );
+}
+
 function SignInPage() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
@@ -436,7 +456,7 @@ function AuthenticatedExperience() {
     return () => { current = false; };
   }, [isLoaded, isSignedIn, user?.id, universeQuery.data?.state, legacyCheckAttempt]);
 
-  if (!isLoaded) return <EchoSplash />;
+  if (!isLoaded) return <SessionLoadingFallback />;
   if (!isSignedIn || !user) {
     // Installed iOS/Android PWAs have their own browser storage. If Clerk's
     // session expires, keep the user inside ECHO and offer sign-in directly,
