@@ -740,8 +740,22 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+function StartupRecovery({ resetError }: { error: Error; resetError: () => void }) {
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-[#111014] px-6 text-center text-[#f2ece8]">
+      <section className="w-full max-w-sm space-y-5">
+        <h1 className="text-3xl tracking-[0.4em]">ECHO</h1>
+        <p>No pudimos completar el inicio de ECHO. Tu cuenta y tus universos no se borraron.</p>
+        <button type="button" className="rounded-xl border border-[#df9fb1] px-5 py-3" onClick={() => { resetError(); window.location.reload(); }}>
+          Reintentar conexión
+        </button>
+        <p className="text-sm text-[#aaa5a6]">No hace falta desinstalar la aplicación.</p>
+      </section>
+    </main>
+  );
+}
+
 function App() {
-  if (!clerkPubKey) throw new Error('Falta la clave pública de Clerk para iniciar ECHO.');
   useEffect(() => {
     if (!document.documentElement.classList.contains('theme-light')) document.documentElement.classList.add('dark');
     document.documentElement.lang = getLanguage();
@@ -749,9 +763,20 @@ function App() {
   return (
     <MotionConfig reducedMotion="user">
       <TooltipProvider>
-        <WouterRouter base={basePath}>
-          <ClerkRoutes />
-        </WouterRouter>
+        <ErrorBoundary FallbackComponent={StartupRecovery}>
+          {clerkPubKey ? (
+            <WouterRouter base={basePath}>
+              <ClerkRoutes />
+            </WouterRouter>
+          ) : (
+            <main className="flex min-h-[100dvh] items-center justify-center bg-[#111014] px-6 text-center text-[#f2ece8]">
+              <section className="max-w-sm space-y-4">
+                <h1 className="text-3xl tracking-[0.4em]">ECHO</h1>
+                <p>La conexión de acceso no está configurada. No borres la aplicación ni crees otra cuenta.</p>
+              </section>
+            </main>
+          )}
+        </ErrorBoundary>
         <Toaster />
       </TooltipProvider>
     </MotionConfig>
