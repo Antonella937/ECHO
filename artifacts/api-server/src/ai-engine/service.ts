@@ -79,21 +79,22 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Linked Kin IDs are stored server-side, never exposed to the client.
   // Only the founder's direct incoming DM lane is routed; social actions stay native.
   let selectedProvider = dependencies.provider;
+  const primaryRecipientId = parsed.data.state.primaryCharacterId;
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       dependencies.liveDmReply === true && input.situation === 'dm' &&
-      input.recipientId === 'nela') {
+      !!primaryRecipientId && input.recipientId === primaryRecipientId) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
     if (typeof kinId === 'string' && kinId.length > 0) {
       const thread = parsed.data.state.messages
-        .filter(m => (m.senderId === 'nela' && m.recipientId === input.characterId) ||
-                     (m.senderId === input.characterId && m.recipientId === 'nela'))
+        .filter(m => (m.senderId === primaryRecipientId && m.recipientId === input.characterId) ||
+                     (m.senderId === input.characterId && m.recipientId === primaryRecipientId))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
-      if (newest?.senderId === 'nela' && typeof newest.text === 'string' && newest.text.trim()) {
+      if (newest?.senderId === primaryRecipientId && typeof newest.text === 'string' && newest.text.trim()) {
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
