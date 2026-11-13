@@ -207,13 +207,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
-  // Fail closed: linked characters must never fall back to ECHO's text provider.
-  // A missing link, invalid situation, or unavailable Kindroid stops generation.
-  if (dependencies.liveDmReply === true) {
+  // Founder universes: text actions are Kindroid-only. Never fall back when a
+  // Kin link is missing, disabled, or Kindroid is unavailable. Non-text actions
+  // (likes, story reactions, views) must remain eligible without a text model.
+  if (dependencies.liveDmReply === true &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      (input.situation === 'dm' || input.situation === 'comment' || input.situation === 'post')) {
     const linkCheck = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
-    if (linkCheck.rows.length && selectedProvider.name !== 'kindroid') {
+    if (!linkCheck.rows.length || selectedProvider.name !== 'kindroid') {
       throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
     }
   }
