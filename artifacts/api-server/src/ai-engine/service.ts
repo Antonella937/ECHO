@@ -5,7 +5,6 @@ import type { VisionContext } from '../vision/contracts';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
-import { clerkClient } from '@clerk/express';
 import { kindroidDmProvider } from './kindroid';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
@@ -42,12 +41,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   const vision = dependencies.vision
     ? await dependencies.vision(ownerId, parsed.data.state, input)
     : { analyses: {}, postSummaries: {} };
-  let language = 'es';
-  try {
-    const user = await clerkClient.users.getUser(ownerId);
-    const configured = user.privateMetadata?.echoInterfaceLanguage;
-    if (typeof configured === 'string' && ['es','en','pt','fr','de','it','ko','ja','zh'].includes(configured)) language = configured;
-  } catch { /* Preserve generation availability if account metadata is temporarily unavailable. */ }
+  // Narrative language is independent of the owner's interface language.
+  // Each character's configured voice.outputLanguage takes precedence in previewDecision.
+  const language = 'en';
   // Supply cached visual observations before the character decides what to say.
   // Never trigger vision billing in the autonomous decision loop.
   const gallery = input.situation === 'post'
