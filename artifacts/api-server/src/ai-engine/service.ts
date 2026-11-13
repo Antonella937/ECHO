@@ -210,6 +210,27 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
+  // Non-text social actions need no generative AI. The opportunity policy has
+  // already checked visibility, follow relationships, cooldowns and repeat caps.
+  // Avoid charging text-model budget merely to return a fixed like or a story
+  // view. For story_reaction, a no-op decision still records a permitted view
+  // through the autonomy executor; it must not invent an emoji reaction.
+  if (dependencies.liveDmReply === true &&
+      ['like_post', 'like_comment', 'story_reaction'].includes(input.situation)) {
+    const situation = input.situation;
+    selectedProvider = {
+      name: 'echo-nontext-policy',
+      async complete(request) {
+        const decision = JSON.stringify({
+          action: situation === 'story_reaction' ? 'none' : 'like',
+          situation, text: null, reaction: null, reason: 'Eligible non-text social action',
+          suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [],
+        });
+        request.validate?.(decision);
+        return { text: decision, model: 'echo-nontext-policy', usage: { promptTokens: 0, completionTokens: 0, cost: 0 }, attempts: [] };
+      },
+    };
+  }
   // Founder universes: text actions are Kindroid-only. Never fall back when a
   // Kin link is missing, disabled, or Kindroid is unavailable. Non-text actions
   // (likes, story reactions, views) must remain eligible without a text model.
