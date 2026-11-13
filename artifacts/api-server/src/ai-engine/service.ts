@@ -1,5 +1,5 @@
 import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionInput } from '@workspace/api-zod';
-import { EngineError, type TextProvider } from './contracts';
+import { EngineError, unknownUsage, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
 import type { VisionContext } from '../vision/contracts';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -227,7 +227,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [],
         });
         request.validate?.(decision);
-        return { text: decision, model: 'echo-nontext-policy', usage: { promptTokens: 0, completionTokens: 0, cost: 0 }, attempts: [] };
+        return { text: decision, model: 'echo-nontext-policy', usage: unknownUsage(), attempts: [] };
       },
     };
   }
