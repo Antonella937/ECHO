@@ -224,9 +224,19 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // Stories can be watched silently, liked with a heart, or reacted to
         // with an emoji. Private text replies are handled separately by the DM
         // lane using the character's Kindroid voice and normal permissions.
-        const roll = Math.random();
-        const storyReaction = situation === 'story_reaction' && roll >= 0.55;
-        const emoji = storyReaction ? (roll < 0.78 ? '❤' : roll < 0.88 ? '😂' : roll < 0.95 ? '😮' : '🔥') : null;
+        const social = actor?.configuration?.social;
+        const story = input.storyId ? parsed.data.state.stories.find(item => item.id === input.storyId) : undefined;
+        const relationship = actor?.configuration?.relationships?.find(item => item.targetId === story?.authorId);
+        // Quiet or less sociable characters mostly watch. Closer connections
+        // are more likely to react, without overriding visibility or privacy.
+        let reactChance = social?.sociability === 'high' ? 0.52 : social?.sociability === 'low' ? 0.18 : 0.34;
+        if (social?.spontaneity === 'high') reactChance += 0.09;
+        if (social?.allowSilence) reactChance -= 0.08;
+        if (relationship?.preset === 'close_friend' || relationship?.preset === 'partner') reactChance += 0.12;
+        reactChance = Math.max(0.08, Math.min(0.7, reactChance));
+        const storyReaction = situation === 'story_reaction' && Math.random() < reactChance;
+        const emojiRoll = Math.random();
+        const emoji = storyReaction ? (emojiRoll < 0.55 ? '❤' : emojiRoll < 0.73 ? '😂' : emojiRoll < 0.88 ? '😮' : '🔥') : null;
         const decision = JSON.stringify({
           action: situation === 'story_reaction' ? (storyReaction ? 'react' : 'none') : 'like',
           situation, text: null, reaction: emoji, reason: 'Eligible non-text social action',
