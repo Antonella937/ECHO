@@ -221,9 +221,15 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     selectedProvider = {
       name: 'echo-nontext-policy',
       async complete(request) {
+        // Stories can be watched silently, liked with a heart, or reacted to
+        // with an emoji. Private text replies are handled separately by the DM
+        // lane using the character's Kindroid voice and normal permissions.
+        const roll = Math.random();
+        const storyReaction = situation === 'story_reaction' && roll >= 0.55;
+        const emoji = storyReaction ? (roll < 0.78 ? '❤' : roll < 0.88 ? '😂' : roll < 0.95 ? '😮' : '🔥') : null;
         const decision = JSON.stringify({
-          action: situation === 'story_reaction' ? 'none' : 'like',
-          situation, text: null, reaction: null, reason: 'Eligible non-text social action',
+          action: situation === 'story_reaction' ? (storyReaction ? 'react' : 'none') : 'like',
+          situation, text: null, reaction: emoji, reason: 'Eligible non-text social action',
           suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [],
         });
         request.validate?.(decision);
