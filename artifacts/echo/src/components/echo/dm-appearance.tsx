@@ -15,6 +15,33 @@ const words: Record<string,[string,string,string,string,string,string]> = {
  ja:['チャットの外観','背景','透明度','背景なし','ダーク','保存'],
  zh:['聊天外观','背景','透明度','无背景','深色','保存'],
 };
+async function optimizeDmBackground(file:File):Promise<string>{
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Unsupported image format');
+ const image=await new Promise<HTMLImageElement>((resolve,reject)=>{
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{URL.revokeObjectURL(url);resolve(img);};
+  img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('Cannot decode image'));};
+  img.src=url;
+ });
+ const canvas=document.createElement('canvas');
+ const context=canvas.getContext('2d');
+ if(!context)throw Error('Canvas unavailable');
+ const longest=Math.max(image.naturalWidth,image.naturalHeight);
+ if(!longest)throw Error('Empty image');
+ const limit=1_800_000;
+ for(const maxSide of [1920,1600,1280,1024,800]){
+  const scale=Math.min(1,maxSide/longest);
+  canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+  canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+  context.drawImage(image,0,0,canvas.width,canvas.height);
+  for(const quality of [0.85,0.72,0.58]){
+   const data=canvas.toDataURL('image/jpeg',quality);
+   if(data.length<limit)return data;
+  }
+ }
+ throw Error('Could not optimize image');
+}
 export type DmAppearance={background:string;opacity:number;image?:string;layout?:'chat'|'narrative'};
 const choices=['none','dark','rose','violet','blue'] as const;
 const gradients:Record<string,string>={
@@ -33,6 +60,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
  const [open,setOpen]=useState(false);
  const [uploadError,setUploadError]=useState(false);
  const [saving,setSaving]=useState(false);
+ const [processing,setProcessing]=useState(false);
  const [draft,setDraft]=useState(value);
  useEffect(()=>setDraft(value),[value]);
  return <div className="relative">
@@ -48,12 +76,12 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    <label className="mt-3 block text-xs">{lang==='es'?'Importar foto':lang==='pt'?'Importar foto':lang==='fr'?'Importer une photo':lang==='de'?'Foto importieren':lang==='it'?'Importa foto':lang==='ko'?'사진 가져오기':lang==='ja'?'写真を読み込む':lang==='zh'?'导入照片':'Import photo'}
     <input className="mt-1 block w-full text-xs" type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{
      const file=e.target.files?.[0];if(!file)return;
-     if(file.size>2_000_000 || !['image/jpeg','image/png','image/webp'].includes(file.type)){setUploadError(true);return;}
-     const reader=new FileReader();reader.onload=()=>{if(typeof reader.result==='string'){setDraft(old=>({...old,background:'photo',image:reader.result as string}));setUploadError(false);}};
-     reader.onerror=()=>setUploadError(true);reader.readAsDataURL(file);
+     setProcessing(true);setUploadError(false);
+     void optimizeDmBackground(file).then(image=>{setDraft(old=>({...old,background:'photo',image}));setUploadError(false);}).catch(()=>setUploadError(true)).finally(()=>setProcessing(false));
     }}/>
    </label>
-   {uploadError&&<p role="alert" className="text-xs text-destructive">{lang==='es'?'Imagen demasiado grande o no se pudo guardar (máximo 2 MB).':'Image too large or could not be saved (max 2 MB).'}</p>}
+   {processing&&<p role="status" className="text-xs">{lang==='es'?'Optimizando foto…':'Optimizing photo…'}</p>}
+   {uploadError&&<p role="alert" className="text-xs text-destructive">{lang==='es'?'No se pudo procesar o guardar la foto. Probá con otra imagen.':'Could not process or save the photo. Try another image.'}</p>}
    {draft.image&&<button type="button" onClick={()=>setDraft(old=>({...old,image:undefined,background:'none'}))} className="mt-2 block text-xs underline">{lang==='es'?'Quitar foto':'Remove photo'}</button>}
    <fieldset className="mt-3"><legend className="text-xs">{lang==='es'?'Presentación':lang==='pt'?'Apresentação':lang==='fr'?'Affichage':lang==='de'?'Darstellung':lang==='it'?'Visualizzazione':lang==='ko'?'표시 방식':lang==='ja'?'表示形式':lang==='zh'?'显示方式':'Display mode'}</legend>
     <div className="mt-1 flex gap-2">{(['chat','narrative'] as const).map(layout=><button key={layout} type="button" aria-pressed={(draft.layout??'chat')===layout} onClick={()=>setDraft(old=>({...old,layout}))} className={`rounded-lg border px-3 py-2 text-xs ${(draft.layout??'chat')===layout?'border-primary bg-primary/15':'border-border'}`}>{layout==='chat'?(lang==='es'?'Chat':lang==='ko'?'채팅':lang==='ja'?'チャット':lang==='zh'?'聊天':'Chat'):(lang==='es'?'Narrativa':lang==='pt'?'Narrativa':lang==='fr'?'Narratif':lang==='de'?'Erzählung':lang==='it'?'Narrativa':lang==='ko'?'서술형':lang==='ja'?'物語形式':lang==='zh'?'叙事':'Narrative')}</button>)}</div>
@@ -61,7 +89,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    <label className="mt-3 block text-xs">{t[2]}: {draft.opacity}%
     <input type="range" min={0} max={100} value={draft.opacity} onChange={e=>setDraft(old=>({...old,opacity:Number(e.target.value)}))} className="mt-2 w-full"/>
    </label>
-   <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" disabled={saving} onClick={async()=>{
+   <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" disabled={saving||processing} onClick={async()=>{
     setSaving(true);setUploadError(false);
     try{
      const match=storageKey.match(/^echo:dm-appearance:[^:]+:([^:]+):([^:]+)$/);
