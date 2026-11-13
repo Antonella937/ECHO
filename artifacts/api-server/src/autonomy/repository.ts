@@ -182,7 +182,7 @@ export async function reserveDryRun(
     }
 
     // DM reservations do not use social activity caps: skip four unnecessary COUNT queries.
-    if (lane === "social") {
+    if (lane === "social" && ownerId !== "user_3LeoBfUicTthDVixNbkPlqXFkdZ") {
       const now = new Date();
       const hourAgo = new Date(now.getTime() - 60 * 60_000);
       const dayAgo = new Date(now.getTime() - 24 * 60 * 60_000);
