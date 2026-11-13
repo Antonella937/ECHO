@@ -94,10 +94,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
       // Do not pass private messages, hidden stories, or unrelated account data.
       const publicContext = targetPost
-        ? `Visible feed post: ${targetPost.caption.slice(0, 500)}${targetComment ? '\\nVisible comment: ' + targetComment.text.slice(0, 300) : ''}`
+        ? `Visible feed post: ${(targetPost.caption ?? '').slice(0, 500)}${targetComment ? '\nVisible comment: ' + targetComment.text.slice(0, 300) : ''}`
         : '';
       const prompt = input.situation === 'comment'
-        ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\\n' + publicContext : ''}`
+        ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
         : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
       selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
     }
