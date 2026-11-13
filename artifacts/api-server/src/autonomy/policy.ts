@@ -267,8 +267,12 @@ export function chooseAutonomyOpportunity(input: {
       history.length < (input.maxActionsPerDay ?? 2) &&
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
       local.hour >= 8 && local.hour < 23) {
-    const outreachChance = input.dmFrequency === "frequently" ? 0.035 :
-      input.dmFrequency === "rarely" ? 0.003 : 0.012;
+    // The worker runs every two minutes. Tiny per-tick probabilities made
+    // opted-in characters appear inactive for hours even before cooldowns.
+    // Keep outreach probabilistic and let the existing daily caps, cooldowns,
+    // recipient eligibility and mutual DM permissions enforce pacing.
+    const outreachChance = input.dmFrequency === "frequently" ? 0.18 :
+      input.dmFrequency === "rarely" ? 0.015 : 0.06;
     if (random() < outreachChance) {
       const recipients = availableTargets(state, character).filter(candidate =>
         !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
