@@ -83,7 +83,7 @@ export default function MessagesPage() {
   );
   const visibleThreads = threads.filter(({ other }) => showRequests
     ? requests.some(r => r.other.id === other.id)
-    : !requests.some(r => r.other.id === other.id) && requestDecisions[other.id] !== 'rejected' && requestDecisions[other.id] !== 'blocked');
+    : requestDecisions[other.id] !== 'rejected' && requestDecisions[other.id] !== 'blocked');
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
   const backToInbox = () => { if (showSaved) { setShowSaved(false); window.history.replaceState(null, "", "/messages"); } else navigate("/"); };

@@ -1,5 +1,5 @@
 import { customFetch } from '@workspace/api-client-react';
-import { uploadPrivateImage } from '@/lib/media';
+import { uploadPrivateImage, primePrivateImage } from '@/lib/media';
 import { privateMediaUrl } from '@/lib/media-source';
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
@@ -96,7 +96,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
      if(!match)throw Error('Missing conversation');
      let image=draft.image;
      if(image?.startsWith('data:image/')){
-      try{image=await uploadPrivateImage(image);}catch(error){throw new Error(`Error al subir la foto: ${error instanceof Error?error.message:'no se pudo conectar con el almacenamiento'}`);}
+      try{const preview=image;image=await uploadPrivateImage(image);primePrivateImage(image,preview);}catch(error){throw new Error(`Error al subir la foto: ${error instanceof Error?error.message:'no se pudo conectar con el almacenamiento'}`);}
      }
      const next={...draft,image,layout:draft.layout??'chat'};
      try{
@@ -111,7 +111,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
  </div>;
 }
 export function dmBackgroundStyle(value:DmAppearance){
- if(value.background==='photo' && value.image && (value.image.startsWith('data:image/')||value.image.startsWith('/objects/'))) return {backgroundImage:`linear-gradient(rgba(0,0,0,${(100-value.opacity)/130}),rgba(0,0,0,${(100-value.opacity)/130})),url(${JSON.stringify(value.image.startsWith('/objects/')?privateMediaUrl(value.image):value.image)})`,backgroundPosition:'center',backgroundSize:'cover',backgroundRepeat:'no-repeat'};
+ if(value.background==='photo' && value.image && (value.image.startsWith('data:image/')||value.image.startsWith('/objects/')||value.image.startsWith('blob:'))) return {backgroundImage:`linear-gradient(rgba(0,0,0,${(100-value.opacity)/130}),rgba(0,0,0,${(100-value.opacity)/130})),url(${JSON.stringify(value.image)})`,backgroundPosition:'center',backgroundSize:'cover',backgroundRepeat:'no-repeat'};
  if(value.background==='none') return {};
  const colors:Record<string,[string,string]>={
   dark:['#14101f','#33283c'],rose:['#4b283c','#ac668d'],
