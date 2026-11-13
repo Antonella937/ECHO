@@ -273,8 +273,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
       .slice(0,3).map(m => m.text),
   ].filter(Boolean).join(' ');
-  const approvedJournals = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
-    .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
+  const approvedJournals = isNonTextSocial ? [] as Awaited<ReturnType<typeof relevantWorldJournals>>
+    : await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
+      .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
   const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
     new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext);
