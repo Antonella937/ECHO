@@ -332,7 +332,7 @@ export async function runAutonomyLiveCycle(
     });
     if (dependencies.lane === "dm" && opportunity.situation !== "dm") {
       await dependencies.repository.complete(ownerId, runId, { status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null }, universeId);
-      return { status: "no_action", reasonCode: "NO_PENDING_DM", characterId: character.id, runId, model: null };
+      return { status: "no_action", reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };
     }
     if (!opportunity.situation) {
       const status = opportunity.reasonCode === "COOLDOWN"
