@@ -104,7 +104,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
-  if (dependencies.liveDmReply === true && input.situation === 'dm' &&
+  if (dependencies.liveDmReply === true &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && input.situation === 'dm' &&
       !!input.recipientId && input.recipientId !== input.characterId) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
