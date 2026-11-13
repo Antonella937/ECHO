@@ -83,6 +83,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Linked characters use their own Kindroid voice for public text too.
   // ECHO still selects the opportunity and validates the draft before execution.
   if (dependencies.liveDmReply === true &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       (input.situation === 'comment' || input.situation === 'post')) {
     const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
