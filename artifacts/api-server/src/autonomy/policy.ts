@@ -186,6 +186,8 @@ export function chooseAutonomyOpportunity(input: {
   maxActionsPerDay?: number;
   lane?: "dm" | "social";
   dmFrequency?: "rarely" | "sometimes" | "frequently";
+  /** Recipients allowed by server-side mutual DM permissions. */
+  allowedDmRecipientIds?: ReadonlySet<string>;
 }): Opportunity {
   const { state, character } = input;
   const now = input.now ?? new Date();
@@ -210,6 +212,7 @@ export function chooseAutonomyOpportunity(input: {
   const incoming = [...state.messages]
     .filter((message) => message.recipientId === character.id &&
       message.senderId !== character.id &&
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(message.senderId)) &&
       !message.hiddenForIds?.includes(character.id) &&
       !!message.text.trim() &&
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
@@ -244,6 +247,7 @@ export function chooseAutonomyOpportunity(input: {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = prioritizeHumanAccount([...state.stories].reverse(), state, story => story.authorId, random).find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(story.authorId)) &&
       (character.configuration?.relationships?.some(relation => relation.targetId === story.authorId) ||
         hasDmThread(state, character.id, story.authorId)) &&
       canCharacterViewCloseFriendsStory(state, story, character.id) &&
@@ -267,10 +271,15 @@ export function chooseAutonomyOpportunity(input: {
       history.length < (input.maxActionsPerDay ?? 2) &&
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
       local.hour >= 8 && local.hour < 23) {
-    const outreachChance = input.dmFrequency === "frequently" ? 0.035 :
-      input.dmFrequency === "rarely" ? 0.003 : 0.012;
+    // The worker runs every two minutes. Tiny per-tick probabilities made
+    // opted-in characters appear inactive for hours even before cooldowns.
+    // Keep outreach probabilistic and let the existing daily caps, cooldowns,
+    // recipient eligibility and mutual DM permissions enforce pacing.
+    const outreachChance = input.dmFrequency === "frequently" ? 0.18 :
+      input.dmFrequency === "rarely" ? 0.015 : 0.06;
     if (random() < outreachChance) {
       const recipients = availableTargets(state, character).filter(candidate =>
+        (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(candidate.id)) &&
         !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
       if (recipients.length) {
         const prioritized = prioritizeHumanAccount(recipients, state, recipient => recipient.id, random);
@@ -341,10 +350,11 @@ export function chooseAutonomyOpportunity(input: {
         relevantAuthor(parent.authorId) &&
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
-  // A story the character already viewed is more relevant for a later
-  // reaction than an unseen story. Never react twice to the same story.
-  const targetStory = prioritizeHumanAccount([...state.stories].sort((a, b) => Number(b.seenBy.includes(character.id)) - Number(a.seenBy.includes(character.id)) || (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, story => story.authorId, random)
-    .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
+  // The zero-cost story policy records a view, not a generated reaction.
+  // Target only unseen stories, otherwise already-seen stories repeatedly
+  // consume the opportunity without producing any visible change.
+  const targetStory = prioritizeHumanAccount([...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, story => story.authorId, random)
+    .find(item => !item.seenBy.includes(character.id) && recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));

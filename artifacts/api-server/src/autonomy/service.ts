@@ -163,6 +163,21 @@ export async function runAutonomyDryRun(
       ownerId, character.id, new Date(now.getTime() - 24 * 60 * 60_000),
       universeId,
     );
+    // Resolve DM permissions before choosing a recipient. A disallowed peer
+    // must not consume an otherwise valid spontaneous outreach opportunity.
+    const dmPermissionRows = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
+      FROM echo_character_dm_permissions WHERE owner_id = ${ownerId} AND universe_id = ${universeId}`);
+    const permissionFor = (id: string) => dmPermissionRows.rows.find(row => row.character_id === id);
+    const senderPermission = permissionFor(character.id);
+    const ownerIdentityId = state.primaryCharacterId;
+    const allowedDmRecipientIds = new Set(state.characters.filter(peer =>
+      !peer.archived && peer.id !== character.id && senderPermission?.enabled === true &&
+      (peer.id === ownerIdentityId || (
+        Array.isArray(senderPermission.allowed_peer_ids) && senderPermission.allowed_peer_ids.includes(peer.id) &&
+        permissionFor(peer.id)?.enabled === true &&
+        Array.isArray(permissionFor(peer.id)?.allowed_peer_ids) &&
+        (permissionFor(peer.id)?.allowed_peer_ids as string[]).includes(character.id)
+      ))).map(peer => peer.id));
     const opportunity = chooseAutonomyOpportunity({
       state,
       character,
@@ -171,6 +186,7 @@ export async function runAutonomyDryRun(
       random: dependencies.random,
       minCooldownMinutes: characterControl.minCooldownMinutes,
       maxActionsPerDay: characterControl.maxActionsPerDay,
+      allowedDmRecipientIds,
     });
     const policyAllowsLive = liveEligibility({
       globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
@@ -332,7 +348,7 @@ export async function runAutonomyLiveCycle(
     });
     if (dependencies.lane === "dm" && opportunity.situation !== "dm") {
       await dependencies.repository.complete(ownerId, runId, { status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null }, universeId);
-      return { status: "no_action", reasonCode: "NO_PENDING_DM", characterId: character.id, runId, model: null };
+      return { status: "no_action", reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };
     }
     if (!opportunity.situation) {
       const status = opportunity.reasonCode === "COOLDOWN"
