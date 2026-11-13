@@ -39,7 +39,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         inArray(echoMemoryArchiveTable.characterId, linkedAccountIds),
       )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(150)
     : [];
-  const vision = dependencies.vision
+  // Likes and story views/reactions do not require image interpretation.
+  // Skip vision loading to avoid unnecessary provider work on non-text actions.
+  const isNonTextSocial = ['like_post', 'like_comment', 'story_reaction'].includes(input.situation);
+  const vision = dependencies.vision && !isNonTextSocial
     ? await dependencies.vision(ownerId, parsed.data.state, input)
     : { analyses: {}, postSummaries: {} };
   // Narrative language is independent of the owner's interface language.
