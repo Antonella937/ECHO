@@ -83,18 +83,25 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   if (process.env.ECHO_KINDROID_AYELEN_ENABLED === 'true' &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       dependencies.liveDmReply === true && input.situation === 'dm' &&
-      !!primaryRecipientId && input.recipientId === primaryRecipientId) {
+      !!input.recipientId && input.recipientId !== input.characterId) {
     const links = await db.execute(sql`SELECT kin_id, social_context_enabled, context_reset_at FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
     if (typeof kinId === 'string' && kinId.length > 0) {
+      const recipientId = input.recipientId!;
       const thread = parsed.data.state.messages
-        .filter(m => (m.senderId === primaryRecipientId && m.recipientId === input.characterId) ||
-                     (m.senderId === input.characterId && m.recipientId === primaryRecipientId))
+        .filter(m => (m.senderId === recipientId && m.recipientId === input.characterId) ||
+                     (m.senderId === input.characterId && m.recipientId === recipientId))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
-      if (newest?.senderId === primaryRecipientId && typeof newest.text === 'string' && newest.text.trim()) {
+      // A linked Kin writes both direct replies and spontaneous DMs. Never
+      // fabricate an incoming human message just to make Kindroid respond.
+      const isDirectReply = newest?.senderId === recipientId && typeof newest.text === 'string' && !!newest.text.trim();
+      if (isDirectReply || dependencies.liveDmReply) {
+        const outgoingPrompt = isDirectReply
+          ? newest!.text
+          : `[ECHO autonomous DM: You have decided to reach out to ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
@@ -157,7 +164,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
             .filter(m => kindroidMemoryAllowed(m, 'nela'))
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
-          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
+          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, outgoingPrompt)
             .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
             .catch(() => [] as string[]);
           const reservedJournalContext = journalFacts.join('\n').slice(0,2200);
@@ -168,11 +175,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // World knowledge is independent of the optional social-context toggle.
         // Restrict it to approved entries visible to this exact character.
         if (links.rows[0]?.social_context_enabled !== true) {
-          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, newest.text)
+          const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, outgoingPrompt)
             .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
           socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,3200);
         }
-        selectedProvider = kindroidDmProvider(newest.text, kinId, socialContext);
+        selectedProvider = kindroidDmProvider(outgoingPrompt, kinId, socialContext);
       }
     }
   }
