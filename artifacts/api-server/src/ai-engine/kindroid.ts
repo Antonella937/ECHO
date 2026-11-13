@@ -72,7 +72,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const raw = (await response.text()).trim();
-      const choice = raw.replace(/^[\\s"'.,!]+|[\\s"'.,!]+$/g, '').toUpperCase();
+      const choice = raw.replace(/^[\s"'.,!]+|[\s"'.,!]+$/g, '').toUpperCase();
       if (!['VIEW', 'LIKE', 'LAUGH', 'SURPRISE', 'FIRE'].includes(choice)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
       const reaction = ({ LIKE: '❤', LAUGH: '😂', SURPRISE: '😮', FIRE: '🔥' } as Record<string, string>)[choice] ?? null;
       const decision = JSON.stringify({
