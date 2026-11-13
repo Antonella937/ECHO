@@ -89,6 +89,12 @@ export class UniverseSync {
         };
       }
       this.view.state = repairOrphanedCharacterLinks(upgradeAccounts(this.view.state));
+      // The human-selected primary identity is the safe entry point on a new
+      // session. A previously active AI persona must not replace it on reload.
+      const primaryId = this.view.state.primaryCharacterId;
+      if (primaryId && this.view.state.characters.some(character => character.id === primaryId && !character.archived)) {
+        this.view.state = { ...this.view.state, currentCharacterId: primaryId };
+      }
       await this.backup();
     } catch (e) { this.view.error = (e as Error).message; }
     finally { this.view.busy = false; this.emit(); }
