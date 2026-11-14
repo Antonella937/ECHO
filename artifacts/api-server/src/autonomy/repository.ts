@@ -96,6 +96,9 @@ export async function listLiveOptInTargets() {
     eq(echoAutonomyOwnersTable.killSwitchEngaged, false),
     isNull(echoUniversesTable.archivedAt),
     isNull(echoUniversesTable.deletedAt),
+    // Per-universe pause is independent of the account-wide emergency stop.
+    // Missing setting defaults to running, preserving existing worlds.
+    sql`COALESCE((${echoUniversesTable.state}::jsonb #>> '{settings,autonomyPaused}')::boolean, false) = false`,
   ));
   return rows.filter((row) => isAutonomyOwnerAuthorized(row.ownerId));
 }
