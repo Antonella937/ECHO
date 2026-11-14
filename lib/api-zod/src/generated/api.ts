@@ -357,6 +357,7 @@ export const getAutonomySettingsResponseCharactersItemMinCooldownMinutesMax = 14
 
 
 export const GetAutonomySettingsResponse = zod.object({
+  "universeAutonomyPaused": zod.boolean(),
   "universeId": zod.string().min(1).max(getAutonomySettingsResponseUniverseIdMax),
   "globalKillSwitchEngaged": zod.boolean(),
   "liveExecutionEnabled": zod.boolean(),
@@ -389,6 +390,9 @@ export const updateAutonomySettingsBodyTwoUniverseIdMax = 120;
 
 
 export const UpdateAutonomySettingsBody = zod.union([zod.object({
+  "universeAutonomyPaused": zod.boolean(),
+  "universeId": zod.string().min(1).max(120).default("primary")
+}),zod.object({
   "globalKillSwitchEngaged": zod.boolean(),
   "universeId": zod.string().min(1).max(updateAutonomySettingsBodyOneUniverseIdMax).default(updateAutonomySettingsBodyOneUniverseIdDefault)
 }),zod.object({
@@ -416,6 +420,7 @@ export const updateAutonomySettingsResponseCharactersItemMinCooldownMinutesMax =
 
 
 export const UpdateAutonomySettingsResponse = zod.object({
+  "universeAutonomyPaused": zod.boolean(),
   "universeId": zod.string().min(1).max(updateAutonomySettingsResponseUniverseIdMax),
   "globalKillSwitchEngaged": zod.boolean(),
   "liveExecutionEnabled": zod.literal(false),
