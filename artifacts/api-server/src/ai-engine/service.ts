@@ -1,11 +1,11 @@
 import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionInput } from '@workspace/api-zod';
-import { EngineError, type TextProvider } from './contracts';
+import { EngineError, unknownUsage, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
 import type { VisionContext } from '../vision/contracts';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
-import { kindroidDmProvider } from './kindroid';
+import { kindroidDmProvider, kindroidStoryDecisionProvider } from './kindroid';
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
@@ -39,7 +39,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         inArray(echoMemoryArchiveTable.characterId, linkedAccountIds),
       )).orderBy(desc(echoMemoryArchiveTable.occurredAt)).limit(150)
     : [];
-  const vision = dependencies.vision
+  // Likes and story views/reactions do not require image interpretation.
+  // Skip vision loading to avoid unnecessary provider work on non-text actions.
+  const isNonTextSocial = ['like_post', 'like_comment', 'story_reaction'].includes(input.situation);
+  const vision = dependencies.vision && !isNonTextSocial
     ? await dependencies.vision(ownerId, parsed.data.state, input)
     : { analyses: {}, postSummaries: {} };
   // Narrative language is independent of the owner's interface language.
@@ -124,11 +127,15 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
+        const recipientName = (parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person').slice(0,80);
+        // A single Kin may have multiple ECHO correspondents. Explicitly label
+        // who sent the latest DM; do not treat an unrelated Kin's message as
+        // the human owner's voice or fabricate a message for spontaneous outreach.
         const outgoingPrompt = storyForReply
-          ? `[ECHO private story reply: You viewed a story by ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
+          ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
           : isDirectReply
-            ? newest!.text
-            : `[ECHO autonomous DM: You have decided to reach out to ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
+            ? `[ECHO incoming private DM from ${recipientName}. Reply to this sender in your established voice, in English. Message follows:]\n${newest!.text}`
+            : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
@@ -210,6 +217,42 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
+  // For the founder's linked characters, Kindroid chooses whether to view,
+  // like or react to a visible story. Never substitute local random choices.
+  if (dependencies.liveDmReply === true &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      input.situation === 'story_reaction') {
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    const story = parsed.data.state.stories.find(item => item.id === input.storyId);
+    if (!story || !canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId) ||
+        !parsed.data.state.follows[input.characterId]?.includes(story.authorId)) {
+      throw new EngineError('STORY_NOT_VISIBLE', 403);
+    }
+    const author = parsed.data.state.characters.find(item => item.id === story.authorId);
+    const relation = actor?.configuration?.relationships?.find(item => item.targetId === story.authorId);
+    selectedProvider = kindroidStoryDecisionProvider(kinId,
+      `Author: ${(author?.name ?? 'someone').slice(0,80)}. Relationship: ${relation?.preset ?? 'unspecified'}. Caption: ${(story.caption ?? '').slice(0,500)}`);
+  }
+  // Likes do not require generated prose. Story interactions above are
+  // Kindroid-driven and must not be replaced by a local random decision.
+  if (dependencies.liveDmReply === true &&
+      ['like_post', 'like_comment'].includes(input.situation)) {
+    const situation = input.situation;
+    selectedProvider = {
+      name: 'echo-nontext-policy',
+      async complete(request) {
+        const decision = JSON.stringify({ action: 'like', situation, text: null,
+          reaction: null, reason: 'Eligible non-text social action',
+          suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [] });
+        request.validate?.(decision);
+        return { text: decision, model: 'echo-nontext-policy', usage: unknownUsage(), attempts: [] };
+      },
+    };
+  }
   // Founder universes: text actions are Kindroid-only. Never fall back when a
   // Kin link is missing, disabled, or Kindroid is unavailable. Non-text actions
   // (likes, story reactions, views) must remain eligible without a text model.
@@ -233,8 +276,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
       .slice(0,3).map(m => m.text),
   ].filter(Boolean).join(' ');
-  const approvedJournals = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
-    .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
+  const approvedJournals = isNonTextSocial ? [] as Awaited<ReturnType<typeof relevantWorldJournals>>
+    : await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, journalQuery)
+      .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
   const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
     new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext);

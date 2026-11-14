@@ -184,6 +184,27 @@ function selectLateCandidate() {
   return () => values.shift() ?? 0.95;
 }
 
+test("DM autonomy does not reply to an unauthorized sender", () => {
+  const { state, mar } = fixture();
+  const noah = state.characters.find(character => character.id === "noah")!;
+  state.messages.push({
+    id: "unauthorized-incoming", threadId: "permission-test", senderId: noah.id,
+    recipientId: mar.id, text: "Can we talk?", createdAt: new Date(NOW.getTime() - 60_000),
+    storyId: null, postId: null, readBy: [], reactions: [], origin: "user",
+  });
+  const blocked = chooseAutonomyOpportunity({
+    state, character: mar, history: [], now: NOW, random: () => 0,
+    lane: "dm", allowedDmRecipientIds: new Set<string>(),
+  });
+  assert.notEqual(blocked.recipientId, noah.id);
+  const permitted = chooseAutonomyOpportunity({
+    state, character: mar, history: [], now: NOW, random: () => 0,
+    lane: "dm", allowedDmRecipientIds: new Set([noah.id]),
+  });
+  assert.equal(permitted.situation, "dm");
+  assert.equal(permitted.recipientId, noah.id);
+});
+
 test("planner chooses silence before spending a model call", () => {
   const { state, mar } = fixture();
   const result = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0.99 });
