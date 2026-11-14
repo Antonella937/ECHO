@@ -349,7 +349,10 @@ export async function runAutonomyLiveCycle(
       const rows = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
         FROM echo_character_dm_permissions
         WHERE owner_id = ${ownerId} AND universe_id = ${universeId}`);
-      const permissionFor = (id: string) => rows.rows.find(row => row.character_id === id);
+      // Build the lookup once: a DM tick can inspect many peers, and repeated
+      // linear scans grow quadratically as a universe adds characters.
+      const permissionsByCharacter = new Map(rows.rows.map(row => [String(row.character_id), row]));
+      const permissionFor = (id: string) => permissionsByCharacter.get(id);
       const sender = permissionFor(character.id);
       liveAllowedDmRecipientIds = new Set(state.characters.filter(peer =>
         !peer.archived && peer.id !== character.id && sender?.enabled === true &&
