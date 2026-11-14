@@ -7,6 +7,9 @@
  */
 
 export type AutonomySettingsUpdate = {
+  universeAutonomyPaused: boolean;
+  universeId?: string;
+} | {
   globalKillSwitchEngaged: boolean;
   /**
      * @minLength 1

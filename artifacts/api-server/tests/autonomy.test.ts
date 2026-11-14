@@ -2,7 +2,7 @@ import test from "node:test";
 import { after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { SaveUniverseBody, type CharacterDecision, type SocialState } from "@workspace/api-zod";
 import {
   db,
@@ -1032,6 +1032,24 @@ test("PostgreSQL controls, idempotency, and execution history are isolated by un
 
   const eligible = (await listLiveOptInTargets()).filter((target) => target.ownerId === ownerId);
   assert.deepEqual(eligible, [{ ownerId, universeId: "studio", characterId: "mar" }]);
+});
+
+test("pausing one universe excludes only its worker targets and controls", async () => {
+  const ownerId = syntheticOwnerId();
+  const { state } = fixture();
+  const now = new Date();
+  await insertSyntheticUniverse(ownerId, state, now, 1, "primary");
+  await insertSyntheticUniverse(ownerId, state, now, 1, "studio");
+  await updateOwnerKillSwitch(ownerId, false);
+  await updateCharacterControl(ownerId, "mar", true, "primary", "dm");
+  await updateCharacterControl(ownerId, "mar", true, "studio", "dm");
+  await db.execute(sql`UPDATE echo_universes
+    SET state = jsonb_set(state::jsonb, '{settings}', COALESCE(state::jsonb->'settings', '{}'::jsonb) || '{"autonomyPaused":true}'::jsonb, true)
+    WHERE owner_id = ${ownerId} AND universe_id = 'primary'`);
+  const targets = (await listLiveOptInTargets()).filter(target => target.ownerId === ownerId);
+  assert.deepEqual(targets.map(target => target.universeId), ["studio"]);
+  assert.equal((await readOwnerControls(ownerId, "primary")).globalKillSwitchEngaged, true);
+  assert.equal((await readOwnerControls(ownerId, "studio")).globalKillSwitchEngaged, false);
 });
 
 test("live executor commits one synthetic post and treats a retry as a duplicate", async () => {

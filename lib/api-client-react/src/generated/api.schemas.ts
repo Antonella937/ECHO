@@ -1055,11 +1055,15 @@ export interface AutonomySettings {
      */
   universeId: string;
   globalKillSwitchEngaged: boolean;
+  universeAutonomyPaused: boolean;
   liveExecutionEnabled: false;
   characters: AutonomyCharacterControl[];
 }
 
 export type AutonomySettingsUpdate = {
+  universeAutonomyPaused: boolean;
+  universeId?: string;
+} | {
   globalKillSwitchEngaged: boolean;
   /**
      * @minLength 1

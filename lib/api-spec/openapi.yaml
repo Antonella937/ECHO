@@ -551,16 +551,23 @@ components:
         minCooldownMinutes: { type: integer, minimum: 60, maximum: 1440 }
     AutonomySettings:
       type: object
-      required: [universeId, globalKillSwitchEngaged, liveExecutionEnabled, characters]
+      required: [universeId, globalKillSwitchEngaged, universeAutonomyPaused, liveExecutionEnabled, characters]
       properties:
         universeId: { type: string, minLength: 1, maxLength: 120 }
         globalKillSwitchEngaged: { type: boolean }
+        universeAutonomyPaused: { type: boolean }
         liveExecutionEnabled: { type: boolean }
         characters:
           type: array
           items: { $ref: "#/components/schemas/AutonomyCharacterControl" }
     AutonomySettingsUpdate:
       oneOf:
+        - type: object
+          additionalProperties: false
+          required: [universeAutonomyPaused]
+          properties:
+            universeAutonomyPaused: { type: boolean }
+            universeId: { type: string, minLength: 1, maxLength: 120, default: primary }
         - type: object
           additionalProperties: false
           required: [globalKillSwitchEngaged]
