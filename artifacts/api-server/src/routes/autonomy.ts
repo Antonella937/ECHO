@@ -32,8 +32,8 @@ import { runAutonomyDryRun } from "../autonomy/service";
 import { executeAutonomyDecision } from "../autonomy/executor";
 import type { Opportunity } from "../autonomy/policy";
 import { MeteredTextProvider } from "../lib/metered-ai";
-import { db, echoAutonomyRunsTable } from "@workspace/db";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { db, echoAutonomyRunsTable, echoUniversesTable } from "@workspace/db";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 const provider = new FreeModelProvider();
@@ -90,6 +90,7 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
   return GetAutonomySettingsResponse.parse({
     universeId,
     globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
+    universeAutonomyPaused: (snapshot.state as { settings?: { autonomyPaused?: boolean } }).settings?.autonomyPaused === true,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: parsed.data.state.characters.filter((character) => !character.archived).map((character) => {
       const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
@@ -166,7 +167,16 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
     const universeId = update.universeId ?? "primary";
     const snapshot = await readUniverse(ownerId, universeId);
     if (!snapshot.state) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
-    if ("globalKillSwitchEngaged" in update) {
+    if ("universeAutonomyPaused" in update) {
+      // Atomic JSONB patch: no revision churn, and no overwrite of concurrent
+      // DM/story updates. The world state save path preserves this server flag.
+      await db.execute(sql`UPDATE echo_universes
+        SET state = jsonb_set(state::jsonb, '{settings}',
+          COALESCE(state::jsonb->'settings', '{}'::jsonb)
+          || jsonb_build_object('autonomyPaused', ${update.universeAutonomyPaused}), true)
+        WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+          AND archived_at IS NULL AND deleted_at IS NULL`);
+    } else if ("globalKillSwitchEngaged" in update) {
       await updateOwnerKillSwitch(ownerId, update.globalKillSwitchEngaged);
     } else {
       const stored = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
