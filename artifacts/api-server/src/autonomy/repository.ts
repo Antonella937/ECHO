@@ -23,6 +23,7 @@ export async function readOwnerControls(ownerId: string, universeId = "primary")
       eq(echoAutonomyCharactersTable.universeId, universeId),
     ));
   return {
+    ownerKillSwitchEngaged: owner?.killSwitchEngaged ?? true,
     globalKillSwitchEngaged: (owner?.killSwitchEngaged ?? true) || universeState?.settings?.autonomyPaused === true,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: new Map(characters.map((row) => [row.characterId, {
