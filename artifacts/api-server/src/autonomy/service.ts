@@ -342,9 +342,28 @@ export async function runAutonomyLiveCycle(
     const history = await dependencies.repository.getExecutedHistory(
       ownerId, character.id, new Date(now.getTime() - DAY_MS), universeId,
     );
+    // In the live DM lane, exclude unauthorized recipients BEFORE random target
+    // selection. Keep the existing final send-time permission check as defense.
+    let liveAllowedDmRecipientIds: ReadonlySet<string> | undefined;
+    if (dependencies.lane === "dm") {
+      const rows = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
+        FROM echo_character_dm_permissions
+        WHERE owner_id = ${ownerId} AND universe_id = ${universeId}`);
+      const permissionFor = (id: string) => rows.rows.find(row => row.character_id === id);
+      const sender = permissionFor(character.id);
+      liveAllowedDmRecipientIds = new Set(state.characters.filter(peer =>
+        !peer.archived && peer.id !== character.id && sender?.enabled === true &&
+        (peer.id === state.primaryCharacterId || (
+          Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(peer.id) &&
+          permissionFor(peer.id)?.enabled === true &&
+          Array.isArray(permissionFor(peer.id)?.allowed_peer_ids) &&
+          (permissionFor(peer.id)?.allowed_peer_ids as string[]).includes(character.id)
+        ))).map(peer => peer.id));
+    }
     const opportunity = chooseAutonomyOpportunity({
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
+      allowedDmRecipientIds: liveAllowedDmRecipientIds,
     });
     if (dependencies.lane === "dm" && opportunity.situation !== "dm") {
       await dependencies.repository.complete(ownerId, runId, { status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null }, universeId);
