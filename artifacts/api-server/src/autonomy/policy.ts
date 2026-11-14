@@ -275,13 +275,16 @@ export function chooseAutonomyOpportunity(input: {
     // opted-in characters appear inactive for hours even before cooldowns.
     // Keep outreach probabilistic and let the existing daily caps, cooldowns,
     // recipient eligibility and mutual DM permissions enforce pacing.
-    const outreachChance = input.dmFrequency === "frequently" ? 0.18 :
-      input.dmFrequency === "rarely" ? 0.015 : 0.06;
-    if (random() < outreachChance) {
-      const recipients = availableTargets(state, character).filter(candidate =>
-        (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(candidate.id)) &&
-        !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
-      if (recipients.length) {
+    const recipients = availableTargets(state, character).filter(candidate =>
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(candidate.id)) &&
+      !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
+    // Only roll for spontaneous outreach when an eligible contact exists.
+    // Keep the selected frequency and cooldown unchanged; do not fabricate a
+    // message or call Kindroid when there is nobody authorized to receive it.
+    if (recipients.length) {
+      const outreachChance = input.dmFrequency === "frequently" ? 0.18 :
+        input.dmFrequency === "rarely" ? 0.015 : 0.06;
+      if (random() < outreachChance) {
         const prioritized = prioritizeHumanAccount(recipients, state, recipient => recipient.id, random);
         const recipient = prioritized[0];
         return { situation: "dm", recipientId: recipient.id,
