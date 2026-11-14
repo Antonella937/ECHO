@@ -127,11 +127,15 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
+        const recipientName = (parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person').slice(0,80);
+        // A single Kin may have multiple ECHO correspondents. Explicitly label
+        // who sent the latest DM; do not treat an unrelated Kin's message as
+        // the human owner's voice or fabricate a message for spontaneous outreach.
         const outgoingPrompt = storyForReply
-          ? `[ECHO private story reply: You viewed a story by ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
+          ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
           : isDirectReply
-            ? newest!.text
-            : `[ECHO autonomous DM: You have decided to reach out to ${parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person'} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
+            ? `[ECHO incoming private DM from ${recipientName}. Reply to this sender in your established voice, in English. Message follows:]\n${newest!.text}`
+            : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
