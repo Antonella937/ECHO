@@ -36,6 +36,11 @@ export function AutonomySettingsSection() {
     { onSuccess: updateCache, onError: () => toast({ title: t("No se pudo guardar el bloqueo global"), variant: "destructive" }) },
   );
 
+  const setUniversePause = (paused: boolean) => update.mutate(
+    { data: { universeAutonomyPaused: paused, universeId } },
+    { onSuccess: updateCache, onError: () => toast({ title: t("No se pudo guardar la pausa del mundo"), variant: "destructive" }) },
+  );
+
   const setCharacter = (characterId: string, enabled: boolean, lane: "social" | "dm") => {
     setUpdatingControl(`${lane}:${characterId}`);
     update.mutate(
@@ -68,6 +73,21 @@ export function AutonomySettingsSection() {
         {settings?.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar con IA de texto. La generación manual de imágenes está disponible; las acciones autónomas con imágenes se controlan por separado.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
       </p>
       <div className="mt-3 divide-y divide-border rounded-2xl border border-border bg-card/60">
+        <div className="flex items-center gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{t("Pausar autonomía de este mundo")}</div>
+            <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {t("Solo pausa este universo. Conserva las preferencias de cada personaje y no afecta a otros mundos.")}
+            </div>
+          </div>
+          <Switch
+            checked={settings?.universeAutonomyPaused ?? false}
+            disabled={!settings || update.isPending}
+            onCheckedChange={setUniversePause}
+            aria-label={t("Pausar autonomía de este mundo")}
+            data-testid="switch-universe-autonomy-pause"
+          />
+        </div>
         <div className="flex items-center gap-3 p-4">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">{t("Bloqueo global")}</div>
