@@ -14,13 +14,16 @@ export { DEFAULT_CHARACTER_CONTROL } from "./constants";
 export async function readOwnerControls(ownerId: string, universeId = "primary") {
   const [owner] = await db.select().from(echoAutonomyOwnersTable)
     .where(eq(echoAutonomyOwnersTable.ownerId, ownerId)).limit(1);
+  const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+    .where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, universeId))).limit(1);
+  const universeState = universe?.state as { settings?: { autonomyPaused?: boolean } } | undefined;
   const characters = await db.select().from(echoAutonomyCharactersTable)
     .where(and(
       eq(echoAutonomyCharactersTable.ownerId, ownerId),
       eq(echoAutonomyCharactersTable.universeId, universeId),
     ));
   return {
-    globalKillSwitchEngaged: owner?.killSwitchEngaged ?? true,
+    globalKillSwitchEngaged: (owner?.killSwitchEngaged ?? true) || universeState?.settings?.autonomyPaused === true,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: new Map(characters.map((row) => [row.characterId, {
       enabled: row.enabled,
