@@ -107,8 +107,17 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
       ...(Array.isArray(previousSetup.dismissedCanonEventIds)
         ? { dismissedCanonEventIds: previousSetup.dismissedCanonEventIds } : {}),
     };
+    // Autonomy pause is server-owned and universe-scoped. Client universe saves
+    // may omit unknown settings fields; never let a normal save reset the pause.
+    const previousSettings = (current?.state as { settings?: Record<string, unknown> } | undefined)?.settings;
+    const requestedSettings = state.settings as Record<string, unknown> | undefined;
     const canonicalState = {
       ...state,
+      settings: {
+        ...(requestedSettings ?? {}),
+        ...(typeof previousSettings?.autonomyPaused === "boolean"
+          ? { autonomyPaused: previousSettings.autonomyPaused } : {}),
+      },
       creatorSetup: {
         ...(creatorSetup ?? {}),
         ...serverCanon,
