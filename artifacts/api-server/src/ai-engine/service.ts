@@ -128,14 +128,19 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
         const recipientName = (parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person').slice(0,80);
-        // A single Kin may have multiple ECHO correspondents. Explicitly label
-        // who sent the latest DM; do not treat an unrelated Kin's message as
-        // the human owner's voice or fabricate a message for spontaneous outreach.
-        const outgoingPrompt = storyForReply
-          ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story in your established voice, in English. Do not invent details or claim they messaged you.]`
+        const actorName = (actor?.name ?? 'your character').slice(0,80);
+        const ownerName = (parsed.data.state.characters.find(c => c.id === parsed.data.state.primaryCharacterId)?.name ?? 'the account owner').slice(0,80);
+        // Kindroid's API maintains a Kin-wide conversation, whereas ECHO has
+        // separate peer threads. Supply only this pair's recent DM turns and
+        // explicitly establish both roles to prevent replies to the owner.
+        const peerHistory = thread.slice(0,6).reverse().map(m =>
+          `${m.senderId === input.characterId ? actorName : recipientName}: ${m.text.slice(0,450)}`).join('\n');
+        const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
+        const outgoingPrompt = peerContext + (storyForReply
+          ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
           : isDirectReply
-            ? `[ECHO incoming private DM from ${recipientName}. Reply to this sender in your established voice, in English. Message follows:]\n${newest!.text}`
-            : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message in your established voice, in English. Do not claim they messaged you or invent a reply from them.]`;
+            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${newest!.text}`
+            : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
           // Reuse ECHO's actor-visible context builder, not a raw global feed dump.
