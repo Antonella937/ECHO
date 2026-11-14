@@ -14,6 +14,7 @@ export interface AutonomySettings {
      */
   universeId: string;
   globalKillSwitchEngaged: boolean;
+  universeAutonomyPaused: boolean;
   liveExecutionEnabled: false;
   characters: AutonomyCharacterControl[];
 }
