@@ -1034,6 +1034,24 @@ test("PostgreSQL controls, idempotency, and execution history are isolated by un
   assert.deepEqual(eligible, [{ ownerId, universeId: "studio", characterId: "mar" }]);
 });
 
+test("pausing one universe excludes only its worker targets and controls", async () => {
+  const ownerId = syntheticOwnerId();
+  const { state } = fixture();
+  const now = new Date();
+  await insertSyntheticUniverse(ownerId, state, now, 1, "primary");
+  await insertSyntheticUniverse(ownerId, state, now, 1, "studio");
+  await updateOwnerKillSwitch(ownerId, false);
+  await updateCharacterControl(ownerId, "mar", true, "primary", "dm");
+  await updateCharacterControl(ownerId, "mar", true, "studio", "dm");
+  await db.update(echoUniversesTable).set({
+    state: { ...state, settings: { autonomyPaused: true } } as unknown as Record<string, unknown>,
+  }).where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, "primary")));
+  const targets = (await listLiveOptInTargets()).filter(target => target.ownerId === ownerId);
+  assert.deepEqual(targets.map(target => target.universeId), ["studio"]);
+  assert.equal((await readOwnerControls(ownerId, "primary")).globalKillSwitchEngaged, true);
+  assert.equal((await readOwnerControls(ownerId, "studio")).globalKillSwitchEngaged, false);
+});
+
 test("live executor commits one synthetic post and treats a retry as a duplicate", async () => {
   const ownerId = syntheticOwnerId();
   const now = new Date();
