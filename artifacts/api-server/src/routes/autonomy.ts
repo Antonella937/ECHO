@@ -89,7 +89,7 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
   const controls = await readOwnerControls(ownerId, universeId);
   return GetAutonomySettingsResponse.parse({
     universeId,
-    globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
+    globalKillSwitchEngaged: controls.ownerKillSwitchEngaged,
     universeAutonomyPaused: (snapshot.state as { settings?: { autonomyPaused?: boolean } }).settings?.autonomyPaused === true,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
     characters: parsed.data.state.characters.filter((character) => !character.archived).map((character) => {
