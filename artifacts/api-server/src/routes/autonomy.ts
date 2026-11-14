@@ -178,7 +178,7 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
           AND archived_at IS NULL AND deleted_at IS NULL`);
     } else if ("globalKillSwitchEngaged" in update) {
       await updateOwnerKillSwitch(ownerId, update.globalKillSwitchEngaged);
-    } else {
+    } else if ("characterId" in update) {
       const stored = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
       const account = stored.success
         ? stored.data.state.characters.find((character) => character.id === update.characterId)
