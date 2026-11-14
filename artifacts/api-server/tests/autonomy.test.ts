@@ -1044,7 +1044,7 @@ test("pausing one universe excludes only its worker targets and controls", async
   await updateCharacterControl(ownerId, "mar", true, "primary", "dm");
   await updateCharacterControl(ownerId, "mar", true, "studio", "dm");
   await db.execute(sql`UPDATE echo_universes
-    SET state = jsonb_set(state::jsonb, '{settings,autonomyPaused}', 'true'::jsonb, true)
+    SET state = jsonb_set(state::jsonb, '{settings}', COALESCE(state::jsonb->'settings', '{}'::jsonb) || '{"autonomyPaused":true}'::jsonb, true)
     WHERE owner_id = ${ownerId} AND universe_id = 'primary'`);
   const targets = (await listLiveOptInTargets()).filter(target => target.ownerId === ownerId);
   assert.deepEqual(targets.map(target => target.universeId), ["studio"]);
