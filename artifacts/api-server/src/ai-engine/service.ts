@@ -92,9 +92,6 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
-    // Founder character text must never silently fall back to a metered
-    // non-Kindroid provider when the Kin link is absent or disabled.
-    if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
     if (typeof kinId === 'string' && kinId.length > 0) {
       const targetPost = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
       const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
@@ -117,9 +114,6 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
-    // Founder character text must never silently fall back to a metered
-    // non-Kindroid provider when the Kin link is absent or disabled.
-    if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
     if (typeof kinId === 'string' && kinId.length > 0) {
       const recipientId = input.recipientId!;
       const thread = parsed.data.state.messages
