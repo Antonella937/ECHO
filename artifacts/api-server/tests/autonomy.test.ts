@@ -2,7 +2,7 @@ import test from "node:test";
 import { after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { SaveUniverseBody, type CharacterDecision, type SocialState } from "@workspace/api-zod";
 import {
   db,
@@ -1043,9 +1043,9 @@ test("pausing one universe excludes only its worker targets and controls", async
   await updateOwnerKillSwitch(ownerId, false);
   await updateCharacterControl(ownerId, "mar", true, "primary", "dm");
   await updateCharacterControl(ownerId, "mar", true, "studio", "dm");
-  await db.update(echoUniversesTable).set({
-    state: { ...state, settings: { autonomyPaused: true } } as unknown as Record<string, unknown>,
-  }).where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, "primary")));
+  await db.execute(sql`UPDATE echo_universes
+    SET state = jsonb_set(state::jsonb, '{settings,autonomyPaused}', 'true'::jsonb, true)
+    WHERE owner_id = ${ownerId} AND universe_id = 'primary'`);
   const targets = (await listLiveOptInTargets()).filter(target => target.ownerId === ownerId);
   assert.deepEqual(targets.map(target => target.universeId), ["studio"]);
   assert.equal((await readOwnerControls(ownerId, "primary")).globalKillSwitchEngaged, true);
