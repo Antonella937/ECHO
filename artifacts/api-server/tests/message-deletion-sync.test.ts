@@ -58,3 +58,27 @@ test('unrelated existing DM survives another conversation deletion', () => {
   assert.equal(result.conflicts.length, 0);
   assert.deepEqual(result.state.messages.map(m => m.id), ['preserved']);
 });
+
+test('explicit server choice removes a locally edited deleted message', () => {
+  const original = message('resolved-server', 'Before');
+  const base = withMessages(original);
+  const local = structuredClone(base);
+  local.messages = [{ ...original, text: 'Unsent edit' }];
+  const remote = structuredClone(base);
+  remote.messages = [];
+  const result = mergeUniverse(base, local, remote, { 'messages.resolved-server': 'remote' });
+  assert.equal(result.conflicts.length, 0);
+  assert.equal(result.state.messages.some(m => m.id === original.id), false);
+});
+
+test('explicit device choice preserves a locally edited deleted message', () => {
+  const original = message('resolved-local', 'Before');
+  const base = withMessages(original);
+  const local = structuredClone(base);
+  local.messages = [{ ...original, text: 'Unsent edit' }];
+  const remote = structuredClone(base);
+  remote.messages = [];
+  const result = mergeUniverse(base, local, remote, { 'messages.resolved-local': 'local' });
+  assert.equal(result.conflicts.length, 0);
+  assert.equal(result.state.messages.find(m => m.id === original.id)?.text, 'Unsent edit');
+});
