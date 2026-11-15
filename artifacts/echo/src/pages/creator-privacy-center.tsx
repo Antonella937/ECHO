@@ -3,7 +3,7 @@ import { useLanguage } from '@/lib/i18n';
 import React from 'react';
 import { CharacterInitials } from '../components/echo/visual-defaults';
 import { hasCharacterImage } from '../lib/visual-defaults';
-import { resolveMedia } from '../lib/media';
+import { useMediaResolver } from '../lib/media';
 import { useUser } from '@clerk/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
@@ -38,6 +38,15 @@ const sharingDescriptions: Record<string,[string,string]> = {"es":["Compartir es
 const sharingUrl = (universeId: string) => `/api/universe/${encodeURIComponent(universeId)}/sharing`;
 const visibilityUrl = (universeId: string, characterId: string) =>
   `/api/character-privacy/${encodeURIComponent(characterId)}/visibility?universeId=${encodeURIComponent(universeId)}`;
+
+function PrivacyCharacterAvatar({ character, universeId }: { character: { id: string; name: string; avatar?: string | null }; universeId: string }) {
+  const media = useMediaResolver();
+  if (!hasCharacterImage(character.avatar)) return <CharacterInitials name={character.name} size={36} />;
+  const src = media(character.avatar!, { sourceUniverseId: universeId, sourceCharacterId: character.id,
+    sourceType: 'avatar', sourceContentId: character.id });
+  return src ? <img className="h-9 w-9 shrink-0 rounded-full object-cover" alt={character.name} src={src} />
+    : <CharacterInitials name={character.name} size={36} />;
+}
 
 function StateCard({ title, body, onRetry, testId }: { title: string; body: string; onRetry?: () => void; testId: string }) {
   const t = usePrivacyCenterText();
@@ -79,7 +88,7 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
       enabled: Boolean(metadata) && !archived,
     })),
   });
-  const disableSharing = useMutation({
+  const updateSharing = useMutation({
     mutationFn: (enabled: boolean) => requestJson<{ sharingEnabled: boolean }>(sharingUrl(universeId), {
       method: 'PUT', body: JSON.stringify({ sharingEnabled: enabled }),
     }),
@@ -120,11 +129,11 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
               : sharing === undefined ? <span className="epc-state-pill">{t("Cargando…")}</span>
               : <button type="button" className={`epc-toggle ${sharing ? 'is-on' : ''}`} role="switch" aria-checked={sharing}
                   aria-label={sharing ? t('Desactivar compartir') : t('Compartir universo')}
-                  disabled={disableSharing.isPending}
-                  onClick={() => disableSharing.mutate(!sharing)} data-testid="toggle-universe-sharing"><i /></button>}
+                  disabled={updateSharing.isPending}
+                  onClick={() => updateSharing.mutate(!sharing)} data-testid="toggle-universe-sharing"><i /></button>}
           </div>
           <p>{(sharingDescriptions[language] ?? sharingDescriptions.en)[sharing ? 0 : 1]}</p>
-          {disableSharing.isError && <p className="ep-form-error" role="alert">{t("No se pudo desactivar. Inténtalo de nuevo.")}</p>}
+          {updateSharing.isError && <p className="ep-form-error" role="alert">{sharing ? t('No se pudo desactivar. Inténtalo de nuevo.') : t('No se pudo activar. Inténtalo de nuevo.')}</p>}
           {consent?.draftAcknowledged && <small className="epc-caption" data-testid="text-consent-record">
             {t('Borrador alfa registrado')}{consent.acknowledgedAt ? ` ${t('el')} ${new Date(consent.acknowledgedAt).toLocaleDateString(language)}` : ''} · {t('versión')} {consent.version}. {t('No es consentimiento legal.')}
           </small>}
@@ -138,11 +147,7 @@ function PrivacyCenterContent({ ownerId }: { ownerId: string }) {
             return (
               <article className="epc-privacy-card" key={character.id} data-testid={`card-privacy-${character.id}`}>
                 <div className="epc-privacy-character">
-                  {hasCharacterImage(character.avatar)
-                    ? <img className="h-9 w-9 shrink-0 rounded-full object-cover" alt={character.name}
-                        src={resolveMedia(character.avatar, { sourceUniverseId: universeId, sourceCharacterId: character.id,
-                          sourceType: 'avatar', sourceContentId: character.id })} />
-                    : <CharacterInitials name={character.name} size={36} />}
+                  <PrivacyCharacterAvatar character={character} universeId={universeId} />
                   <div><strong>{character.name}</strong><small>
                     {t(query?.isError ? 'No se pudo cargar' : query?.data ? (isPublic ? 'Perfil público' : 'Perfil privado') : 'Cargando…')}
                   </small></div>
