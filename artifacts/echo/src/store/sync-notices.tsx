@@ -76,6 +76,13 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
           <p className="mt-3 text-sm text-muted-foreground">No se sobrescribió el servidor. Guarda una copia antes de elegir qué versión conservar. Si el servidor indica «Eliminado», elegirlo quitará el registro local. La copia de recuperación permanece en este dispositivo.</p>
           {view.conflicts.map(c => <fieldset key={c.path} className="mt-5 rounded-2xl border border-border p-4">
             <legend className="break-all px-2 text-xs text-primary">{conflictLabel(c.path)}</legend>
+            {/^messages\\.[^.]+$/.test(c.path) && (() => {
+              const record = (c.local ?? c.remote) as Record<string, unknown> | undefined;
+              const characters = view.state?.characters ?? [];
+              const sender = characters.find(character => character.id === record?.senderId)?.name;
+              const recipient = characters.find(character => character.id === record?.recipientId)?.name;
+              return sender && recipient ? <p className="mb-2 text-xs text-muted-foreground">{sender} → {recipient}</p> : null;
+            })()}
             {(['local', 'remote'] as const).map(side => <label key={side} className="my-2 flex items-start gap-3 rounded-xl bg-secondary p-3">
               <input type="radio" name={c.path} checked={choices[c.path] === side} onChange={() => setChoices(v => ({ ...v, [c.path]: side }))} />
               <span className="min-w-0 break-words text-sm"><strong>{side === 'local' ? 'Este dispositivo' : 'Servidor'}</strong><span className="mt-1 block text-xs">{preview(c[side])}</span></span>
