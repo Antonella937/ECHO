@@ -87,3 +87,13 @@ export function validateMpSubscriptionBinding(payment: VerifiedMpPayment, preapp
   }
   return { accepted: true };
 }
+
+/**
+ * Provider webhook resource IDs may arrive as JSON numbers. Normalize only
+ * decimal identifiers without coercing arbitrary objects or strings.
+ */
+export function normalizeMpPaymentResourceId(value: unknown): string | null {
+  if (typeof value === "string" && /^[0-9]{1,30}$/.test(value)) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
+  return null;
+}
