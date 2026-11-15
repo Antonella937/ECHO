@@ -72,3 +72,18 @@ export async function fetchMpPaymentEvidence(id: string): Promise<VerifiedMpPaym
     clearTimeout(timeout);
   }
 }
+
+/**
+ * Conservative subscription binding check. A matching external reference
+ * alone is insufficient to attribute a payment to a recurring preapproval.
+ */
+export function validateMpSubscriptionBinding(payment: VerifiedMpPayment, preapprovalId: string):
+  { accepted: true } | { accepted: false; reason: string } {
+  if (!preapprovalId || !payment.subscriptionId) {
+    return { accepted: false, reason: "MISSING_SUBSCRIPTION_BINDING" };
+  }
+  if (payment.subscriptionId !== preapprovalId) {
+    return { accepted: false, reason: "SUBSCRIPTION_PAYMENT_BINDING_MISMATCH" };
+  }
+  return { accepted: true };
+}
