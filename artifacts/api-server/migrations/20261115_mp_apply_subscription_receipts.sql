@@ -9,6 +9,7 @@ CREATE OR REPLACE FUNCTION echo_apply_verified_subscription_receipt(
 DECLARE
   receipt record;
   intent record;
+  updated_count integer;
 BEGIN
   SELECT * INTO receipt FROM echo_mp_payment_receipts
     WHERE provider_payment_id = p_payment_id FOR UPDATE;
@@ -45,8 +46,15 @@ BEGIN
           status = 'active',
           current_period_end = EXCLUDED.current_period_end,
           updated_at = now()
-      WHERE echo_subscriptions.current_period_end IS NULL
-         OR echo_subscriptions.current_period_end < EXCLUDED.current_period_end;
+      WHERE (echo_subscriptions.current_period_end IS NULL
+         OR echo_subscriptions.current_period_end <= now()
+         OR echo_subscriptions.plan = EXCLUDED.plan)
+        AND (echo_subscriptions.current_period_end IS NULL
+         OR echo_subscriptions.current_period_end < EXCLUDED.current_period_end);
+
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+  -- A stale payment cannot be marked applied if it did not change the plan.
+  IF updated_count <> 1 THEN RETURN false; END IF;
 
   UPDATE echo_mp_payment_receipts SET applied_at = now()
     WHERE provider_payment_id = p_payment_id AND applied_at IS NULL;
