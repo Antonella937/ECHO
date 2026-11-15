@@ -21,6 +21,7 @@ BEGIN
     RETURN false;
   END IF;
   IF p_period_end IS NULL
+     OR p_period_end <= now()
      OR p_period_end <= receipt.paid_at
      OR p_period_end > receipt.paid_at + INTERVAL '35 days' THEN
     RETURN false;
