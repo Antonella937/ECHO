@@ -7,7 +7,7 @@ import type { Message, SocialState } from '../../echo/src/domain/types';
 const message = (id: string, text: string): Message => ({
   id, threadId: 'vivienne__ezra', senderId: 'vivienne', recipientId: 'ezra',
   text, createdAt: '2026-11-14T10:00:00.000Z', storyId: null,
-  postId: null, readBy: [], origin: 'human',
+  postId: null, readBy: [], origin: 'user',
 });
 
 function withMessages(...messages: Message[]): SocialState {
