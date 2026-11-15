@@ -48,6 +48,14 @@ export function mergeUniverse(
         return [...new Set([...left, ...right])].filter(id => old.has(id) ? ls.has(id) && rs.has(id) : ls.has(id) || rs.has(id));
       }
     }
+    // A message that was already present in the common ancestor and has been
+    // removed on the server must not be silently resurrected from an unchanged
+    // device cache. If the local copy was edited, keep the conflict for review.
+    // Never apply this rule to new messages absent from the common ancestor.
+    if (/^messages\\.[^.]+$/.test(path) && object(b) && object(l) && r === undefined) {
+      if (same(l, b)) return undefined;
+      return conflict(b, l, r, path);
+    }
     // A locally missing highlight must never hide a server-backed collection.
     // This also covers old recovery bases that already contained the highlight:
     // the generic three-way "remote unchanged" branch would otherwise prefer
