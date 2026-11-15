@@ -57,7 +57,7 @@ export async function fetchMpPaymentEvidence(id: string): Promise<VerifiedMpPaym
     const data: unknown = await response.json();
     if (!data || typeof data !== "object") throw new Error("INVALID_MP_PAYMENT_RESPONSE");
     const record = data as Record<string, unknown>;
-    if (String(record.id ?? "") !== id) throw new Error("MP_PAYMENT_ID_MISMATCH");
+    if (normalizeMpPaymentResourceId(record.id) !== id) throw new Error("MP_PAYMENT_ID_MISMATCH");
     return {
       id,
       status: typeof record.status === "string" ? record.status : "unknown",
