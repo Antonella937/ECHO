@@ -28,3 +28,12 @@ CREATE INDEX IF NOT EXISTS echo_mp_receipts_reference_idx ON echo_mp_payment_rec
 CREATE INDEX IF NOT EXISTS echo_mp_receipts_reversal_idx
   ON echo_mp_payment_receipts(provider_status, applied_at)
   WHERE applied_at IS NOT NULL AND provider_status IN ('refunded','charged_back');
+
+-- Staging-only audit view for refund/chargeback events that require review.
+-- This view does not automatically revoke purchased capacity or subscriptions.
+CREATE OR REPLACE VIEW echo_mp_reversed_applied_receipts AS
+SELECT provider_payment_id, owner_id, reference, purchase_kind,
+       provider_status, paid_at, applied_at
+FROM echo_mp_payment_receipts
+WHERE applied_at IS NOT NULL
+  AND provider_status IN ('refunded', 'charged_back');
