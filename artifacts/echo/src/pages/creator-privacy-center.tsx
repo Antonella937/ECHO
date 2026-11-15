@@ -15,6 +15,7 @@ import {
   useGetOwnerConsent,
   useGetUniverse,
   useListCreatorUniverses,
+  customFetch,
 } from '@workspace/api-client-react';
 import { AlphaConsentBoundary } from '@/components/echo/alpha-consent';
 import { PreviewHeading, PreviewShell } from './creator-product-previews';
@@ -25,12 +26,12 @@ import './creator-product-previews.css';
 type Visibility = 'public' | 'private';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
+  // Use the same configured API origin and session handling as other ECHO requests.
+  return customFetch<T>(url, {
     credentials: 'same-origin', cache: 'no-store', ...init,
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
+    responseType: 'json',
   });
-  if (!response.ok) throw new Error(`HTTP_${response.status}`);
-  return response.json() as Promise<T>;
 }
 
 const sharingDescriptions: Record<string,[string,string]> = {"es":["Compartir está habilitado. Solo quien tenga un enlace autorizado podrá ver una vista limitada.","Privado. Activá compartir para generar enlaces de vista previa."],"en":["Sharing is enabled. Only people with an authorized link can see a limited preview.","Private. Enable sharing to generate preview links."],"pt":["Compartilhamento ativado. Apenas quem tiver um link autorizado poderá ver uma prévia limitada.","Privado. Ative o compartilhamento para gerar links de prévia."],"fr":["Partage activé. Seules les personnes ayant un lien autorisé peuvent voir un aperçu limité.","Privé. Activez le partage pour créer des liens d’aperçu."],"de":["Teilen aktiviert. Nur Personen mit autorisiertem Link können eine eingeschränkte Vorschau sehen.","Privat. Aktiviere Teilen, um Vorschaulinks zu erstellen."],"it":["Condivisione attiva. Solo chi ha un link autorizzato può vedere un’anteprima limitata.","Privato. Attiva la condivisione per creare link di anteprima."],"ko":["공유가 활성화되었습니다. 승인된 링크가 있는 사람만 제한된 미리보기를 볼 수 있습니다.","비공개입니다. 미리보기 링크를 만들려면 공유를 활성화하세요."],"ja":["共有が有効です。許可されたリンクを持つ人だけが限定プレビューを閲覧できます。","非公開です。プレビューリンクを作成するには共有を有効にしてください。"],"zh":["分享已启用。只有持有授权链接的人才能查看有限预览。","当前为私密状态。启用分享即可生成预览链接。"]};
