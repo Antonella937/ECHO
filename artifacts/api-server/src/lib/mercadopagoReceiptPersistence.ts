@@ -25,6 +25,12 @@ export async function recordVerifiedMpSubscriptionPayment(paymentId: string): Pr
       await client.query("ROLLBACK");
       return { recorded: false, reason: "UNLINKED_SUBSCRIPTION_INTENT" };
     }
+    // A matching external reference is insufficient to prove this installment
+    // belongs to the preapproval. Require an explicit provider subscription ID.
+    if (payment.subscriptionId !== intent.provider_preapproval_id) {
+      await client.query("ROLLBACK");
+      return { recorded: false, reason: "SUBSCRIPTION_PAYMENT_BINDING_MISMATCH" };
+    }
     const evidence = validateMpPaymentEvidence({
       payment, reference: intent.reference, amountArs: Number(intent.amount_ars),
     });
