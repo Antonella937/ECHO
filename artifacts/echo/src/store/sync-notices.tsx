@@ -25,6 +25,7 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
   const [choices, setChoices] = useState<Resolutions>({});
   const [confirmImport, setConfirmImport] = useState(false);
   const [deferred, setDeferred] = useState(false);
+  const [conflictDismissed, setConflictDismissed] = useState(false);
   const download = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(view.state, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'echo-recuperacion.json'; a.click();
@@ -61,7 +62,14 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
         </div>
       </div>
     )}
-    {!!view.conflicts.length && (
+    {!!view.conflicts.length && conflictDismissed && (
+      <aside className="fixed inset-x-3 bottom-24 z-[110] mx-auto max-w-md rounded-2xl border border-border bg-card p-4 text-sm shadow-xl" role="status">
+        <p>Hay mensajes pendientes de sincronizar. Puedes consultar ECHO, pero los cambios están pausados hasta resolverlos.</p>
+        <button className="mt-3 rounded-xl bg-primary px-3 py-2 text-primary-foreground" onClick={() => setConflictDismissed(false)}>Revisar diferencias</button>
+        <button className="ml-3 underline" onClick={download}>Guardar copia</button>
+      </aside>
+    )}
+    {!!view.conflicts.length && !conflictDismissed && (
       <div className="fixed inset-0 z-[120] overflow-auto bg-background/95 p-5" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
         <div className="mx-auto max-w-lg py-8">
           <h2 id="conflict-title" className="text-xl font-semibold">Hay cambios que necesitan tu decisión</h2>
@@ -77,6 +85,7 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
             className="mt-6 w-full rounded-2xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-40"
             onClick={() => { engine?.resolve(choices); setChoices({}); }}>Combinar con mis elecciones</button>
           <button className="mt-4 w-full underline" onClick={download}>Descargar copia antes de resolver</button>
+          <button className="mt-4 w-full text-sm underline" onClick={() => setConflictDismissed(true)}>Seguir mirando ECHO sin resolver todavía</button>
         </div>
       </div>
     )}
