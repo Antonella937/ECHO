@@ -54,6 +54,18 @@ export class UniverseSync {
   private recoveryOwner() { return this.universeId === 'primary' ? this.owner : `${this.owner}:universe:${this.universeId}`; }
   private emit() { if (!this.stopped) this.publish({ ...this.view }); }
   stop() { this.stopped = true; }
+  /** Read-only diagnostic snapshot; never mutates local or server history. */
+  exportConflictBackup() {
+    return structuredClone({
+      format: 'echo-conflict-backup-v2',
+      savedAt: new Date().toISOString(),
+      universeId: this.universeId,
+      base: this.base,
+      state: this.view.state,
+      remote: this.conflictRemote,
+      conflicts: this.view.conflicts,
+    });
+  }
   private backup() {
     if (!this.view.state) return this.disk;
     const recovery = structuredClone({ base: this.base, state: this.view.state });
