@@ -27,14 +27,9 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
   const [deferred, setDeferred] = useState(false);
   const [conflictDismissed, setConflictDismissed] = useState(false);
   const download = () => {
-    const snapshot = view.conflicts.length ? {
-      format: 'echo-conflict-backup-v1',
-      savedAt: new Date().toISOString(),
-      state: view.state,
-      conflicts: view.conflicts,
-    } : view.state;
+    const snapshot = view.conflicts.length && engine ? engine.exportConflictBackup() : view.state;
     const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }));
-    const a = document.createElement('a'); a.href = url; a.download = view.conflicts.length ? 'echo-conflictos-respaldo.json' : 'echo-recuperacion.json'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = view.conflicts.length ? 'echo-conflictos-respaldo-v2.json' : 'echo-recuperacion.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <>
