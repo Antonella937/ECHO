@@ -15,9 +15,9 @@ const preview = (value: unknown) => {
   return 'Datos guardados';
 };
 const conflictLabel = (path: string) => {
-  if (/^messages\\.[^.]+(?:\\.|$)/.test(path)) return 'Mensaje de una conversación';
-  if (/^posts\\.[^.]+(?:\\.|$)/.test(path)) return 'Publicación';
-  if (/^stories\\.[^.]+(?:\\.|$)/.test(path)) return 'Historia';
+  if (/^messages\.[^.]+(?:\.|$)/.test(path)) return 'Mensaje de una conversación';
+  if (/^posts\.[^.]+(?:\.|$)/.test(path)) return 'Publicación';
+  if (/^stories\.[^.]+(?:\.|$)/.test(path)) return 'Historia';
   return 'Cambio pendiente de sincronización';
 };
 
@@ -76,7 +76,7 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
           <p className="mt-3 text-sm text-muted-foreground">No se sobrescribió el servidor. Guarda una copia antes de elegir qué versión conservar. Si el servidor indica «Eliminado», elegirlo quitará el registro local. La copia de recuperación permanece en este dispositivo.</p>
           {view.conflicts.map(c => <fieldset key={c.path} className="mt-5 rounded-2xl border border-border p-4">
             <legend className="break-all px-2 text-xs text-primary">{conflictLabel(c.path)}</legend>
-            {/^messages\\.[^.]+$/.test(c.path) && (() => {
+            {/^messages\.[^.]+$/.test(c.path) && (() => {
               const record = (c.local ?? c.remote) as Record<string, unknown> | undefined;
               const characters = view.state?.characters ?? [];
               const sender = characters.find(character => character.id === record?.senderId)?.name;
