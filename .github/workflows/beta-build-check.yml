@@ -36,6 +36,8 @@ jobs:
         run: pnpm run typecheck
       - name: Verify fresh participant starts with empty universe
         run: pnpm --filter @workspace/api-server exec tsx --test ../../artifacts/echo/tests/private-beta-starter.test.ts
+      - name: Verify message deletion synchronization
+        run: pnpm --filter @workspace/api-server run test:message-sync
       - name: Build frontend
         run: pnpm --filter @workspace/echo run build
       - name: Build API
