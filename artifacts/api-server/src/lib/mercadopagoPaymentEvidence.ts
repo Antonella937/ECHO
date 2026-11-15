@@ -6,7 +6,7 @@ export type VerifiedMpPayment = {
   transactionAmount: number | null;
   currencyId: string | null;
   dateApproved: string | null;
-  subscriptionId: string | null;
+  subscriptionId?: string | null;
 };
 export function validateMpPaymentEvidence(input: {
   payment: VerifiedMpPayment;
