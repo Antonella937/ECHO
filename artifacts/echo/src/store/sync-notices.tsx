@@ -2,8 +2,24 @@ import { useState } from 'react';
 import type { UniverseSync, SyncView } from './synchronization';
 import type { Resolutions } from './merge';
 
-const preview = (value: unknown) => value === undefined ? 'Eliminado' :
-  (typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 240);
+const preview = (value: unknown) => {
+  if (value === undefined) return 'Eliminado';
+  if (typeof value === 'string') return value.slice(0, 240);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const message = typeof record.text === 'string' ? record.text :
+      typeof record.content === 'string' ? record.content : null;
+    if (message !== null) return message.slice(0, 240);
+    return 'Registro guardado (sin vista previa de texto)';
+  }
+  return 'Datos guardados';
+};
+const conflictLabel = (path: string) => {
+  if (/^messages\\.[^.]+(?:\\.|$)/.test(path)) return 'Mensaje de una conversación';
+  if (/^posts\\.[^.]+(?:\\.|$)/.test(path)) return 'Publicación';
+  if (/^stories\\.[^.]+(?:\\.|$)/.test(path)) return 'Historia';
+  return 'Cambio pendiente de sincronización';
+};
 
 export function SyncNotices({ view, engine }: { view: SyncView; engine: UniverseSync | null }) {
   const [choices, setChoices] = useState<Resolutions>({});
@@ -49,9 +65,9 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
       <div className="fixed inset-0 z-[120] overflow-auto bg-background/95 p-5" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
         <div className="mx-auto max-w-lg py-8">
           <h2 id="conflict-title" className="text-xl font-semibold">Hay cambios que necesitan tu decisión</h2>
-          <p className="mt-3 text-sm text-muted-foreground">No se sobrescribió el servidor. Elige qué versión conservar en cada diferencia. La copia de recuperación y el original de la importación permanecen en este dispositivo.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No se sobrescribió el servidor. Guarda una copia antes de elegir qué versión conservar. Si el servidor indica «Eliminado», elegirlo quitará el registro local. La copia de recuperación permanece en este dispositivo.</p>
           {view.conflicts.map(c => <fieldset key={c.path} className="mt-5 rounded-2xl border border-border p-4">
-            <legend className="break-all px-2 text-xs text-primary">{c.path}</legend>
+            <legend className="break-all px-2 text-xs text-primary">{conflictLabel(c.path)}</legend>
             {(['local', 'remote'] as const).map(side => <label key={side} className="my-2 flex items-start gap-3 rounded-xl bg-secondary p-3">
               <input type="radio" name={c.path} checked={choices[c.path] === side} onChange={() => setChoices(v => ({ ...v, [c.path]: side }))} />
               <span className="min-w-0 break-words text-sm"><strong>{side === 'local' ? 'Este dispositivo' : 'Servidor'}</strong><span className="mt-1 block text-xs">{preview(c[side])}</span></span>
