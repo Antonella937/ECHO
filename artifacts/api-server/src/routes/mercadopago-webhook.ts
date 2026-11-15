@@ -14,6 +14,14 @@ router.post("/billing/mercadopago/webhook", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const dataId = typeof req.query["data.id"] === "string"
     ? req.query["data.id"] : typeof req.body?.data?.id === "string" ? req.body.data.id : "";
+  // Do not accept a signed query ID paired with a different body resource.
+  // The signature covers the resource ID, not arbitrary body fields.
+  const queryId = typeof req.query["data.id"] === "string" ? req.query["data.id"] : "";
+  const bodyId = typeof req.body?.data?.id === "string" ? req.body.data.id : "";
+  if (queryId && bodyId && queryId !== bodyId) {
+    res.status(400).json({ error: "MP_RESOURCE_ID_CONFLICT" });
+    return;
+  }
   const signature = req.header("x-signature");
   const requestId = req.header("x-request-id");
   if (!verifyMpWebhookSignature({
