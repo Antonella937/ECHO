@@ -82,3 +82,28 @@ test('explicit device choice preserves a locally edited deleted message', () => 
   assert.equal(result.conflicts.length, 0);
   assert.equal(result.state.messages.find(m => m.id === original.id)?.text, 'Unsent edit');
 });
+
+test('independent universe merges do not alter messages from another world', () => {
+  const blackthorneMessage = message('blackthorne-only', 'Academy message');
+  const musicMessage = { ...message('music-only', 'Band message'),
+    threadId: 'nela__mar', senderId: 'nela', recipientId: 'mar' };
+  const academyBase = withMessages(blackthorneMessage);
+  const academyRemote = structuredClone(academyBase);
+  academyRemote.messages = [];
+  const musicBase = withMessages(musicMessage);
+  const musicLocal = structuredClone(musicBase);
+  const musicRemote = structuredClone(musicBase);
+  const academyResult = mergeUniverse(academyBase, structuredClone(academyBase), academyRemote);
+  const musicResult = mergeUniverse(musicBase, musicLocal, musicRemote);
+  assert.deepEqual(academyResult.state.messages.map(m => m.id), []);
+  assert.deepEqual(musicResult.state.messages.map(m => m.id), ['music-only']);
+  assert.equal(musicResult.conflicts.length, 0);
+});
+
+test('a missing recovery base does not silently discard a locally present DM', () => {
+  const local = withMessages(message('legacy-local', 'Preserve imported message'));
+  const remote = structuredClone(local);
+  remote.messages = [];
+  const result = mergeUniverse(null, local, remote);
+  assert.ok(result.state.messages.some(m => m.id === 'legacy-local'));
+});
