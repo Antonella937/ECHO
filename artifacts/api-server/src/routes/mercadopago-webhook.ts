@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { verifyMpWebhookSignature } from "../lib/mercadopagoWebhookSignature";
 import { fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
 import { recordVerifiedMpSubscriptionPayment } from "../lib/mercadopagoReceiptPersistence";
+import { normalizeMpPaymentResourceId } from "../lib/mercadopagoPaymentEvidence";
 
 /**
  * Public provider callback, registered BEFORE the private-beta auth gate.
@@ -12,12 +13,14 @@ import { recordVerifiedMpSubscriptionPayment } from "../lib/mercadopagoReceiptPe
 const router: IRouter = Router();
 router.post("/billing/mercadopago/webhook", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  const dataId = typeof req.query["data.id"] === "string"
-    ? req.query["data.id"] : typeof req.body?.data?.id === "string" ? req.body.data.id : "";
+  const topic = typeof req.body?.type === "string" ? req.body.type : "";
+  const queryId = typeof req.query["data.id"] === "string" ? req.query["data.id"] : "";
+  const bodyId = topic === "payment"
+    ? normalizeMpPaymentResourceId(req.body?.data?.id) ?? ""
+    : typeof req.body?.data?.id === "string" ? req.body.data.id : "";
+  const dataId = queryId || bodyId;
   // Do not accept a signed query ID paired with a different body resource.
   // The signature covers the resource ID, not arbitrary body fields.
-  const queryId = typeof req.query["data.id"] === "string" ? req.query["data.id"] : "";
-  const bodyId = typeof req.body?.data?.id === "string" ? req.body.data.id : "";
   if (queryId && bodyId && queryId !== bodyId) {
     res.status(400).json({ error: "MP_RESOURCE_ID_CONFLICT" });
     return;
@@ -31,7 +34,6 @@ router.post("/billing/mercadopago/webhook", async (req, res) => {
     res.status(401).json({ error: "INVALID_MP_SIGNATURE" });
     return;
   }
-  const topic = typeof req.body?.type === "string" ? req.body.type : "";
   if (topic === "payment") {
     try {
       // Signed notification is a trigger, not payment proof or a grant.
