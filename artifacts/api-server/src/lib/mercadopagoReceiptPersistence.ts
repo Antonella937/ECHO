@@ -53,7 +53,7 @@ export async function recordVerifiedMpSubscriptionPayment(paymentId: string): Pr
       // An existing payment ID might belong to another owner or reference.
       // Never report it as a harmless duplicate without checking its binding.
       const existing = await client.query(
-        `SELECT owner_id,reference,purchase_kind,provider_preapproval_id,amount_ars,currency
+        `SELECT owner_id,reference,purchase_kind,provider_preapproval_id,amount_ars,currency,provider_status,paid_at
          FROM echo_mp_payment_receipts WHERE provider_payment_id=$1`,
         [evidence.paymentId],
       );
@@ -61,7 +61,8 @@ export async function recordVerifiedMpSubscriptionPayment(paymentId: string): Pr
       const same = row && row.owner_id === intent.owner_id &&
         row.reference === intent.reference && row.purchase_kind === "subscription" &&
         row.provider_preapproval_id === intent.provider_preapproval_id &&
-        row.currency === "ARS" && Number(row.amount_ars) === Number(intent.amount_ars);
+        row.currency === "ARS" && Number(row.amount_ars) === Number(intent.amount_ars) &&
+        row.provider_status === "approved" && row.paid_at !== null;
       if (!same) {
         await client.query("ROLLBACK");
         return { recorded: false, reason: "PAYMENT_ALREADY_BOUND_ELSEWHERE" };
