@@ -6,6 +6,7 @@ export type VerifiedMpPayment = {
   transactionAmount: number | null;
   currencyId: string | null;
   dateApproved: string | null;
+  subscriptionId: string | null;
 };
 export function validateMpPaymentEvidence(input: {
   payment: VerifiedMpPayment;
@@ -64,6 +65,8 @@ export async function fetchMpPaymentEvidence(id: string): Promise<VerifiedMpPaym
       transactionAmount: typeof record.transaction_amount === "number" ? record.transaction_amount : null,
       currencyId: typeof record.currency_id === "string" ? record.currency_id : null,
       dateApproved: typeof record.date_approved === "string" ? record.date_approved : null,
+      // Fail closed if the payment response does not explicitly identify its subscription.
+      subscriptionId: typeof record.preapproval_id === "string" ? record.preapproval_id : null,
     };
   } finally {
     clearTimeout(timeout);
