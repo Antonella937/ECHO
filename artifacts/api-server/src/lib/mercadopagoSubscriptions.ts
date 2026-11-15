@@ -95,3 +95,46 @@ export function buildMpPreapprovalPayload(input: {
     },
   };
 }
+
+/**
+ * Creates a sandbox-only recurring preapproval. This does not establish a
+ * paid subscription: the returned checkout URL must not grant entitlements.
+ */
+export async function createMpTestPreapproval(input: Parameters<typeof buildMpPreapprovalPayload>[0]):
+  Promise<{ id: string; checkoutUrl: string }> {
+  if (process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
+    throw new Error("MP_SANDBOX_CHECKOUT_DISABLED");
+  }
+  const payload = buildMpPreapprovalPayload(input);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(`${MP_API}/preapproval`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testToken()}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`MP_PREAPPROVAL_HTTP_${response.status}`);
+    const result: unknown = await response.json();
+    if (!result || typeof result !== "object") throw new Error("INVALID_MP_PREAPPROVAL_RESPONSE");
+    const record = result as Record<string, unknown>;
+    if (typeof record.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(record.id)) {
+      throw new Error("INVALID_MP_PREAPPROVAL_ID");
+    }
+    const checkoutUrl = record.init_point;
+    if (typeof checkoutUrl !== "string") throw new Error("INVALID_MP_CHECKOUT_URL");
+    const url = new URL(checkoutUrl);
+    if (url.protocol !== "https:" || !["www.mercadopago.com.ar", "mercadopago.com.ar"].includes(url.hostname)) {
+      throw new Error("INVALID_MP_CHECKOUT_URL");
+    }
+    if (record.external_reference !== input.reference) throw new Error("MP_PREAPPROVAL_REFERENCE_MISMATCH");
+    return { id: record.id, checkoutUrl: url.toString() };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
