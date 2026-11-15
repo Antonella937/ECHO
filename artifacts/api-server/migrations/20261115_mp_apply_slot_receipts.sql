@@ -45,3 +45,5 @@ BEGIN
 END;
 $$;
 -- Keep application privilege limited to the trusted backend database role.
+
+REVOKE ALL ON FUNCTION echo_apply_verified_slot_receipt(text) FROM PUBLIC;
