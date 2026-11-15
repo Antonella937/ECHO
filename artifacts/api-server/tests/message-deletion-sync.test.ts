@@ -18,7 +18,8 @@ test('unchanged cached message stays deleted when remote intentionally removed i
   const original = message('deleted-peer-message', 'Old conversation');
   const base = withMessages(original);
   const local = structuredClone(base);
-  const remote = withMessages();
+  const remote = structuredClone(base);
+  remote.messages = [];
   const result = mergeUniverse(base, local, remote);
   assert.equal(result.conflicts.length, 0);
   assert.equal(result.state.messages.some(m => m.id === original.id), false);
@@ -27,8 +28,10 @@ test('unchanged cached message stays deleted when remote intentionally removed i
 test('edited local DM versus server deletion remains an explicit conflict', () => {
   const original = message('edited-peer-message', 'Original');
   const base = withMessages(original);
-  const local = withMessages({ ...original, text: 'New unsynced edit' });
-  const remote = withMessages();
+  const local = structuredClone(base);
+  local.messages = [{ ...original, text: 'New unsynced edit' }];
+  const remote = structuredClone(base);
+  remote.messages = [];
   const result = mergeUniverse(base, local, remote);
   assert.ok(result.conflicts.some(c => c.path === 'messages.edited-peer-message'));
   assert.equal(local.messages[0].text, 'New unsynced edit');
@@ -37,8 +40,9 @@ test('edited local DM versus server deletion remains an explicit conflict', () =
 test('new unsynced DM absent from base is not discarded by server absence', () => {
   const fresh = message('new-peer-message', 'New message');
   const base = withMessages();
-  const local = withMessages(fresh);
-  const remote = withMessages();
+  const local = structuredClone(base);
+  local.messages = [fresh];
+  const remote = structuredClone(base);
   const result = mergeUniverse(base, local, remote);
   assert.equal(result.conflicts.length, 0);
   assert.ok(result.state.messages.some(m => m.id === fresh.id));
@@ -48,7 +52,9 @@ test('unrelated existing DM survives another conversation deletion', () => {
   const removed = message('removed', 'Remove');
   const preserved = { ...message('preserved', 'Keep'), threadId: 'nela__vivienne', senderId: 'nela', recipientId: 'vivienne' };
   const base = withMessages(removed, preserved);
-  const result = mergeUniverse(base, structuredClone(base), withMessages(preserved));
+  const remote = structuredClone(base);
+  remote.messages = [preserved];
+  const result = mergeUniverse(base, structuredClone(base), remote);
   assert.equal(result.conflicts.length, 0);
   assert.deepEqual(result.state.messages.map(m => m.id), ['preserved']);
 });
