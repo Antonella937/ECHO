@@ -52,7 +52,7 @@ export function mergeUniverse(
     // removed on the server must not be silently resurrected from an unchanged
     // device cache. If the local copy was edited, keep the conflict for review.
     // Never apply this rule to new messages absent from the common ancestor.
-    if (/^messages\\.[^.]+$/.test(path) && object(b) && object(l) && r === undefined) {
+    if (/^messages\.[^.]+$/.test(path) && object(b) && object(l) && r === undefined) {
       if (same(l, b)) return undefined;
       return conflict(b, l, r, path);
     }
