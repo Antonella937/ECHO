@@ -127,15 +127,19 @@ router.post("/billing/mercadopago/subscription-test-checkout", requireAuth, asyn
     return;
   }
   try {
+    // Atomically claim the draft before making a non-idempotent provider call.
+    // A failed/ambiguous request stays 'creating' for manual reconciliation.
     const result = await pool.query(
-      `SELECT reference,plan,amount_ars FROM echo_mp_subscription_intents
+      `UPDATE echo_mp_subscription_intents
+       SET status='creating',updated_at=now()
        WHERE reference=$1 AND owner_id=$2 AND status='draft'
-         AND provider_preapproval_id IS NULL LIMIT 1`,
+         AND provider_preapproval_id IS NULL
+       RETURNING reference,plan,amount_ars`,
       [reference, req.userId!],
     );
     const intent = result.rows[0];
     if (!intent) {
-      res.status(409).json({ error: "DRAFT_NOT_AVAILABLE" });
+      res.status(409).json({ error: "DRAFT_ALREADY_CLAIMED_OR_UNAVAILABLE" });
       return;
     }
     const preapproval = await createMpTestPreapproval({
@@ -148,7 +152,7 @@ router.post("/billing/mercadopago/subscription-test-checkout", requireAuth, asyn
     const updated = await pool.query(
       `UPDATE echo_mp_subscription_intents
        SET provider_preapproval_id=$1,status='pending',updated_at=now()
-       WHERE reference=$2 AND owner_id=$3 AND status='draft'
+       WHERE reference=$2 AND owner_id=$3 AND status='creating'
          AND provider_preapproval_id IS NULL RETURNING reference`,
       [preapproval.id, reference, req.userId!],
     );
