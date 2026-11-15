@@ -19,6 +19,10 @@ router.post("/billing/mercadopago/webhook", async (req, res) => {
     ? normalizeMpPaymentResourceId(req.body?.data?.id) ?? ""
     : typeof req.body?.data?.id === "string" ? req.body.data.id : "";
   const dataId = queryId || bodyId;
+  if (topic === "payment" && (!dataId || !normalizeMpPaymentResourceId(dataId))) {
+    res.status(400).json({ error: "INVALID_MP_PAYMENT_ID" });
+    return;
+  }
   // Do not accept a signed query ID paired with a different body resource.
   // The signature covers the resource ID, not arbitrary body fields.
   if (queryId && bodyId && queryId !== bodyId) {
