@@ -27,8 +27,14 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
   const [deferred, setDeferred] = useState(false);
   const [conflictDismissed, setConflictDismissed] = useState(false);
   const download = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(view.state, null, 2)], { type: 'application/json' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'echo-recuperacion.json'; a.click();
+    const snapshot = view.conflicts.length ? {
+      format: 'echo-conflict-backup-v1',
+      savedAt: new Date().toISOString(),
+      state: view.state,
+      conflicts: view.conflicts,
+    } : view.state;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = view.conflicts.length ? 'echo-conflictos-respaldo.json' : 'echo-recuperacion.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <>
@@ -64,7 +70,7 @@ export function SyncNotices({ view, engine }: { view: SyncView; engine: Universe
     )}
     {!!view.conflicts.length && conflictDismissed && (
       <aside className="fixed inset-x-3 bottom-24 z-[110] mx-auto max-w-md rounded-2xl border border-border bg-card p-4 text-sm shadow-xl" role="status">
-        <p>Hay mensajes pendientes de sincronizar. Puedes consultar ECHO, pero los cambios están pausados hasta resolverlos.</p>
+        <p>Hay cambios pendientes de sincronizar. Puedes consultar ECHO, pero las modificaciones están pausadas hasta resolverlos.</p>
         <button className="mt-3 rounded-xl bg-primary px-3 py-2 text-primary-foreground" onClick={() => setConflictDismissed(false)}>Revisar diferencias</button>
         <button className="ml-3 underline" onClick={download}>Guardar copia</button>
       </aside>
