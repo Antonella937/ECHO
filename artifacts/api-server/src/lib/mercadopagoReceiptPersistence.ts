@@ -1,5 +1,5 @@
 import { pool } from "@workspace/db";
-import { fetchMpPaymentEvidence, validateMpPaymentEvidence } from "./mercadopagoPaymentEvidence";
+import { fetchMpPaymentEvidence, validateMpPaymentEvidence, validateMpSubscriptionBinding } from "./mercadopagoPaymentEvidence";
 
 /**
  * Store provider-confirmed evidence for an existing server-created subscription
@@ -27,9 +27,10 @@ export async function recordVerifiedMpSubscriptionPayment(paymentId: string): Pr
     }
     // A matching external reference is insufficient to prove this installment
     // belongs to the preapproval. Require an explicit provider subscription ID.
-    if (payment.subscriptionId !== intent.provider_preapproval_id) {
+    const binding = validateMpSubscriptionBinding(payment, intent.provider_preapproval_id);
+    if (!binding.accepted) {
       await client.query("ROLLBACK");
-      return { recorded: false, reason: "SUBSCRIPTION_PAYMENT_BINDING_MISMATCH" };
+      return { recorded: false, reason: binding.reason };
     }
     const evidence = validateMpPaymentEvidence({
       payment, reference: intent.reference, amountArs: Number(intent.amount_ars),
