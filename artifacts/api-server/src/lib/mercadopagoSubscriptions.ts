@@ -102,7 +102,7 @@ export function buildMpPreapprovalPayload(input: {
  */
 export async function createMpTestPreapproval(input: Parameters<typeof buildMpPreapprovalPayload>[0]):
   Promise<{ id: string; checkoutUrl: string }> {
-  if (process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
+  if (process.env.NODE_ENV === "production" || process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true") {
     throw new Error("MP_SANDBOX_CHECKOUT_DISABLED");
   }
   const payload = buildMpPreapprovalPayload(input);
