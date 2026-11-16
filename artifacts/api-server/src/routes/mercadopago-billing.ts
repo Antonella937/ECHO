@@ -3,7 +3,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { createMpTestPreapproval } from "../lib/mercadopagoSubscriptions";
+import { createMpTestPreapproval, fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
 
 /**
  * Mercado Pago subscription preflight.
@@ -170,6 +170,54 @@ router.post("/billing/mercadopago/subscription-test-checkout", requireAuth, asyn
   } catch (error) {
     req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP sandbox checkout failed");
     res.status(503).json({ error: "SANDBOX_CHECKOUT_UNAVAILABLE" });
+  }
+});
+
+
+/**
+ * Owner-scoped read-only recovery diagnostics. Never retries a provider POST,
+ * resets a claimed draft, or activates paid entitlements.
+ */
+router.get("/billing/mercadopago/subscription-checkout-status", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const reference = req.query.reference;
+  if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference)) {
+    res.status(400).json({ error: "INVALID_REFERENCE" });
+    return;
+  }
+  try {
+    const result = await pool.query(
+      `SELECT status,provider_preapproval_id,updated_at
+       FROM echo_mp_subscription_intents
+       WHERE reference=$1 AND owner_id=$2 LIMIT 1`,
+      [reference, req.userId!],
+    );
+    const intent = result.rows[0];
+    if (!intent) {
+      res.status(404).json({ error: "CHECKOUT_NOT_FOUND" });
+      return;
+    }
+    if (!intent.provider_preapproval_id) {
+      res.json({
+        reference, status: intent.status,
+        recovery: intent.status === "creating" ? "manual_review_required" : "none",
+        retryAllowed: intent.status === "draft",
+        entitlementChanged: false,
+      });
+      return;
+    }
+    const provider = await fetchMpPreapproval(intent.provider_preapproval_id);
+    if (provider.id !== intent.provider_preapproval_id || provider.externalReference !== reference) {
+      res.status(409).json({ error: "PROVIDER_BINDING_MISMATCH", recovery: "manual_review_required" });
+      return;
+    }
+    res.json({
+      reference, status: intent.status, providerStatus: provider.status,
+      recovery: "linked", retryAllowed: false, entitlementChanged: false,
+    });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP checkout status unavailable");
+    res.status(503).json({ error: "CHECKOUT_STATUS_UNAVAILABLE" });
   }
 });
 
