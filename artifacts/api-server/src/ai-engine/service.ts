@@ -133,8 +133,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // Kindroid's API maintains a Kin-wide conversation, whereas ECHO has
         // separate peer threads. Supply only this pair's recent DM turns and
         // explicitly establish both roles to prevent replies to the owner.
-        const peerHistory = thread.slice(0,6).reverse().map(m =>
-          `${m.senderId === input.characterId ? actorName : recipientName}: ${m.text.slice(0,450)}`).join('\n');
+        // The latest incoming DM is appended separately below. Do not send it
+        // twice or crowd it out with older turns in Kindroid's shared history.
+        const previousTurns = isDirectReply ? thread.slice(1,5) : thread.slice(0,4);
+        const peerHistory = previousTurns.reverse().map(m =>
+          `${m.senderId === input.characterId ? actorName : recipientName}: ${m.text.slice(0,300)}`).join('\n');
         const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
         const outgoingPrompt = peerContext + (storyForReply
           ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
