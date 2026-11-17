@@ -65,6 +65,34 @@ kindroidLinksRouter.put('/characters/kindroid-link',async(req,res)=>{
   }catch{res.status(503).json({error:'KINDROID_LINK_UNAVAILABLE'});}
 });
 
+
+/** Read-only connection probe. Never sends a message or returns chat content. */
+kindroidLinksRouter.get('/characters/kindroid-link/check', async (req,res) => {
+  res.setHeader('Cache-Control','private, no-store');
+  const p=scope.safeParse(req.query);
+  if(!p.success){res.status(400).json({error:'INVALID_QUERY'});return;}
+  if(!await authorized(req.userId!,p.data.universeId,p.data.characterId)){
+    res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;
+  }
+  try {
+    const rows=await db.execute(sql`SELECT kin_id,enabled FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${p.data.universeId} AND character_id=${p.data.characterId} LIMIT 1`);
+    const link=rows.rows[0];
+    if(!link || link.enabled!==true){res.status(404).json({error:'KINDROID_LINK_NOT_ENABLED'});return;}
+    const key=process.env.ECHO_KINDROID_API_KEY;
+    if(!key){res.status(503).json({error:'KINDROID_KEY_MISSING'});return;}
+    const url=new URL('https://api.kindroid.ai/v1/get-chat-messages');
+    url.searchParams.set('ai_id',String(link.kin_id));
+    url.searchParams.set('limit','1');
+    const upstream=await fetch(url,{method:'GET',headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(12000)});
+    // Never read or return private chat history, even when the request succeeds.
+    await upstream.body?.cancel();
+    res.json({reachable:upstream.ok,status:upstream.status,category:upstream.ok?'accessible':upstream.status===401||upstream.status===403?'authorization':upstream.status===404?'not_found':upstream.status===400?'bad_request':'upstream_error'});
+  }catch{
+    res.status(502).json({error:'KINDROID_READ_ONLY_CHECK_FAILED'});
+  }
+});
+
 /** Disconnect only the external Kindroid adapter. The ECHO character, social
  * state, relationships, messages and memories remain untouched. */
 kindroidLinksRouter.delete('/characters/kindroid-link',async(req,res)=>{
