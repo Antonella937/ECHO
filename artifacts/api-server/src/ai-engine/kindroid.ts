@@ -57,7 +57,25 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
         console.warn('[kindroid] upstream rejected request', { situation, status: response.status, category, providerCode, payloadChars: requestMessage.length, promptChars: message.length, socialContextChars: socialContext.length });
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
-      const reply = (await response.text()).trim();
+      const rawReply = (await response.text()).trim();
+      // Kindroid responses may be plain text or a structured JSON response.
+      // Never insert a serialized JSON envelope into an ECHO conversation.
+      let reply = rawReply;
+      if (rawReply.startsWith('{')) {
+        try {
+          const parsed: unknown = JSON.parse(rawReply);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const record = parsed as Record<string, unknown>;
+            const value = [record.response, record.message, record.text, record.reply]
+              .find(candidate => typeof candidate === 'string' && candidate.trim());
+            if (typeof value !== 'string') throw new EngineError('KINDROID_RESPONSE_FORMAT_UNSUPPORTED', 502);
+            reply = value.trim();
+          }
+        } catch (error) {
+          if (error instanceof EngineError) throw error;
+          throw new EngineError('KINDROID_RESPONSE_FORMAT_UNSUPPORTED', 502);
+        }
+      }
       if (!reply || reply.startsWith('<<ERROR>>') || reply.startsWith('<<HTTP_ERROR>>')) throw new EngineError('KINDROID_GENERATION_FAILED', 502);
       const decision = JSON.stringify({
         action: 'draft', situation, text: reply.slice(0, situation === 'dm' ? 2000 : situation === 'post' ? 600 : 1000), reason: 'Kindroid character text',
