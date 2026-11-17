@@ -1,5 +1,23 @@
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 
+/** Classify upstream errors without persisting response bodies or private messages. */
+async function classifyKindroidFailure(response: Response): Promise<string> {
+  if (response.status === 429) return 'rate_limit';
+  if (response.status === 401 || response.status === 403) return 'authorization';
+  if (response.status === 404) return 'not_found';
+  if (response.status >= 500) return 'upstream_server';
+  if (response.status !== 400 && response.status !== 422) return 'other_http';
+  try {
+    const raw = (await response.text()).slice(0, 2048).toLowerCase();
+    if (/ai[_ -]?id|kin[_ -]?id|character|not found/.test(raw)) return 'invalid_character';
+    if (/message|length|too long|content/.test(raw)) return 'invalid_message';
+    if (/stream|parameter|field|payload|json/.test(raw)) return 'invalid_payload';
+    return 'bad_request_unknown';
+  } catch {
+    return 'unreadable_error';
+  }
+}
+
 /** Private, opt-in Kindroid DM adapter. No profile changes, chat breaks, or social autonomy. */
 export function kindroidDmProvider(message: string, kinId: string, socialContext = '', request: typeof fetch = fetch, situation: 'dm' | 'comment' | 'post' = 'dm'): TextProvider {
   return {
@@ -24,8 +42,8 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
-        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, rateLimited: response.status === 429 });
-        await response.body?.cancel();
+        const category = await classifyKindroidFailure(response);
+        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, category });
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const reply = (await response.text()).trim();
@@ -69,8 +87,8 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
-        console.warn('[kindroid] upstream rejected request', { situation: 'story_reaction', status: response.status, rateLimited: response.status === 429 });
-        await response.body?.cancel();
+        const category = await classifyKindroidFailure(response);
+        console.warn('[kindroid] upstream rejected request', { situation: 'story_reaction', status: response.status, category });
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const raw = (await response.text()).trim();
