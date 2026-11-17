@@ -83,6 +83,7 @@ kindroidLinksRouter.get('/characters/kindroid-link/check', async (req,res) => {
     if(!key){res.status(503).json({error:'KINDROID_KEY_MISSING'});return;}
     const url=new URL('https://api.kindroid.ai/v1/get-chat-messages');
     url.searchParams.set('ai_id',String(link.kin_id));
+    url.searchParams.set('limit','1');
     const upstream=await fetch(url,{method:'GET',headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(12000)});
     // Never read or return private chat history, even when the request succeeds.
     await upstream.body?.cancel();
