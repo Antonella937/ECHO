@@ -93,6 +93,33 @@ kindroidLinksRouter.get('/characters/kindroid-link/check', async (req,res) => {
   }
 });
 
+
+/** Owner-only, read-only preflight for retrying an existing DM. Never sends to Kindroid. */
+kindroidLinksRouter.get('/characters/kindroid-link/retry-preflight', async (req,res) => {
+  res.setHeader('Cache-Control','private, no-store');
+  const parsed=scope.extend({messageId:z.string().min(1).max(160)}).safeParse(req.query);
+  if(!parsed.success){res.status(400).json({error:'INVALID_QUERY'});return;}
+  const {universeId,characterId,messageId}=parsed.data;
+  if(!await authorized(req.userId!,universeId,characterId)){
+    res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;
+  }
+  try{
+    const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
+    const state=universe?.state as {messages?:Array<{id:string;senderId:string;recipientId:string;text?:string;threadId?:string}>}|undefined;
+    const message=state?.messages?.find(m=>m.id===messageId);
+    if(!message || message.recipientId!==characterId || message.senderId===characterId || !message.text?.trim()){
+      res.status(404).json({error:'ORIGINAL_DM_NOT_FOUND'});return;
+    }
+    const link=await db.execute(sql`SELECT enabled FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} LIMIT 1`);
+    if(link.rows[0]?.enabled!==true){res.status(409).json({error:'KINDROID_LINK_NOT_ENABLED'});return;}
+    const hasLaterReply=!!state?.messages?.some(m=>m.threadId===message.threadId && m.senderId===characterId && state.messages!.indexOf(m)>state.messages!.indexOf(message));
+    res.json({originalMessageFound:true,kindroidLinkEnabled:true,hasLaterReply,
+      safeToSend:false,reason:'UPSTREAM_DELIVERY_NOT_YET_VERIFIED'});
+  }catch{res.status(503).json({error:'RETRY_PREFLIGHT_UNAVAILABLE'});}
+});
+
 /** Disconnect only the external Kindroid adapter. The ECHO character, social
  * state, relationships, messages and memories remain untouched. */
 kindroidLinksRouter.delete('/characters/kindroid-link',async(req,res)=>{
