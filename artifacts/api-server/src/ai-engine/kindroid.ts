@@ -1,20 +1,30 @@
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 
 /** Classify upstream errors without persisting response bodies or private messages. */
-async function classifyKindroidFailure(response: Response): Promise<string> {
-  if (response.status === 429) return 'rate_limit';
-  if (response.status === 401 || response.status === 403) return 'authorization';
-  if (response.status === 404) return 'not_found';
-  if (response.status >= 500) return 'upstream_server';
-  if (response.status !== 400 && response.status !== 422) return 'other_http';
+async function classifyKindroidFailure(response: Response): Promise<{category:string; providerCode:string}> {
+  const result = (category:string, providerCode='unavailable') => ({category,providerCode});
+  if (response.status === 429) return result('rate_limit');
+  if (response.status === 401 || response.status === 403) return result('authorization');
+  if (response.status === 404) return result('not_found');
+  if (response.status >= 500) return result('upstream_server');
+  if (response.status !== 400 && response.status !== 422) return result('other_http');
   try {
     const raw = (await response.text()).slice(0, 2048).toLowerCase();
-    if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return 'invalid_character';
-    if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return 'invalid_message';
-    if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return 'invalid_payload';
-    return 'bad_request_unknown';
+    let providerCode = 'unavailable';
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const record = parsed as Record<string,unknown>;
+        const code = typeof record.code === 'string' ? record.code : typeof record.error_code === 'string' ? record.error_code : null;
+        if (code && /^[a-z][a-z0-9_-]{0,63}$/.test(code)) providerCode = code;
+      }
+    } catch { /* Provider may return plain text; never log it. */ }
+    if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return result('invalid_character',providerCode);
+    if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return result('invalid_message',providerCode);
+    if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return result('invalid_payload',providerCode);
+    return result('bad_request_unknown',providerCode);
   } catch {
-    return 'unreadable_error';
+    return result('unreadable_error');
   }
 }
 
@@ -43,8 +53,8 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
-        const category = await classifyKindroidFailure(response);
-        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, category, payloadChars: requestMessage.length, promptChars: message.length, socialContextChars: socialContext.length });
+        const { category, providerCode } = await classifyKindroidFailure(response);
+        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, category, providerCode, payloadChars: requestMessage.length, promptChars: message.length, socialContextChars: socialContext.length });
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const reply = (await response.text()).trim();
