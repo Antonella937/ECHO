@@ -24,6 +24,7 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
+        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, rateLimited: response.status === 429 });
         await response.body?.cancel();
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
@@ -68,6 +69,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
+        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, rateLimited: response.status === 429 });
         await response.body?.cancel();
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
