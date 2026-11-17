@@ -9,9 +9,9 @@ async function classifyKindroidFailure(response: Response): Promise<string> {
   if (response.status !== 400 && response.status !== 422) return 'other_http';
   try {
     const raw = (await response.text()).slice(0, 2048).toLowerCase();
-    if (/ai[_ -]?id|kin[_ -]?id|character|not found/.test(raw)) return 'invalid_character';
-    if (/message|length|too long|content/.test(raw)) return 'invalid_message';
-    if (/stream|parameter|field|payload|json/.test(raw)) return 'invalid_payload';
+    if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return 'invalid_character';
+    if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return 'invalid_message';
+    if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return 'invalid_payload';
     return 'bad_request_unknown';
   } catch {
     return 'unreadable_error';
