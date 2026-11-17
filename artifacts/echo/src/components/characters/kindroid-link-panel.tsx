@@ -17,6 +17,7 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
  const [data,setData]=useState<LinkState>({kinId:'',enabled:false,socialContextEnabled:false});
  const [busy,setBusy]=useState(false);
  const [status,setStatus]=useState('');
+ const [checking,setChecking]=useState(false);
  useEffect(()=>{setData({kinId:'',enabled:false,socialContextEnabled:false});setStatus('');},[characterId,universeId]);
  useEffect(()=>{
    let active=true;
@@ -31,6 +32,21 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
      await customFetch('/api/characters/kindroid-link',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId,universeId,kinId:data.kinId.trim(),enabled:data.enabled,socialContextEnabled:data.socialContextEnabled}),responseType:'json'});
      setStatus(t[4]);
    }catch{setStatus(t[5]);}finally{setBusy(false);}
+ }
+ async function checkConnection(){
+   if(busy||checking||!data.enabled)return;
+   setChecking(true);setStatus('');
+   try{
+     const result=await customFetch<{reachable:boolean;status:number;category:string}>(
+       `/api/characters/kindroid-link/check?characterId=${encodeURIComponent(characterId)}&universeId=${encodeURIComponent(universeId)}`,
+       {responseType:'json'}
+     );
+     setStatus(result.reachable
+       ? (language==='es'?'Conexión confirmada: Kindroid reconoce este personaje.':'Connection confirmed: Kindroid recognizes this character.')
+       : `Kindroid HTTP ${result.status}: ${result.category}. ${language==='es'?'No se enviaron mensajes.':'No messages were sent.'}`);
+   }catch{
+     setStatus(language==='es'?'No se pudo comprobar la conexión. No se enviaron mensajes.':'Could not check connection. No messages were sent.');
+   }finally{setChecking(false);}
  }
  async function disconnect(){
    if(busy||!data.kinId.trim())return;
@@ -70,7 +86,11 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
      <p className="mt-3 text-xs text-muted-foreground">{t[6]}</p>
      <button type="button" disabled={busy||!data.kinId.trim()} onClick={save}
        className="mt-4 h-11 w-full rounded-xl bg-primary font-semibold text-primary-foreground disabled:opacity-50">{t[3]}</button>
-     {data.kinId.trim()&&<button type="button" disabled={busy} onClick={disconnect}
+     {data.kinId.trim()&&<button type="button" disabled={busy||checking||!data.enabled} onClick={checkConnection}
+       className="mt-3 h-11 w-full rounded-xl border border-border text-sm font-semibold disabled:opacity-50">
+       {checking?(language==='es'?'Comprobando…':'Checking…'):(language==='es'?'Comprobar conexión (sin enviar DM)':'Check connection (no DM sent)')}
+     </button>}
+     {data.kinId.trim()&&<button type="button" disabled={busy||checking} onClick={disconnect}
        className="mt-3 h-11 w-full rounded-xl border border-destructive/50 text-sm font-semibold text-destructive disabled:opacity-50">
        {language==='es'?'Desvincular Kindroid (conservar personaje)':language==='pt'?'Desvincular Kindroid (manter personagem)':language==='fr'?'Dissocier Kindroid (conserver le personnage)':language==='de'?'Kindroid trennen (Charakter behalten)':language==='it'?'Scollega Kindroid (mantieni personaggio)':language==='ko'?'Kindroid 연결 해제 (캐릭터 유지)':language==='ja'?'Kindroidの連携解除（キャラクターは保持）':language==='zh'?'解除 Kindroid 绑定（保留角色）':'Disconnect Kindroid (keep character)'}
      </button>}
