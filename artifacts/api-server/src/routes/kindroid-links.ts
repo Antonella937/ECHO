@@ -124,7 +124,7 @@ kindroidLinksRouter.get('/characters/kindroid-link/retry-preflight', async (req,
  * Fail closed on unknown response shapes; never expose provider message content. */
 kindroidLinksRouter.get('/characters/kindroid-link/retry-history-check', async (req,res) => {
   res.setHeader('Cache-Control','private, no-store');
-  const parsed=scope.extend({messageId:z.string().min(1).max(160)}).safeParse(req.query);
+  const parsed=scope.extend({messageId:z.string().min(1).max(160).optional()}).safeParse(req.query);
   if(!parsed.success){res.status(400).json({error:'INVALID_QUERY'});return;}
   const {universeId,characterId,messageId}=parsed.data;
   if(!await authorized(req.userId!,universeId,characterId)){
@@ -134,7 +134,7 @@ kindroidLinksRouter.get('/characters/kindroid-link/retry-history-check', async (
     const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
       .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
     const state=universe?.state as {messages?:Array<{id:string;senderId:string;recipientId:string;text?:string}>}|undefined;
-    const original=state?.messages?.find(m=>m.id===messageId);
+    const original=messageId ? state?.messages?.find(m=>m.id===messageId) : [...(state?.messages??[])].reverse().find(m=>m.recipientId===characterId && m.senderId!==characterId && !!m.text?.trim());
     if(!original?.text?.trim() || original.recipientId!==characterId || original.senderId===characterId){
       res.status(404).json({error:'ORIGINAL_DM_NOT_FOUND'});return;
     }
