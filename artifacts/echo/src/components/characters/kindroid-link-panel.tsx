@@ -18,6 +18,7 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
  const [busy,setBusy]=useState(false);
  const [status,setStatus]=useState('');
  const [checking,setChecking]=useState(false);
+ const [checkingHistory,setCheckingHistory]=useState(false);
  useEffect(()=>{setData({kinId:'',enabled:false,socialContextEnabled:false});setStatus('');},[characterId,universeId]);
  useEffect(()=>{
    let active=true;
@@ -47,6 +48,21 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
    }catch{
      setStatus(language==='es'?'No se pudo comprobar la conexión. No se enviaron mensajes.':'Could not check connection. No messages were sent.');
    }finally{setChecking(false);}
+ }
+ async function checkLatestDm(){
+   if(busy||checking||checkingHistory||!data.enabled)return;
+   setCheckingHistory(true);setStatus('');
+   try{
+     const result=await customFetch<{historyReadable?:boolean;delivery?:string;reason?:string}>(
+       `/api/characters/kindroid-link/retry-history-check?characterId=${encodeURIComponent(characterId)}&universeId=${encodeURIComponent(universeId)}`,
+       {responseType:'json'}
+     );
+     setStatus(result.delivery==='found'
+       ? (language==='es'?'El texto del último DM aparece en el historial reciente de Kindroid. No se reenvió nada.':'Latest DM text appears in recent Kindroid history. Nothing was resent.')
+       : (language==='es'?'No se pudo confirmar la entrega del último DM. No se reenvió nada.':'Could not confirm delivery of latest DM. Nothing was resent.'));
+   }catch{
+     setStatus(language==='es'?'No se pudo consultar el historial de Kindroid. No se enviaron mensajes.':'Could not check Kindroid history. No messages were sent.');
+   }finally{setCheckingHistory(false);}
  }
  async function disconnect(){
    if(busy||!data.kinId.trim())return;
@@ -90,7 +106,11 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
        className="mt-3 h-11 w-full rounded-xl border border-border text-sm font-semibold disabled:opacity-50">
        {checking?(language==='es'?'Comprobando…':'Checking…'):(language==='es'?'Comprobar conexión (sin enviar DM)':'Check connection (no DM sent)')}
      </button>}
-     {data.kinId.trim()&&<button type="button" disabled={busy||checking} onClick={disconnect}
+     {data.kinId.trim()&&data.enabled&&<button type="button" disabled={busy||checking||checkingHistory} onClick={checkLatestDm}
+       className="mt-3 h-11 w-full rounded-xl border border-border text-sm font-semibold disabled:opacity-50">
+       {checkingHistory?(language==='es'?'Revisando historial…':'Checking history…'):(language==='es'?'Comprobar entrega del último DM (sin reenviar)':'Check latest DM delivery (no resend)')}
+     </button>}
+     {data.kinId.trim()&&<button type="button" disabled={busy||checking||checkingHistory} onClick={disconnect}
        className="mt-3 h-11 w-full rounded-xl border border-destructive/50 text-sm font-semibold text-destructive disabled:opacity-50">
        {language==='es'?'Desvincular Kindroid (conservar personaje)':language==='pt'?'Desvincular Kindroid (manter personagem)':language==='fr'?'Dissocier Kindroid (conserver le personnage)':language==='de'?'Kindroid trennen (Charakter behalten)':language==='it'?'Scollega Kindroid (mantieni personaggio)':language==='ko'?'Kindroid 연결 해제 (캐릭터 유지)':language==='ja'?'Kindroidの連携解除（キャラクターは保持）':language==='zh'?'解除 Kindroid 绑定（保留角色）':'Disconnect Kindroid (keep character)'}
      </button>}
