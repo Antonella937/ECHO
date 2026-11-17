@@ -120,6 +120,47 @@ kindroidLinksRouter.get('/characters/kindroid-link/retry-preflight', async (req,
   }catch{res.status(503).json({error:'RETRY_PREFLIGHT_UNAVAILABLE'});}
 });
 
+/** Read-only reconciliation: compare the stored DM against recent provider history.
+ * Fail closed on unknown response shapes; never expose provider message content. */
+kindroidLinksRouter.get('/characters/kindroid-link/retry-history-check', async (req,res) => {
+  res.setHeader('Cache-Control','private, no-store');
+  const parsed=scope.extend({messageId:z.string().min(1).max(160)}).safeParse(req.query);
+  if(!parsed.success){res.status(400).json({error:'INVALID_QUERY'});return;}
+  const {universeId,characterId,messageId}=parsed.data;
+  if(!await authorized(req.userId!,universeId,characterId)){
+    res.status(403).json({error:'CHARACTER_NOT_ACCESSIBLE'});return;
+  }
+  try{
+    const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
+    const state=universe?.state as {messages?:Array<{id:string;senderId:string;recipientId:string;text?:string}>}|undefined;
+    const original=state?.messages?.find(m=>m.id===messageId);
+    if(!original?.text?.trim() || original.recipientId!==characterId || original.senderId===characterId){
+      res.status(404).json({error:'ORIGINAL_DM_NOT_FOUND'});return;
+    }
+    const links=await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} AND enabled=true LIMIT 1`);
+    if(!links.rows[0]?.kin_id){res.status(409).json({error:'KINDROID_LINK_NOT_ENABLED'});return;}
+    const key=process.env.ECHO_KINDROID_API_KEY;
+    if(!key){res.status(503).json({error:'KINDROID_KEY_MISSING'});return;}
+    const url=new URL('https://api.kindroid.ai/v1/get-chat-messages');
+    url.searchParams.set('ai_id',String(links.rows[0].kin_id));
+    url.searchParams.set('limit','100');
+    const upstream=await fetch(url,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(12000)});
+    if(!upstream.ok){await upstream.body?.cancel();res.status(502).json({error:'KINDROID_HISTORY_UNAVAILABLE',status:upstream.status});return;}
+    const body:unknown=await upstream.json();
+    const rows=Array.isArray(body)?body:body && typeof body==='object' && !Array.isArray(body)
+      ? (body as Record<string,unknown>).messages : undefined;
+    if(!Array.isArray(rows)){res.json({historyReadable:true,delivery:'unknown',reason:'UNSUPPORTED_HISTORY_FORMAT',safeToSend:false});return;}
+    const texts=rows.map(row=>row && typeof row==='object' && !Array.isArray(row)
+      ? (row as Record<string,unknown>).message ?? (row as Record<string,unknown>).content ?? (row as Record<string,unknown>).text
+      : undefined).filter((value):value is string=>typeof value==='string');
+    const found=texts.some(value=>value.trim()===original.text!.trim());
+    // A miss in a bounded history is not proof of non-delivery.
+    res.json({historyReadable:true,delivery:found?'found':'unknown',reason:found?'ORIGINAL_TEXT_PRESENT':'NOT_FOUND_IN_RECENT_HISTORY',safeToSend:false});
+  }catch{res.status(502).json({error:'KINDROID_HISTORY_CHECK_FAILED'});}
+});
+
 /** Disconnect only the external Kindroid adapter. The ECHO character, social
  * state, relationships, messages and memories remain untouched. */
 kindroidLinksRouter.delete('/characters/kindroid-link',async(req,res)=>{
