@@ -192,7 +192,7 @@ export class UniverseSync {
           this.view.conflicts.length === 0 && !this.importHash &&
           Object.keys(this.decisions).length === 0 &&
           same({ ...this.base, currentCharacterId: '' }, { ...this.view.state, currentCharacterId: '' });
-        if (attempt === 0 && clean && this.remoteRevision !== null && this.io === defaultIO) {
+        if (attempt === 0 && clean && !localRecoveryFailure && this.remoteRevision !== null && this.io === defaultIO) {
           const revision = await loadUniverseRevision(this.universeId);
           if (revision === this.remoteRevision) {
             this.view.lastSavedAt = Date.now();
