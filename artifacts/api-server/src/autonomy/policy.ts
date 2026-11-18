@@ -272,8 +272,9 @@ export function chooseAutonomyOpportunity(input: {
       canCharacterViewCloseFriendsStory(state, story, character.id) &&
       (asTime(story.createdAt) ?? 0) > now.getTime() - DAY_MS &&
       (asTime(story.createdAt) ?? 0) <= now.getTime() &&
-      !state.messages.some(message => message.senderId === character.id && message.storyId === story.id) &&
-      !history.some(item => item.situation === "dm" && item.targetId === story.authorId));
+      // De-duplicate by story, not by recipient: an earlier ordinary DM must not
+      // suppress a later eligible story reply. Daily caps and cooldown still apply.
+      !state.messages.some(message => message.senderId === character.id && message.storyId === story.id));
     if (candidate) {
       return { situation: "dm", recipientId: candidate.authorId, storyId: candidate.id,
         reasonCode: "OPPORTUNITY_SELECTED",
