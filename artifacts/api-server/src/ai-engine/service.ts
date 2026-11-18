@@ -151,14 +151,26 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // explicitly establish both roles to prevent replies to the owner.
         // The latest incoming DM is appended separately below. Do not send it
         // twice or crowd it out with older turns in Kindroid's shared history.
-        const previousTurns = isDirectReply ? thread.slice(1,5) : thread.slice(0,4);
+        // Treat consecutive incoming messages as one turn when no character reply
+        // intervened. This covers a music attachment followed by its caption.
+        const latestTime = newest ? new Date(newest.createdAt).getTime() : NaN;
+        const incomingBatch = isDirectReply ? thread.filter((m, index) =>
+          index === 0 || (
+            m.senderId === recipientId &&
+            thread.slice(0, index).every(prior => prior.senderId === recipientId) &&
+            Number.isFinite(latestTime) &&
+            latestTime - new Date(m.createdAt).getTime() >= 0 &&
+            latestTime - new Date(m.createdAt).getTime() <= 120_000
+          )).slice(0, 4) : [];
+        const previousTurns = thread.slice(incomingBatch.length, incomingBatch.length + 4);
         const peerHistory = previousTurns.reverse().map(m =>
           `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m)}`).join('\n');
+        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n');
         const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
         const outgoingPrompt = peerContext + (storyForReply
           ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
           : isDirectReply
-            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${describeDmMessage(newest!)}`
+            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
