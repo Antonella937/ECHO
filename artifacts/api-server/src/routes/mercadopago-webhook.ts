@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { verifyMpWebhookSignature } from "../lib/mercadopagoWebhookSignature";
 import { fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
+import { recordVerifiedMpSubscriptionPayment } from "../lib/mercadopagoReceiptPersistence";
+import { normalizeMpPaymentResourceId } from "../lib/mercadopagoPaymentEvidence";
 
 /**
  * Public provider callback, registered BEFORE the private-beta auth gate.
@@ -11,8 +13,22 @@ import { fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
 const router: IRouter = Router();
 router.post("/billing/mercadopago/webhook", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  const dataId = typeof req.query["data.id"] === "string"
-    ? req.query["data.id"] : typeof req.body?.data?.id === "string" ? req.body.data.id : "";
+  const topic = typeof req.body?.type === "string" ? req.body.type : "";
+  const queryId = typeof req.query["data.id"] === "string" ? req.query["data.id"] : "";
+  const bodyId = topic === "payment"
+    ? normalizeMpPaymentResourceId(req.body?.data?.id) ?? ""
+    : typeof req.body?.data?.id === "string" ? req.body.data.id : "";
+  const dataId = queryId || bodyId;
+  if (topic === "payment" && (!dataId || !normalizeMpPaymentResourceId(dataId))) {
+    res.status(400).json({ error: "INVALID_MP_PAYMENT_ID" });
+    return;
+  }
+  // Do not accept a signed query ID paired with a different body resource.
+  // The signature covers the resource ID, not arbitrary body fields.
+  if (queryId && bodyId && queryId !== bodyId) {
+    res.status(400).json({ error: "MP_RESOURCE_ID_CONFLICT" });
+    return;
+  }
   const signature = req.header("x-signature");
   const requestId = req.header("x-request-id");
   if (!verifyMpWebhookSignature({
@@ -22,7 +38,28 @@ router.post("/billing/mercadopago/webhook", async (req, res) => {
     res.status(401).json({ error: "INVALID_MP_SIGNATURE" });
     return;
   }
-  const topic = typeof req.body?.type === "string" ? req.body.type : "";
+  if (topic === "payment") {
+    try {
+      // Signed notification is a trigger, not payment proof or a grant.
+      const outcome = await recordVerifiedMpSubscriptionPayment(dataId);
+      if (!outcome.recorded) {
+        // Ignore unrelated or unbound payments. Do not grant entitlements.
+        res.status(202).json({ accepted: true, recorded: false, entitlementChanged: false });
+        return;
+      }
+      const eventKey = `payment:${dataId}:${requestId}`;
+      await pool.query(
+        `INSERT INTO echo_mp_webhook_events(event_key,topic,provider_resource_id,status)
+         VALUES($1,$2,$3,'received') ON CONFLICT(event_key) DO NOTHING`,
+        [eventKey, topic, dataId],
+      );
+      res.status(202).json({ accepted: true, recorded: true, duplicate: outcome.duplicate, entitlementChanged: false });
+    } catch (error) {
+      req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP payment webhook unavailable");
+      res.status(503).json({ error: "MP_WEBHOOK_RETRY" });
+    }
+    return;
+  }
   if (topic !== "subscription_preapproval") {
     res.status(202).json({ accepted: true, ignored: true });
     return;

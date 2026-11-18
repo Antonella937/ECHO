@@ -3,6 +3,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
+import { createMpTestPreapproval, fetchMpPreapproval } from "../lib/mercadopagoSubscriptions";
 
 /**
  * Mercado Pago subscription preflight.
@@ -96,6 +97,128 @@ router.post("/billing/mercadopago/subscription-draft", requireAuth, async (req, 
     amount,
     checkoutUrl: null,
   });
+});
+
+
+/**
+ * Opt-in sandbox checkout only. A created preapproval is NOT payment evidence.
+ * This endpoint is disabled by default and must not be enabled in production.
+ */
+router.post("/billing/mercadopago/subscription-test-checkout", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (process.env.ECHO_MP_SANDBOX_CHECKOUT_ENABLED !== "true" ||
+      process.env.NODE_ENV === "production") {
+    res.status(503).json({ error: "SANDBOX_CHECKOUT_DISABLED" });
+    return;
+  }
+  if (lifetimeAccessForOwner(req.userId!) !== null) {
+    res.status(409).json({ error: "BILLING_EXEMPT" });
+    return;
+  }
+  const reference = req.body?.reference;
+  const payerEmail = req.body?.payerEmail;
+  if (typeof reference !== "string" || typeof payerEmail !== "string") {
+    res.status(400).json({ error: "INVALID_CHECKOUT_INPUT" });
+    return;
+  }
+  const callback = process.env.ECHO_MP_CALLBACK_URL;
+  if (!callback) {
+    res.status(503).json({ error: "MP_CALLBACK_NOT_CONFIGURED" });
+    return;
+  }
+  try {
+    // Atomically claim the draft before making a non-idempotent provider call.
+    // A failed/ambiguous request stays 'creating' for manual reconciliation.
+    const result = await pool.query(
+      `UPDATE echo_mp_subscription_intents
+       SET status='creating',updated_at=now()
+       WHERE reference=$1 AND owner_id=$2 AND status='draft'
+         AND provider_preapproval_id IS NULL
+       RETURNING reference,plan,amount_ars`,
+      [reference, req.userId!],
+    );
+    const intent = result.rows[0];
+    if (!intent) {
+      res.status(409).json({ error: "DRAFT_ALREADY_CLAIMED_OR_UNAVAILABLE" });
+      return;
+    }
+    const preapproval = await createMpTestPreapproval({
+      reference: intent.reference,
+      plan: intent.plan,
+      amountArs: Number(intent.amount_ars),
+      payerEmail,
+      backUrl: callback,
+    });
+    const updated = await pool.query(
+      `UPDATE echo_mp_subscription_intents
+       SET provider_preapproval_id=$1,status='pending',updated_at=now()
+       WHERE reference=$2 AND owner_id=$3 AND status='creating'
+         AND provider_preapproval_id IS NULL RETURNING reference`,
+      [preapproval.id, reference, req.userId!],
+    );
+    if (updated.rowCount !== 1) {
+      // A concurrent checkout may have created another provider resource.
+      // Do not expose the orphaned checkout URL to the client.
+      res.status(409).json({ error: "CHECKOUT_ALREADY_STARTED" });
+      return;
+    }
+    res.status(201).json({
+      environment: "test", checkoutEnabled: true,
+      reference, checkoutUrl: preapproval.checkoutUrl,
+      status: "pending", entitlementChanged: false,
+    });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP sandbox checkout failed");
+    res.status(503).json({ error: "SANDBOX_CHECKOUT_UNAVAILABLE" });
+  }
+});
+
+
+/**
+ * Owner-scoped read-only recovery diagnostics. Never retries a provider POST,
+ * resets a claimed draft, or activates paid entitlements.
+ */
+router.get("/billing/mercadopago/subscription-checkout-status", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const reference = req.query.reference;
+  if (typeof reference !== "string" || !/^echo:(plus|premium):[a-f0-9-]{36}$/.test(reference)) {
+    res.status(400).json({ error: "INVALID_REFERENCE" });
+    return;
+  }
+  try {
+    const result = await pool.query(
+      `SELECT status,provider_preapproval_id,updated_at
+       FROM echo_mp_subscription_intents
+       WHERE reference=$1 AND owner_id=$2 LIMIT 1`,
+      [reference, req.userId!],
+    );
+    const intent = result.rows[0];
+    if (!intent) {
+      res.status(404).json({ error: "CHECKOUT_NOT_FOUND" });
+      return;
+    }
+    if (!intent.provider_preapproval_id) {
+      res.json({
+        reference, status: intent.status,
+        recovery: intent.status === "creating" ? "manual_review_required" : "none",
+        retryAllowed: intent.status === "draft",
+        entitlementChanged: false,
+      });
+      return;
+    }
+    const provider = await fetchMpPreapproval(intent.provider_preapproval_id);
+    if (provider.id !== intent.provider_preapproval_id || provider.externalReference !== reference) {
+      res.status(409).json({ error: "PROVIDER_BINDING_MISMATCH", recovery: "manual_review_required" });
+      return;
+    }
+    res.json({
+      reference, status: intent.status, providerStatus: provider.status,
+      recovery: "linked", retryAllowed: false, entitlementChanged: false,
+    });
+  } catch (error) {
+    req.log.warn({ error: error instanceof Error ? error.name : "unknown" }, "MP checkout status unavailable");
+    res.status(503).json({ error: "CHECKOUT_STATUS_UNAVAILABLE" });
+  }
 });
 
 router.get("/billing/mercadopago/subscription-drafts", requireAuth, async (req, res) => {
