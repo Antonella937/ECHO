@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, eq, or } from "drizzle-orm";
 import { db, echoCharacterBlocksTable, echoCharacterPrivacyTable, echoUniversesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canForwardStory } from "../lib/storySharePolicy";
+import { canForwardStory, canCreateStoryRepost } from "../lib/storySharePolicy";
 import { storyIsStillVisible } from "../lib/socialContentAccess";
 
 const input = z.object({
@@ -78,6 +78,56 @@ export function createStorySharesRouter(): IRouter {
       res.status(allowed ? 200 : 403).json({ allowed });
     } catch {
       res.status(503).json({ allowed: false, error: "STORY_SHARE_AUTHORIZATION_UNAVAILABLE" });
+    }
+  });
+  // Authorization only: publishing must still be performed by a separate,
+  // atomic endpoint that stores the origin reference and rechecks read access.
+  router.post("/stories/authorize-repost", requireAuth, async (req, res): Promise<void> => {
+    res.setHeader("Cache-Control", "private, no-store");
+    const parsed = z.object({ universeId: z.string().min(1).max(120), actorId: z.string().min(1).max(120), storyId: z.string().min(1).max(120) }).strict().safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ allowed: false, error: "INVALID_STORY_REPOST" }); return; }
+    const { universeId, actorId, storyId } = parsed.data;
+    try {
+      const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
+        .where(and(eq(echoUniversesTable.ownerId, req.userId!), eq(echoUniversesTable.universeId, universeId))).limit(1);
+      if (!universe) { res.status(403).json({ allowed: false }); return; }
+      const state = universe.state as State;
+      const story = objects(state.stories).find(s => s.id === storyId);
+      const authorId = typeof story?.authorId === "string" ? story.authorId : "";
+      const characters = objects(state.characters);
+      if (!story || !characters.some(c => c.id === actorId && c.archived !== true) ||
+          !characters.some(c => c.id === authorId && c.archived !== true)) {
+        res.status(403).json({ allowed: false }); return;
+      }
+      const [blocks] = await Promise.all([
+        db.select().from(echoCharacterBlocksTable).where(and(
+          eq(echoCharacterBlocksTable.blockerOwnerId, req.userId!),
+          eq(echoCharacterBlocksTable.blockerUniverseId, universeId),
+        )),
+      ]);
+      const closeFriends = state.closeFriends && typeof state.closeFriends === "object"
+        ? state.closeFriends as Record<string, unknown> : {};
+      const list = Array.isArray(closeFriends[authorId]) ? closeFriends[authorId] as unknown[] : [];
+      const allowedIds = Array.isArray(story.allowedViewerIds) ? story.allowedViewerIds : list;
+      const actorCanViewOriginal = story.closeFriendsOnly !== true ||
+        (list.includes(actorId) && allowedIds.includes(actorId));
+      const created = Date.parse(String(story.createdAt ?? ""));
+      const now = Date.now();
+      const allowed = canCreateStoryRepost({
+        actorId, originalAuthorId: authorId,
+        mentionedAccountIds: Array.isArray(story.mentionedAccountIds)
+          ? story.mentionedAccountIds.filter((id): id is string => typeof id === "string") : [],
+        originalActive: Number.isFinite(created) && created <= now && now - created < 86400000,
+        originalExists: storyIsStillVisible(state, story, now),
+        actorCanViewOriginal, originalIsRepost: typeof story.repostOfStoryId === "string",
+        blocksVerified: true,
+        blockedBetweenActorAndAuthor: blocks.some(b =>
+          (b.blockerCharacterId === actorId && b.blockedCharacterId === authorId) ||
+          (b.blockerCharacterId === authorId && b.blockedCharacterId === actorId)),
+      });
+      res.status(allowed ? 200 : 403).json({ allowed });
+    } catch {
+      res.status(503).json({ allowed: false, error: "STORY_REPOST_AUTHORIZATION_UNAVAILABLE" });
     }
   });
   return router;
