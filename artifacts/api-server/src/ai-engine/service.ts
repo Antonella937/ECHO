@@ -92,7 +92,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
-    if (typeof kinId === 'string' && kinId.length > 0) {
+    // Founder live social text must never silently fall back to a metered model.
+    if (typeof kinId !== 'string' || kinId.length === 0) {
+      throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    }
+    {
       const targetPost = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
       const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
       // Do not pass private messages, hidden stories, or unrelated account data.
@@ -102,9 +106,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const prompt = input.situation === 'comment'
         ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
         : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
-      if (input.situation === 'post' || targetPost) {
-        selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
+      if (input.situation === 'comment' && !targetPost) {
+        throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
       }
+      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
     }
   }
   if (dependencies.liveDmReply === true &&
@@ -160,6 +165,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
+        // A missing, expired, or inaccessible story must not silently become
+        // an unrelated unsolicited DM. Preserve the intended story target.
+        if (input.storyId && !storyForReply) throw new EngineError('STORY_REPLY_TARGET_UNAVAILABLE', 404);
         const recipientName = (parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person').slice(0,80);
         const actorName = (actor?.name ?? 'your character').slice(0,80);
         const ownerName = (parsed.data.state.characters.find(c => c.id === parsed.data.state.primaryCharacterId)?.name ?? 'the account owner').slice(0,80);
@@ -184,8 +192,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
         const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n').slice(0, 3000);
         const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
+        // Reuse cached, access-controlled vision observations; never request a new
+        // paid analysis just to generate an autonomous story reply.
+        const storyVisual = storyForReply
+          ? vision.analyses[`story:${storyForReply.id}:story:${storyForReply.id}`]
+          : undefined;
+        const visualContext = storyVisual
+          ? `Cached visual observations (not identity verification): ${storyVisual.sceneDescription.slice(0,700)}. Visible activities: ${storyVisual.activities.slice(0,4).join('; ').slice(0,240)}. Notable details: ${storyVisual.notableDetails.slice(0,4).join('; ').slice(0,240)}. Uncertainties: ${storyVisual.uncertainty.slice(0,3).join('; ').slice(0,200)}.`
+          : 'No verified visual description is available for this story. Do not claim to see specific objects, people, places or actions from the image.';
         const outgoingPrompt = peerContext + (storyForReply
-          ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
+          ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. ${visualContext} Write one natural private DM about the story using only grounded details. Do not invent details or claim they messaged you.]`
           : isDirectReply
             ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
