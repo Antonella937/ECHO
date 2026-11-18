@@ -179,10 +179,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             latestTime - new Date(m.createdAt).getTime() >= 0 &&
             latestTime - new Date(m.createdAt).getTime() <= 120_000
           )).slice(0, 4) : [];
-        const previousTurns = activeThread.slice(incomingBatch.length, incomingBatch.length + 4);
+        const previousTurns = activeThread.slice(incomingBatch.length, incomingBatch.length + 2);
         const peerHistory = previousTurns.reverse().map(m =>
-          `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m)}`).join('\n');
-        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n');
+          `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
+        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n').slice(0, 3000);
         const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
         const outgoingPrompt = peerContext + (storyForReply
           ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
@@ -212,9 +212,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             recentSocial?: { posts?: Array<{ id?:string; author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
               comments?: Array<{author?:{name?:string};text?:string;postId?:string}> }; memory?: { historicalRecalled?: Array<{kind?:string;targetId?:string|null;text?:string}> };
           };
-          const posts = (data.recentSocial?.posts ?? []).slice(-5).map(p =>
+          const posts = (data.recentSocial?.posts ?? []).slice(-1).map(p =>
             `Post by ${(p.author?.name ?? 'Unknown').slice(0,60)}: ${(p.caption ?? '').slice(0,220)}${p.visionSummary ? ' | Image: '+p.visionSummary.slice(0,150):''}`);
-          const comments = (data.recentSocial?.comments ?? []).slice(-5).map(m =>
+          const comments = (data.recentSocial?.comments ?? []).slice(-1).map(m =>
             `Comment by ${(m.author?.name ?? 'Unknown').slice(0,60)}: ${(m.text ?? '').slice(0,180)}`);
           // Recover older public posts on demand from persisted ECHO history.
           // The author must be followed by the actor (or be the actor); never
@@ -235,27 +235,27 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             })
             .filter(x => x.score > 0)
             .sort((a,b) => b.score-a.score || new Date(b.p.createdAt).getTime()-new Date(a.p.createdAt).getTime())
-            .slice(0,3)
+            .slice(0,1)
             .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
           // Stories are only remembered if this actor actually viewed them.
           // Never infer story viewing from a follow alone.
           const seenStories = visibleSeenStoriesForKindroid(freshState, input.characterId)
             .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
-            .slice(0,3)
+            .slice(0,1)
             .map(s => {
               const author = parsed.data.state.characters.find(ch => ch.id === s.authorId);
               return `Story actually viewed by this character, posted by ${(author?.name ?? 'Unknown').slice(0,60)}: ${s.caption.slice(0,200)}`;
             });
           // The shared context builder already ranks archived memories and
           // scopes private conversation memories to this exact DM recipient.
-          const memories = (data.memory?.historicalRecalled ?? []).slice(0,3)
+          const memories = (data.memory?.historicalRecalled ?? []).slice(0,1)
             .filter(m => kindroidMemoryAllowed(m, 'nela'))
             .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
           const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, outgoingPrompt)
             .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
             .catch(() => [] as string[]);
-          const reservedJournalContext = journalFacts.join('\n').slice(0,2200);
-          const socialBudget = Math.max(0, 5000 - reservedJournalContext.length - 1);
+          const reservedJournalContext = journalFacts.join('\n').slice(0,400);
+          const socialBudget = Math.max(0, 500 - reservedJournalContext.length - 1);
           const socialPart = [...posts,...comments,...older,...seenStories,...memories].join('\n').slice(0,socialBudget);
           socialContext = [reservedJournalContext,socialPart].filter(Boolean).join('\n');
         }
@@ -264,7 +264,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         if (links.rows[0]?.social_context_enabled !== true) {
           const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, outgoingPrompt)
             .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
-          socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,3200);
+          socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,500);
         }
         selectedProvider = kindroidDmProvider(outgoingPrompt, kinId, socialContext);
       }
