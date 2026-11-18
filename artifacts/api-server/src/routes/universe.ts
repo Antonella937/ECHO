@@ -693,7 +693,7 @@ router.put("/universe", async (req, res): Promise<void> => {
     const incoming = enrichedState.messages.filter(message =>
       !oldIds.has(message.id) && message.senderId === enrichedState.currentCharacterId &&
       message.recipientId !== message.senderId &&
-      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0) &&
+      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0 || Boolean(message.musicTrackId)) &&
       !message.hiddenForIds?.includes(message.recipientId));
     // A single save may contain several consecutive messages from the same
     // person (for example a music share followed by its caption). Trigger one

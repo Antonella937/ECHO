@@ -148,11 +148,13 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const metadata = [title && `title: ${title}`, artist && `artist: ${artist}`].filter(Boolean).join(', ');
           return `[${type} attachment shared in ECHO${metadata ? `, ${metadata}` : ''}${duration}; content not analyzed]`;
         });
-        return [text, ...attachments].filter(Boolean).join(' ');
+        const music = typeof record.musicTrackId === 'string' && record.musicTrackId.trim() 
+          ? `[ECHO Music track shared${typeof record.musicTitle === 'string' ? `: ${record.musicTitle.slice(0, 120)}` : ''}; audio content not analyzed]` : '';
+        return [text, music, ...attachments].filter(Boolean).join(' ');
       };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
       // fabricate an incoming human message just to make Kindroid respond.
-      const isDirectReply = newest?.senderId === recipientId && !!(newest.text?.trim() || (Array.isArray((newest as unknown as Record<string, unknown>).attachments) && ((newest as unknown as Record<string, unknown>).attachments as unknown[]).length > 0));
+      const isDirectReply = newest?.senderId === recipientId && !!(newest.text?.trim() || newest.musicTrackId || (Array.isArray((newest as unknown as Record<string, unknown>).attachments) && ((newest as unknown as Record<string, unknown>).attachments as unknown[]).length > 0));
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;

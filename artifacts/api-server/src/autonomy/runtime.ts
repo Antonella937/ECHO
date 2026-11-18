@@ -136,7 +136,7 @@ async function recoverPersistedDmOnce(): Promise<void> {
       message.recipientId === target.characterId &&
       message.senderId !== target.characterId &&
       !message.hiddenForIds?.includes(target.characterId) &&
-      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0) &&
+      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0 || Boolean(message.musicTrackId)) &&
       new Date(message.createdAt).getTime() >= cutoff)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     for (const message of candidates) {

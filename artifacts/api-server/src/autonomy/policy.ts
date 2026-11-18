@@ -216,7 +216,7 @@ export function chooseAutonomyOpportunity(input: {
       message.senderId !== character.id &&
       (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(message.senderId)) &&
       !message.hiddenForIds?.includes(character.id) &&
-      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0) &&
+      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0 || Boolean(message.musicTrackId)) &&
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
       now.getTime() - (asTime(message.createdAt) ?? 0) < 30 * DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
