@@ -99,11 +99,16 @@ export function createStorySharesRouter(): IRouter {
           !characters.some(c => c.id === authorId && c.archived !== true)) {
         res.status(403).json({ allowed: false }); return;
       }
-      const [blocks] = await Promise.all([
+      const [blocks, privacy] = await Promise.all([
         db.select().from(echoCharacterBlocksTable).where(and(
           eq(echoCharacterBlocksTable.blockerOwnerId, req.userId!),
           eq(echoCharacterBlocksTable.blockerUniverseId, universeId),
         )),
+        db.select({ visibility: echoCharacterPrivacyTable.visibility }).from(echoCharacterPrivacyTable).where(and(
+          eq(echoCharacterPrivacyTable.ownerId, req.userId!),
+          eq(echoCharacterPrivacyTable.universeId, universeId),
+          eq(echoCharacterPrivacyTable.characterId, authorId),
+        )).limit(1),
       ]);
       const closeFriends = state.closeFriends && typeof state.closeFriends === "object"
         ? state.closeFriends as Record<string, unknown> : {};
@@ -113,7 +118,9 @@ export function createStorySharesRouter(): IRouter {
         (list.includes(actorId) && allowedIds.includes(actorId));
       const created = Date.parse(String(story.createdAt ?? ""));
       const now = Date.now();
-      const allowed = canCreateStoryRepost({
+      const author = characters.find(c => c.id === authorId);
+      const publicOrigin = author?.privateAccount !== true && privacy[0]?.visibility === "public" && story.closeFriendsOnly !== true;
+      const allowed = publicOrigin && canCreateStoryRepost({
         actorId, originalAuthorId: authorId,
         mentionedAccountIds: Array.isArray(story.mentionedAccountIds)
           ? story.mentionedAccountIds.filter((id): id is string => typeof id === "string") : [],
