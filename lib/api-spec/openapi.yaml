@@ -1213,6 +1213,8 @@ components:
       properties:
         hiddenForIds: { type: array, uniqueItems: true, maxItems: 2, items: { type: string } }
         quoteMessageId: { type: string }
+        musicTrackId: { type: string }
+        musicTitle: { type: string }
         attachments: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/MessageAttachment" } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         id: { type: string }
@@ -1493,6 +1495,8 @@ components:
       properties:
         hiddenForIds: { type: array, uniqueItems: true, maxItems: 2, items: { type: string } }
         quoteMessageId: { type: string }
+        musicTrackId: { type: string }
+        musicTitle: { type: string }
         attachments: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/MessageAttachment" } }
         reactions: { type: array, items: { $ref: "#/components/schemas/SocialReaction" } }
         id: { type: string }

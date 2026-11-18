@@ -1379,6 +1379,8 @@ export const GetUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "musicTrackId": zod.string().optional(),
+  "musicTitle": zod.string().optional(),
   "hiddenForIds": zod.array(zod.string()).max(getUniverseResponseStateOneMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
@@ -1926,6 +1928,8 @@ export const SaveUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "musicTrackId": zod.string().optional(),
+  "musicTitle": zod.string().optional(),
   "hiddenForIds": zod.array(zod.string()).max(saveUniverseBodyStateMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
@@ -2463,6 +2467,8 @@ export const SaveUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "musicTrackId": zod.string().optional(),
+  "musicTitle": zod.string().optional(),
   "hiddenForIds": zod.array(zod.string()).max(saveUniverseResponseStateOneMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
@@ -3048,6 +3054,8 @@ export const VerifyUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "musicTrackId": zod.string().optional(),
+  "musicTitle": zod.string().optional(),
   "hiddenForIds": zod.array(zod.string()).max(verifyUniverseResponseOneStateOneMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
@@ -3906,6 +3914,8 @@ export const CreateCreatorUniverseBody = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "musicTrackId": zod.string().optional(),
+  "musicTitle": zod.string().optional(),
   "hiddenForIds": zod.array(zod.string()).max(createCreatorUniverseBodyStateMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
@@ -4441,6 +4451,8 @@ export const CreateCreatorUniverseResponse = zod.object({
   "origin": zod.string()
 })),
   "messages": zod.array(zod.object({
+  "musicTrackId": zod.string().optional(),
+  "musicTitle": zod.string().optional(),
   "hiddenForIds": zod.array(zod.string()).max(createCreatorUniverseResponseStateMessagesItemHiddenForIdsMax).optional(),
   "quoteMessageId": zod.string().optional(),
   "attachments": zod.array(zod.object({
