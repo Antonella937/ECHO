@@ -1,0 +1,34 @@
+name: Comment sync regression tests
+
+on:
+  push:
+    branches:
+      - 'test/comment-sync-repost-20261118'
+    paths:
+      - 'artifacts/api-server/tests/comment-sync.test.ts'
+      - 'artifacts/api-server/tests/story-repost-sync.test.ts'
+      - 'artifacts/echo/src/store/**'
+      - 'artifacts/echo/src/domain/**'
+      - '.github/workflows/comment-sync-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  comment-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run comment sync regression tests
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/comment-sync.test.ts tests/story-repost-sync.test.ts
