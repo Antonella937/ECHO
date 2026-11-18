@@ -369,6 +369,7 @@ export async function runAutonomyLiveCycle(
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
+      targetIncomingMessageId: dependencies.targetIncomingMessageId,
     });
     if (dependencies.targetIncomingMessageId) {
       const target = state.messages.find(message => message.id === dependencies.targetIncomingMessageId);
