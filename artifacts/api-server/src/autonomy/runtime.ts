@@ -82,6 +82,20 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
   const preference = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND character_id = ${characterId} LIMIT 1`);
   if ((preference.rows[0]?.preferences as { responseTiming?: string } | undefined)?.responseTiming !== "instant") return;
+  // Coalesce rapid consecutive saves before contacting the AI provider.
+  // Only the latest incoming DM in the same thread is allowed to trigger.
+  // This is a best-effort debounce, not a durable delivery queue.
+  await new Promise<void>(resolve => setTimeout(resolve, 1800));
+  const snapshot = await readUniverse(ownerId, universeId);
+  const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+  if (!parsed.success) return;
+  const incoming = parsed.data.messages.find(message => message.id === messageId);
+  if (!incoming || incoming.recipientId !== characterId) return;
+  const latestInThread = parsed.data.messages
+    .filter(message => message.threadId === incoming.threadId &&
+      message.senderId === incoming.senderId && message.recipientId === characterId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  if (latestInThread?.id !== messageId) return;
   const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}`).digest("hex");
   const idempotencyKey = `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
