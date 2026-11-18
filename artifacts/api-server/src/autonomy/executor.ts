@@ -101,7 +101,7 @@ export function applyAutonomyDecision(
   // Model-generated visual directions are metadata, never user-facing captions.
   // A gallery image is attached separately after authorization and availability checks.
   const text = decision.action === "draft" && decision.situation === "post"
-    ? rawText.replace(/\\[\\s*(?:image|photo|picture|visual|alt(?:\\s+text)?|image\\s+description)\\s*:\\s*[^\\]]*\\]/gi, "").trim()
+    ? rawText.replace(/\[\s*(?:image|photo|picture|visual|alt(?:\s+text)?|image\s+description)\s*:\s*[^\]]*\]/gi, "").trim()
     : rawText;
 
   if (decision.action === "draft" && decision.situation === "post") {
