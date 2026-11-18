@@ -78,3 +78,17 @@ test("autonomous DM rejects strangers and accepts an existing conversation", () 
   assert.equal(result.state.messages[1].recipientId, "noah");
   assert.equal(result.state.notifications.length, 1);
 });
+
+test("autonomous posts remove visual directions without discarding the real caption", () => {
+  const state = fixture();
+  const result = apply(state, { situation: "post" } as Opportunity,
+    decision("draft", "post", "Morning in the studio. ☕\n\n[Image: A charcoal-covered hand holding coffee.]"));
+  assert.equal(result.state.posts[0].caption, "Morning in the studio. ☕");
+  assert.equal(result.state.posts[0].image, "");
+});
+test("autonomous posts reject image-only prompts instead of publishing them", () => {
+  const state = fixture();
+  assert.throws(() => apply(state, { situation: "post" } as Opportunity,
+    decision("draft", "post", "[Image: a photo that does not exist]")),
+    (error: unknown) => error instanceof SocialExecutionError && error.reasonCode === "EMPTY_POST_TEXT");
+});
