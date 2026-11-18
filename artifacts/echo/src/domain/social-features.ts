@@ -18,6 +18,15 @@ export function canViewStory(story: Story, viewerId: string, state: SocialState)
   const current = state.closeFriends?.[story.authorId] ?? [];
   return current.includes(viewerId) && (story.allowedViewerIds ?? current).includes(viewerId);
 }
+
+/** A mention is an invitation to reshare, never a grant to bypass story privacy. */
+export function canRepostMentionedStory(story: Story, actorId: string, state: SocialState, now = Date.now()): boolean {
+  if (story.authorId === actorId || !isStoryActive(story, now)) return false;
+  if (!story.mentionedAccountIds?.includes(actorId)) return false;
+  // Reposts of reposts are deliberately excluded until origin-chain permissions are enforced.
+  if (story.repostOfStoryId) return false;
+  return canViewStory(story, actorId, state);
+}
 export function mentionIds(text: string, accounts: Character[]): string[] {
   const handles = [...text.matchAll(/(?:^|[^a-zA-Z0-9_])@([a-zA-Z0-9_][a-zA-Z0-9_.]{0,29})/g)].map(m => m[1].replace(/\.+$/, '').toLowerCase());
   return accounts.filter(c => handles.includes(c.handle.toLowerCase())).map(c => c.id);
