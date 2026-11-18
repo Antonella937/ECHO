@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AtSign, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Music2, Send, Trash2, X } from 'lucide-react';
-import { canViewStory, isStoryActive } from '@/domain/social-features';
+import { canViewStory, canRepostMentionedStory, isStoryActive } from '@/domain/social-features';
 import { storyViewCount, storyViewerIds, formatCount } from '@/domain/accounts';
 import { StoryMetricsEditor } from './story-metrics-editor';
 import { SocialText } from './social-text';
@@ -98,6 +98,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [viewerFilter, setViewerFilter] = useState<'views' | 'likes'>('views');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [reposting, setReposting] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -211,6 +212,24 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       toast({ title: t('No se pudo compartir'), description: 'No se pudo verificar el permiso de compartir esta historia.' });
     }
   };
+  const canRepost = canRepostMentionedStory(liveStory, me.id, state) &&
+    !state.characters.find(c => c.id === liveStory.authorId)?.privateAccount && !liveStory.closeFriendsOnly;
+  const repostToMyStory = async () => {
+    if (!canRepost || reposting) return;
+    setReposting(true);
+    try {
+      const result = await customFetch<{ allowed: boolean }>('/api/stories/authorize-repost', {
+        method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId, actorId: me.id, storyId: liveStory.id }),
+      });
+      if (!result.allowed) throw new Error('No autorizado');
+      actions.repostMentionedStory(liveStory.id);
+      toast({ title: 'Historia agregada', description: 'Compartida con crédito a la historia original.' });
+      onClose();
+    } catch (error) {
+      toast({ title: 'No se pudo repostear', description: (error as Error).message });
+    } finally { setReposting(false); }
+  };
   const myReaction = liveStory.reactions?.find((r) => r.actorId === me.id)?.value;
   const react = (value: string) => {
     try {
@@ -318,6 +337,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           </button>
         </div>
 
+        {canRepost && <button type="button" disabled={reposting} onClick={() => void repostToMyStory()} className="absolute right-4 top-24 z-20 rounded-full border border-white/30 bg-black/65 px-4 py-2 text-xs font-semibold text-white backdrop-blur disabled:opacity-50" data-testid="button-story-repost">{reposting ? 'Compartiendo…' : 'Agregar a mi historia'}</button>}
         {showShare && <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={t('Compartir historia')}>
           <div className="flex max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-card p-4 text-foreground" data-testid="story-share-picker">
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Compartir historia')}</h2><button type="button" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" onClick={() => setShowShare(false)} aria-label={t('Cerrar')}><X size={20}/></button></div>
