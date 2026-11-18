@@ -203,7 +203,8 @@ test('Safari IndexedDB lleno no bloquea el guardado remoto de un comentario', as
   d.edit(s => ({ ...s, comments: [{ id: 'luca-comment', postId: 'luca-post', authorId: 'nela', text: 'love this', createdAt: '2026-11-18', parentId: null, replyToAuthorId: null, likes: [], origin: 'user' }] }));
   await d.sync();
   assert.equal(h.server().comments[0].id, 'luca-comment');
-  assert.equal(d.view.error, null);
+  assert.match(d.view.error ?? '', /copia de recuperación|Almacenamiento lleno/);
+  assert.equal(h.stats().saves > 0, true, 'el comentario se guardó en el servidor');
 });
 
 test('Safari lleno y servidor desconectado muestra ambos fallos sin afirmar guardado', async () => {
