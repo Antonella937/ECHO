@@ -47,3 +47,31 @@ export function canCharacterViewCloseFriendsStory(stateValue: unknown, storyValu
   const allowed = Array.isArray(story.allowedViewerIds) ? story.allowedViewerIds : list;
   return list.includes(viewerId) && allowed.includes(viewerId);
 }
+
+/** Reposts are references, not copies. Call this with authoritative origin and viewer permissions.
+ * The API must recheck this policy on each read and never trust client-provided grants.
+ */
+export type StoryRepostPolicyInput = {
+  actorId: string;
+  originalAuthorId: string;
+  mentionedAccountIds: readonly string[];
+  originalActive: boolean;
+  originalExists: boolean;
+  actorCanViewOriginal: boolean;
+  originalIsRepost: boolean;
+  /** The eventual audience must be checked individually before serving origin media. */
+  destinationViewerCanViewOriginal: boolean;
+  blocksVerified: boolean;
+  blockedBetweenActorAndAuthor: boolean;
+};
+
+export function canCreateStoryRepost(input: Omit<StoryRepostPolicyInput, 'destinationViewerCanViewOriginal'>): boolean {
+  return Boolean(input.blocksVerified && input.originalExists && input.originalActive &&
+    input.actorId && input.originalAuthorId && input.actorId !== input.originalAuthorId &&
+    input.mentionedAccountIds.includes(input.actorId) && input.actorCanViewOriginal &&
+    !input.originalIsRepost && !input.blockedBetweenActorAndAuthor);
+}
+
+export function canReadStoryRepost(input: StoryRepostPolicyInput): boolean {
+  return canCreateStoryRepost(input) && input.destinationViewerCanViewOriginal;
+}
