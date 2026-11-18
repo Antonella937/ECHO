@@ -7,7 +7,7 @@ import { VerifiedBadge } from './verified-badge';
 import { customFetch } from '@workspace/api-client-react';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
-import { Heart, X } from 'lucide-react';
+import { Heart, X, MoreHorizontal } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { timeAgo } from '@/lib/media';
@@ -83,11 +83,17 @@ function CommentNode({ comment, replies, onReply, highlightId }: { comment: Comm
 
 function CommentRow({ comment, onReply, small, highlight }: { comment: Comment; onReply(c: Comment): void; small?: boolean; highlight?: boolean }) {
   const t = usePostInteractionsText();
-  const { character, me, actions } = useSocial();
+  const { character, me, actions, state } = useSocial();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.text);
+  const [error, setError] = useState<string | null>(null);
   const author = character(comment.authorId);
   const replyTo = comment.replyToAuthorId ? character(comment.replyToAuthorId) : undefined;
   if (!author && !comment.guestHandle) return null;
   const liked = comment.likes.includes(me.id);
+  const canEdit = comment.authorId === me.id && !comment.guestHandle;
+  const canDelete = comment.authorId === me.id || state.posts.some(p => p.id === comment.postId && p.authorId === me.id);
   return (
     <div className={cn('flex gap-3 rounded-2xl transition-colors', highlight && 'bg-accent/50 -mx-2 p-2')} data-testid={`comment-${comment.id}`}>
       {comment.guestHandle ? <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-xs">♡</div> : author && <Link href={`/profile/${author.id}`} className="shrink-0" data-testid={`link-comment-author-${comment.id}`}><CharacterAvatar character={author} size={small ? 28 : 34} /></Link>}
@@ -97,6 +103,8 @@ function CommentRow({ comment, onReply, small, highlight }: { comment: Comment; 
           {replyTo && <span className="mr-1 text-primary">@{replyTo.handle}</span>}
           <span className="text-foreground/90"><SocialText text={comment.text} /></span>
         </p>
+        {editing && <form className="mt-2 flex flex-col gap-2" onSubmit={e => { e.preventDefault(); try { actions.editComment(comment.id, draft); setEditing(false); setError(null); } catch (err) { setError((err as Error).message); } }}><textarea className="w-full rounded-lg border border-border bg-background p-2 text-sm" value={draft} maxLength={2000} onChange={e => setDraft(e.target.value)} aria-label="Editar comentario" /><div className="flex gap-3 text-xs"><button type="submit" className="text-primary">Guardar</button><button type="button" onClick={() => setEditing(false)}>Cancelar</button></div></form>}
+        {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground">
           <span>{timeAgo(comment.createdAt)}</span>
           {comment.likes.length > 0 && <span>{comment.likes.length} {t("Me gusta")}</span>}
@@ -105,6 +113,7 @@ function CommentRow({ comment, onReply, small, highlight }: { comment: Comment; 
           </button>}
         </div>
       </div>
+      {(canEdit || canDelete) && <div className="relative shrink-0"><button type="button" aria-label="Opciones del comentario" aria-expanded={menuOpen} data-testid={`comment-menu-${comment.id}`} className="grid h-11 w-8 place-items-center" onClick={() => setMenuOpen(v => !v)}><MoreHorizontal className="h-4 w-4" /></button>{menuOpen && <div className="absolute right-0 top-10 z-30 min-w-32 rounded-xl border border-border bg-background p-2 shadow-lg">{canEdit && <button type="button" className="block w-full rounded px-3 py-2 text-left text-sm" onClick={() => { setDraft(comment.text); setEditing(true); setMenuOpen(false); }}>Editar</button>}{canDelete && <button type="button" className="block w-full rounded px-3 py-2 text-left text-sm text-destructive" onClick={() => { setMenuOpen(false); if (window.confirm('¿Eliminar este comentario?')) { try { actions.deleteComment(comment.id); } catch (err) { setError((err as Error).message); } } }}>Eliminar</button>}</div>}</div>}
       <button
         onClick={() => actions.toggleCommentLike(comment.id)}
         className="tap -mr-2 grid h-11 w-11 shrink-0 place-items-center"
