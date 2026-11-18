@@ -133,7 +133,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const type = typeof item.type === 'string' ? item.type.slice(0, 32) : 'file';
           const duration = typeof item.durationSeconds === 'number' && Number.isFinite(item.durationSeconds)
             ? `, ${Math.round(item.durationSeconds)} seconds` : '';
-          return `[${type} attachment shared in ECHO${duration}; content not analyzed]`;
+          // Only expose metadata explicitly present on the attachment.
+          // Never infer that the provider has listened to the audio.
+          const title = typeof item.title === 'string' ? item.title.trim().slice(0, 120) : '';
+          const artist = typeof item.artist === 'string' ? item.artist.trim().slice(0, 120) : '';
+          const metadata = [title && `title: ${title}`, artist && `artist: ${artist}`].filter(Boolean).join(', ');
+          return `[${type} attachment shared in ECHO${metadata ? `, ${metadata}` : ''}${duration}; content not analyzed]`;
         });
         return [text, ...attachments].filter(Boolean).join(' ');
       };
