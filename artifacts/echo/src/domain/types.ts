@@ -127,6 +127,8 @@ export interface Comment {
 }
 
 export interface Story {
+  /** Original story identifier for attributed reposts; permission checks must follow the source. */
+  repostOfStoryId?: string;
   musicClip?: MusicClip;
   closeFriendsOnly?: boolean;
   allowedViewerIds?: string[];
