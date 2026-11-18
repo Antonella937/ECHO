@@ -107,7 +107,12 @@ export class UniverseSync {
       if (primaryId && this.view.state.characters.some(character => character.id === primaryId && !character.archived)) {
         this.view.state = { ...this.view.state, currentCharacterId: primaryId };
       }
-      await this.backup();
+      // The remote universe is already loaded. A local recovery failure should
+      // not prevent the coordinator from attempting its remote sync.
+      try { await this.backup(); }
+      catch (error) {
+        this.view.error = `No se pudo conservar la copia de recuperación: ${(error as Error).message}`;
+      }
     } catch (e) { this.view.error = (e as Error).message; }
     finally { this.view.busy = false; this.emit(); }
     if (this.view.state) await this.sync();
