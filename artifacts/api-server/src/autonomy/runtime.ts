@@ -5,6 +5,7 @@ import { executeAutonomyDecision } from "./executor";
 import { AUTONOMY_LIVE_EXECUTION_ENABLED } from "./constants";
 import {
   claimAutonomyWorkerLease,
+  claimAutonomySecondarySlot,
   completeDryRun,
   getExecutedActionHistory,
   listLiveOptInTargets,
@@ -203,11 +204,19 @@ export function startAutonomyBackgroundWorker() {
           }
         },
       });
+      // Only one instance may run secondary work in a social slot, even after
+      // the primary worker lease has been released during a rolling deploy.
       if (result.status === "completed" && socialSlot !== lastSocialSlotAttempted) {
+        const secondaryClaimed = await claimAutonomySecondarySlot(socialSlot).catch(error => {
+          logger.warn({ code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }, "Secondary autonomy slot claim failed");
+          return false;
+        });
+        if (secondaryClaimed) {
+      if (true) {
         await runPassiveStoryViews().catch(error =>
           logger.warn({ code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }, "Passive story view scan failed"));
       }
-      if (result.status === "completed" && socialSlot !== lastGroupSlotAttempted) {
+      if (true) {
         lastGroupSlotAttempted = socialSlot;
         try {
           // One group at most per tick. Avoid fan-out and unexpected provider usage.
@@ -226,7 +235,7 @@ export function startAutonomyBackgroundWorker() {
           logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" }, "Group autonomy tick failed");
         }
       }
-      if (result.status === "completed" && socialSlot !== lastCollaborationSlotAttempted) {
+      if (true) {
         lastCollaborationSlotAttempted = socialSlot;
         try {
           const targets = await listLiveOptInTargets();
@@ -242,6 +251,8 @@ export function startAutonomyBackgroundWorker() {
           }
         } catch (error) {
           logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" }, "Collaboration autonomy tick failed");
+        }
+      }
         }
       }
       if (result.status === "completed") {

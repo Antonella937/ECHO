@@ -121,6 +121,24 @@ export async function claimAutonomyWorkerLease(token: string, now = new Date(), 
   return rows.length === 1 && rows[0]?.token === token;
 }
 
+/** Reserve secondary social work once per 30-minute slot across overlapping deploy instances.
+ * Keep the lease until the slot ends rather than releasing it after work: a
+ * second instance must not replay passive views, groups or collaborations.
+ */
+export async function claimAutonomySecondarySlot(slot: number, now = new Date()): Promise<boolean> {
+  const slotEnd = new Date((slot + 1) * 30 * 60_000);
+  if (slotEnd.getTime() <= now.getTime()) return false;
+  const token = `secondary-${slot}`;
+  const rows = await db.insert(echoAutonomyWorkerLeasesTable).values({
+    name: "autonomy-secondary-social-slot", token, expiresAt: slotEnd, updatedAt: now,
+  }).onConflictDoUpdate({
+    target: echoAutonomyWorkerLeasesTable.name,
+    set: { token, expiresAt: slotEnd, updatedAt: now },
+    setWhere: lt(echoAutonomyWorkerLeasesTable.expiresAt, now),
+  }).returning({ token: echoAutonomyWorkerLeasesTable.token });
+  return rows.length === 1 && rows[0]?.token === token;
+}
+
 export async function releaseAutonomyWorkerLease(token: string) {
   await db.delete(echoAutonomyWorkerLeasesTable).where(and(
     eq(echoAutonomyWorkerLeasesTable.name, "autonomy-live-worker"),
