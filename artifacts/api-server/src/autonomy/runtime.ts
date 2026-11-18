@@ -96,6 +96,15 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
       message.senderId === incoming.senderId && message.recipientId === characterId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
   if (latestInThread?.id !== messageId) return;
+  // A prior trigger may have completed while this one was waiting.
+  // Do not send another reply if the character already answered this DM.
+  const incomingAt = new Date(incoming.createdAt).getTime();
+  if (parsed.data.messages.some(message =>
+    message.threadId === incoming.threadId &&
+    message.senderId === characterId &&
+    message.recipientId === incoming.senderId &&
+    new Date(message.createdAt).getTime() > incomingAt
+  )) return;
   const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}`).digest("hex");
   const idempotencyKey = `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
