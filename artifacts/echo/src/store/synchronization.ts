@@ -177,12 +177,12 @@ export class UniverseSync {
   }
   private async perform() {
     this.view.busy = true; this.view.error = null; this.emit();
+    let localRecoveryFailure: string | null = null;
     try {
       // A full local recovery snapshot can exceed Safari's IndexedDB quota.
       // Do not let a failed local write prevent an authenticated server save.
       // If the server also fails, surface BOTH failures so the user knows the
       // pending edit has not been durably preserved anywhere.
-      let localRecoveryFailure: string | null = null;
       try { await this.disk; }
       catch (error) { localRecoveryFailure = (error as Error).message; }
       for (let attempt = 0; attempt < 5; attempt++) {
