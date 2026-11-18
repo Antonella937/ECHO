@@ -232,7 +232,8 @@ export function chooseAutonomyOpportunity(input: {
   const unanswered = candidates.find((message) => {
     const sentAt = asTime(message.createdAt) ?? 0;
     const latestOwnReply = state.messages
-      .filter((item) => item.senderId === character.id && item.recipientId === message.senderId)
+      .filter((item) => item.threadId === message.threadId &&
+        item.senderId === character.id && item.recipientId === message.senderId)
       .reduce((latest, item) => Math.max(latest, asTime(item.createdAt) ?? 0), 0);
     return latestOwnReply < sentAt;
   });
