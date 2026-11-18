@@ -21,7 +21,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - name: Test Safari recovery and universe synchronization
-        run: pnpm --filter @workspace/scripts run test:echo-privacy
+        run: pnpm --filter @workspace/scripts exec tsx --test ../artifacts/echo/tests/privacy-sync.test.ts
       - run: pnpm --filter @workspace/api-server exec tsx --test tests/cloudflare-r2-offline.test.ts
       - run: pnpm --filter @workspace/api-server run test:support
       - run: pnpm --filter @workspace/api-server run build
