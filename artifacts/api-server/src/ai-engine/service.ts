@@ -133,7 +133,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       // Read optional metadata defensively without assuming media bytes exist.
       const describeDmMessage = (message: (typeof thread)[number]) => {
         const record = message as unknown as Record<string, unknown>;
-        const text = typeof record.text === 'string' ? record.text.slice(0, 300) : '';
+        // Preserve complete ordinary multi-paragraph DMs (including closing questions).
+        // Bound exceptionally long messages to protect the Kindroid prompt budget.
+        const text = typeof record.text === 'string' ? record.text.slice(0, 4000) : '';
         const rawAttachments = Array.isArray(record.attachments) ? record.attachments : [];
         const attachments = rawAttachments.slice(0, 4).map((raw: unknown) => {
           if (!raw || typeof raw !== 'object') return '[attachment; content not analyzed]';
