@@ -162,7 +162,7 @@ export async function reserveDryRun(
       }
       // Retry a persisted failed DM reservation at most twice. A new attempt
       // still rechecks the saved conversation before contacting the provider.
-      if (existing.status === "failed" && existing.attemptCount < 3 &&
+      if (lane === "dm" && (existing.status === "provider_failed" || existing.status === "live_failed") && existing.attemptCount < 3 &&
           Date.now() - existing.updatedAt.getTime() >= 120_000) {
         const [reclaimed] = await tx.update(echoAutonomyRunsTable).set({
           status: "running", sourceRevision, updatedAt: new Date(),
@@ -171,7 +171,7 @@ export async function reserveDryRun(
           eq(echoAutonomyRunsTable.ownerId, ownerId),
           eq(echoAutonomyRunsTable.universeId, universeId),
           eq(echoAutonomyRunsTable.id, existing.id),
-          eq(echoAutonomyRunsTable.status, "failed"),
+          eq(echoAutonomyRunsTable.status, existing.status),
         )).returning({ id: echoAutonomyRunsTable.id });
         if (reclaimed) return { kind: "created", runId: String(existing.id) };
       }
