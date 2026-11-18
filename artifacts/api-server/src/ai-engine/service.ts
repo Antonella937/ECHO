@@ -165,6 +165,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
+        // A missing, expired, or inaccessible story must not silently become
+        // an unrelated unsolicited DM. Preserve the intended story target.
+        if (input.storyId && !storyForReply) throw new EngineError('STORY_REPLY_TARGET_UNAVAILABLE', 404);
         const recipientName = (parsed.data.state.characters.find(c => c.id === recipientId)?.name ?? 'this person').slice(0,80);
         const actorName = (actor?.name ?? 'your character').slice(0,80);
         const ownerName = (parsed.data.state.characters.find(c => c.id === parsed.data.state.primaryCharacterId)?.name ?? 'the account owner').slice(0,80);
