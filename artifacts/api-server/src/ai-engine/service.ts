@@ -148,7 +148,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           const metadata = [title && `title: ${title}`, artist && `artist: ${artist}`].filter(Boolean).join(', ');
           return `[${type} attachment shared in ECHO${metadata ? `, ${metadata}` : ''}${duration}; content not analyzed]`;
         });
-        const music = typeof record.musicTrackId === 'string' && record.musicTrackId.trim()\n          ? `[ECHO Music track shared${typeof record.musicTitle === 'string' ? `: ${record.musicTitle.slice(0, 120)}` : ''}; audio content not analyzed]` : '';\n        return [text, music, ...attachments].filter(Boolean).join(' ');
+        const music = typeof record.musicTrackId === 'string' && record.musicTrackId.trim() 
+          ? `[ECHO Music track shared${typeof record.musicTitle === 'string' ? `: ${record.musicTitle.slice(0, 120)}` : ''}; audio content not analyzed]` : '';
+        return [text, music, ...attachments].filter(Boolean).join(' ');
       };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
       // fabricate an incoming human message just to make Kindroid respond.
