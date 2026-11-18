@@ -113,8 +113,12 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   // Stories without a valid music clip retain their standard duration.
   const storyDurationMs = liveStory.musicClip && (liveStory.musicClip.clipSeconds === 15 || liveStory.musicClip.clipSeconds === 30)
     ? liveStory.musicClip.clipSeconds * 1000 : DEFAULT_STORY_DURATION_MS;
-  const storyMediaSource = { sourceUniverseId: universeId, sourceCharacterId: story.authorId, sourceType: 'story' as const, sourceContentId: story.id };
-  const storyImage = resolveMedia(story.image, storyMediaSource);
+  const originalStory = liveStory.repostOfStoryId ? state.stories.find(s => s.id === liveStory.repostOfStoryId) : undefined;
+  const originalAuthor = originalStory ? state.characters.find(c => c.id === originalStory.authorId) : undefined;
+  // Media authorization must use the original object's owner and content id.
+  const mediaOwner = originalStory ?? liveStory;
+  const storyMediaSource = { sourceUniverseId: universeId, sourceCharacterId: mediaOwner.authorId, sourceType: 'story' as const, sourceContentId: mediaOwner.id };
+  const storyImage = resolveMedia(mediaOwner.image, storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
   // A private image can take a few seconds to resolve on mobile. Loading is not an error.
   useEffect(() => {
@@ -127,7 +131,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const showImageError = imageUnavailable && (failedStoryImage === story.id || storyImageWaitExpired);
   const retryStoryImage = () => {
     setFailedStoryImage(null);
-    retryPrivateMedia(story.image, storyMediaSource);
+    retryPrivateMedia(mediaOwner.image, storyMediaSource);
   };
 
   useEffect(() => {
@@ -294,6 +298,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[hsl(240_8%_3%/0.75)] to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[hsl(240_8%_3%/0.85)] to-transparent" />
+
+        {originalAuthor && <div className="absolute left-4 top-20 z-20 rounded-lg bg-black/65 px-3 py-2 text-xs text-white backdrop-blur" data-testid="story-repost-credit">Repost de @{originalAuthor.handle}</div>}
 
         {/* progress */}
         <div className="relative z-10 flex gap-1 px-3 pt-[max(env(safe-area-inset-top),12px)]">
