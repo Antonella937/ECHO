@@ -216,3 +216,13 @@ test('Safari lleno y servidor desconectado muestra ambos fallos sin afirmar guar
   assert.equal(h.server().posts.length, 0);
   assert.equal(d.view.state?.posts[0].id, 'unsaved');
 });
+
+
+test('Safari lleno al iniciar conserva el universo remoto visible', async () => {
+  const initial = fixture(); initial.posts.push(post('existing'));
+  const h = harness(initial); h.recoveryBlocked(true);
+  const d = h.device(); await d.initialize();
+  assert.equal(d.view.state?.posts[0].id, 'existing');
+  assert.equal(d.view.busy, false);
+  assert.equal(h.server().posts[0].id, 'existing');
+});
