@@ -92,7 +92,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
-    if (typeof kinId === 'string' && kinId.length > 0) {
+    // Founder live social text must never silently fall back to a metered model.
+    if (typeof kinId !== 'string' || kinId.length === 0) {
+      throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    }
+    {
       const targetPost = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
       const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
       // Do not pass private messages, hidden stories, or unrelated account data.
@@ -102,9 +106,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const prompt = input.situation === 'comment'
         ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
         : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
-      if (input.situation === 'post' || targetPost) {
-        selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
+      if (input.situation === 'comment' && !targetPost) {
+        throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
       }
+      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
     }
   }
   if (dependencies.liveDmReply === true &&
