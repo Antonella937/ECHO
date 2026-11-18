@@ -1,4 +1,6 @@
 import { usePostInteractionsText } from '@/lib/post-interactions-translations';
+import { useLanguage } from '@/lib/i18n';
+import { dmSharePrompt } from '@/lib/dm-share-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { ArrowDown, ArrowUp, Check, Copy, Link2, MessageCircleOff, MessageCircle, Pencil, Pin, PinOff, Share, Trash2, User } from 'lucide-react';
@@ -59,6 +61,7 @@ export function LikersSheet({ post, open, onClose }: { post: Post; open: boolean
 
 export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean; onClose(): void }) {
   const t = usePostInteractionsText();
+  const language = useLanguage();
   const { state, me, actions, character } = useSocial();
   const [copied, setCopied] = useState(false);
   const [sentTo, setSentTo] = useState<string[]>([]);
@@ -88,7 +91,7 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
   };
 
   const sendTo = (id: string) => {
-    actions.sendMessage(id, 'Mira esto', { postId: post.id });
+    actions.sendMessage(id, dmSharePrompt(language), { postId: post.id });
     setSentTo((s) => [...s, id]);
   };
 
