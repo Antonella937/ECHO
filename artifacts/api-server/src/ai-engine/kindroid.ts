@@ -19,6 +19,12 @@ async function classifyKindroidFailure(response: Response): Promise<{category:st
         if (code && /^[a-z][a-z0-9_-]{0,63}$/.test(code)) providerCode = code;
       }
     } catch { /* Provider may return plain text; never log it. */ }
+    // Categorize known provider rejections without logging raw response text,
+    // Kin identifiers, API credentials, or private message content.
+    if (/(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available).{0,50}(?:kin|ai[_ -]?id|character)|(?:kin|ai[_ -]?id|character).{0,50}(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available)/.test(raw)) return result('invalid_character',providerCode);
+    if (/(?:subscription|plan|tier|api access|api permission|api enabled|api disabled|api limit|quota|credits|billing)/.test(raw)) return result('account_restriction',providerCode);
+    if (/(?:chat|conversation|history|context).{0,45}(?:unavailable|invalid|disabled|locked|missing|not found|limit|exceeded)|(?:unavailable|invalid|disabled|locked).{0,45}(?:chat|conversation|history)/.test(raw)) return result('conversation_restriction',providerCode);
+    if (/(?:internal error|server error|service unavailable|temporarily unavailable|maintenance|overloaded)/.test(raw)) return result('upstream_unavailable',providerCode);
     if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return result('invalid_character',providerCode);
     if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return result('invalid_message',providerCode);
     if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return result('invalid_payload',providerCode);
