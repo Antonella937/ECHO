@@ -121,6 +121,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
                      (m.senderId === input.characterId && m.recipientId === recipientId))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
+      // A pair of identities can have multiple conversation threads.
+      // Never pass messages from a different thread to the linked Kin.
+      const activeThread = newest ? thread.filter(m => m.threadId === newest.threadId) : [];
       // The SocialState DM schema may not expose an attachment array.
       // Read optional metadata defensively without assuming media bytes exist.
       const describeDmMessage = (message: (typeof thread)[number]) => {
@@ -159,15 +162,15 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // Treat consecutive incoming messages as one turn when no character reply
         // intervened. This covers a music attachment followed by its caption.
         const latestTime = newest ? new Date(newest.createdAt).getTime() : NaN;
-        const incomingBatch = isDirectReply ? thread.filter((m, index) =>
+        const incomingBatch = isDirectReply ? activeThread.filter((m, index) =>
           index === 0 || (
             m.senderId === recipientId &&
-            thread.slice(0, index).every(prior => prior.senderId === recipientId) &&
+            activeThread.slice(0, index).every(prior => prior.senderId === recipientId) &&
             Number.isFinite(latestTime) &&
             latestTime - new Date(m.createdAt).getTime() >= 0 &&
             latestTime - new Date(m.createdAt).getTime() <= 120_000
           )).slice(0, 4) : [];
-        const previousTurns = thread.slice(incomingBatch.length, incomingBatch.length + 4);
+        const previousTurns = activeThread.slice(incomingBatch.length, incomingBatch.length + 4);
         const peerHistory = previousTurns.reverse().map(m =>
           `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m)}`).join('\n');
         const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n');
