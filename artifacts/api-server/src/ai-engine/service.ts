@@ -121,16 +121,20 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
                      (m.senderId === input.characterId && m.recipientId === recipientId))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
-      // Describe only attachment metadata actually stored in ECHO. Kindroid does
-      // not receive audio bytes here, so never imply it listened to a track.
+      // The SocialState DM schema may not expose an attachment array.
+      // Read optional metadata defensively without assuming media bytes exist.
       const describeDmMessage = (message: (typeof thread)[number]) => {
-        const text = message.text.slice(0, 300);
-        const attachments = (message.attachments ?? []).slice(0, 4)
-          .map(item => {
-            const duration = typeof item.durationSeconds === 'number'
-              ? `, ${Math.round(item.durationSeconds)} seconds` : '';
-            return `[${item.type} attachment shared in ECHO${duration}; content not analyzed]`;
-          });
+        const record = message as unknown as Record<string, unknown>;
+        const text = typeof record.text === 'string' ? record.text.slice(0, 300) : '';
+        const rawAttachments = Array.isArray(record.attachments) ? record.attachments : [];
+        const attachments = rawAttachments.slice(0, 4).map((raw: unknown) => {
+          if (!raw || typeof raw !== 'object') return '[attachment; content not analyzed]';
+          const item = raw as Record<string, unknown>;
+          const type = typeof item.type === 'string' ? item.type.slice(0, 32) : 'file';
+          const duration = typeof item.durationSeconds === 'number' && Number.isFinite(item.durationSeconds)
+            ? `, ${Math.round(item.durationSeconds)} seconds` : '';
+          return `[${type} attachment shared in ECHO${duration}; content not analyzed]`;
+        });
         return [text, ...attachments].filter(Boolean).join(' ');
       };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
