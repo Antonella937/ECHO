@@ -1933,7 +1933,9 @@ export const SaveUniverseBody = zod.object({
   "type": zod.enum(['image', 'video', 'audio']),
   "url": zod.string().min(1),
   "mimeType": zod.string().optional(),
-  "durationSeconds": zod.number().min(saveUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin).optional()
+  "durationSeconds": zod.number().min(saveUniverseBodyStateMessagesItemAttachmentsItemDurationSecondsMin).optional(),
+  "title": zod.string().max(120).optional(),
+  "artist": zod.string().max(120).optional()
 })).max(saveUniverseBodyStateMessagesItemAttachmentsMax).optional(),
   "reactions": zod.array(zod.object({
   "id": zod.string(),

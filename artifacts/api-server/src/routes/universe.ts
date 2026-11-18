@@ -692,9 +692,18 @@ router.put("/universe", async (req, res): Promise<void> => {
     const oldIds = new Set(previousState.data.messages.map(message => message.id));
     const incoming = enrichedState.messages.filter(message =>
       !oldIds.has(message.id) && message.senderId === enrichedState.currentCharacterId &&
-      message.recipientId !== message.senderId && message.text.trim().length > 0 &&
+      message.recipientId !== message.senderId &&
+      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0) &&
       !message.hiddenForIds?.includes(message.recipientId));
+    // A single save may contain several consecutive messages from the same
+    // person (for example a music share followed by its caption). Trigger one
+    // immediate reply per recipient/thread, using the latest incoming message.
+    // The AI context builder includes the preceding messages in that turn.
+    const latestByThread = new Map<string, typeof incoming[number]>();
     for (const message of incoming) {
+      latestByThread.set(`${message.threadId}:${message.recipientId}`, message);
+    }
+    for (const message of latestByThread.values()) {
       void checkWorldJournalAfterDm(req.userId!, universeId, message.threadId,
         enrichedState.messages, enrichedState.characters);
       void triggerImmediateDmReply(req.userId!, universeId, message.recipientId, message.id)

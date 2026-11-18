@@ -82,11 +82,35 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
   const preference = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND character_id = ${characterId} LIMIT 1`);
   if ((preference.rows[0]?.preferences as { responseTiming?: string } | undefined)?.responseTiming !== "instant") return;
+  // Coalesce rapid consecutive saves before contacting the AI provider.
+  // Only the latest incoming DM in the same thread is allowed to trigger.
+  // This is a best-effort debounce, not a durable delivery queue.
+  await new Promise<void>(resolve => setTimeout(resolve, 1800));
+  const snapshot = await readUniverse(ownerId, universeId);
+  const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+  if (!parsed.success) return;
+  const incoming = parsed.data.messages.find(message => message.id === messageId);
+  if (!incoming || incoming.recipientId !== characterId) return;
+  const latestInThread = parsed.data.messages
+    .filter(message => message.threadId === incoming.threadId &&
+      message.senderId === incoming.senderId && message.recipientId === characterId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  if (latestInThread?.id !== messageId) return;
+  // A prior trigger may have completed while this one was waiting.
+  // Do not send another reply if the character already answered this DM.
+  const incomingAt = new Date(incoming.createdAt).getTime();
+  if (parsed.data.messages.some(message =>
+    message.threadId === incoming.threadId &&
+    message.senderId === characterId &&
+    message.recipientId === incoming.senderId &&
+    new Date(message.createdAt).getTime() > incomingAt
+  )) return;
   const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}`).digest("hex");
   const idempotencyKey = `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
     repository, provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
     liveExecutionEnabled: AUTONOMY_LIVE_EXECUTION_ENABLED, lane: "dm",
+    targetIncomingMessageId: messageId,
     sketchDelivery: dispatchHyunPrivateSketch,
     voiceDelivery: await getVoiceOwnerControls(ownerId).then(controls => controls ? {
       ...controls, dispatch: dispatchAutonomousVoice, resolveVoiceId: resolveAutonomousVoiceId,
@@ -94,13 +118,58 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
   });
 }
 
+/**
+ * Re-discover unacknowledged DMs from persisted universe state after a restart.
+ * Disabled by default until staging verification; one candidate per worker slot.
+ * The existing reservation key makes repeated scans idempotent.
+ */
+async function recoverPersistedDmOnce(): Promise<void> {
+  if (process.env.ECHO_DM_RECOVERY_ENABLED !== "true") return;
+  const targets = await listLiveOptInTargets();
+  const cutoff = Date.now() - 48 * 60 * 60_000;
+  for (const target of targets.filter(item => item.dmEnabled)) {
+    const snapshot = await readUniverse(target.ownerId, target.universeId);
+    const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+    if (!parsed.success) continue;
+    const messages = parsed.data.messages;
+    const candidates = messages.filter(message =>
+      message.recipientId === target.characterId &&
+      message.senderId !== target.characterId &&
+      !message.hiddenForIds?.includes(target.characterId) &&
+      (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0) &&
+      new Date(message.createdAt).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    for (const message of candidates) {
+      const sentAt = new Date(message.createdAt).getTime();
+      const newerIncoming = messages.some(other => other.threadId === message.threadId &&
+        other.senderId === message.senderId && other.recipientId === target.characterId &&
+        new Date(other.createdAt).getTime() > sentAt);
+      const answered = messages.some(other => other.threadId === message.threadId &&
+        other.senderId === target.characterId && other.recipientId === message.senderId &&
+        new Date(other.createdAt).getTime() > sentAt);
+      if (newerIncoming || answered) continue;
+      await triggerImmediateDmReply(target.ownerId, target.universeId, target.characterId, message.id);
+      return; // Bound provider calls and DB scans to one DM per recovery tick.
+    }
+  }
+}
+
 export function startAutonomyBackgroundWorker() {
+  let lastRecoverySlotAttempted = -1;
   let lastSocialSlotAttempted = -1;
   let lastGroupSlotAttempted = -1;
   let lastCollaborationSlotAttempted = -1;
   return startAutonomyWorker({
     enabled: AUTONOMY_LIVE_EXECUTION_ENABLED,
     tick: async () => {
+      // Run only on the periodic slot; never fan out on every worker heartbeat.
+      const recoverySlot = Math.floor(Date.now() / (5 * 60_000));
+      if (recoverySlot !== lastRecoverySlotAttempted) {
+        lastRecoverySlotAttempted = recoverySlot;
+        await recoverPersistedDmOnce().catch(error =>
+          logger.warn({ code: error instanceof Error ? error.message.slice(0, 100) : "UNKNOWN" },
+            "Persisted DM recovery skipped"));
+      }
       const socialSlot = Math.floor(Date.now() / (30 * 60_000));
       const result = await runAutonomyWorkerTick({
         socialTickDue: socialSlot !== lastSocialSlotAttempted,

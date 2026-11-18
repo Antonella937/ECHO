@@ -278,6 +278,8 @@ export async function runAutonomyLiveCycle(
     now?: Date;
     random?: () => number;
     lane?: "dm" | "social";
+    /** When set, an immediate DM trigger must only answer this exact incoming message. */
+    targetIncomingMessageId?: string;
     /** Separate, disabled-by-default private sketch adapter; never used for other media. */
     sketchDelivery?: (input: {
       ownerId: string; universeId: string; characterId: string;
@@ -367,7 +369,27 @@ export async function runAutonomyLiveCycle(
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
+      targetIncomingMessageId: dependencies.targetIncomingMessageId,
     });
+    if (dependencies.targetIncomingMessageId) {
+      const target = state.messages.find(message => message.id === dependencies.targetIncomingMessageId);
+      const targetTime = target ? new Date(target.createdAt).getTime() : NaN;
+      const alreadyAnswered = target && state.messages.some(message =>
+        message.threadId === target.threadId &&
+        message.senderId === character.id &&
+        message.recipientId === target.senderId &&
+        new Date(message.createdAt).getTime() > targetTime);
+      // Never redirect a targeted incoming-DM trigger to another conversation.
+      if (!target || target.recipientId !== character.id ||
+          opportunity.situation !== "dm" || opportunity.recipientId !== target.senderId ||
+          alreadyAnswered) {
+        await dependencies.repository.complete(ownerId, runId, {
+          status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null,
+        }, universeId);
+        return { status: "no_action", reasonCode: "TARGET_DM_NOT_ELIGIBLE",
+          characterId: character.id, runId, model: null };
+      }
+    }
     if (dependencies.lane === "dm" && opportunity.situation !== "dm") {
       await dependencies.repository.complete(ownerId, runId, { status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: null }, universeId);
       return { status: "no_action", reasonCode: opportunity.reasonCode, characterId: character.id, runId, model: null };

@@ -1099,6 +1099,8 @@ components:
         url: { type: string, minLength: 1 }
         mimeType: { type: string }
         durationSeconds: { type: number, minimum: 0 }
+        title: { type: string, maxLength: 120 }
+        artist: { type: string, maxLength: 120 }
     StoryHighlight:
       type: object
       required: [id, authorId, title, storyIds]

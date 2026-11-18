@@ -114,6 +114,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
+    // Never silently switch a linked founder DM to Gemini when Kindroid
+    // is disconnected. Preserve the pending message for a later retry.
+    if (typeof kinId !== 'string' || kinId.length === 0) {
+      throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    }
     if (typeof kinId === 'string' && kinId.length > 0) {
       const recipientId = input.recipientId!;
       const thread = parsed.data.state.messages
@@ -121,9 +126,33 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
                      (m.senderId === input.characterId && m.recipientId === recipientId))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
+      // A pair of identities can have multiple conversation threads.
+      // Never pass messages from a different thread to the linked Kin.
+      const activeThread = newest ? thread.filter(m => m.threadId === newest.threadId) : [];
+      // The SocialState DM schema may not expose an attachment array.
+      // Read optional metadata defensively without assuming media bytes exist.
+      const describeDmMessage = (message: (typeof thread)[number]) => {
+        const record = message as unknown as Record<string, unknown>;
+        const text = typeof record.text === 'string' ? record.text.slice(0, 300) : '';
+        const rawAttachments = Array.isArray(record.attachments) ? record.attachments : [];
+        const attachments = rawAttachments.slice(0, 4).map((raw: unknown) => {
+          if (!raw || typeof raw !== 'object') return '[attachment; content not analyzed]';
+          const item = raw as Record<string, unknown>;
+          const type = typeof item.type === 'string' ? item.type.slice(0, 32) : 'file';
+          const duration = typeof item.durationSeconds === 'number' && Number.isFinite(item.durationSeconds)
+            ? `, ${Math.round(item.durationSeconds)} seconds` : '';
+          // Only expose metadata explicitly present on the attachment.
+          // Never infer that the provider has listened to the audio.
+          const title = typeof item.title === 'string' ? item.title.trim().slice(0, 120) : '';
+          const artist = typeof item.artist === 'string' ? item.artist.trim().slice(0, 120) : '';
+          const metadata = [title && `title: ${title}`, artist && `artist: ${artist}`].filter(Boolean).join(', ');
+          return `[${type} attachment shared in ECHO${metadata ? `, ${metadata}` : ''}${duration}; content not analyzed]`;
+        });
+        return [text, ...attachments].filter(Boolean).join(' ');
+      };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
       // fabricate an incoming human message just to make Kindroid respond.
-      const isDirectReply = newest?.senderId === recipientId && typeof newest.text === 'string' && !!newest.text.trim();
+      const isDirectReply = newest?.senderId === recipientId && !!(newest.text?.trim() || (Array.isArray((newest as unknown as Record<string, unknown>).attachments) && ((newest as unknown as Record<string, unknown>).attachments as unknown[]).length > 0));
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
@@ -135,14 +164,26 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // explicitly establish both roles to prevent replies to the owner.
         // The latest incoming DM is appended separately below. Do not send it
         // twice or crowd it out with older turns in Kindroid's shared history.
-        const previousTurns = isDirectReply ? thread.slice(1,5) : thread.slice(0,4);
+        // Treat consecutive incoming messages as one turn when no character reply
+        // intervened. This covers a music attachment followed by its caption.
+        const latestTime = newest ? new Date(newest.createdAt).getTime() : NaN;
+        const incomingBatch = isDirectReply ? activeThread.filter((m, index) =>
+          index === 0 || (
+            m.senderId === recipientId &&
+            activeThread.slice(0, index).every(prior => prior.senderId === recipientId) &&
+            Number.isFinite(latestTime) &&
+            latestTime - new Date(m.createdAt).getTime() >= 0 &&
+            latestTime - new Date(m.createdAt).getTime() <= 120_000
+          )).slice(0, 4) : [];
+        const previousTurns = activeThread.slice(incomingBatch.length, incomingBatch.length + 4);
         const peerHistory = previousTurns.reverse().map(m =>
-          `${m.senderId === input.characterId ? actorName : recipientName}: ${m.text.slice(0,300)}`).join('\n');
+          `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m)}`).join('\n');
+        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n');
         const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
         const outgoingPrompt = peerContext + (storyForReply
           ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
           : isDirectReply
-            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${newest!.text}`
+            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
