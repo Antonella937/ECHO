@@ -10,7 +10,7 @@ import { deleteUnusedAccount, duplicateCharacter } from '@/domain/character-core
 import { validatePostMedia } from '@/domain/post-media';
 import type { PostMedia } from '@/domain/types';
 import type { Appearance, MessageAttachment, StoryHighlight } from '@/domain/types';
-import { editSocialPost, setPinnedPost, movePinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, canViewStory, type PostEdit } from '@/domain/social-features';
+import { editSocialPost, setPinnedPost, movePinnedPost, toggleReaction, saveHighlight, mentionNotifications, isStoryActive, canViewStory, canRepostMentionedStory, type PostEdit } from '@/domain/social-features';
 import { getActiveUniverseId } from './persistence';
 import { MediaScopeContext } from '@/lib/media';
 import { playMessageSound } from '@/lib/message-sounds';
@@ -53,6 +53,7 @@ export interface SocialActions {
   votePoll(postId: string, optionId: string): void;
   createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; collaborationInvites?: string[]; poll?: import('@/domain/types').Post['poll']; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
   createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
+  repostMentionedStory(storyId: string): string;
   deletePost(postId: string): void;
   deleteStory(storyId: string): void;
   toggleCloseFriend(characterId: string): void;
@@ -459,6 +460,22 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           const next = mentionNotifications(s, caption, myId(), { storyId: id }, mentionedAccountIds);
           return closeFriendsOnly ? { ...next, notifications: next.notifications.filter(n => n.storyId !== id || allowedViewerIds.includes(n.recipientId)) } : next;
         });
+        return id;
+      },
+      repostMentionedStory(storyId) {
+        const source = cur().stories.find(s => s.id === storyId);
+        if (!source || !canRepostMentionedStory(source, myId(), cur())) throw new Error('Esta historia no se puede repostear.');
+        // A public-origin-only safeguard until server-side audience intersection
+        // is enforced for private and close-friends originals on every media read.
+        const author = cur().characters.find(c => c.id === source.authorId);
+        if (!author || author.privateAccount || source.closeFriendsOnly) throw new Error('Todavía no se pueden repostear historias privadas.');
+        const id = uid('s');
+        dispatch({ type: 'story.created', story: {
+          id, authorId: myId(), repostOfStoryId: source.id, image: source.image,
+          caption: source.caption, createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
+          ...(source.music ? { music: source.music } : {}),
+          ...(source.musicClip ? { musicClip: source.musicClip } : {}),
+        } });
         return id;
       },
       deletePost(postId) {
