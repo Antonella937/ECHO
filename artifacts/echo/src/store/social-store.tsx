@@ -45,6 +45,8 @@ export interface SocialActions {
   toggleSave(postId: string): void;
   addComment(postId: string, text: string, parentId?: string | null, replyToAuthorId?: string | null): void;
   toggleCommentLike(commentId: string): void;
+  editComment(commentId: string, text: string): void;
+  deleteComment(commentId: string): void;
   setCommunityCommentsEnabled(accountId: string, enabled: boolean): void;
   addCommunityComment(postId: string, handle: string, text: string): void;
   respondCollaboration(postId: string, accept: boolean): void;
@@ -320,6 +322,19 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const safeHandle = handle.trim().replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '').slice(0, 32);
         if (safeHandle.length < 3 || !text.trim() || text.length > 500) throw new Error('Ingresá un usuario válido y un comentario de hasta 500 caracteres.');
         coordinator.current?.edit(state => ({ ...state, comments: [...state.comments, { id: uid('community'), postId, authorId: post.authorId, guestHandle: safeHandle, text: text.trim(), createdAt: new Date().toISOString(), parentId: null, replyToAuthorId: null, likes: [], origin: 'user' as const }] }));
+      },
+      editComment(commentId, text) {
+        const comment = cur().comments.find(c => c.id === commentId);
+        if (!comment || comment.authorId !== myId() || comment.guestHandle) throw new Error('Solo podés editar comentarios de tu identidad activa.');
+        if (!text.trim() || text.trim().length > 2000) throw new Error('El comentario debe tener entre 1 y 2000 caracteres.');
+        coordinator.current?.edit(s => ({ ...s, comments: s.comments.map(c => c.id === commentId ? { ...c, text: text.trim(), editedAt: new Date().toISOString() } : c) }));
+      },
+      deleteComment(commentId) {
+        const comment = cur().comments.find(c => c.id === commentId);
+        if (!comment) throw new Error('El comentario ya no existe.');
+        const post = cur().posts.find(p => p.id === comment.postId);
+        if (comment.authorId !== myId() && post?.authorId !== myId()) throw new Error('Solo podés borrar tus comentarios o moderar tus publicaciones.');
+        coordinator.current?.edit(s => ({ ...s, comments: s.comments.filter(c => c.id !== commentId), notifications: s.notifications.filter(n => n.commentId !== commentId) }));
       },
       toggleCommentLike(commentId) {
         const c = cur().comments.find((x) => x.id === commentId);
