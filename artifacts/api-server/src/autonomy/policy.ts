@@ -188,6 +188,8 @@ export function chooseAutonomyOpportunity(input: {
   dmFrequency?: "rarely" | "sometimes" | "frequently";
   /** Recipients allowed by server-side mutual DM permissions. */
   allowedDmRecipientIds?: ReadonlySet<string>;
+  /** Restrict an immediate reply to the exact incoming DM, never another thread. */
+  targetIncomingMessageId?: string;
 }): Opportunity {
   const { state, character } = input;
   const now = input.now ?? new Date();
@@ -218,7 +220,16 @@ export function chooseAutonomyOpportunity(input: {
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
       now.getTime() - (asTime(message.createdAt) ?? 0) < 30 * DAY_MS)
     .sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0));
-  const unanswered = incoming.find((message) => {
+  const target = input.targetIncomingMessageId
+    ? incoming.find(message => message.id === input.targetIncomingMessageId)
+    : undefined;
+  const latestForTargetThread = target && incoming.find(message =>
+    message.threadId === target.threadId && message.senderId === target.senderId);
+  // A newer incoming message supersedes an older trigger in the same thread.
+  const candidates = input.targetIncomingMessageId
+    ? (target && latestForTargetThread?.id === target.id ? [target] : [])
+    : incoming;
+  const unanswered = candidates.find((message) => {
     const sentAt = asTime(message.createdAt) ?? 0;
     const latestOwnReply = state.messages
       .filter((item) => item.senderId === character.id && item.recipientId === message.senderId)
@@ -234,6 +245,13 @@ export function chooseAutonomyOpportunity(input: {
     return { situation: "dm", recipientId: unanswered.senderId,
       reasonCode: "OPPORTUNITY_SELECTED",
       reason: "A recent incoming direct message is awaiting a reply.",
+      localHour: local.hour, timezone };
+  }
+
+  // A targeted trigger must never fall through to unsolicited outreach.
+  if (input.targetIncomingMessageId) {
+    return { situation: null, reasonCode: "NO_SOCIAL_TARGET",
+      reason: "The targeted incoming DM is no longer eligible.",
       localHour: local.hour, timezone };
   }
 
