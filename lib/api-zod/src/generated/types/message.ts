@@ -12,6 +12,8 @@ export interface Message {
   /** @maxItems 2 */
   hiddenForIds?: string[];
   quoteMessageId?: string;
+  musicTrackId?: string;
+  musicTitle?: string;
   /** @maxItems 5 */
   attachments?: MessageAttachment[];
   reactions?: SocialReaction[];
