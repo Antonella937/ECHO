@@ -114,6 +114,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
     const kinId = links.rows[0]?.kin_id;
+    // Never silently switch a linked founder DM to Gemini when Kindroid
+    // is disconnected. Preserve the pending message for a later retry.
+    if (typeof kinId !== 'string' || kinId.length === 0) {
+      throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    }
     if (typeof kinId === 'string' && kinId.length > 0) {
       const recipientId = input.recipientId!;
       const thread = parsed.data.state.messages
