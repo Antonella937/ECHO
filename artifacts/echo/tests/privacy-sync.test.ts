@@ -197,7 +197,8 @@ test('la copia antigua vinculada a un propietario no se ofrece a otra cuenta', a
 
 
 test('Safari IndexedDB lleno no bloquea el guardado remoto de un comentario', async () => {
-  const h = harness(), d = h.device(); await d.initialize();
+  const initial = fixture(); initial.posts.push(post('luca-post'));
+  const h = harness(initial), d = h.device(); await d.initialize();
   h.recoveryBlocked(true);
   d.edit(s => ({ ...s, comments: [{ id: 'luca-comment', postId: 'luca-post', authorId: 'nela', text: 'love this', createdAt: '2026-11-18', parentId: null, replyToAuthorId: null, likes: [], origin: 'user' }] }));
   await d.sync();
