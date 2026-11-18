@@ -121,6 +121,18 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
                      (m.senderId === input.characterId && m.recipientId === recipientId))
         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const newest = thread[0];
+      // Describe only attachment metadata actually stored in ECHO. Kindroid does
+      // not receive audio bytes here, so never imply it listened to a track.
+      const describeDmMessage = (message: (typeof thread)[number]) => {
+        const text = message.text.slice(0, 300);
+        const attachments = (message.attachments ?? []).slice(0, 4)
+          .map(item => {
+            const duration = typeof item.durationSeconds === 'number'
+              ? `, ${Math.round(item.durationSeconds)} seconds` : '';
+            return `[${item.type} attachment shared in ECHO${duration}; content not analyzed]`;
+          });
+        return [text, ...attachments].filter(Boolean).join(' ');
+      };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
       // fabricate an incoming human message just to make Kindroid respond.
       const isDirectReply = newest?.senderId === recipientId && typeof newest.text === 'string' && !!newest.text.trim();
@@ -137,12 +149,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // twice or crowd it out with older turns in Kindroid's shared history.
         const previousTurns = isDirectReply ? thread.slice(1,5) : thread.slice(0,4);
         const peerHistory = previousTurns.reverse().map(m =>
-          `${m.senderId === input.characterId ? actorName : recipientName}: ${m.text.slice(0,300)}`).join('\n');
+          `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m)}`).join('\n');
         const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
         const outgoingPrompt = peerContext + (storyForReply
           ? `[ECHO private story reply: You viewed a story by ${recipientName}. Caption: ${(storyForReply.caption ?? '').slice(0,400)}. Write one natural private DM about the story. Do not invent details or claim they messaged you.]`
           : isDirectReply
-            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${newest!.text}`
+            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${describeDmMessage(newest!)}`
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         let socialContext = '';
         if (links.rows[0]?.social_context_enabled === true) {
