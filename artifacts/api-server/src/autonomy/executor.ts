@@ -97,7 +97,12 @@ export function applyAutonomyDecision(
   const character = state.characters.find((item) => item.id === characterId && !item.archived);
   if (!character) throw new SocialExecutionError("CHARACTER_NOT_ACTIVE");
 
-  const text = decision.text?.trim() ?? "";
+  const rawText = decision.text?.trim() ?? "";
+  // Model-generated visual directions are metadata, never user-facing captions.
+  // A gallery image is attached separately after authorization and availability checks.
+  const text = decision.action === "draft" && decision.situation === "post"
+    ? rawText.replace(/\\[\\s*(?:image|photo|picture|visual|alt(?:\\s+text)?|image\\s+description)\\s*:\\s*[^\\]]*\\]/gi, "").trim()
+    : rawText;
 
   if (decision.action === "draft" && decision.situation === "post") {
     if (!text) throw new SocialExecutionError("EMPTY_POST_TEXT");
