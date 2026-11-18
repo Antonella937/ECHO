@@ -24,7 +24,7 @@ const post = (id: string, caption = id): Post => ({
 });
 
 function harness(initial = fixture(), legacy: SocialState | null = null) {
-  let server = clone(initial), revision = 1, saves = 0, stale = 0, verifies = 0, offline = false, failVerify = false;
+  let server = clone(initial), revision = 1, saves = 0, stale = 0, verifies = 0, offline = false, failVerify = false, recoveryBlocked = false;
   const recoveries = new Map<string, Recovery>(), receipts = new Set<string>(), converted = new Map<string, SocialState>(), claims = new Map<string, string>();
   const original = clone(legacy);
   const io = {
@@ -35,7 +35,7 @@ function harness(initial = fixture(), legacy: SocialState | null = null) {
       server = clone(state); revision++; saves++; return { state: clone(server), revision };
     },
     async loadRecovery(owner: string) { return clone(recoveries.get(owner) ?? null); },
-    async saveRecovery(owner: string, value: Recovery) { recoveries.set(owner, clone(value)); },
+    async saveRecovery(owner: string, value: Recovery) { if (recoveryBlocked) throw Error('Almacenamiento lleno o bloqueado'); recoveries.set(owner, clone(value)); },
     async loadLegacyState() { return clone(legacy); },
     async fingerprint(s: SocialState) { return JSON.stringify(s); },
     async importedBy(owner: string, hash: string) { return receipts.has(owner + hash); },
@@ -58,7 +58,7 @@ function harness(initial = fixture(), legacy: SocialState | null = null) {
   return {
     device, io, recoveries, receipts, original, legacy: () => legacy,
     server: () => clone(server), stats: () => ({ saves, stale, verifies }),
-    offline: (v: boolean) => { offline = v; }, failVerify: (v: boolean) => { failVerify = v; },
+    offline: (v: boolean) => { offline = v; }, recoveryBlocked: (v: boolean) => { recoveryBlocked = v; }, failVerify: (v: boolean) => { failVerify = v; },
   };
 }
 
@@ -193,4 +193,37 @@ test('la copia antigua vinculada a un propietario no se ofrece a otra cuenta', a
   await a.initialize(); await a.importLegacy();
   const b = h.device('owner-b'); await b.initialize();
   assert.equal(b.view.legacyAvailable, false);
+});
+
+
+test('Safari IndexedDB lleno no bloquea el guardado remoto de un comentario', async () => {
+  const initial = fixture(); initial.posts.push(post('luca-post'));
+  const h = harness(initial), d = h.device(); await d.initialize();
+  h.recoveryBlocked(true);
+  d.edit(s => ({ ...s, comments: [{ id: 'luca-comment', postId: 'luca-post', authorId: 'nela', text: 'love this', createdAt: '2026-11-18', parentId: null, replyToAuthorId: null, likes: [], origin: 'user' }] }));
+  await d.sync();
+  assert.equal(h.server().comments[0].id, 'luca-comment');
+  assert.match(d.view.error ?? '', /copia de recuperación|Almacenamiento lleno/);
+  assert.equal(h.stats().saves > 0, true, 'el comentario se guardó en el servidor');
+});
+
+test('Safari lleno y servidor desconectado muestra ambos fallos sin afirmar guardado', async () => {
+  const h = harness(), d = h.device(); await d.initialize();
+  h.recoveryBlocked(true); h.offline(true);
+  d.edit(s => ({ ...s, posts: [post('unsaved')] }));
+  await d.sync();
+  assert.match(d.view.error ?? '', /conexión/);
+  assert.match(d.view.error ?? '', /copia local/);
+  assert.equal(h.server().posts.length, 0);
+  assert.equal(d.view.state?.posts[0].id, 'unsaved');
+});
+
+
+test('Safari lleno al iniciar conserva el universo remoto visible', async () => {
+  const initial = fixture(); initial.posts.push(post('existing'));
+  const h = harness(initial); h.recoveryBlocked(true);
+  const d = h.device(); await d.initialize();
+  assert.equal(d.view.state?.posts[0].id, 'existing');
+  assert.equal(d.view.busy, false);
+  assert.equal(h.server().posts[0].id, 'existing');
 });

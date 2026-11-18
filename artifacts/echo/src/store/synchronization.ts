@@ -107,7 +107,12 @@ export class UniverseSync {
       if (primaryId && this.view.state.characters.some(character => character.id === primaryId && !character.archived)) {
         this.view.state = { ...this.view.state, currentCharacterId: primaryId };
       }
-      await this.backup();
+      // The remote universe is already loaded. A local recovery failure should
+      // not prevent the coordinator from attempting its remote sync.
+      try { await this.backup(); }
+      catch (error) {
+        this.view.error = `No se pudo conservar la copia de recuperación: ${(error as Error).message}`;
+      }
     } catch (e) { this.view.error = (e as Error).message; }
     finally { this.view.busy = false; this.emit(); }
     if (this.view.state) await this.sync();
@@ -177,8 +182,14 @@ export class UniverseSync {
   }
   private async perform() {
     this.view.busy = true; this.view.error = null; this.emit();
+    let localRecoveryFailure: string | null = null;
     try {
-      await this.disk;
+      // A full local recovery snapshot can exceed Safari's IndexedDB quota.
+      // Do not let a failed local write prevent an authenticated server save.
+      // If the server also fails, surface BOTH failures so the user knows the
+      // pending edit has not been durably preserved anywhere.
+      try { await this.disk; }
+      catch (error) { localRecoveryFailure = (error as Error).message; }
       for (let attempt = 0; attempt < 5; attempt++) {
         // On an unchanged idle device, a tiny revision probe replaces the
         // full universe download. Never skip when local edits or conflicts exist.
@@ -186,7 +197,7 @@ export class UniverseSync {
           this.view.conflicts.length === 0 && !this.importHash &&
           Object.keys(this.decisions).length === 0 &&
           same({ ...this.base, currentCharacterId: '' }, { ...this.view.state, currentCharacterId: '' });
-        if (attempt === 0 && clean && this.remoteRevision !== null && this.io === defaultIO) {
+        if (attempt === 0 && clean && !localRecoveryFailure && this.remoteRevision !== null && this.io === defaultIO) {
           const revision = await loadUniverseRevision(this.universeId);
           if (revision === this.remoteRevision) {
             this.view.lastSavedAt = Date.now();
@@ -238,7 +249,10 @@ export class UniverseSync {
         this.view.conflicts = next.conflicts;
         this.conflictRemote = saved.state;
         this.decisions = {};
-        await this.backup();
+        // The server now holds the merged state. A failed local snapshot is
+        // non-fatal here; future edits will retry local recovery as before.
+        try { await this.backup(); }
+        catch (error) { localRecoveryFailure = (error as Error).message; }
         if (this.importHash) {
           await this.io.verifySavedUniverse(saved.state, this.universeId);
           await this.io.markImported(this.owner, this.importHash);
@@ -251,7 +265,9 @@ export class UniverseSync {
       }
       throw new Error('Hay cambios simultáneos continuos. Tus cambios están conservados en este dispositivo; reintenta.');
     } catch (e) {
-      this.view.error = (e as Error).message;
+      this.view.error = (e as Error).message + (localRecoveryFailure
+        ? ` Además, no se pudo guardar la copia local (${localRecoveryFailure}). Descargá una copia antes de cerrar ECHO.`
+        : '');
       // Verification can be retried from the retained legacy copy; don't leave
       // the UI accepting clicks that would be silently blocked.
       this.importHash = null;
