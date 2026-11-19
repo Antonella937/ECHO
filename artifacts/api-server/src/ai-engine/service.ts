@@ -2,6 +2,7 @@ import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionI
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
 import type { VisionContext } from '../vision/contracts';
+import { visionService } from '../vision/service';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
@@ -42,9 +43,24 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Likes and story views/reactions do not require image interpretation.
   // Skip vision loading to avoid unnecessary provider work on non-text actions.
   const isNonTextSocial = ['like_post', 'like_comment', 'story_reaction'].includes(input.situation);
-  const vision = dependencies.vision && !isNonTextSocial
+  let vision: VisionContext = dependencies.vision && !isNonTextSocial
     ? await dependencies.vision(ownerId, parsed.data.state, input)
     : { analyses: {}, postSummaries: {} };
+  // A story reply needs the image, not merely its caption. Analyze once through
+  // the owner-scoped, content-hash cache and existing metered vision safeguards.
+  // Never charge for story views, likes or reactions.
+  if (input.storyId && !isNonTextSocial && !vision.analyses[`story:${input.storyId}:story:${input.storyId}`]) {
+    const target = parsed.data.state.stories.find(story => story.id === input.storyId);
+    if (target && canCharacterViewCloseFriendsStory(parsed.data.state, target, input.characterId)) {
+      try {
+        vision = await visionService.ensureForDecision(ownerId, parsed.data.state, input);
+      } catch (error) {
+        // If the image is unavailable, keep the reply functional without
+        // pretending it was seen; errors remain visible in server logs.
+        console.warn('ECHO_STORY_VISION_UNAVAILABLE', error instanceof Error ? error.message : 'unknown');
+      }
+    }
+  }
   // Narrative language is independent of the owner's interface language.
   // Each character's configured voice.outputLanguage takes precedence in previewDecision.
   const language = 'en';
