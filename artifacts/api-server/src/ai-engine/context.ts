@@ -342,6 +342,7 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
     }
   }
   if (contextSize() > 60000) throw new EngineError('CONTEXT_BUDGET_EXCEEDED');
+  const serialized = JSON.stringify(context);
   if (truncated) warnings.push('CONTEXT_TRUNCATED: long fields or arrays were bounded for this preview');
   const actual = context as typeof data;
   const content = {
