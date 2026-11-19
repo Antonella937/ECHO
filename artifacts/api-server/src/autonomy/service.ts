@@ -316,7 +316,18 @@ export async function runAutonomyLiveCycle(
 
   const controls = await dependencies.repository.readControls(ownerId, universeId);
   const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
-  if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged || !(dependencies.lane === "dm" ? control.dmEnabled : control.enabled)) {
+  // Answering an explicitly received DM is not autonomous outreach. A character
+  // with an enabled Kindroid connection may reply even when unsolicited DM
+  // autonomy is off. The global kill switch and bilateral DM permissions remain.
+  let linkedInboundReply = false;
+  if (dependencies.lane === "dm" && dependencies.targetIncomingMessageId && !control.dmEnabled) {
+    const link = await db.execute(sql`SELECT 1 FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+        AND character_id = ${character.id} AND enabled = true LIMIT 1`);
+    linkedInboundReply = link.rows.length > 0;
+  }
+  if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged ||
+      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply) : control.enabled)) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
