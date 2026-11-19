@@ -38,6 +38,8 @@ export default function GroupConversationPage() {
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [toolsOpen,setToolsOpen] = useState(false);
   const [wallpaperOpen,setWallpaperOpen] = useState(false);
+  const [eventsOpen,setEventsOpen] = useState(false);
+  const cameraRef=useRef<HTMLInputElement>(null);
   const [wallpaper,setWallpaper] = useState('');
   const wallpaperKey=user?.id&&id?`echo:group-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${me.id}:${id}`:'';
   useEffect(()=>{try{setWallpaper(wallpaperKey?localStorage.getItem(wallpaperKey)??'':'');}catch{setWallpaper('');}},[wallpaperKey]);
@@ -441,13 +443,16 @@ export default function GroupConversationPage() {
       </div>}
     </div>
     {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="block cursor-pointer rounded-xl border border-white/20 p-3 text-sm">Elegir foto de fondo<input type="file" accept="image/*" className="sr-only" onChange={e=>{changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
-    {group && id && group.participantIds.includes(me.id) && <GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} />}
+    {eventsOpen && group && id && group.participantIds.includes(me.id) && <div className="relative z-40 mx-3 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><button type="button" onClick={()=>setEventsOpen(false)} className="mb-2 text-sm">✕ Cerrar acontecimientos</button><GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} /></div>}
     <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);try{validateAttachments(files,pendingFiles.length);setPendingFiles(old=>[...old,...files]);setError('');}catch(err){setError((err as Error).message);}e.target.value='';}} />
       <div className="relative shrink-0">
         {toolsOpen&&<div role="menu" aria-label="Opciones del grupo" className="absolute bottom-full left-0 z-50 mb-3 w-[min(19rem,calc(100vw-2rem))] rounded-3xl border border-white/20 bg-background/90 p-2 shadow-2xl backdrop-blur-2xl">
+          <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);setEventsOpen(true);}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">♧ Acontecimientos del grupo</button>
           <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);setWallpaperOpen(true);}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">◉ Apariencia del chat</button>
           <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);fileRef.current?.click();}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">＋ Adjuntar fotos o archivos</button>
+          <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);cameraRef.current?.click();}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">◎ Sacar foto</button>
           <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);setShowMusicLibrary(true);setMusicDraftStatus('');}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">♫ ECHO Music</button>
         </div>}
         <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-label="Más opciones" aria-expanded={toolsOpen} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-background/40 backdrop-blur-xl"><Plus className={toolsOpen?'h-6 w-6 rotate-45':'h-6 w-6'}/></button>
