@@ -52,12 +52,20 @@ export default function ConversationPage() {
   const { me, character, actions, state } = useSocial();
   const identityId = me.id;
   const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${identityId}:${id??''}`;
+  const legacyAppearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
+  // Only the universe's original identity inherits legacy wallpapers. Never share them with other personas.
+  const isOriginalIdentity = identityId === state.characters[0]?.id;
   const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
   const resolveWallpaper = useMediaResolver();
   const wallpaperAppearance = appearance.background === 'photo' && appearance.image
     ? (() => { const image = resolveWallpaper(appearance.image); return image ? { ...appearance, image } : { ...appearance, background: 'none' as const }; })()
     : appearance;
   useEffect(()=>{
+    const scopedCached = localStorage.getItem(appearanceKey);
+    const legacyCached = isOriginalIdentity ? localStorage.getItem(legacyAppearanceKey) : null;
+    if (!scopedCached && legacyCached) {
+      try { localStorage.setItem(appearanceKey, legacyCached); } catch { /* optional cache */ }
+    }
     setAppearance(readDmAppearance(appearanceKey));
     if(!user?.id || !id)return;
     let active=true;
@@ -67,7 +75,7 @@ export default function ConversationPage() {
         try{localStorage.setItem(appearanceKey,JSON.stringify(result.appearance));}catch{/* optional cache */}
       }}).catch(()=>{/* use cached appearance while offline */});
     return()=>{active=false;};
-  },[appearanceKey,user?.id,id,identityId]);
+  },[appearanceKey,legacyAppearanceKey,isOriginalIdentity,user?.id,id,identityId]);
   const other = character(id);
   const messages = useThreadMessages(id);
   const [, navigate] = useLocation();
