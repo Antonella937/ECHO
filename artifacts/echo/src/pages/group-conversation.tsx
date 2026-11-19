@@ -310,13 +310,16 @@ export default function GroupConversationPage() {
   };
   return <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
     {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper}")`}} />}
-    <header className="relative z-30 shrink-0 border-0 bg-transparent pt-safe"><div className="flex h-16 min-w-0 items-center gap-3 px-2">
-      <button onClick={() => navigate('/messages')} aria-label="Volver" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><ChevronLeft className="h-6 w-6" /></button>
-      <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible rounded-full bg-secondary">{group?.avatar ? <img src={resolveMedia(group.avatar)} alt="" className="h-11 w-11 rounded-full object-cover" /> : <Users className="h-5 w-5" />}<span className="absolute -bottom-1 -right-1 rounded-full border-2 border-background bg-primary px-1 text-[10px] text-primary-foreground">{group?.participantIds.length ?? 0}</span></div>
-      <div className="min-w-0 flex-1"><h1 className="truncate text-[15px] font-semibold">{group?.name ?? 'Grupo'}</h1><p className="truncate text-xs text-muted-foreground">{group?.participantIds.map(x => character(x)?.name ?? x).join(', ')}</p></div>
-      <button onClick={() => { setSearchOpen(old => !old); setSearchResults([]); }} aria-label="Buscar mensajes" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Search className="h-5 w-5" /></button>
-      <button onClick={() => { setGroupName(group?.name ?? ''); setAvatarUrl(group?.avatar ?? ''); setSettingsOpen(true); }} aria-label="Opciones del grupo" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><MoreHorizontal className="h-6 w-6" /></button>
-    </div></header>
+    <header className="relative z-30 shrink-0 bg-transparent pt-safe">
+      <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2">
+        <button type="button" onClick={()=>navigate('/messages')} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
+        <div className="flex min-w-0 max-w-full flex-col items-center gap-1 text-center">
+          <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full border border-white/15 bg-background/35 backdrop-blur-xl">{group?.avatar?<img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover"/>:<Users className="h-6 w-6"/>}</div>
+          <h1 className="max-w-full truncate text-sm font-semibold">{group?.name??'Grupo'}</h1>
+        </div>
+        <button type="button" onClick={()=>{setGroupName(group?.name??'');setAvatarUrl(group?.avatar??'');setSettingsOpen(true);}} aria-label="Opciones del grupo" className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><MoreHorizontal className="h-5 w-5"/></button>
+      </div>
+    </header>
     {searchOpen && <div className="shrink-0 border-b border-border bg-background p-3">
       <form onSubmit={searchMessages} className="flex gap-2"><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar en esta conversación" className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm" /><button type="submit" className="rounded-xl bg-secondary px-3 text-sm">Buscar</button></form>
       {!!searchResults.length && <div className="mt-2 max-h-44 space-y-2 overflow-y-auto">{searchResults.map(m => <div key={m.id} className="rounded-lg bg-secondary p-2 text-xs"><strong>{character(m.senderId)?.name ?? m.senderId}</strong><p className="break-words"><SocialText text={m.text} /></p></div>)}</div>}
