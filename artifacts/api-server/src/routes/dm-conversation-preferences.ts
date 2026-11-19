@@ -124,7 +124,18 @@ dmConversationPreferencesRouter.get("/dm/appearance",async(req,res)=>{
   if(!await validAppearancePair(req.userId!,universeId,identityId,characterId)){res.status(403).json({error:"CHARACTER_NOT_ACCESSIBLE"});return;}
   const result=await db.execute(sql`SELECT preferences->'appearanceByIdentity'->${identityId} AS appearance FROM echo_dm_conversation_preferences WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} LIMIT 1`);
   const validated=appearance.safeParse(result.rows[0]?.appearance);
-  res.json({appearance:validated.success?validated.data:defaultAppearance});
+  if(validated.success){res.json({appearance:validated.data});return;}
+  // Read-only migration fallback: only the universe's original persona sees old wallpapers.
+  // Other identities must never inherit a legacy conversation background.
+  const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+   .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
+  const originalId=(universe?.state as {characters?:Array<{id:string}>}|null)?.characters?.[0]?.id;
+  if(identityId===originalId){
+   const legacy=await db.execute(sql`SELECT preferences->'appearance' AS appearance FROM echo_dm_conversation_preferences WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} LIMIT 1`);
+   const previous=appearance.safeParse(legacy.rows[0]?.appearance);
+   if(previous.success){res.json({appearance:previous.data,inherited:true});return;}
+  }
+  res.json({appearance:defaultAppearance});
  }catch{res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
 });
 dmConversationPreferencesRouter.put("/dm/appearance",async(req,res)=>{
