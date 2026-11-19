@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { configuredR2, signR2Request, type R2Config } from "../src/lib/cloudflareR2";
-import { fetchStored } from "../src/routes/supabase-storage";
 import { kindroidDmProvider } from "../src/ai-engine/kindroid";
 
 const config: R2Config = {
@@ -64,7 +63,18 @@ test("Vision storage reader retrieves private R2 bytes through signed GET withou
         headers: { "content-type": "image/png" },
       });
     };
-    const response = await fetchStored("/objects/r2/00000000-0000-0000-0000-000000000001");
+    // The storage router imports the database module; supply a non-connected offline placeholder.
+    // This test never opens a database connection or performs a real network request.
+    const previousDatabaseUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL ||= "postgresql://offline:offline@127.0.0.1:5432/offline";
+    let response: Response;
+    try {
+      const { fetchStored } = await import("../src/routes/supabase-storage");
+      response = await fetchStored("/objects/r2/00000000-0000-0000-0000-000000000001");
+    } finally {
+      if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = previousDatabaseUrl;
+    }
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("content-type"), "image/png");
     assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [137,80,78,71,13,10,26,10]);
