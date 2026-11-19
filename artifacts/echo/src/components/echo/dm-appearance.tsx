@@ -64,7 +64,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
  const [draft,setDraft]=useState(value);
  useEffect(()=>setDraft(value),[value]);
  return <div className="relative">
-  <button type="button" onClick={()=>setOpen(v=>!v)} className="rounded-full border border-border px-3 py-2 text-xs" aria-expanded={open}>{t[0]}</button>
+  <button type="button" onClick={()=>setOpen(v=>!v)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl transition hover:bg-secondary/50" aria-expanded={open} aria-label={t[0]} title={t[0]}><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18h-1.5a2 2 0 0 1-1.5-2 2 2 0 0 1 2-2h1a2 2 0 0 0 2-2 2 2 0 0 0-2-2h-1a2 2 0 0 1-2-2 2 2 0 0 1 2-2z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="11" cy="7" r=".8"/><circle cx="16" cy="9" r=".8"/></svg></button>
   {open&&<section className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-background p-3 shadow-xl">
    <p className="mb-2 text-xs font-medium">{t[1]}</p>
    <div className="flex flex-wrap gap-2">{choices.map(choice=><button type="button" key={choice}
