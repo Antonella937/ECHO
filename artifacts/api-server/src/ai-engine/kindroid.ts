@@ -1,8 +1,8 @@
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 
 /** Classify upstream errors without persisting response bodies or private messages. */
-async function classifyKindroidFailure(response: Response): Promise<{category:string; providerCode:string}> {
-  const result = (category:string, providerCode='unavailable') => ({category,providerCode});
+async function classifyKindroidFailure(response: Response): Promise<{category:string; providerCode:string; errorFormat:string}> {
+  const result = (category:string, providerCode='unavailable', errorFormat='unknown') => ({category,providerCode,errorFormat});
   if (response.status === 429) return result('rate_limit');
   if (response.status === 401 || response.status === 403) return result('authorization');
   if (response.status === 404) return result('not_found');
@@ -11,24 +11,27 @@ async function classifyKindroidFailure(response: Response): Promise<{category:st
   try {
     const raw = (await response.text()).slice(0, 2048).toLowerCase();
     let providerCode = 'unavailable';
+    let errorFormat = 'plain_text';
     try {
       const parsed: unknown = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const record = parsed as Record<string,unknown>;
-        const code = typeof record.code === 'string' ? record.code : typeof record.error_code === 'string' ? record.error_code : null;
-        if (code && /^[a-z][a-z0-9_-]{0,63}$/.test(code)) providerCode = code;
+        const nested = record.error && typeof record.error === 'object' && !Array.isArray(record.error) ? record.error as Record<string,unknown> : null;
+        errorFormat = nested ? 'json_nested_error' : 'json_object';
+        const code = [record.code, record.error_code, nested?.code, nested?.error_code].find(value => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/i.test(value)) as string | undefined;
+        if (code) providerCode = code.toLowerCase();
       }
     } catch { /* Provider may return plain text; never log it. */ }
     // Categorize known provider rejections without logging raw response text,
     // Kin identifiers, API credentials, or private message content.
-    if (/(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available).{0,50}(?:kin|ai[_ -]?id|character)|(?:kin|ai[_ -]?id|character).{0,50}(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available)/.test(raw)) return result('invalid_character',providerCode);
-    if (/(?:subscription|plan|tier|api access|api permission|api enabled|api disabled|api limit|quota|credits|billing)/.test(raw)) return result('account_restriction',providerCode);
-    if (/(?:chat|conversation|history|context).{0,45}(?:unavailable|invalid|disabled|locked|missing|not found|limit|exceeded)|(?:unavailable|invalid|disabled|locked).{0,45}(?:chat|conversation|history)/.test(raw)) return result('conversation_restriction',providerCode);
-    if (/(?:internal error|server error|service unavailable|temporarily unavailable|maintenance|overloaded)/.test(raw)) return result('upstream_unavailable',providerCode);
-    if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return result('invalid_character',providerCode);
-    if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return result('invalid_message',providerCode);
-    if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return result('invalid_payload',providerCode);
-    return result('bad_request_unknown',providerCode);
+    if (/(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available).{0,50}(?:kin|ai[_ -]?id|character)|(?:kin|ai[_ -]?id|character).{0,50}(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available)/.test(raw)) return result('invalid_character',providerCode,errorFormat);
+    if (/(?:subscription|plan|tier|api access|api permission|api enabled|api disabled|api limit|quota|credits|billing)/.test(raw)) return result('account_restriction',providerCode,errorFormat);
+    if (/(?:chat|conversation|history|context).{0,45}(?:unavailable|invalid|disabled|locked|missing|not found|limit|exceeded)|(?:unavailable|invalid|disabled|locked).{0,45}(?:chat|conversation|history)/.test(raw)) return result('conversation_restriction',providerCode,errorFormat);
+    if (/(?:internal error|server error|service unavailable|temporarily unavailable|maintenance|overloaded)/.test(raw)) return result('upstream_unavailable',providerCode,errorFormat);
+    if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return result('invalid_character',providerCode,errorFormat);
+    if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return result('invalid_message',providerCode,errorFormat);
+    if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return result('invalid_payload',providerCode,errorFormat);
+    return result('bad_request_unknown',providerCode,errorFormat);
   } catch {
     return result('unreadable_error');
   }
@@ -59,8 +62,8 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
-        const { category, providerCode } = await classifyKindroidFailure(response);
-        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, category, providerCode, payloadChars: requestMessage.length, promptChars: message.length, socialContextChars: socialContext.length });
+        const { category, providerCode, errorFormat } = await classifyKindroidFailure(response);
+        console.warn('[kindroid] upstream rejected request', { situation, status: response.status, category, providerCode, errorFormat, payloadChars: requestMessage.length, promptChars: message.length, socialContextChars: socialContext.length });
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const rawReply = (await response.text()).trim();
