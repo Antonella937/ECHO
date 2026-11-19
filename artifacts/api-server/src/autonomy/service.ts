@@ -221,7 +221,7 @@ export async function runAutonomyDryRun(
     const preview = await previewForOwner(ownerId, decisionInput, {
       read: (id) => dependencies.repository.read(id, universeId),
       provider: dependencies.provider,
-      vision: (id, state, input) => visionService.loadContext(id, state, input),
+      vision: (id, state, input) => visionService.ensureForDecision(id, state, input),
     });
     await dependencies.repository.complete(ownerId, runId, {
       status: preview.decision.action === "none" ? "no_action" : "previewed",
@@ -487,7 +487,7 @@ export async function runAutonomyLiveCycle(
     try {
       preview = await previewForOwner(ownerId, decisionInput, {
         read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
-        vision: (id, state, input) => visionService.loadContext(id, state, input),
+        vision: (id, state, input) => visionService.ensureForDecision(id, state, input),
         liveDmReply: true, // All live text actions use linked Kindroid, not just DM replies.
       });
     } finally {
