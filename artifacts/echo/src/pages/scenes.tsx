@@ -197,10 +197,10 @@ export default function ScenesPage() {
     catch{setError(es?'No se pudo actualizar la escena.':'Could not update scene.')}
     finally{setBusy(false)}
   };
-  return <main className="mx-auto w-full max-w-2xl min-w-0 space-y-5 overflow-x-hidden px-4 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
-    <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur"><h1 className="text-xl font-bold">ECHO Scenes</h1><Link href="/messages" className="shrink-0 text-sm text-muted-foreground">{st("Volver a mensajes")}</Link></div>
-    <button type="button" onClick={()=>setShowCreate(value=>!value)} className="w-full rounded-xl border border-border p-3 text-left text-sm font-semibold">{showCreate ? (es?"− Ocultar creación":"− Hide creation") : (es?"+ Crear nueva escena":"+ Create new scene")}</button>
-    {showCreate&&<form onSubmit={create} className="space-y-3 rounded-2xl border border-border p-4">
+  return <main className={active ? "relative isolate mx-auto flex h-[100dvh] w-full max-w-2xl min-w-0 flex-col overflow-hidden bg-background" : "mx-auto w-full max-w-2xl min-w-0 space-y-5 overflow-x-hidden px-4 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]"}>
+    {!active&&<div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur"><h1 className="text-xl font-bold">ECHO Scenes</h1><Link href="/messages" className="shrink-0 text-sm text-muted-foreground">{st("Volver a mensajes")}</Link></div>}
+    {!active&&<button type="button" onClick={()=>setShowCreate(value=>!value)} className="w-full rounded-xl border border-border p-3 text-left text-sm font-semibold">{showCreate ? (es?"− Ocultar creación":"− Hide creation") : (es?"+ Crear nueva escena":"+ Create new scene")}</button>
+    {!active&&showCreate&&<form onSubmit={create} className="space-y-3 rounded-2xl border border-border p-4">
       <h2 className="font-semibold">{st("Crear escena")}</h2>
       <input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} placeholder={st("Título")} className="w-full rounded-xl border border-border bg-background p-3"/>
       <textarea maxLength={4000} value={premise} onChange={e=>setPremise(e.target.value)} placeholder={st("Premisa")} className="w-full rounded-xl border border-border bg-background p-3"/>
@@ -213,10 +213,10 @@ export default function ScenesPage() {
       </fieldset>
       <button disabled={busy||!title.trim()||!participants.length} className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">{st("Crear")}</button>
     </form>}
-    <section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><button key={s.sceneId} onClick={()=>setSelected(s.sceneId)} className={`block w-full rounded-xl border p-3 text-left ${selected===s.sceneId?'border-primary':'border-border'}`}><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>)}</section>
-    {active&&<section className="relative isolate space-y-3 overflow-hidden rounded-3xl border border-white/15 bg-background/25 p-4 shadow-xl">
-      {sceneWallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-cover bg-center" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.38),rgba(0,0,0,.5)),url("${sceneWallpaper}")`}} />}
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{active.title}</h2>
+    {!active&&<section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><button key={s.sceneId} onClick={()=>setSelected(s.sceneId)} className={`block w-full rounded-xl border p-3 text-left ${selected===s.sceneId?'border-primary':'border-border'}`}><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>)}</section>}
+    {active&&<section className="relative isolate flex min-h-0 flex-1 flex-col gap-3 overflow-hidden bg-transparent px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
+      {sceneWallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.38),rgba(0,0,0,.5)),url("${sceneWallpaper}")`}} />}
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 rounded-3xl bg-background/30 p-2 backdrop-blur-xl"><div className="flex items-center gap-2"><button type="button" onClick={()=>{setSelected(null);setEvents([]);}} aria-label={es?"Volver a escenas":"Back to scenes"} className="rounded-full border border-white/20 bg-background/40 px-3 py-2">‹</button><h2 className="font-semibold">{active.title}</h2></div>
         <div className="flex items-center gap-2">
           <label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
             {es?'Cambiar fondo':'Change wallpaper'}
@@ -224,7 +224,7 @@ export default function ScenesPage() {
           </label>
           {sceneWallpaper&&<button type="button" onClick={()=>changeSceneWallpaper()} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">{es?'Quitar':'Remove'}</button>}
         </div>
-      </div><p className="text-sm text-muted-foreground">{active.premise}</p><details open className="rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{st("Turnos y estado")}</summary>
+      </div><details className="relative z-10 rounded-2xl border border-white/15 bg-background/50 p-3 backdrop-blur-xl"><summary className="cursor-pointer text-xs font-medium">{es?"Descripción e instrucciones":"Description and instructions"}</summary><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{active.premise}</p></details><details className="relative z-10 rounded-2xl border border-white/15 bg-background/50 p-3 backdrop-blur-xl"><summary className="cursor-pointer text-sm font-semibold">{st("Turnos y estado")}</summary>
         <div className="space-y-3 pt-3">
           <label className="block space-y-1 text-sm"><span className="font-medium">{st("Estilo de escritura de IA")}</span>
             <select disabled={busy||active.status==='finished'} value={active.turnSettings?.style??'natural'}
@@ -266,14 +266,14 @@ export default function ScenesPage() {
             <button type="button" disabled={busy} onClick={()=>void deleteScene()} className="rounded-xl border border-destructive px-3 py-2 text-sm text-destructive disabled:opacity-50">{st("Eliminar escena definitivamente")}</button>
           </div>
         </div>
-      </details><div className="flex flex-wrap gap-2">
+      </details><div className="relative z-10 flex flex-wrap gap-2">
         {active.status==='active'&&<button type="button" disabled={busy||active.turnSettings?.mode==='manual'} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
           title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex flex-col items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{state.characters.find(c=>c.id===id)?.avatar?<img src={state.characters.find(c=>c.id===id)!.avatar} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
-      </div>{active.canon === "main" && <SceneCanonReview key={`${universeId}:${active.sceneId}`} universeId={universeId} sceneId={active.sceneId} />}<div className="max-h-[60dvh] space-y-3 overflow-y-auto rounded-2xl bg-background/15 p-2 backdrop-blur-[2px]">{events.map(ev=><article key={ev.eventId} className="rounded-2xl border border-white/10 bg-background/65 p-3 text-sm shadow-sm backdrop-blur-xl"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="flex min-w-0 flex-wrap gap-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><input ref={sceneMessageRef} value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-full border border-white/20 bg-background/50 p-3 backdrop-blur-xl"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
-    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+      </div>{active.canon === "main" && <SceneCanonReview key={`${universeId}:${active.sceneId}`} universeId={universeId} sceneId={active.sceneId} />}<div className="relative z-10 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl bg-transparent p-2">{events.map(ev=><article key={ev.eventId} className="rounded-2xl border border-white/10 bg-background/65 p-3 text-sm shadow-sm backdrop-blur-xl"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="relative z-10 flex min-w-0 flex-wrap gap-2 rounded-3xl bg-background/20 p-2 backdrop-blur-lg"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><input ref={sceneMessageRef} value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-full border border-white/20 bg-background/50 p-3 backdrop-blur-xl"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
+    {error&&<p role="alert" className="relative z-20 px-3 text-sm text-destructive">{error}</p>}
   </main>;
 }
