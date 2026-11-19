@@ -317,9 +317,31 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
         attachmentsNotAnalyzed: (message.attachments ?? []).map(a => a.type) } }
         : recipient ? identityOf(recipient.id) : null;
   const context = bounded({ now: now.toISOString(), situation: input.situation, target,
-    ...data });
-  const serialized = JSON.stringify(context);
-  if (serialized.length > 60000) throw new EngineError('CONTEXT_BUDGET_EXCEEDED');
+    ...data }) as Record<string, any>;
+  // Keep the active target and identity intact. Shed older secondary context before
+  // failing a live reply; never discard the referenced story, tags or vision evidence.
+  const contextSize = () => JSON.stringify(context).length;
+  const social = context.recentSocial as Record<string, unknown[]> | undefined;
+  if (social) {
+    for (const key of ['posts', 'comments', 'stories', 'messages']) {
+      const entries = social[key];
+      while (Array.isArray(entries) && entries.length > (key === 'messages' ? 4 : 1) && contextSize() > 60000) {
+        entries.shift();
+        truncated = true;
+      }
+    }
+  }
+  const memory = context.memory as Record<string, unknown> | undefined;
+  if (memory) {
+    for (const key of ['historicalRecalled', 'olderVoiceNotes', 'recent', 'recalled', 'aliasConversationRecall']) {
+      const entries = memory[key];
+      while (Array.isArray(entries) && entries.length > 0 && contextSize() > 60000) {
+        entries.shift();
+        truncated = true;
+      }
+    }
+  }
+  if (contextSize() > 60000) throw new EngineError('CONTEXT_BUDGET_EXCEEDED');
   if (truncated) warnings.push('CONTEXT_TRUNCATED: long fields or arrays were bounded for this preview');
   const actual = context as typeof data;
   const content = {
