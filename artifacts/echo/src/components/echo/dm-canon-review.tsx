@@ -14,7 +14,7 @@ const labels: Record<string,[string,string,string,string,string,string,string,st
  zh:['私信事件','查找事件','待审核的私人候选事件','没有候选事件。','加载失败。',"批准","编辑","忽略"],
 };
 type Candidate={sourceId:string;text:string;actorId:string};
-export function DmCanonReview({universeId,peerId}:{universeId:string;peerId:string}){
+export function DmCanonReview({universeId,peerId,externalOpen,onExternalClose}:{universeId:string;peerId:string;externalOpen?:boolean;onExternalClose?:()=>void}){
  const lang=useLanguage();const t=labels[lang]??labels.en;
  const [items,setItems]=useState<Candidate[]|null>(null);
  const [busy,setBusy]=useState(false);const [error,setError]=useState(false);
@@ -34,12 +34,12 @@ export function DmCanonReview({universeId,peerId}:{universeId:string;peerId:stri
    setItems(old=>old?.filter(x=>x.sourceId!==item.sourceId)??null);
   }catch{setError(true);}finally{setBusy(false);}
  };
- return <details className="group relative inline-block align-middle">
-  <summary title={t[0]} aria-label={t[0]} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-border/70 bg-background/55 text-foreground backdrop-blur-md transition hover:bg-secondary/70 [&::-webkit-details-marker]:hidden">
+ return <div className="group relative inline-block align-middle">
+  {externalOpen===undefined&&<details><summary title={t[0]} aria-label={t[0]} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-border/70 bg-background/55 text-foreground backdrop-blur-md transition hover:bg-secondary/70 [&::-webkit-details-marker]:hidden">
    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-  </summary>
-  <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[55vh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border/70 bg-background/95 p-3 shadow-xl backdrop-blur-xl">
-  <p className="mb-2 text-sm font-semibold">{t[0]}</p>
+  </summary></details>}
+  {(externalOpen??false)&&<div className="absolute bottom-full left-0 z-50 mb-2 max-h-[55vh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border/70 bg-background/95 p-3 shadow-xl backdrop-blur-xl">
+  <div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold">{t[0]}</p><button type="button" onClick={onExternalClose} aria-label="Cerrar">✕</button></div>
   <button type="button" disabled={busy} onClick={()=>void load()} className="my-2 rounded-lg border border-border px-3 py-2 text-xs">{t[1]}</button>
   {error&&<p role="alert" className="text-xs text-destructive">{t[4]}</p>}
   {items?.length===0&&<p className="text-xs text-muted-foreground">{t[3]}</p>}
@@ -52,6 +52,6 @@ export function DmCanonReview({universeId,peerId}:{universeId:string;peerId:stri
       <button type="button" disabled={busy} onClick={()=>void decide(item,'dismiss')} className="rounded border border-border px-3 py-2 text-xs">{t[7]}</button>
     </div>
   </div>)}
-  </div>
- </details>;
+  </div>}
+ </div>;
 }
