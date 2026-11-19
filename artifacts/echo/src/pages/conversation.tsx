@@ -12,7 +12,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Clapperboard, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Paperclip, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { Clapperboard, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -93,6 +93,9 @@ export default function ConversationPage() {
   }, [text]);
 
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
+  const [attachmentsMenuOpen,setAttachmentsMenuOpen] = useState(false);
+  const [appearanceMenuOpen,setAppearanceMenuOpen] = useState(false);
+  const [eventsMenuOpen,setEventsMenuOpen] = useState(false);
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
   const [quoteId, setQuoteId] = useState<string | null>(null);
@@ -106,6 +109,7 @@ export default function ConversationPage() {
   const [hiding, setHiding] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(pending); pendingRef.current = pending;
   const activeThreadRef = useRef(id); activeThreadRef.current = id;
   const unreadCount = messages.filter((m) => m.recipientId === me.id && !m.readBy.includes(me.id)).length;
@@ -350,7 +354,7 @@ export default function ConversationPage() {
           <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="z-10 ml-auto tap flex h-11 min-w-[58px] items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-3 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
-      <div className="relative z-30 flex justify-end bg-transparent px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
+
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
       <div className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
@@ -409,7 +413,7 @@ export default function ConversationPage() {
         <div ref={endRef} />
       </div>
 
-      {id && <DmCanonReview key={id} universeId={getActiveUniverseId(user?.id ?? '')} peerId={id} />}
+
     <form onSubmit={submit} className="relative bottom-[var(--echo-keyboard-inset,0px)] z-40 border-0 bg-transparent px-3 pb-safe pt-2" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
@@ -499,13 +503,10 @@ export default function ConversationPage() {
             {pending.filter(p => p.error).map(p => <p key={p.key} className="break-words">{p.error}</p>)}
           </div>
         )}
-        <div className="mb-2 flex items-center justify-end gap-2">
-          <button type="button" onClick={() => { setShowMusicLibrary(value => !value); setMusicDraftStatus(''); }}
-            aria-label={showMusicLibrary ? 'Cerrar música' : 'ECHO Music'} title={showMusicLibrary ? 'Cerrar música' : 'ECHO Music'} aria-expanded={showMusicLibrary}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-background/55 text-lg backdrop-blur-md transition hover:bg-secondary/70">
-            <span aria-hidden="true">♫</span>
-          </button>
-        </div>
+        {(appearanceMenuOpen||eventsMenuOpen)&&<div className="relative z-50 mb-2 flex justify-start">
+          {appearanceMenuOpen&&<DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance} externalOpen onExternalClose={()=>setAppearanceMenuOpen(false)}/>}
+          {eventsMenuOpen&&id&&<DmCanonReview universeId={getActiveUniverseId(user?.id??'')} peerId={id} externalOpen onExternalClose={()=>setEventsMenuOpen(false)}/>}
+        </div>}
         {musicDraftStatus && <p role="status" className="mb-2 text-xs text-muted-foreground">{musicDraftStatus}</p>}
         {showMusicLibrary && <div className="mb-3">
           <MusicLibraryPicker characterId={me.id} onCancel={() => setShowMusicLibrary(false)} onSelect={async selection => {
@@ -546,9 +547,21 @@ export default function ConversationPage() {
           <div className="flex items-center gap-2 pb-1">
             <input ref={fileRef} type="file" multiple hidden accept="image/*,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
               onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }} data-testid="input-attachment-file" />
-            <button type="button" onClick={() => fileRef.current?.click()} aria-label={t("Adjuntar foto, video o audio")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-attach">
-              <Paperclip className="h-5 w-5" strokeWidth={1.7} />
-            </button>
+            <div className="relative shrink-0">
+              {attachmentsMenuOpen&&<div className="absolute bottom-full left-0 z-50 mb-3 w-[min(19rem,calc(100vw-2rem))] rounded-3xl border border-white/20 bg-background/85 p-2 shadow-2xl backdrop-blur-2xl" role="menu" aria-label="Opciones del chat">
+                {([
+                  {label:'Acontecimientos',icon:Bookmark,action:()=>setEventsMenuOpen(true)},
+                  {label:'Apariencia del chat',icon:Palette,action:()=>setAppearanceMenuOpen(true)},
+                  {label:'Adjuntar fotos o archivos',icon:ImagePlus,action:()=>fileRef.current?.click()},
+                  {label:'Sacar foto',icon:Camera,action:()=>cameraRef.current?.click()},
+                  {label:'ECHO Music',icon:Music2,action:()=>{setShowMusicLibrary(true);setMusicDraftStatus('');}},
+                ]).map(option=><button key={option.label} type="button" role="menuitem" onClick={()=>{setAttachmentsMenuOpen(false);option.action();}} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm hover:bg-white/10"><option.icon className="h-5 w-5 shrink-0"/>{option.label}</button>)}
+              </div>}
+              <button type="button" onClick={()=>setAttachmentsMenuOpen(v=>!v)} aria-label="Más opciones" aria-expanded={attachmentsMenuOpen} className="tap grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-background/45 shadow-sm backdrop-blur-xl" data-testid="button-attach">
+                <Plus className={cn('h-6 w-6 transition-transform',attachmentsMenuOpen&&'rotate-45')} strokeWidth={1.7}/>
+              </button>
+            </div>
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}} />
             <textarea
               ref={composerRef}
               value={text}
