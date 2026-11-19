@@ -324,21 +324,21 @@ export default function ConversationPage() {
 
   return (
     <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
-      {appearance.background !== "none" && <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{...dmBackgroundStyle(wallpaperAppearance),backgroundPosition:"center",backgroundSize:"cover"}} />}
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/45 pt-safe backdrop-blur-md">
-        <div className="flex h-16 items-center gap-2 px-2">
-          <button onClick={back} aria-label={t("Volver")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="button-back">
+      {appearance.background !== "none" && <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10" style={{...dmBackgroundStyle(wallpaperAppearance),backgroundPosition:"center",backgroundSize:"cover"}} />}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-background/20 pt-safe backdrop-blur-xl">
+        <div className="relative flex h-[76px] items-center justify-between gap-2 px-3">
+          <button onClick={back} aria-label={t("Volver")} className="tap z-10 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-back">
             <ChevronLeft className="h-6 w-6" strokeWidth={1.6} />
           </button>
-          <Link href={`/profile/${other.id}`} className="flex min-w-0 items-center gap-3" data-testid="link-conversation-profile">
-            <CharacterAvatar character={other} size={38} />
-            <div className="min-w-0 leading-tight">
-              <div className="flex min-w-0 items-center gap-1 text-[15px] font-semibold"><span className="truncate">{other.name}</span><VerifiedBadge account={other} className="h-3.5 w-3.5 shrink-0" /></div>
+          <Link href={`/profile/${other.id}`} className="absolute inset-y-0 left-1/2 flex max-w-[52%] -translate-x-1/2 flex-col items-center justify-center gap-0.5 text-center" data-testid="link-conversation-profile">
+            <CharacterAvatar character={other} size={32} />
+            <div className="min-w-0 max-w-full leading-tight">
+              <div className="flex min-w-0 items-center justify-center gap-1 text-[12px] font-semibold"><span className="truncate">{other.name}</span><VerifiedBadge account={other} className="h-3.5 w-3.5 shrink-0" /></div>
               <div className="truncate text-xs text-muted-foreground">@{other.handle}</div>
             </div>
           </Link>
 
-          <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="ml-auto tap flex h-11 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-primary hover:bg-primary/20" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
+          <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="z-10 ml-auto tap flex h-11 min-w-[58px] items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-3 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
       <div className="relative z-40 flex justify-end px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
