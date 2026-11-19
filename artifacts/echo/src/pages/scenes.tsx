@@ -106,7 +106,7 @@ export default function ScenesPage() {
     try {await customFetch('/api/scenes/events',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,sceneId:selected,actorId:me.id,text:message.trim(),visibility:'participants',audienceIds:[]})});setMessage('');
       const r=await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(selected)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,{method:'GET',responseType:'json'});setEvents(r.events);
       if(active?.turnSettings?.autoReply && active?.status==='active' && active.turnSettings?.mode!=='manual'){
-        const ai=active.participantIds.filter(id=>id!==me.id);
+        const ai=active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present');
         const turn=active.turnSettings;
         const chosen=turn?.nextCharacterId && ai.includes(turn.nextCharacterId)?turn.nextCharacterId:
           turn?.mode==='ordered' ? (turn.order??[]).filter(id=>ai.includes(id))[(turn.cursor??0)%Math.max(1,(turn.order??[]).filter(id=>ai.includes(id)).length)]:
@@ -138,7 +138,9 @@ export default function ScenesPage() {
     finally{setBusy(false)}
   };
   const generateReply = async (characterId:string)=>{
-    if(!active || busy)return;setBusy(true);setError('');
+    if(!active || busy)return;
+    if((presence[characterId]??'present')!=='present'){setError(es?'Ese personaje no está presente en la escena.':'That character is not present in the scene.');return;}
+    setBusy(true);setError('');
     try{
       if(!events.some(event=>event.text.trim())){setError(es?'Primero escribí el mensaje inicial de la escena. Después tocá el personaje que querés que responda.':'Write the opening scene message first, then tap a character to reply.');return;}
       if(active.turnSettings?.mode==='manual' && active.turnSettings?.nextCharacterId!==characterId){
@@ -159,8 +161,8 @@ export default function ScenesPage() {
   };
   const continueScene = async () => {
     if(!active || active.status!=='active' || busy)return;
-    const ai = active.participantIds.filter(id=>id!==me.id);
-    if(!ai.length)return;
+    const ai = active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present');
+    if(!ai.length){setError(es?'No hay personajes presentes disponibles para responder.':'No present characters are available to reply.');return;}
     const turn=active.turnSettings;
     let target=turn?.nextCharacterId && ai.includes(turn.nextCharacterId)?turn.nextCharacterId:null;
     if(!target && turn?.mode==='manual'){
@@ -246,7 +248,7 @@ export default function ScenesPage() {
           </select>
           <select value={nextSpeaker} onChange={e=>setNextSpeaker(e.target.value)} className="w-full rounded-xl border border-border bg-background p-2">
             <option value="">{st("Elegir personaje")}</option>
-            {active.participantIds.filter(id=>id!==me.id).map(id=><option key={id} value={id}>{state.characters.find(c=>c.id===id)?.name??id}</option>)}
+            {active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present').map(id=><option key={id} value={id}>{state.characters.find(c=>c.id===id)?.name??id}</option>)}
           </select>
           <button type="button" disabled={busy||!nextSpeaker||active.status!=='active'} onClick={()=>void updateTurns(active.turnSettings?.mode??'automatic',nextSpeaker)} className="rounded-xl border border-border px-3 py-2 text-sm">{st("Elegir próximo turno")}</button>
           <div className="space-y-2"><div className="text-sm font-medium">{st("Presencia narrativa")}</div>
@@ -268,7 +270,7 @@ export default function ScenesPage() {
         </div>
       </details><div className="relative z-10 flex flex-wrap gap-2">
         {active.status==='active'&&<button type="button" disabled={busy||active.turnSettings?.mode==='manual'} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
-        {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
+        {active.status==='active'&&active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present').map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
           title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex flex-col items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{state.characters.find(c=>c.id===id)?.avatar?<img src={state.characters.find(c=>c.id===id)!.avatar} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
