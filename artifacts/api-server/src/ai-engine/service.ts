@@ -200,8 +200,17 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         const visualContext = storyVisual
           ? `Cached visual observations (not identity verification): ${storyVisual.sceneDescription.slice(0,700)}. Visible activities: ${storyVisual.activities.slice(0,4).join('; ').slice(0,240)}. Notable details: ${storyVisual.notableDetails.slice(0,4).join('; ').slice(0,240)}. Uncertainties: ${storyVisual.uncertainty.slice(0,3).join('; ').slice(0,200)}.`
           : 'No verified visual description is available for this story. Do not claim to see specific objects, people, places or actions from the image.';
+        const storyMentions = storyForReply
+          ? (storyForReply.mentionedAccountIds ?? []).map(id => {
+              const tagged = parsed.data.state.characters.find(c => c.id === id);
+              return tagged ? `${tagged.name} (account ${id})` : id;
+            }).slice(0, 10).join(', ')
+          : '';
+        const storyMetadata = storyForReply
+          ? `Story media: ${storyForReply.image ? 'image attached' : 'no image attached'}. Tagged accounts: ${storyMentions || 'none'}. Tags identify mentioned accounts, not verified faces. `
+          : '';
         const outgoingPrompt = peerContext + (storyForReply
-          ? `[ECHO private story reply — IMAGE AND IDENTITY BOUNDARY: You (${actorName}) are the VIEWER, not the subject or author. The story AUTHOR is ${recipientName}. The photo may depict another person entirely. Caption (authored by ${recipientName}, not by you): ${(storyForReply.caption ?? '').slice(0,400)}. Any @mentions in the caption are tagged accounts, NOT proof of who appears in the photo. ${visualContext} Never claim that you are pictured, photographed, tagged, working in the scene, or own the photo unless the supplied story context explicitly establishes that fact. A visual description alone cannot verify a person's identity. React as ${actorName} to ${recipientName}'s story from the perspective of an outside viewer. If identity is unclear, refer to the person in the photo as 'they' or comment on the caption instead. Write one natural private DM using only grounded details. Do not invent details or claim they messaged you.]`
+          ? `[ECHO private story reply — IMAGE AND IDENTITY BOUNDARY: You (${actorName}) are the VIEWER, not the subject or author. The story AUTHOR is ${recipientName}. The photo may depict another person entirely. ${storyMetadata}Caption (authored by ${recipientName}, not by you): ${(storyForReply.caption ?? '').slice(0,400)}. Any @mentions in the caption are tagged accounts, NOT proof of who appears in the photo. ${visualContext} Never claim that you are pictured, photographed, tagged, working in the scene, or own the photo unless the supplied story context explicitly establishes that fact. A visual description alone cannot verify a person's identity. React as ${actorName} to ${recipientName}'s story from the perspective of an outside viewer. If identity is unclear, refer to the person in the photo as 'they' or comment on the caption instead. Write one natural private DM using only grounded details. Do not invent details or claim they messaged you.]`
           : isDirectReply
             ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
