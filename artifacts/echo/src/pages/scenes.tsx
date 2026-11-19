@@ -34,6 +34,26 @@ export default function ScenesPage() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [showCreate,setShowCreate] = useState(false);
+  const [sceneWallpaper,setSceneWallpaper] = useState('');
+  const wallpaperKey = user?.id && selected ? `echo:scene-wallpaper:${user.id}:${universeId}:${me.id}:${selected}` : '';
+  useEffect(()=>{
+    if(!wallpaperKey){setSceneWallpaper('');return;}
+    try{setSceneWallpaper(localStorage.getItem(wallpaperKey)??'');}catch{setSceneWallpaper('');}
+  },[wallpaperKey]);
+  const changeSceneWallpaper = (file?:File) => {
+    if(!wallpaperKey)return;
+    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setSceneWallpaper('');return;}
+    if(!file.type.startsWith('image/')||file.size>1_500_000){
+      setError(es?'Elegí una imagen de menos de 1,5 MB.':'Choose an image smaller than 1.5 MB.');return;
+    }
+    const reader=new FileReader();
+    reader.onload=()=>{
+      if(typeof reader.result!=='string')return;
+      try{localStorage.setItem(wallpaperKey,reader.result);setSceneWallpaper(reader.result);setError('');}
+      catch{setError(es?'No hay espacio para guardar el fondo en este dispositivo.':'Not enough space to save this wallpaper on this device.');}
+    };
+    reader.readAsDataURL(file);
+  };
   const [sourceMessage, setSourceMessage] = useState<{messageId:string;peerName:string}|null>(null);
   useEffect(() => {
     if (!user?.id || new URLSearchParams(window.location.search).get('fromDm') !== '1') return;
@@ -194,7 +214,17 @@ export default function ScenesPage() {
       <button disabled={busy||!title.trim()||!participants.length} className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">{st("Crear")}</button>
     </form>}
     <section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><button key={s.sceneId} onClick={()=>setSelected(s.sceneId)} className={`block w-full rounded-xl border p-3 text-left ${selected===s.sceneId?'border-primary':'border-border'}`}><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>)}</section>
-    {active&&<section className="space-y-3 rounded-2xl border border-border p-4"><h2 className="font-semibold">{active.title}</h2><p className="text-sm text-muted-foreground">{active.premise}</p><details open className="rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{st("Turnos y estado")}</summary>
+    {active&&<section className="relative isolate space-y-3 overflow-hidden rounded-3xl border border-white/15 bg-background/25 p-4 shadow-xl">
+      {sceneWallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-cover bg-center" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.38),rgba(0,0,0,.5)),url("${sceneWallpaper}")`}} />}
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{active.title}</h2>
+        <div className="flex items-center gap-2">
+          <label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
+            {es?'Cambiar fondo':'Change wallpaper'}
+            <input type="file" accept="image/*" className="sr-only" onChange={e=>{changeSceneWallpaper(e.target.files?.[0]);e.target.value='';}} />
+          </label>
+          {sceneWallpaper&&<button type="button" onClick={()=>changeSceneWallpaper()} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">{es?'Quitar':'Remove'}</button>}
+        </div>
+      </div><p className="text-sm text-muted-foreground">{active.premise}</p><details open className="rounded-xl border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{st("Turnos y estado")}</summary>
         <div className="space-y-3 pt-3">
           <label className="block space-y-1 text-sm"><span className="font-medium">{st("Estilo de escritura de IA")}</span>
             <select disabled={busy||active.status==='finished'} value={active.turnSettings?.style??'natural'}
@@ -243,7 +273,7 @@ export default function ScenesPage() {
           <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{state.characters.find(c=>c.id===id)?.avatar?<img src={state.characters.find(c=>c.id===id)!.avatar} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
-      </div>{active.canon === "main" && <SceneCanonReview key={`${universeId}:${active.sceneId}`} universeId={universeId} sceneId={active.sceneId} />}<div className="max-h-96 space-y-3 overflow-y-auto">{events.map(ev=><article key={ev.eventId} className="rounded-xl bg-secondary p-3 text-sm"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="flex min-w-0 flex-wrap gap-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><input ref={sceneMessageRef} value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-xl border border-border bg-background p-3"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
+      </div>{active.canon === "main" && <SceneCanonReview key={`${universeId}:${active.sceneId}`} universeId={universeId} sceneId={active.sceneId} />}<div className="max-h-[60dvh] space-y-3 overflow-y-auto rounded-2xl bg-background/15 p-2 backdrop-blur-[2px]">{events.map(ev=><article key={ev.eventId} className="rounded-2xl border border-white/10 bg-background/65 p-3 text-sm shadow-sm backdrop-blur-xl"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="flex min-w-0 flex-wrap gap-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><input ref={sceneMessageRef} value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-full border border-white/20 bg-background/50 p-3 backdrop-blur-xl"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
     {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
   </main>;
 }
