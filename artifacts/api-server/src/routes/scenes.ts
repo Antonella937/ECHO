@@ -454,9 +454,9 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
         "This is a separate scene, not a private DM. Only use the scene context below.",
         context,
         "[End scene context. Continue naturally as your character.]",
-      ].join("\\n").slice(0,6000);
+      ].join("\n").slice(0,6000);
       const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
-      const draft = z.object({text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
+      const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
     } else {
       const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
