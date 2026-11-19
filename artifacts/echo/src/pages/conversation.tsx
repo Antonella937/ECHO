@@ -401,7 +401,7 @@ export default function ConversationPage() {
       </div>
 
       {id && <DmCanonReview key={id} universeId={getActiveUniverseId(user?.id ?? '')} peerId={id} />}
-    <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-border/60 bg-background/45 px-3 pb-safe pt-2 backdrop-blur-md" data-testid="form-composer">
+    <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-white/10 bg-background/20 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
@@ -537,7 +537,7 @@ export default function ConversationPage() {
           <div className="flex items-center gap-2 pb-1">
             <input ref={fileRef} type="file" multiple hidden accept="image/*,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
               onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }} data-testid="input-attachment-file" />
-            <button type="button" onClick={() => fileRef.current?.click()} aria-label={t("Adjuntar foto, video o audio")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary" data-testid="button-attach">
+            <button type="button" onClick={() => fileRef.current?.click()} aria-label={t("Adjuntar foto, video o audio")} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-attach">
               <Paperclip className="h-5 w-5" strokeWidth={1.7} />
             </button>
             <textarea
@@ -547,12 +547,12 @@ export default function ConversationPage() {
               placeholder={`${t("Escribir como")} ${me.name.split(' ')[0]}…`}
               rows={1}
               maxLength={10000}
-              className="min-h-12 min-w-0 flex-1 resize-none overflow-hidden rounded-2xl border border-input bg-card px-5 py-3 text-[15px] placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
+              className="min-h-12 min-w-0 flex-1 resize-none overflow-hidden rounded-full border border-white/20 bg-background/35 px-5 py-3 text-[15px] shadow-sm backdrop-blur-xl placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
               aria-label={`${t("Mensaje para")} ${other.name}`}
               data-testid="input-message"
             />
             {!text.trim() && ready.length === 0 && !uploading ? (
-              <button type="button" onClick={() => { setRecordingTip(true); void recorder.start(); }} aria-label={t("Grabar nota de voz")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full bg-secondary" data-testid="button-record-voice">
+              <button type="button" onClick={() => { setRecordingTip(true); void recorder.start(); }} aria-label={t("Grabar nota de voz")} className="tap grid h-12 w-12 shrink-0 place-items-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl" data-testid="button-record-voice">
                 <Mic className="h-5 w-5" strokeWidth={1.8} />
               </button>
             ) : (
