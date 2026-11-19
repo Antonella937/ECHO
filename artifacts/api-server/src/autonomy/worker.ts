@@ -98,7 +98,8 @@ export async function runAutonomyWorkerTick(input: {
           result.status === "rate_limited" || result.status === "duplicate" ||
           result.status === "in_progress") noAction += 1;
         else failed += 1;
-      } catch {
+      } catch (error) {
+        console.warn("AUTONOMY_WORKER_CHARACTER_FAILED", { lane, code: safeErrorCode(error) });
         backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS);
         failed += 1;
       }
@@ -119,7 +120,11 @@ export async function runAutonomyWorkerTick(input: {
           if (result.status === "executed") executed++;
           else if (result.status === "failed") failed++;
           else noAction++;
-        } catch { backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS); failed++; }
+        } catch (error) {
+          console.warn("AUTONOMY_WORKER_CHARACTER_FAILED", { lane: "social", code: safeErrorCode(error) });
+          backgroundFailureUntil.set(failureKey, now.getTime() + FAILED_CHARACTER_BACKOFF_MS);
+          failed++;
+        }
       }
     }
     return { status: "completed", evaluated, executed, noAction, failed };
