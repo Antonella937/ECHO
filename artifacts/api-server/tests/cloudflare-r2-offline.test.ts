@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { configuredR2, signR2Request, type R2Config } from "../src/lib/cloudflareR2";
 import { fetchStored } from "../src/routes/supabase-storage";
+import { kindroidDmProvider } from "../src/ai-engine/kindroid";
 
 const config: R2Config = {
   accountId: "a".repeat(32),
@@ -74,5 +75,32 @@ test("Vision storage reader retrieves private R2 bytes through signed GET withou
       if (previous[index] === undefined) delete process.env[key];
       else process.env[key] = previous[index];
     });
+  }
+});
+
+test("Kindroid receives cached visual observations as text without sending a real DM", async () => {
+  const originalKey = process.env.ECHO_KINDROID_API_KEY;
+  const visualDescription = "A red circle centered on a blue canvas";
+  const message = "[ECHO private story reply: Caption: studio night. Cached visual observations (not identity verification): " + visualDescription + ". Write one natural private DM about the story using only grounded details.]";
+  let calls = 0;
+  try {
+    process.env.ECHO_KINDROID_API_KEY = "offline-test-only";
+    const request: typeof fetch = async (input, init) => {
+      calls++;
+      assert.equal(String(input), "https://api.kindroid.ai/v1/send-message");
+      const body = JSON.parse(String(init?.body)) as { ai_id: string; message: string; stream: boolean };
+      assert.equal(body.ai_id, "offline_test_kin_001");
+      assert.equal(body.stream, false);
+      assert.ok(body.message.includes(visualDescription));
+      assert.ok(!body.message.includes("/objects/r2/"));
+      return new Response("That red circle is striking.", { status: 200 });
+    };
+    const provider = kindroidDmProvider(message, "offline_test_kin_001", "", request);
+    const result = await provider.complete({} as Parameters<typeof provider.complete>[0]);
+    assert.ok(result.text.includes("That red circle is striking."));
+    assert.equal(calls, 1);
+  } finally {
+    if (originalKey === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = originalKey;
   }
 });
