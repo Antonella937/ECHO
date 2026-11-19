@@ -147,7 +147,13 @@ kindroidLinksRouter.get('/characters/kindroid-link/retry-history-check', async (
     url.searchParams.set('ai_id',String(links.rows[0].kin_id));
     url.searchParams.set('limit','100');
     const upstream=await fetch(url,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(12000)});
-    if(!upstream.ok){await upstream.body?.cancel();res.status(502).json({error:'KINDROID_HISTORY_UNAVAILABLE',status:upstream.status});return;}
+    if(!upstream.ok){
+      await upstream.body?.cancel();
+      // Preserve upstream status as structured metadata for the owner, but never
+      // expose provider response bodies or private conversation content.
+      res.json({historyReadable:false,delivery:'unknown',reason:'PROVIDER_HTTP_ERROR',providerStatus:upstream.status,safeToSend:false});
+      return;
+    }
     const body:unknown=await upstream.json();
     const rows=Array.isArray(body)?body:body && typeof body==='object' && !Array.isArray(body)
       ? (body as Record<string,unknown>).messages : undefined;
