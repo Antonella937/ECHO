@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLanguage } from '@/lib/i18n';
 const groupLabels: Record<string, Record<string,string>> = {"en":{"Salir del grupo":"Leave group","Eliminar grupo definitivamente":"Permanently delete group","Salir del modo espectadora":"Exit spectator mode","Estás viendo este grupo como espectadora. No sos participante.":"You're viewing this group as a spectator. You're not a participant."},"pt":{"Salir del grupo":"Sair do grupo","Eliminar grupo definitivamente":"Excluir grupo permanentemente","Salir del modo espectadora":"Sair do modo espectador","Estás viendo este grupo como espectadora. No sos participante.":"Você está vendo este grupo como espectadora. Não é participante."},"fr":{"Salir del grupo":"Quitter le groupe","Eliminar grupo definitivamente":"Supprimer définitivement le groupe","Salir del modo espectadora":"Quitter le mode spectateur","Estás viendo este grupo como espectadora. No sos participante.":"Vous regardez ce groupe en spectatrice. Vous ne participez pas."},"de":{"Salir del grupo":"Gruppe verlassen","Eliminar grupo definitivamente":"Gruppe endgültig löschen","Salir del modo espectadora":"Zuschauermodus verlassen","Estás viendo este grupo como espectadora. No sos participante.":"Du siehst diese Gruppe als Zuschauerin und bist kein Mitglied."},"it":{"Salir del grupo":"Esci dal gruppo","Eliminar grupo definitivamente":"Elimina definitivamente il gruppo","Salir del modo espectadora":"Esci dalla modalità spettatore","Estás viendo este grupo como espectadora. No sos participante.":"Stai osservando questo gruppo senza partecipare."},"ko":{"Salir del grupo":"그룹 나가기","Eliminar grupo definitivamente":"그룹 영구 삭제","Salir del modo espectadora":"관전자 모드 나가기","Estás viendo este grupo como espectadora. No sos participante.":"이 그룹을 관전 중이며 참여자가 아닙니다."},"ja":{"Salir del grupo":"グループを退出","Eliminar grupo definitivamente":"グループを完全に削除","Salir del modo espectadora":"観戦モードを終了","Estás viendo este grupo como espectadora. No sos participante.":"このグループを観覧中です。参加者ではありません。"},"zh":{"Salir del grupo":"退出群组","Eliminar grupo definitivamente":"永久删除群组","Salir del modo espectadora":"退出旁观模式","Estás viendo este grupo como espectadora. No sos participante.":"你正在旁观此群组，并非参与者。"}};
 import { useLocation, useParams } from 'wouter';
-import { ChevronLeft, Send, Users, MoreHorizontal, Search, Pin, Paperclip, X, Mic, Square } from 'lucide-react';
+import { ChevronLeft, Send, Users, MoreHorizontal, Search, Pin, Plus, X, Mic, Square } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useSocial } from '@/store/social-store';
@@ -36,6 +36,19 @@ export default function GroupConversationPage() {
   const [text, setText] = useState('');
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
+  const [toolsOpen,setToolsOpen] = useState(false);
+  const [wallpaperOpen,setWallpaperOpen] = useState(false);
+  const [wallpaper,setWallpaper] = useState('');
+  const wallpaperKey=user?.id&&id?`echo:group-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${me.id}:${id}`:'';
+  useEffect(()=>{try{setWallpaper(wallpaperKey?localStorage.getItem(wallpaperKey)??'':'');}catch{setWallpaper('');}},[wallpaperKey]);
+  const changeWallpaper=(file?:File)=>{
+    if(!wallpaperKey)return;
+    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setWallpaper('');return;}
+    if(!file.type.startsWith('image/')||file.size>1_500_000){setError('Elegí una imagen de menos de 1,5 MB.');return;}
+    const reader=new FileReader();
+    reader.onload=()=>{if(typeof reader.result!=='string')return;try{localStorage.setItem(wallpaperKey,reader.result);setWallpaper(reader.result);setError('');}catch{setError('No se pudo guardar el fondo.');}};
+    reader.readAsDataURL(file);
+  };
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
   const [savingTrackId, setSavingTrackId] = useState<string | null>(null);
@@ -295,8 +308,9 @@ export default function GroupConversationPage() {
     } catch { setError('No se pudo enviar el mensaje.'); }
     finally { setSending(false); setUploading(false); }
   };
-  return <div className="flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
-    <header className="z-30 shrink-0 border-b border-border/60 bg-background/95 pt-safe backdrop-blur-xl"><div className="flex h-16 min-w-0 items-center gap-3 px-2">
+  return <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
+    {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper}")`}} />}
+    <header className="relative z-30 shrink-0 border-0 bg-transparent pt-safe"><div className="flex h-16 min-w-0 items-center gap-3 px-2">
       <button onClick={() => navigate('/messages')} aria-label="Volver" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><ChevronLeft className="h-6 w-6" /></button>
       <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible rounded-full bg-secondary">{group?.avatar ? <img src={resolveMedia(group.avatar)} alt="" className="h-11 w-11 rounded-full object-cover" /> : <Users className="h-5 w-5" />}<span className="absolute -bottom-1 -right-1 rounded-full border-2 border-background bg-primary px-1 text-[10px] text-primary-foreground">{group?.participantIds.length ?? 0}</span></div>
       <div className="min-w-0 flex-1"><h1 className="truncate text-[15px] font-semibold">{group?.name ?? 'Grupo'}</h1><p className="truncate text-xs text-muted-foreground">{group?.participantIds.map(x => character(x)?.name ?? x).join(', ')}</p></div>
@@ -370,7 +384,7 @@ export default function GroupConversationPage() {
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
     </div>}
-    <main className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-5" data-testid="group-messages">
+    <main className="relative z-10 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-transparent px-4 py-5" data-testid="group-messages">
       {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">Podés iniciar la escena desde el modo espectadora, sin mandar un mensaje.</p></div>}
       {messages.filter(m => m.pinnedAt).length > 0 && <div className="mb-3 rounded-xl bg-secondary/70 px-3 py-2 text-xs"><Pin className="mr-1 inline h-3 w-3" /> {messages.filter(m => m.pinnedAt).length} mensaje(s) fijado(s)</div>}
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>
@@ -401,11 +415,7 @@ export default function GroupConversationPage() {
     {error && <p role="alert" className="px-4 text-sm text-destructive">{error}</p>}
     {!!pendingFiles.length && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2">{pendingFiles.map((file, index) => <span key={index} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-secondary px-2 py-1 text-xs"><span className="max-w-36 truncate">{file.name}</span><button type="button" aria-label="Quitar archivo" onClick={() => setPendingFiles(files => files.filter((_, i) => i !== index))}><X className="h-3 w-3" /></button></span>)}</div>}
     {recorder.status !== 'idle' && <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2 text-sm"><span>{recorder.status === 'requesting' ? 'Solicitando micrófono…' : `Grabando · ${formatDuration(recorder.elapsed)}`}</span><div className="flex gap-3"><button type="button" onClick={recorder.cancel} className="text-muted-foreground">Cancelar</button><button type="button" onClick={recorder.stop} className="font-semibold text-primary">Terminar</button></div></div>}
-    <div className="shrink-0 border-t border-border px-3 py-2">
-      <button type="button" onClick={() => { setShowMusicLibrary(value => !value); setMusicDraftStatus(''); }}
-        className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">
-        {showMusicLibrary ? 'Cerrar música' : '🎵 ECHO Music'}
-      </button>
+    <div className="relative z-30 shrink-0 border-0 bg-transparent px-3 py-2">
       {musicDraftStatus && <p role="status" className="mt-2 text-xs text-muted-foreground">{musicDraftStatus}</p>}
       {showMusicLibrary && <div className="mt-2">
         <MusicLibraryPicker characterId={me.id} onCancel={() => setShowMusicLibrary(false)} onSelect={async selection => {
@@ -427,12 +437,20 @@ export default function GroupConversationPage() {
         }} />
       </div>}
     </div>
+    {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="block cursor-pointer rounded-xl border border-white/20 p-3 text-sm">Elegir foto de fondo<input type="file" accept="image/*" className="sr-only" onChange={e=>{changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
     {group && id && group.participantIds.includes(me.id) && <GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} />}
-    <form onSubmit={send} className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-background px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
+    <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
-      <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Adjuntar archivos" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary"><Paperclip className="h-5 w-5" /></button>
+      <div className="relative shrink-0">
+        {toolsOpen&&<div role="menu" aria-label="Opciones del grupo" className="absolute bottom-full left-0 z-50 mb-3 w-[min(19rem,calc(100vw-2rem))] rounded-3xl border border-white/20 bg-background/90 p-2 shadow-2xl backdrop-blur-2xl">
+          <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);setWallpaperOpen(true);}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">◉ Apariencia del chat</button>
+          <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);fileRef.current?.click();}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">＋ Adjuntar fotos o archivos</button>
+          <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);setShowMusicLibrary(true);setMusicDraftStatus('');}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">♫ ECHO Music</button>
+        </div>}
+        <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-label="Más opciones" aria-expanded={toolsOpen} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-background/40 backdrop-blur-xl"><Plus className={toolsOpen?'h-6 w-6 rotate-45':'h-6 w-6'}/></button>
+      </div>
       <button type="button" onClick={() => void recorder.start()} disabled={recorder.status !== 'idle' || sending || pendingFiles.length >= 5} aria-label="Grabar nota de voz" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-50"><Mic className="h-5 w-5" /></button>
-      <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="max-h-36 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-2xl bg-secondary px-4 py-3 outline-none whitespace-pre-wrap" aria-label="Mensaje al grupo" />
+      <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="max-h-36 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-full border border-white/20 bg-background/40 px-4 py-3 outline-none backdrop-blur-xl whitespace-pre-wrap" aria-label="Mensaje al grupo" />
       <button disabled={(!text.trim() && !pendingFiles.length) || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
     </form>
   </div>;
