@@ -199,7 +199,7 @@ export default function ScenesPage() {
   };
   return <main className={active ? "relative isolate mx-auto flex h-[100dvh] w-full max-w-2xl min-w-0 flex-col overflow-hidden bg-background" : "mx-auto w-full max-w-2xl min-w-0 space-y-5 overflow-x-hidden px-4 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]"}>
     {!active&&<div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur"><h1 className="text-xl font-bold">ECHO Scenes</h1><Link href="/messages" className="shrink-0 text-sm text-muted-foreground">{st("Volver a mensajes")}</Link></div>}
-    {!active&&<button type="button" onClick={()=>setShowCreate(value=>!value)} className="w-full rounded-xl border border-border p-3 text-left text-sm font-semibold">{showCreate ? (es?"− Ocultar creación":"− Hide creation") : (es?"+ Crear nueva escena":"+ Create new scene")}</button>
+    {!active&&<button type="button" onClick={()=>setShowCreate(value=>!value)} className="w-full rounded-xl border border-border p-3 text-left text-sm font-semibold">{showCreate ? (es?"− Ocultar creación":"− Hide creation") : (es?"+ Crear nueva escena":"+ Create new scene")}</button>}
     {!active&&showCreate&&<form onSubmit={create} className="space-y-3 rounded-2xl border border-border p-4">
       <h2 className="font-semibold">{st("Crear escena")}</h2>
       <input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} placeholder={st("Título")} className="w-full rounded-xl border border-border bg-background p-3"/>
