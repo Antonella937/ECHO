@@ -57,7 +57,9 @@ function analysisKey(entityType: VisionEntityType, entityId: string, mediaId: st
 }
 
 function safeImagePath(path: string): boolean {
-  // Both legacy private uploads and owner-scoped Cloudflare R2 media are stored\n  // in echo_media. Do not accept arbitrary external URLs or bypass ownership/ACL checks.\n  return /^\/objects\/(?:uploads|r2)\/[a-f0-9-]{20,}$/i.test(path);
+  // Both legacy private uploads and owner-scoped Cloudflare R2 media are stored
+  // in echo_media. Do not accept arbitrary external URLs or bypass ownership/ACL checks.
+  return /^\/objects\/(?:uploads|r2)\/[a-f0-9-]{20,}$/i.test(path);
 }
 
 function hashImage(mimeType: string, bytes: Buffer): string {
