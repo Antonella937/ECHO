@@ -223,7 +223,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             }).slice(0, 10).join(', ')
           : '';
         const namedStorySubject = storyForReply && (storyForReply.mentionedAccountIds ?? []).length === 1
-          ? parsed.data.state.characters.find(c => c.id === storyForReply.mentionedAccountIds[0])?.name
+          ? parsed.data.state.characters.find(c => c.id === (storyForReply.mentionedAccountIds ?? [])[0])?.name
           : undefined;
         const storyMetadata = storyForReply
           ? `Media type: ${storyForReply.image ? 'PHOTO (still image, not video or clip)' : 'text-only story (no photo)'}. Tagged accounts: ${storyMentions || 'none'}. Tagged accounts are explicitly named people, but a tag alone does not prove a face's identity. ${namedStorySubject ? `The story explicitly tags ${namedStorySubject}. If the caption refers to a singular person being teased or photographed and the visual observations are consistent, understand that ${namedStorySubject} is the intended subject; refer to ${namedStorySubject} by name, not yourself. If visual evidence conflicts or multiple people make the subject ambiguous, distinguish the tag from what can be seen instead of asserting identity. ` : ''}`
