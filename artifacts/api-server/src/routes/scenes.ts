@@ -7,6 +7,7 @@ import { db, echoUniversesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
+import { kindroidDmProvider } from "../ai-engine/kindroid";
 
 export const scenesRouter: IRouter = Router();
 scenesRouter.use(requireAuth);
@@ -439,9 +440,30 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       character: { ...character, avatar: undefined, identity: undefined, referenceImages: undefined },
       participants: people, sceneMemory: previousSummary,
       visibleEvents: visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text })) }).slice(0,18000);
-    const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
-    const decoded: unknown = JSON.parse(completion.text);
-    const result = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded);
+    // Linked Kindroid characters use their existing voice for scene dialogue.
+    // Do not silently fall back to another model if the external provider fails.
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND character_id=${characterId}
+        AND enabled=true LIMIT 1`);
+    const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
+    let replyText: string;
+    if (kinId) {
+      const scenePrompt = [
+        "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
+        "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
+        "This is a separate scene, not a private DM. Only use the scene context below.",
+        context,
+        "[End scene context. Continue naturally as your character.]",
+      ].join("\\n").slice(0,6000);
+      const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:""});
+      const draft = z.object({text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
+      replyText = draft.text;
+    } else {
+      const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
+      const decoded: unknown = JSON.parse(completion.text);
+      replyText = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded).text;
+    }
+    const result = {text:replyText};
     await db.execute(sql`UPDATE echo_scene_events SET text = ${result.text} WHERE owner_id = ${ownerId}
       AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND event_id = ${eventId}`);
     reservedId = null;
