@@ -92,7 +92,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
    <button type="button" className="mt-3 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground" disabled={saving||processing} onClick={async()=>{
     setSaving(true);setUploadError('');
     try{
-     const match=storageKey.match(/^echo:dm-appearance:[^:]+:([^:]+):([^:]+)$/);
+     const match=storageKey.match(/^echo:dm-appearance:[^:]+:([^:]+):([^:]+):([^:]+)$/);
      if(!match)throw Error('Missing conversation');
      let image=draft.image;
      if(image?.startsWith('data:image/')){
@@ -101,7 +101,7 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
      const next={...draft,image,layout:draft.layout??'chat'};
      try{
       await customFetch('/api/dm/appearance',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({universeId:match[1],characterId:match[2],appearance:next})});
+       body:JSON.stringify({universeId:match[1],identityId:match[2],characterId:match[3],appearance:next})});
      }catch(error){throw new Error(`Error al guardar el fondo del chat: ${error instanceof Error?error.message:'el servidor rechazó la configuración'}`); }
      try{localStorage.setItem(storageKey,JSON.stringify(next));}catch{/* server copy is authoritative */}
      onChange(next);setOpen(false);
