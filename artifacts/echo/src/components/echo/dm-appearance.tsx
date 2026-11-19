@@ -55,7 +55,7 @@ export function readDmAppearance(key:string):DmAppearance{
    opacity:typeof raw?.opacity==='number'&&Number.isFinite(raw.opacity)?Math.max(0,Math.min(100,raw.opacity)):35, image:typeof raw?.image==='string'&&(raw.image.startsWith('data:image/')||raw.image.startsWith('/objects/'))?raw.image:undefined,layout:raw?.layout==='narrative'?'narrative':'chat'};
  }catch{return {background:'none',opacity:35};}
 }
-export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void}){
+export function DmAppearanceSettings({storageKey,value,onChange,externalOpen,onExternalClose}:{storageKey:string;value:DmAppearance;onChange:(next:DmAppearance)=>void;externalOpen?:boolean;onExternalClose?:()=>void}){
  const lang=useLanguage();const t=words[lang]??words.en;
  const [open,setOpen]=useState(false);
  const [uploadError,setUploadError]=useState('');
@@ -64,9 +64,9 @@ export function DmAppearanceSettings({storageKey,value,onChange}:{storageKey:str
  const [draft,setDraft]=useState(value);
  useEffect(()=>setDraft(value),[value]);
  return <div className="relative">
-  <button type="button" onClick={()=>setOpen(v=>!v)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl transition hover:bg-secondary/50" aria-expanded={open} aria-label={t[0]} title={t[0]}><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18h-1.5a2 2 0 0 1-1.5-2 2 2 0 0 1 2-2h1a2 2 0 0 0 2-2 2 2 0 0 0-2-2h-1a2 2 0 0 1-2-2 2 2 0 0 1 2-2z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="11" cy="7" r=".8"/><circle cx="16" cy="9" r=".8"/></svg></button>
-  {open&&<section className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-background p-3 shadow-xl">
-   <p className="mb-2 text-xs font-medium">{t[1]}</p>
+  {externalOpen===undefined&&<button type="button" onClick={()=>setOpen(v=>!v)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl transition hover:bg-secondary/50" aria-expanded={open} aria-label={t[0]} title={t[0]}><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18h-1.5a2 2 0 0 1-1.5-2 2 2 0 0 1 2-2h1a2 2 0 0 0 2-2 2 2 0 0 0-2-2h-1a2 2 0 0 1-2-2 2 2 0 0 1 2-2z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="11" cy="7" r=".8"/><circle cx="16" cy="9" r=".8"/></svg></button>}
+  {(externalOpen??open)&&<section className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-background p-3 shadow-xl">
+   <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-medium">{t[1]}</p><button type="button" aria-label="Cerrar" onClick={()=>{setOpen(false);onExternalClose?.();}}>✕</button></div>
    <div className="flex flex-wrap gap-2">{choices.map(choice=><button type="button" key={choice}
     aria-label={choice==='none'?t[3]:choice==='dark'?t[4]:choice}
     aria-pressed={draft.background===choice}
