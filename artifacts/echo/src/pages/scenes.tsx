@@ -25,6 +25,7 @@ export default function ScenesPage() {
   const [presence,setPresence] = useState<Record<string,'present'|'absent'|'left'>>({});
   const [title,setTitle] = useState('');
   const [premise,setPremise] = useState('');
+  const [createMode,setCreateMode] = useState<'automatic'|'manual'>('manual');
   const [canon,setCanon] = useState<'main'|'alternate'>('main');
   const [participants,setParticipants] = useState<string[]>([]);
   const [message,setMessage] = useState('');
@@ -78,7 +79,7 @@ export default function ScenesPage() {
     finally{setBusy(false)}
   };
   const create = async (e:FormEvent) => {e.preventDefault();if(!participants.length)return;setBusy(true);setError('');
-    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);setSourceMessage(null);setShowCreate(false);}
+    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await customFetch(`/api/scenes/${encodeURIComponent(r.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:createMode,order:[me.id,...participants],nextCharacterId:null,autoReply:createMode==='automatic'})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);setSourceMessage(null);setShowCreate(false);}
     catch{setError(es?'No se pudo crear la escena.':'Could not create scene.')}finally{setBusy(false)}
   };
   const send = async (e:FormEvent) => {e.preventDefault();if(!selected||!message.trim())return;setBusy(true);setError('');
@@ -109,7 +110,7 @@ export default function ScenesPage() {
     try {
       const result=await customFetch<{turnSettings:NonNullable<Scene['turnSettings']>}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/turns`,{
         method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({universeId,mode,order:active.turnSettings?.order??active.participantIds,nextCharacterId,style:options.style??active.turnSettings?.style??'natural',autoReply:options.autoReply??active.turnSettings?.autoReply??false})
+        body:JSON.stringify({universeId,mode,order:active.turnSettings?.order??active.participantIds,nextCharacterId,style:options.style??active.turnSettings?.style??'natural',autoReply:mode==='manual'?false:(options.autoReply??active.turnSettings?.autoReply??false)})
       });
       setScenes(previous=>previous.map(scene=>scene.sceneId===active.sceneId?{...scene,turnSettings:result.turnSettings}:scene));
       setNextSpeaker('');
@@ -117,8 +118,13 @@ export default function ScenesPage() {
     finally{setBusy(false)}
   };
   const generateReply = async (characterId:string)=>{
-    if(!active)return;setBusy(true);setError('');
+    if(!active || busy)return;setBusy(true);setError('');
     try{
+      if(!events.some(event=>event.text.trim())){setError(es?'Primero escribí el mensaje inicial de la escena. Después tocá el personaje que querés que responda.':'Write the opening scene message first, then tap a character to reply.');return;}
+      if(active.turnSettings?.mode==='manual' && active.turnSettings?.nextCharacterId!==characterId){
+        const result=await customFetch<{turnSettings:NonNullable<Scene['turnSettings']>}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:'manual',order:active.turnSettings?.order??active.participantIds,nextCharacterId:characterId,style:active.turnSettings?.style??'natural',autoReply:false})});
+        setScenes(previous=>previous.map(scene=>scene.sceneId===active.sceneId?{...scene,turnSettings:result.turnSettings}:scene));
+      }
       await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/reply`,{
         method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({universeId,characterId})
@@ -128,7 +134,7 @@ export default function ScenesPage() {
         customFetch<{scenes:Scene[]}>(`/api/scenes?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'})
       ]);
       setEvents(history.events);setScenes(listing.scenes);
-    }catch{setError(es?'No se pudo generar la respuesta. Revisá el turno y los créditos de IA.':'Could not generate a reply. Check turn settings and AI credits.')}
+    }catch{setError(es?'No se pudo generar la respuesta. Comprobá que haya un mensaje nuevo y que ese personaje no haya respondido ya al mismo turno.':'Could not generate a reply. Check for a new scene message and whether this character already replied to that turn.')}
     finally{setBusy(false)}
   };
   const continueScene = async () => {
@@ -181,6 +187,10 @@ export default function ScenesPage() {
       <select value={canon} onChange={e=>setCanon(e.target.value as 'main'|'alternate')} className="w-full rounded-xl border border-border bg-background p-3"><option value="main">{st("Canon principal")}</option><option value="alternate">{st("Universo alternativo")}</option></select>
       <div className="text-sm font-medium">{st("Participantes")}</div>
       <div className="max-h-40 space-y-2 overflow-y-auto">{characters.map(c=><label key={c.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={participants.includes(c.id)} onChange={e=>setParticipants(old=>e.target.checked?[...old,c.id]:old.filter(x=>x!==c.id))}/>{c.name}</label>)}</div>
+      <fieldset className="space-y-2"><legend className="text-sm font-medium">{es?'Modo de turnos':'Turn mode'}</legend>
+        <div className="grid grid-cols-2 gap-2">{(['manual','automatic'] as const).map(mode=><button key={mode} type="button" aria-pressed={createMode===mode} onClick={()=>setCreateMode(mode)} className={`rounded-xl border p-3 text-sm ${createMode===mode?'border-primary bg-primary/10':'border-border'}`}>{mode==='manual'?st('Manual'):st('Automático')}</button>)}</div>
+        <p className="text-xs text-muted-foreground">{createMode==='manual'?(es?'Elegí quién responde tocando su avatar.':'Tap an avatar to choose who replies.'):(es?'Los personajes responden según el contexto.':'Characters reply based on context.')}</p>
+      </fieldset>
       <button disabled={busy||!title.trim()||!participants.length} className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">{st("Crear")}</button>
     </form>}
     <section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><button key={s.sceneId} onClick={()=>setSelected(s.sceneId)} className={`block w-full rounded-xl border p-3 text-left ${selected===s.sceneId?'border-primary':'border-border'}`}><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>)}</section>
@@ -197,7 +207,7 @@ export default function ScenesPage() {
             </select>
           </label>
           <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
-            <input type="checkbox" className="mt-1" disabled={busy||active.status==='finished'} checked={active.turnSettings?.autoReply??false}
+            <input type="checkbox" className="mt-1" disabled={busy||active.status==='finished'||active.turnSettings?.mode==='manual'} checked={active.turnSettings?.autoReply??false}
               onChange={e=>void updateTurns(active.turnSettings?.mode??'automatic',active.turnSettings?.nextCharacterId??null,{autoReply:e.target.checked})}/>
             <span><strong>{st("Autonomía de respuesta")}</strong><span className="mt-1 block text-xs text-muted-foreground">{es?'La IA responde automáticamente una vez después de que escribís. Para continuar sin escribir, usá «Continuar escena».':'AI replies once after you send a message. To continue without writing, use Continue scene.'}</span></span>
           </label>
@@ -227,10 +237,11 @@ export default function ScenesPage() {
           </div>
         </div>
       </details><div className="flex flex-wrap gap-2">
-        {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
+        {active.status==='active'&&<button type="button" disabled={busy||active.turnSettings?.mode==='manual'} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
-          className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-          ✦ {state.characters.find(c=>c.id===id)?.name??id}
+          title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex flex-col items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{state.characters.find(c=>c.id===id)?.avatar?<img src={state.characters.find(c=>c.id===id)!.avatar} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
+          {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
       </div>{active.canon === "main" && <SceneCanonReview key={`${universeId}:${active.sceneId}`} universeId={universeId} sceneId={active.sceneId} />}<div className="max-h-96 space-y-3 overflow-y-auto">{events.map(ev=><article key={ev.eventId} className="rounded-xl bg-secondary p-3 text-sm"><strong>{ev.actorId===me.id?me.name:state.characters.find(c=>c.id===ev.actorId)?.name??ev.actorId}</strong><p className="mt-1 whitespace-pre-wrap"><SocialText text={ev.text} /></p></article>)}</div><form onSubmit={send} className="flex min-w-0 flex-wrap gap-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><input ref={sceneMessageRef} value={message} onChange={e=>setMessage(e.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="min-w-0 flex-1 rounded-xl border border-border bg-background p-3"/><button disabled={busy||active.status!=='active'||!message.trim()} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{st("Enviar")}</button></form></section>}
     {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}

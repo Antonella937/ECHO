@@ -33,7 +33,7 @@ async function classifyKindroidFailure(response: Response): Promise<{category:st
     if (/(?:chat|conversation|history|context).{0,45}(?:unavailable|invalid|disabled|locked|missing|not found|limit|exceeded)|(?:unavailable|invalid|disabled|locked).{0,45}(?:chat|conversation|history)/.test(raw)) return result('conversation_restriction',providerCode,errorFormat,errorFingerprint);
     if (/(?:internal error|server error|service unavailable|temporarily unavailable|maintenance|overloaded)/.test(raw)) return result('upstream_unavailable',providerCode,errorFormat,errorFingerprint);
     if (/invalid (?:ai[_ -]?id|kin[_ -]?id|character)|(?:ai[_ -]?id|kin[_ -]?id|character) (?:invalid|not found|does not exist)|character not found/.test(raw)) return result('invalid_character',providerCode,errorFormat,errorFingerprint);
-    if (/message (?:is )?(?:invalid|missing|too long)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return result('invalid_message',providerCode,errorFormat,errorFingerprint);
+    if (/(?:message (?:is )?(?:invalid|missing|too long)|invalid message)|(?:length|content) (?:limit|exceeded|invalid)|too long/.test(raw)) return result('invalid_message',providerCode,errorFormat,errorFingerprint);
     if (/(?:invalid|missing|unexpected|unsupported) (?:stream|parameter|field|payload|json)|(?:stream|parameter|field|payload|json) (?:invalid|missing|unsupported)/.test(raw)) return result('invalid_payload',providerCode,errorFormat,errorFingerprint);
     return result('bad_request_unknown',providerCode,errorFormat,errorFingerprint);
   } catch {

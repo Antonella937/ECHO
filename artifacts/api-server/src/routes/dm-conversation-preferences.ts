@@ -108,25 +108,43 @@ const appearance = z.object({
   image:z.string().regex(new RegExp("^/objects/(?:uploads|r2)/[0-9a-f-]{36}$","i")).optional(),
 }).strict().refine(value=>value.background!=="photo" || !!value.image);
 const defaultAppearance={background:"none",opacity:35,layout:"chat"};
-dmConversationPreferencesRouter.get("/dm/appearance", async(req,res)=>{
+// Identity-scoped wallpapers live alongside the legacy appearance, without changing the
+// preference table's primary key or overwriting AI conversation preferences.
+const appearanceScope=scope.extend({identityId:identifier});
+async function validAppearancePair(ownerId:string,universeId:string,identityId:string,characterId:string){
+ if(identityId===characterId)return false;
+ return (await ownsCharacter(ownerId,universeId,identityId)) && (await ownsCharacter(ownerId,universeId,characterId));
+}
+dmConversationPreferencesRouter.get("/dm/appearance",async(req,res)=>{
  res.setHeader("Cache-Control","private, no-store");
- const parsed=scope.safeParse(req.query);
+ const parsed=appearanceScope.safeParse(req.query);
  if(!parsed.success){res.status(400).json({error:"INVALID_QUERY"});return;}
- const {universeId,characterId}=parsed.data;
+ const {universeId,characterId,identityId}=parsed.data;
  try{
-  if(!await ownsCharacter(req.userId!,universeId,characterId)){res.status(403).json({error:"CHARACTER_NOT_ACCESSIBLE"});return;}
-  const result=await db.execute(sql`SELECT preferences->'appearance' AS appearance FROM echo_dm_conversation_preferences WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} LIMIT 1`);
+  if(!await validAppearancePair(req.userId!,universeId,identityId,characterId)){res.status(403).json({error:"CHARACTER_NOT_ACCESSIBLE"});return;}
+  const result=await db.execute(sql`SELECT preferences->'appearanceByIdentity'->${identityId} AS appearance FROM echo_dm_conversation_preferences WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} LIMIT 1`);
   const validated=appearance.safeParse(result.rows[0]?.appearance);
-  res.json({appearance:validated.success?validated.data:defaultAppearance});
+  if(validated.success){res.json({appearance:validated.data});return;}
+  // Read-only migration fallback: only the universe's original persona sees old wallpapers.
+  // Other identities must never inherit a legacy conversation background.
+  const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+   .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,universeId))).limit(1);
+  const originalId=(universe?.state as {characters?:Array<{id:string}>}|null)?.characters?.[0]?.id;
+  if(identityId===originalId){
+   const legacy=await db.execute(sql`SELECT preferences->'appearance' AS appearance FROM echo_dm_conversation_preferences WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND character_id=${characterId} LIMIT 1`);
+   const previous=appearance.safeParse(legacy.rows[0]?.appearance);
+   if(previous.success){res.json({appearance:previous.data,inherited:true});return;}
+  }
+  res.json({appearance:defaultAppearance});
  }catch{res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
 });
 dmConversationPreferencesRouter.put("/dm/appearance",async(req,res)=>{
  res.setHeader("Cache-Control","private, no-store");
- const parsed=scope.extend({appearance}).strict().safeParse(req.body);
+ const parsed=appearanceScope.extend({appearance}).strict().safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"INVALID_DM_APPEARANCE"});return;}
- const {universeId,characterId}=parsed.data;
+ const {universeId,characterId,identityId}=parsed.data;
  try{
-  if(!await ownsCharacter(req.userId!,universeId,characterId)){res.status(403).json({error:"CHARACTER_NOT_ACCESSIBLE"});return;}
+  if(!await validAppearancePair(req.userId!,universeId,identityId,characterId)){res.status(403).json({error:"CHARACTER_NOT_ACCESSIBLE"});return;}
   if(parsed.data.appearance.image){
    const [owned]=await db.select({objectPath:echoMediaTable.objectPath}).from(echoMediaTable)
     .where(and(eq(echoMediaTable.ownerId,req.userId!),eq(echoMediaTable.objectPath,parsed.data.appearance.image))).limit(1);
@@ -134,9 +152,9 @@ dmConversationPreferencesRouter.put("/dm/appearance",async(req,res)=>{
   }
   const payload=JSON.stringify(parsed.data.appearance);
   await db.execute(sql`INSERT INTO echo_dm_conversation_preferences(owner_id,universe_id,character_id,preferences)
-   VALUES(${req.userId!},${universeId},${characterId},jsonb_build_object('appearance',${payload}::jsonb))
+   VALUES(${req.userId!},${universeId},${characterId},jsonb_build_object('appearanceByIdentity',jsonb_build_object(${identityId},${payload}::jsonb)))
    ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET
-   preferences=jsonb_set(COALESCE(echo_dm_conversation_preferences.preferences,'{}'::jsonb),'{appearance}',${payload}::jsonb),updated_at=now()`);
+   preferences=jsonb_set(COALESCE(echo_dm_conversation_preferences.preferences,'{}'::jsonb),ARRAY['appearanceByIdentity',${identityId}],${payload}::jsonb,true),updated_at=now()`);
   res.json({appearance:parsed.data.appearance});
  }catch{res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
 });
