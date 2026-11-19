@@ -130,13 +130,11 @@ async function recoverPersistedDmOnce(): Promise<void> {
   // Syntax: ownerId:universeId:characterId, separated by commas.
   const allowlist = (process.env.ECHO_DM_RECOVERY_TARGETS ?? "").split(",").map(x => x.trim()).filter(Boolean);
   if (!allowlist.length) return;
-  const targets = await listLiveOptInTargets();
   const cutoff = Date.now() - 48 * 60 * 60_000;
   for (const key of allowlist) {
     const [ownerId, universeId, characterId] = key.split(":");
     if (!ownerId || !universeId || !characterId) continue;
-    const target = targets.find(t => t.ownerId === ownerId && t.universeId === universeId && t.characterId === characterId);
-    if (!target) continue;
+    const target = { ownerId, universeId, characterId };
     const link = await db.execute(sql`SELECT 1 FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
         AND character_id = ${characterId} AND enabled = true LIMIT 1`);
