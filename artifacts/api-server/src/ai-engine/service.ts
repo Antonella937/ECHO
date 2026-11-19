@@ -237,7 +237,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // have not viewed them. Keep this separate from other people's viewed stories.
         // Only attach it when the incoming message refers to a story, to protect
         // Kindroid's limited context budget and avoid irrelevant social leakage.
-        const asksAboutStory = /\\b(story|stories|status|historia|historias|subiste|publicaste)\\b/i.test(newest?.text ?? '');
+        const asksAboutStory = /\b(story|stories|status|historia|historias|subiste|publicaste)\b/i.test(newest?.text ?? '');
         if (asksAboutStory && !storyForReply) {
           const ownStories = parsed.data.state.stories
             .filter(st => st.authorId === input.characterId)
@@ -248,8 +248,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
               const tags = (st.mentionedAccountIds ?? []).map(id =>
                 parsed.data.state.characters.find(ch => ch.id === id)?.name ?? id).slice(0, 4);
               return `Published ${st.createdAt}: ${st.image ? 'still photo' : 'text-only'}; caption: "${(st.caption ?? '').slice(0, 180)}"; tagged accounts: ${tags.join(', ') || 'none'}.`;
-            }).join('\\n');
-            outgoingPrompt += `\\n[ECHO OWN PROFILE — VERIFIED PUBLISHED STORIES: These are stories on YOUR (${actorName}) profile, not stories posted by the person messaging you. You can refer to their captions, media type and tagged accounts. Tags identify mentioned accounts, not visually verified faces. Do not invent unseen image details. If asked which story, distinguish the entries by caption and time.\\n${ownStoryContext.slice(0, 650)}\\n]`;
+            }).join('\n');
+            outgoingPrompt += `\n[ECHO OWN PROFILE — VERIFIED PUBLISHED STORIES: These are stories on YOUR (${actorName}) profile, not stories posted by the person messaging you. You can refer to their captions, media type and tagged accounts. Tags identify mentioned accounts, not visually verified faces. Do not invent unseen image details. If asked which story, distinguish the entries by caption and time.\n${ownStoryContext.slice(0, 650)}\n]`;
           }
         }
         let socialContext = '';
