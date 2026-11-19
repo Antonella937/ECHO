@@ -21,7 +21,7 @@ const storageUrl = (base: string, path: string) => `${base}/storage/v1/object/${
 const validPath = (path: string) => /^\/objects\/(?:uploads|r2)\/[0-9a-f-]{36}$/i.test(path);
 const isR2Path = (path: string) => path.startsWith("/objects/r2/");
 const useR2 = () => process.env.ECHO_STORAGE_PROVIDER === "r2";
-const fetchStored = (path: string, range?: string) => {
+export const fetchStored = (path: string, range?: string) => {
   if (isR2Path(path)) {
     const config = configuredR2();
     if (!config) throw Error("R2_NOT_CONFIGURED");
