@@ -1,9 +1,8 @@
+import { fetchStored } from "../routes/supabase-storage";
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { db, echoMediaTable, echoVisionAnalysesTable, echoVisionMediaRefsTable, echoVisionPostSummariesTable } from "@workspace/db";
 import type { CharacterDecisionInput, SocialState } from "@workspace/api-zod";
-import { ObjectPermission } from "../lib/objectAcl";
-import { ObjectStorageService } from "../lib/objectStorage";
 import { validMediaHeader } from "../lib/mediaSafety";
 import {
   VisionAnalysisSchema,
@@ -21,7 +20,6 @@ import { EngineError } from "../ai-engine/contracts";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const visionProvider = new OpenRouterVisionProvider();
-const objectStorage = new ObjectStorageService();
 
 interface MediaItem {
   id: string;
@@ -84,30 +82,20 @@ async function ownedImage(ownerId: string, item: MediaItem): Promise<{ bytes: Bu
     .limit(1);
   if (!row) throw new VisionError("VISION_MEDIA_NOT_OWNED", 404);
 
-  let file;
-  try { file = await objectStorage.getObjectEntityFile(row.objectPath); }
-  catch { throw new VisionError("VISION_MEDIA_NOT_FOUND", 404); }
-  const allowed = await objectStorage.canAccessObjectEntity({
-    userId: ownerId,
-    objectFile: file,
-    requestedPermission: ObjectPermission.READ,
-  }).catch(() => false);
-  if (!allowed) throw new VisionError("VISION_MEDIA_ACCESS_DENIED", 403);
-
-  let metadata: Record<string, unknown>;
-  try {
-    const [rawMetadata] = await file.getMetadata();
-    metadata = rawMetadata as Record<string, unknown>;
-  } catch { throw new VisionError("VISION_MEDIA_READ_FAILED", 502); }
-  const mimeType = String(metadata.contentType ?? "").split(";")[0].trim().toLowerCase();
-  const size = Number(metadata.size ?? 0);
-  if (!IMAGE_MIMES.has(mimeType) || size < 1 || size > MAX_IMAGE_BYTES)
+  // Owner must be verified against echo_media before signing any private read.
+  // Reuse the same provider-aware reader as the authenticated media routes.
+  let response: Response;
+  try { response = await fetchStored(row.objectPath); }
+  catch { throw new VisionError("VISION_MEDIA_READ_FAILED", 502); }
+  if (!response.ok) throw new VisionError("VISION_MEDIA_NOT_FOUND", 404);
+  const mimeType = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const sizeHeader = Number(response.headers.get("content-length") ?? 0);
+  if (!IMAGE_MIMES.has(mimeType) || sizeHeader > MAX_IMAGE_BYTES)
     throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
   let bytes: Buffer;
-  try {
-    const [downloaded] = await file.download({ validation: false });
-    bytes = downloaded;
-  } catch { throw new VisionError("VISION_MEDIA_READ_FAILED", 502); }
+  try { bytes = Buffer.from(await response.arrayBuffer()); }
+  catch { throw new VisionError("VISION_MEDIA_READ_FAILED", 502); }
+  if (!bytes.length) throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
   if (bytes.length > MAX_IMAGE_BYTES) throw new VisionError("VISION_IMAGE_FORMAT_OR_SIZE_INVALID", 415);
   if (!validMediaHeader(bytes, mimeType)) throw new VisionError("VISION_IMAGE_HEADER_INVALID", 415);
   return { bytes, mimeType, contentHash: hashImage(mimeType, bytes) };
