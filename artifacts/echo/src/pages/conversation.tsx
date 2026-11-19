@@ -332,9 +332,9 @@ export default function ConversationPage() {
   }, [id, messages.length]);
 
   return (
-    <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden">
-      {appearance.background !== "none" && <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10" style={{...dmBackgroundStyle(wallpaperAppearance),backgroundPosition:"center",backgroundSize:"cover"}} />}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-background/20 pt-safe backdrop-blur-xl">
+    <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
+      {appearance.background !== "none" && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0" style={{...dmBackgroundStyle(wallpaperAppearance),backgroundPosition:"center",backgroundSize:"cover",backgroundRepeat:"no-repeat"}} />}
+      <header className="relative z-30 border-0 bg-transparent pt-safe">
         <div className="relative flex h-[76px] items-center justify-between gap-2 px-3">
           <button onClick={back} aria-label={t("Volver")} className="tap z-10 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-back">
             <ChevronLeft className="h-6 w-6" strokeWidth={1.6} />
@@ -350,10 +350,10 @@ export default function ConversationPage() {
           <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="z-10 ml-auto tap flex h-11 min-w-[58px] items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-3 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
         </div>
       </header>
-      <div className="relative z-40 flex justify-end px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
+      <div className="relative z-30 flex justify-end bg-transparent px-3 py-1"><DmAppearanceSettings storageKey={appearanceKey} value={appearance} onChange={setAppearance}/></div>
       <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
+      <div className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
           <CharacterAvatar character={other} size={72} />
           <div className="mt-3 inline-flex items-center gap-1.5 font-display text-lg">{other.name}<VerifiedBadge account={other} /></div>
@@ -410,7 +410,7 @@ export default function ConversationPage() {
       </div>
 
       {id && <DmCanonReview key={id} universeId={getActiveUniverseId(user?.id ?? '')} peerId={id} />}
-    <form onSubmit={submit} className="sticky bottom-[var(--echo-keyboard-inset,0px)] z-40 border-t border-white/10 bg-background/20 px-3 pb-safe pt-2 backdrop-blur-xl" data-testid="form-composer">
+    <form onSubmit={submit} className="relative bottom-[var(--echo-keyboard-inset,0px)] z-40 border-0 bg-transparent px-3 pb-safe pt-2" data-testid="form-composer">
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
