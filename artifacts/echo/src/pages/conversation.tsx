@@ -49,7 +49,9 @@ export default function ConversationPage() {
   const { user } = useUser();
   const [otherTyping, setOtherTyping] = useState(false);
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
-  const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
+  const { me, character, actions, state } = useSocial();
+  const identityId = me.id;
+  const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${identityId}:${id??''}`;
   const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
   const resolveWallpaper = useMediaResolver();
   const wallpaperAppearance = appearance.background === 'photo' && appearance.image
@@ -59,14 +61,13 @@ export default function ConversationPage() {
     setAppearance(readDmAppearance(appearanceKey));
     if(!user?.id || !id)return;
     let active=true;
-    customFetch<{appearance:typeof appearance}>(`/api/dm/appearance?${new URLSearchParams({universeId:getActiveUniverseId(user.id),characterId:id})}`,
+    customFetch<{appearance:typeof appearance}>(`/api/dm/appearance?${new URLSearchParams({universeId:getActiveUniverseId(user.id),identityId,characterId:id})}`,
       {method:'GET',responseType:'json',cache:'no-store'})
       .then(result=>{if(active&&result.appearance){setAppearance(result.appearance);
         try{localStorage.setItem(appearanceKey,JSON.stringify(result.appearance));}catch{/* optional cache */}
       }}).catch(()=>{/* use cached appearance while offline */});
     return()=>{active=false;};
-  },[appearanceKey,user?.id,id]);
-  const { me, character, actions, state } = useSocial();
+  },[appearanceKey,user?.id,id,identityId]);
   const other = character(id);
   const messages = useThreadMessages(id);
   const [, navigate] = useLocation();
