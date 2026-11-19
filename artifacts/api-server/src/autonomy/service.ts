@@ -190,7 +190,7 @@ export async function runAutonomyDryRun(
     });
     const policyAllowsLive = liveEligibility({
       globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
-      characterEnabled: characterControl.enabled || (dependencies.lane === "dm" && Boolean(dependencies.targetIncomingMessageId) && linkedInboundReply),
+      characterEnabled: characterControl.enabled,
       opportunity,
     });
     const eligible = AUTONOMY_LIVE_EXECUTION_ENABLED && policyAllowsLive;
