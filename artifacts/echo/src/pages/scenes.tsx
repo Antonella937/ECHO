@@ -110,7 +110,7 @@ export default function ScenesPage() {
     try {
       const result=await customFetch<{turnSettings:NonNullable<Scene['turnSettings']>}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/turns`,{
         method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({universeId,mode,order:active.turnSettings?.order??active.participantIds,nextCharacterId,style:options.style??active.turnSettings?.style??'natural',autoReply:options.autoReply??active.turnSettings?.autoReply??false})
+        body:JSON.stringify({universeId,mode,order:active.turnSettings?.order??active.participantIds,nextCharacterId,style:options.style??active.turnSettings?.style??'natural',autoReply:mode==='manual'?false:(options.autoReply??active.turnSettings?.autoReply??false)})
       });
       setScenes(previous=>previous.map(scene=>scene.sceneId===active.sceneId?{...scene,turnSettings:result.turnSettings}:scene));
       setNextSpeaker('');
@@ -120,7 +120,7 @@ export default function ScenesPage() {
   const generateReply = async (characterId:string)=>{
     if(!active || busy)return;setBusy(true);setError('');
     try{
-      if(!events.length){setError(es?'Primero escribí el mensaje inicial de la escena. Después tocá el personaje que querés que responda.':'Write the opening scene message first, then tap a character to reply.');return;}
+      if(!events.some(event=>event.text.trim())){setError(es?'Primero escribí el mensaje inicial de la escena. Después tocá el personaje que querés que responda.':'Write the opening scene message first, then tap a character to reply.');return;}
       if(active.turnSettings?.mode==='manual' && active.turnSettings?.nextCharacterId!==characterId){
         const result=await customFetch<{turnSettings:NonNullable<Scene['turnSettings']>}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:'manual',order:active.turnSettings?.order??active.participantIds,nextCharacterId:characterId,style:active.turnSettings?.style??'natural',autoReply:false})});
         setScenes(previous=>previous.map(scene=>scene.sceneId===active.sceneId?{...scene,turnSettings:result.turnSettings}:scene));
@@ -207,7 +207,7 @@ export default function ScenesPage() {
             </select>
           </label>
           <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
-            <input type="checkbox" className="mt-1" disabled={busy||active.status==='finished'} checked={active.turnSettings?.autoReply??false}
+            <input type="checkbox" className="mt-1" disabled={busy||active.status==='finished'||active.turnSettings?.mode==='manual'} checked={active.turnSettings?.autoReply??false}
               onChange={e=>void updateTurns(active.turnSettings?.mode??'automatic',active.turnSettings?.nextCharacterId??null,{autoReply:e.target.checked})}/>
             <span><strong>{st("Autonomía de respuesta")}</strong><span className="mt-1 block text-xs text-muted-foreground">{es?'La IA responde automáticamente una vez después de que escribís. Para continuar sin escribir, usá «Continuar escena».':'AI replies once after you send a message. To continue without writing, use Continue scene.'}</span></span>
           </label>
