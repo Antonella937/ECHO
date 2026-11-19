@@ -78,11 +78,11 @@ async function runPassiveStoryViews() {
 }
 
 /** Event-driven fast path for an incoming DM. Never scans unrelated characters. */
-export async function triggerImmediateDmReply(ownerId: string, universeId: string, characterId: string, messageId: string): Promise<void> {
+export async function triggerImmediateDmReply(ownerId: string, universeId: string, characterId: string, messageId: string, recovery = false): Promise<void> {
   if (!AUTONOMY_LIVE_EXECUTION_ENABLED) return;
   const preference = await db.execute(sql`SELECT preferences FROM echo_dm_conversation_preferences
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND character_id = ${characterId} LIMIT 1`);
-  if ((preference.rows[0]?.preferences as { responseTiming?: string } | undefined)?.responseTiming !== "instant") return;
+  if (!recovery && (preference.rows[0]?.preferences as { responseTiming?: string } | undefined)?.responseTiming !== "instant") return;
   // Coalesce rapid consecutive saves before contacting the AI provider.
   // Only the latest incoming DM in the same thread is allowed to trigger.
   // This is a best-effort debounce, not a durable delivery queue.
@@ -126,9 +126,19 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
  */
 async function recoverPersistedDmOnce(): Promise<void> {
   if (process.env.ECHO_DM_RECOVERY_ENABLED !== "true") return;
-  const targets = await listLiveOptInTargets();
+  // Explicit owner/character allowlist: never replay other people's conversations.
+  // Syntax: ownerId:universeId:characterId, separated by commas.
+  const allowlist = (process.env.ECHO_DM_RECOVERY_TARGETS ?? "").split(",").map(x => x.trim()).filter(Boolean);
+  if (!allowlist.length) return;
   const cutoff = Date.now() - 48 * 60 * 60_000;
-  for (const target of targets.filter(item => item.dmEnabled)) {
+  for (const key of allowlist) {
+    const [ownerId, universeId, characterId] = key.split(":");
+    if (!ownerId || !universeId || !characterId) continue;
+    const target = { ownerId, universeId, characterId };
+    const link = await db.execute(sql`SELECT 1 FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+        AND character_id = ${characterId} AND enabled = true LIMIT 1`);
+    if (!link.rows.length) continue;
     const snapshot = await readUniverse(target.ownerId, target.universeId);
     const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
     if (!parsed.success) continue;
@@ -149,7 +159,7 @@ async function recoverPersistedDmOnce(): Promise<void> {
         other.senderId === target.characterId && other.recipientId === message.senderId &&
         new Date(other.createdAt).getTime() > sentAt);
       if (newerIncoming || answered) continue;
-      await triggerImmediateDmReply(target.ownerId, target.universeId, target.characterId, message.id);
+      await triggerImmediateDmReply(target.ownerId, target.universeId, target.characterId, message.id, true);
       return; // Bound provider calls and DB scans to one DM per recovery tick.
     }
   }

@@ -259,9 +259,13 @@ export function chooseAutonomyOpportunity(input: {
   // A story reply is a private DM, not a public story reaction. Keep it in the
   // existing DM lane so bilateral permissions and delivery limits still apply.
   const dmChance = input.dmFrequency === "frequently" ? 0.42 : input.dmFrequency === "rarely" ? 0.08 : 0.25;
+  // Story replies are timely reactions to a new story, not cold outreach.
+  // Keep the daily action ceiling and per-story deduplication, but don't apply
+  // the six-hour unsolicited-DM cooldown to a newly posted story.
+  const unsolicitedDmCooldownPassed = latestActivity === 0 ||
+    now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000;
   if (input.lane === "dm" && !unanswered &&
       history.length < (input.maxActionsPerDay ?? 2) &&
-      (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
       random() < dmChance) {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = prioritizeHumanAccount([...state.stories].reverse(), state, story => story.authorId, random).find(story =>
@@ -281,6 +285,11 @@ export function chooseAutonomyOpportunity(input: {
         reason: "A visible story from a followed account invites an occasional private reply.",
         localHour: local.hour, timezone };
     }
+  }
+  // Unsolicited outreach still obeys the character's configured cooldown.
+  if (input.lane === "dm" && !unsolicitedDmCooldownPassed) {
+    return { situation: null, reasonCode: "NO_SOCIAL_TARGET",
+      reason: "Unsolicited DM cooldown is active.", localHour: local.hour, timezone };
   }
   // Ordinary spontaneous outreach is separate from story replies. Previously the
   // DM lane could only reply to an incoming message or a recent story, leaving
