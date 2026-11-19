@@ -65,7 +65,7 @@ export function DmAppearanceSettings({storageKey,value,onChange,externalOpen,onE
  useEffect(()=>setDraft(value),[value]);
  return <div className="relative">
   {externalOpen===undefined&&<button type="button" onClick={()=>setOpen(v=>!v)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl transition hover:bg-secondary/50" aria-expanded={open} aria-label={t[0]} title={t[0]}><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18h-1.5a2 2 0 0 1-1.5-2 2 2 0 0 1 2-2h1a2 2 0 0 0 2-2 2 2 0 0 0-2-2h-1a2 2 0 0 1-2-2 2 2 0 0 1 2-2z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="11" cy="7" r=".8"/><circle cx="16" cy="9" r=".8"/></svg></button>}
-  {(externalOpen??open)&&<section className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-background p-3 shadow-xl">
+  {(externalOpen??open)&&<section className="absolute bottom-full left-0 z-50 mb-2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-background/95 p-3 shadow-xl backdrop-blur-xl">
    <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-medium">{t[1]}</p><button type="button" aria-label="Cerrar" onClick={()=>{setOpen(false);onExternalClose?.();}}>✕</button></div>
    <div className="flex flex-wrap gap-2">{choices.map(choice=><button type="button" key={choice}
     aria-label={choice==='none'?t[3]:choice==='dark'?t[4]:choice}
