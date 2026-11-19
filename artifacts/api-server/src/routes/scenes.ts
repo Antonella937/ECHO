@@ -455,7 +455,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
         context,
         "[End scene context. Continue naturally as your character.]",
       ].join("\\n").slice(0,6000);
-      const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:""});
+      const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
       const draft = z.object({text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
     } else {
