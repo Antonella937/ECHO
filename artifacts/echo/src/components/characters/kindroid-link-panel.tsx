@@ -53,13 +53,21 @@ export function KindroidLinkPanel({characterId}:{characterId:string}) {
    if(busy||checking||checkingHistory||!data.enabled)return;
    setCheckingHistory(true);setStatus('');
    try{
-     const result=await customFetch<{historyReadable?:boolean;delivery?:string;reason?:string}>(
+     const result=await customFetch<{historyReadable?:boolean;delivery?:string;reason?:string;providerStatus?:number}>(
        `/api/characters/kindroid-link/retry-history-check?characterId=${encodeURIComponent(characterId)}&universeId=${encodeURIComponent(universeId)}`,
        {responseType:'json'}
      );
-     setStatus(result.delivery==='found'
-       ? (language==='es'?'El texto del último DM aparece en el historial reciente de Kindroid. No se reenvió nada.':'Latest DM text appears in recent Kindroid history. Nothing was resent.')
-       : (language==='es'?'No se pudo confirmar la entrega del último DM. No se reenvió nada.':'Could not confirm delivery of latest DM. Nothing was resent.'));
+     const es=language==='es';
+     const message=result.delivery==='found'
+       ? (es?'El último DM aparece en el historial reciente de Kindroid.':'The latest DM appears in recent Kindroid history.')
+       : result.reason==='PROVIDER_HTTP_ERROR'
+         ? (es?`Kindroid rechazó la consulta del historial (HTTP ${result.providerStatus ?? '?'}).`:`Kindroid rejected the history lookup (HTTP ${result.providerStatus ?? '?'}).`)
+         : result.reason==='UNSUPPORTED_HISTORY_FORMAT'
+           ? (es?'Kindroid respondió, pero ECHO no reconoce el formato del historial.':'Kindroid responded, but ECHO cannot recognize the history format.')
+           : result.reason==='NOT_FOUND_IN_RECENT_HISTORY'
+             ? (es?'El último DM no aparece entre los mensajes recientes consultados; eso no demuestra que no se haya entregado.':'The latest DM was not found in the recent messages checked; this does not prove non-delivery.')
+             : (es?'No se pudo confirmar la entrega del último DM.':'Could not confirm delivery of the latest DM.');
+     setStatus(`${message} ${es?'No se reenvió nada.':'Nothing was resent.'}`);
    }catch{
      setStatus(language==='es'?'No se pudo consultar el historial de Kindroid. No se enviaron mensajes.':'Could not check Kindroid history. No messages were sent.');
    }finally{setCheckingHistory(false);}
