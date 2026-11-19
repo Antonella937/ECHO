@@ -101,7 +101,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [reposting, setReposting] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const swipeStartY = useRef<number | null>(null);
 
   const group = groups[Math.min(gi, groups.length - 1)];
@@ -175,6 +175,15 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       document.body.style.overflow = '';
     };
   }, [next, prev, onClose, editingMetrics]);
+
+  // Grow the story composer up to six lines, then scroll inside it.
+  // Unlike a single-line input, a textarea preserves paragraph breaks in DMs.
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = '48px';
+    field.style.height = `${Math.min(Math.max(field.scrollHeight, 48), 176)}px`;
+  }, [reply, story.id]);
 
   const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showShare || editingMetrics || confirmDelete || (imageIsPrivate && imageUnavailable);
 
@@ -454,15 +463,22 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
               </div>
             )}
             <MentionSuggestions text={reply} onPick={setReply} excludeId={me.id} className="mb-2" />
-            <form onSubmit={submit} className="flex items-center gap-2">
-              <input
+            <form onSubmit={submit} className="flex items-end gap-2">
+              <textarea
                 ref={inputRef}
+                rows={1}
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
                 onFocus={() => setReplyFocused(true)}
                 onBlur={() => setReplyFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder={`${t("Responder a")} ${group.author.name.split(' ')[0]}…`}
-                className="h-12 min-w-0 flex-1 rounded-full border border-[hsl(0_0%_100%/0.3)] bg-transparent px-5 text-[15px] text-foreground placeholder:text-foreground/60 focus:border-foreground/70 focus:outline-none"
+                className="min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-3xl border border-[hsl(0_0%_100%/0.3)] bg-transparent px-5 py-3 text-[15px] leading-6 text-foreground placeholder:text-foreground/60 focus:border-foreground/70 focus:outline-none"
                 data-testid="input-story-reply"
                 aria-label={t("Responder a la historia")}
               />
