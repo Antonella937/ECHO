@@ -118,8 +118,13 @@ export default function ScenesPage() {
     finally{setBusy(false)}
   };
   const generateReply = async (characterId:string)=>{
-    if(!active)return;setBusy(true);setError('');
+    if(!active || busy)return;setBusy(true);setError('');
     try{
+      if(!events.length){setError(es?'Primero escribí el mensaje inicial de la escena. Después tocá el personaje que querés que responda.':'Write the opening scene message first, then tap a character to reply.');return;}
+      if(active.turnSettings?.mode==='manual' && active.turnSettings?.nextCharacterId!==characterId){
+        const result=await customFetch<{turnSettings:NonNullable<Scene['turnSettings']>}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:'manual',order:active.turnSettings?.order??active.participantIds,nextCharacterId:characterId,style:active.turnSettings?.style??'natural',autoReply:false})});
+        setScenes(previous=>previous.map(scene=>scene.sceneId===active.sceneId?{...scene,turnSettings:result.turnSettings}:scene));
+      }
       await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/reply`,{
         method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({universeId,characterId})
@@ -129,7 +134,7 @@ export default function ScenesPage() {
         customFetch<{scenes:Scene[]}>(`/api/scenes?${new URLSearchParams({universeId})}`,{method:'GET',responseType:'json'})
       ]);
       setEvents(history.events);setScenes(listing.scenes);
-    }catch{setError(es?'No se pudo generar la respuesta. Revisá el turno y los créditos de IA.':'Could not generate a reply. Check turn settings and AI credits.')}
+    }catch{setError(es?'No se pudo generar la respuesta. Comprobá que haya un mensaje nuevo y que ese personaje no haya respondido ya al mismo turno.':'Could not generate a reply. Check for a new scene message and whether this character already replied to that turn.')}
     finally{setBusy(false)}
   };
   const continueScene = async () => {
@@ -232,9 +237,9 @@ export default function ScenesPage() {
           </div>
         </div>
       </details><div className="flex flex-wrap gap-2">
-        {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
+        {active.status==='active'&&<button type="button" disabled={busy||active.turnSettings?.mode==='manual'} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id).map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
-          title={es?'Tocar para responder':'Tap to reply'} className="flex flex-col items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex flex-col items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
