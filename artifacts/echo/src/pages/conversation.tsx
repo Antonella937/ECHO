@@ -492,8 +492,9 @@ export default function ConversationPage() {
         )}
         <div className="mb-2 flex items-center justify-end gap-2">
           <button type="button" onClick={() => { setShowMusicLibrary(value => !value); setMusicDraftStatus(''); }}
-            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">
-            {showMusicLibrary ? 'Cerrar música' : '🎵 ECHO Music'}
+            aria-label={showMusicLibrary ? 'Cerrar música' : 'ECHO Music'} title={showMusicLibrary ? 'Cerrar música' : 'ECHO Music'} aria-expanded={showMusicLibrary}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-background/55 text-lg backdrop-blur-md transition hover:bg-secondary/70">
+            <span aria-hidden="true">♫</span>
           </button>
         </div>
         {musicDraftStatus && <p role="status" className="mb-2 text-xs text-muted-foreground">{musicDraftStatus}</p>}
