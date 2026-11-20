@@ -90,13 +90,9 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         if (typeof parsed.text !== "string" || !parsed.text.trim() || (!linkedKinId && parsed.text.length > 800)) throw new Error("INVALID_GROUP_REPLY");
       },
     });
-    const parsedCompletion = JSON.parse(completion.text) as { text?: unknown; action?: unknown };
-    const kindroidDecision = linkedKinId && typeof parsedCompletion.text === "string"
-      ? (() => { try { return JSON.parse(parsedCompletion.text) as { text?: unknown }; } catch { return null; } })()
-      : null;
-    const replyText = linkedKinId ? kindroidDecision?.text : parsedCompletion.text;
-    if (typeof replyText !== "string" || !replyText.trim()) throw new Error("INVALID_GROUP_REPLY");
-    const text = replyText.trim().slice(0, 800);
+    const parsedCompletion = JSON.parse(completion.text) as { text?: unknown };
+    if (typeof parsedCompletion.text !== "string" || !parsedCompletion.text.trim()) throw new Error("INVALID_GROUP_REPLY");
+    const text = parsedCompletion.text.trim().slice(0, 800);
     const inserted = await db.execute(sql`INSERT INTO echo_group_messages
       (owner_id, universe_id, id, group_id, sender_id, body, read_by)
       SELECT ${ownerId}, ${universeId}, ${randomUUID()}, id, ${speakerId}, ${text}, ${JSON.stringify([speakerId])}::jsonb
