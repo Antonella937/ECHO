@@ -196,7 +196,7 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
     const last = lastMessages.at(-1);
     const previous = lastMessages.at(-2);
     const lastIsAi = !!last && (last.sender_type?.toLowerCase() === "ai" || last.sender === kinId);
-    const previousIsUser = !!previous && (previous.sender_type?.toLowerCase() === "user" || previous.sender_type?.toLowerCase() === "human");
+    const previousIsUser = !!previous && (previous.sender_type?.toLowerCase() === "user" || previous.sender_type?.toLowerCase() === "human" || previous.sender?.toLowerCase() === "user" || previous.sender?.toLowerCase() === "human");
     const matchesEchoContext = !!previous?.message && previous.message.includes("[ECHO PRIVATE THREAD") &&
       (previous.message.includes("VANTA") || previous.message.includes("ECHO_PROFILE"));
     // Return only structural diagnostics, never conversation text or provider credentials.
