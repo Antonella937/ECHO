@@ -462,14 +462,15 @@ export default function CreatePage() {
           <span className="sr-only">{t("Pie de foto")}</span>
           <textarea
             value={caption}
-            onChange={(e) => setCaption(e.target.value.slice(0, 600))}
-            rows={2}
+            onChange={(e) => setCaption(e.target.value.slice(0, mode === 'story' ? 600 : 5000))}
+            rows={4}
             placeholder={t(mode === 'story' ? 'Texto sobre la historia (opcional)' : 'Escribe un pie de foto…')}
             className="min-h-[76px] w-full resize-none rounded-2xl border border-input bg-card px-4 py-3 text-[15px] leading-relaxed placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
             data-testid="input-caption"
           />
+          {mode !== "story" && <span className="mt-1 block text-right text-xs text-muted-foreground">{caption.length}/5000</span>}
         </label>
-        <MentionSuggestions text={caption} onPick={(t) => setCaption(t.slice(0, 600))} excludeId={me.id} className="mt-2" />
+        <MentionSuggestions text={caption} onPick={(t) => setCaption(t.slice(0, mode === 'story' ? 600 : 5000))} excludeId={me.id} className="mt-2" />
 
         {mode === 'story' && (
           <div className="mt-3 grid gap-3">
