@@ -7,6 +7,8 @@
  */
 
 export interface Comment {
+  /** Fictional community username, independent of the post author's identity. */
+  guestHandle?: string;
   id: string;
   postId: string;
   authorId: string;
