@@ -414,7 +414,7 @@ router.post("/group-dms/:groupId/scene/next", async (req, res) => {
   const groupId = String(req.params.groupId);
   const allowed = await db.execute(sql`SELECT id FROM echo_group_conversations
     WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
-      AND scene_observer_enabled=true AND autonomy_enabled=true LIMIT 1`);
+      AND scene_observer_enabled=true LIMIT 1`);
   if (!allowed.rows.length) { res.status(403).json({ error: "SCENE_NOT_ENABLED" }); return; }
   try {
     const result = await runGroupAutonomyOnce(req.userId!, universeId, groupId, true);
