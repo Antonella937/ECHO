@@ -6,7 +6,7 @@ import { visionService } from '../vision/service';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
-import { kindroidDmProvider, kindroidStoryDecisionProvider } from './kindroid';
+import { kindroidDmProvider, kindroidStoryDecisionProvider, kindroidLikeDecisionProvider } from './kindroid';
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
@@ -399,9 +399,24 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     selectedProvider = kindroidStoryDecisionProvider(kinId,
       `Author: ${(author?.name ?? 'someone').slice(0,80)}. Relationship: ${relation?.preset ?? 'unspecified'}. Caption: ${(story.caption ?? '').slice(0,500)}`, undefined, input.characterId);
   }
-  // Likes do not require generated prose. Story interactions above are
-  // Kindroid-driven and must not be replaced by a local random decision.
+  // Founder: every like decision belongs to Kindroid, never a local automatic policy.
   if (dependencies.liveDmReply === true &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      (input.situation === 'like_post' || input.situation === 'like_comment')) {
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    const post = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
+    const comment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
+    const visibleContext = [post?.caption, comment?.text].filter(Boolean).join('\n');
+    if (!visibleContext) throw new EngineError('SOCIAL_TARGET_NOT_FOUND', 404);
+    selectedProvider = kindroidLikeDecisionProvider(kinId, input.situation, visibleContext, undefined, input.characterId);
+  }
+  // Keep the previous non-text policy only for other owners.
+  if (dependencies.liveDmReply === true &&
+      ownerId !== 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
       ['like_post', 'like_comment'].includes(input.situation)) {
     const situation = input.situation;
     selectedProvider = {
@@ -420,7 +435,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // (likes, story reactions, views) must remain eligible without a text model.
   if (dependencies.liveDmReply === true &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      (input.situation === 'dm' || input.situation === 'comment' || input.situation === 'post')) {
+      (input.situation === 'dm' || input.situation === 'comment' || input.situation === 'post' ||
+       input.situation === 'story_reaction' || input.situation === 'like_post' || input.situation === 'like_comment')) {
     const linkCheck = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
