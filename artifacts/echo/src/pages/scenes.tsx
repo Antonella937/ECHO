@@ -1,4 +1,4 @@
-import { useMediaResolver } from '@/lib/media';
+import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import { SceneCanonReview } from '@/components/echo/scene-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
@@ -43,19 +43,21 @@ export default function ScenesPage() {
     if(!wallpaperKey){setSceneWallpaper('');return;}
     try{setSceneWallpaper(localStorage.getItem(wallpaperKey)??'');}catch{setSceneWallpaper('');}
   },[wallpaperKey]);
-  const changeSceneWallpaper = (file?:File) => {
+  const [wallpaperUploading,setWallpaperUploading] = useState(false);
+  const changeSceneWallpaper = async (file?:File) => {
     if(!wallpaperKey)return;
-    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setSceneWallpaper('');return;}
-    if(!file.type.startsWith('image/')||file.size>1_500_000){
-      setError(es?'Elegí una imagen de menos de 1,5 MB.':'Choose an image smaller than 1.5 MB.');return;
+    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setSceneWallpaper('');setError('');return;}
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10_000_000){
+      setError(es?'Elegí una imagen JPG, PNG o WebP de hasta 10 MB.':'Choose a JPG, PNG or WebP image up to 10 MB.');return;
     }
-    const reader=new FileReader();
-    reader.onload=()=>{
-      if(typeof reader.result!=='string')return;
-      try{localStorage.setItem(wallpaperKey,reader.result);setSceneWallpaper(reader.result);setError('');}
-      catch{setError(es?'No hay espacio para guardar el fondo en este dispositivo.':'Not enough space to save this wallpaper on this device.');}
-    };
-    reader.readAsDataURL(file);
+    setWallpaperUploading(true);
+    try{
+      const uploaded=await uploadPrivateFile(file);
+      localStorage.setItem(wallpaperKey,uploaded.url);
+      setSceneWallpaper(uploaded.url);
+      setError('');
+    }catch{setError(es?'No se pudo subir el fondo. Intentá nuevamente.':'Could not upload wallpaper. Try again.');}
+    finally{setWallpaperUploading(false);}
   };
   const [sourceMessage, setSourceMessage] = useState<{messageId:string;peerName:string}|null>(null);
   useEffect(() => {
@@ -229,7 +231,7 @@ export default function ScenesPage() {
         <div className="flex items-center gap-2">
           <button type="button" aria-expanded={showSceneSettings} onClick={()=>setShowSceneSettings(v=>!v)} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs">{es?"Opciones":"Options"} ···</button>
           {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
-            {es?'Cambiar fondo':'Change wallpaper'}
+            {wallpaperUploading?(es?'Subiendo fondo…':'Uploading wallpaper…'):(es?'Cambiar fondo':'Change wallpaper')}
             <input type="file" accept="image/*" className="sr-only" onChange={e=>{changeSceneWallpaper(e.target.files?.[0]);e.target.value='';}} />
           </label>}
           {showSceneSettings&&sceneWallpaper&&<button type="button" onClick={()=>changeSceneWallpaper()} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">{es?'Quitar':'Remove'}</button>}
