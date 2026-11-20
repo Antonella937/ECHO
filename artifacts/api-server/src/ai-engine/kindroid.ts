@@ -101,7 +101,14 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
           throw new EngineError('KINDROID_RESPONSE_FORMAT_UNSUPPORTED', 502);
         }
       }
-      if (!reply || reply.startsWith('<<ERROR>>') || reply.startsWith('<<HTTP_ERROR>>')) throw new EngineError('KINDROID_GENERATION_FAILED', 502);
+      if (!reply || reply.startsWith('<<ERROR>>') || reply.startsWith('<<HTTP_ERROR>>')) {
+        console.warn('[kindroid] generation returned failure marker', {
+          traceId, situation, elapsedMs: Date.now() - startedAt,
+          failureKind: !reply ? 'empty_response' : reply.startsWith('<<HTTP_ERROR>>') ? 'http_error_marker' : 'generation_error_marker',
+          responseChars: reply.length,
+        });
+        throw new EngineError('KINDROID_GENERATION_FAILED', 502);
+      }
       const decision = JSON.stringify({
         action: 'draft', situation, text: reply.slice(0, situation === 'dm' ? 2000 : situation === 'post' ? 600 : 1000), reason: 'Kindroid character text',
         suggestedDelayMinutes: 0, galleryPhotoId: null, reaction: null, contextSections: [],
