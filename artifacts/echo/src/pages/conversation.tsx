@@ -154,7 +154,7 @@ export default function ConversationPage() {
     try {
       await customFetch('/api/autonomy/retry-dm-reply', { method: 'POST', responseType: 'json',
         body: JSON.stringify({ universeId: getActiveUniverseId(user.id), characterId: id, messageId: latest.id }) });
-      setRetryDmNotice('Reintento solicitado para el mensaje original. No se envió otro mensaje tuyo.');
+      setRetryDmNotice('Kindroid generó una respuesta. Si todavía no aparece, actualizá el chat.');
     } catch {
       setRetryDmNotice('No se pudo recuperar la respuesta. Tu mensaje original sigue intacto.');
     } finally { setRetryingDm(false); }
