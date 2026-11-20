@@ -142,6 +142,22 @@ export default function ConversationPage() {
   }, [id, user?.id]);
 
   const [kindroidFailure, setKindroidFailure] = useState<string | null>(null);
+  const [checkingKindroidHistory, setCheckingKindroidHistory] = useState(false);
+  const [kindroidHistoryNotice, setKindroidHistoryNotice] = useState<string | null>(null);
+  const checkKindroidHistory = async () => {
+    if (!user?.id || !id || checkingKindroidHistory) return;
+    setCheckingKindroidHistory(true); setKindroidHistoryNotice(null);
+    try {
+      const result = await customFetch(`/api/autonomy/kindroid-pending-reply?universeId=${encodeURIComponent(getActiveUniverseId(user.id))}&characterId=${encodeURIComponent(id)}`, { responseType: 'json' }) as {status?: string; error?: string};
+      setKindroidHistoryNotice(result.status === 'reply_found_in_kindroid'
+        ? 'La respuesta está en Kindroid, pero todavía no se importó a ECHO.'
+        : result.status === 'no_pending_dm'
+          ? 'No hay un mensaje pendiente de respuesta en este chat.'
+          : 'Kindroid no pudo confirmar automáticamente la respuesta. No se envió ningún mensaje nuevo.');
+    } catch {
+      setKindroidHistoryNotice('No se pudo consultar el historial de Kindroid. No se envió ningún mensaje nuevo.');
+    } finally { setCheckingKindroidHistory(false); }
+  };
   const [retryingDm, setRetryingDm] = useState(false);
   const [retryDmNotice, setRetryDmNotice] = useState<string | null>(null);
   const retryLastDm = async () => {
@@ -448,6 +464,15 @@ export default function ConversationPage() {
             className="mb-2 w-full rounded-xl border border-border bg-secondary/80 px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
             data-testid="button-retry-kindroid-dm">{retryingDm ? 'Reintentando…' : '↻ Reintentar respuesta al último mensaje'}</button>
         )}
+        {messages.length > 0 && (() => {
+          const latest = [...messages].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+          return latest?.senderId === identityId && latest?.recipientId === id;
+        })() && (
+          <button type="button" disabled={checkingKindroidHistory} onClick={() => void checkKindroidHistory()}
+            className="mb-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
+            data-testid="button-check-kindroid-history">{checkingKindroidHistory ? 'Consultando Kindroid…' : 'Consultar respuesta existente en Kindroid (sin reenviar)'}</button>
+        )}
+        {kindroidHistoryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidHistoryNotice}</div>}
         {retryDmNotice && (
           <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{retryDmNotice}</div>
         )}
