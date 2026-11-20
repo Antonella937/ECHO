@@ -41,10 +41,17 @@ export default function ScenesPage() {
   const [sceneWallpaper,setSceneWallpaper] = useState('');
   const resolveMedia = useMediaResolver();
   const wallpaperKey = user?.id && selected ? `echo:scene-wallpaper:${user.id}:${universeId}:${me.id}:${selected}` : '';
+  const [groupBackgroundId,setGroupBackgroundId] = useState('');
+  const [matchingGroups,setMatchingGroups] = useState<Array<{id:string;name:string;participantIds:string[]}>>([]);
+  useEffect(()=>{const scene=scenes.find(item=>item.sceneId===selected);if(!scene||!user?.id){setMatchingGroups([]);return;}let cancelled=false;customFetch<{groups:Array<{id:string;name:string;participantIds:string[]}>}>(`/api/group-dms?${new URLSearchParams({universeId,actorId:me.id})}`,{method:'GET',responseType:'json'}).then(result=>{if(cancelled)return;const ids=new Set(scene.participantIds.filter(id=>id!==me.id));setMatchingGroups(result.groups.filter(g=>{const members=g.participantIds.filter(id=>id!==me.id);return members.length===ids.size&&members.every(id=>ids.has(id));}));}).catch(()=>{if(!cancelled)setMatchingGroups([]);});return()=>{cancelled=true;};},[selected,scenes,user?.id,universeId,me.id]);
   useEffect(()=>{
     if(!wallpaperKey){setSceneWallpaper('');return;}
     try{setSceneWallpaper(localStorage.getItem(wallpaperKey)??'');}catch{setSceneWallpaper('');}
   },[wallpaperKey]);
+  useEffect(()=>{if(!selected||!user?.id){setGroupBackgroundId('');return;}const key=`echo:scene-source-group:${user.id}:${universeId}:${me.id}:${selected}`;try{setGroupBackgroundId(localStorage.getItem(key)??'');}catch{setGroupBackgroundId('');}},[selected,user?.id,universeId,me.id]);
+  const linkedGroupWallpaperKey=groupBackgroundId&&user?.id?`echo:group-wallpaper:${user.id}:${universeId}:${me.id}:${groupBackgroundId}`:'';
+  const [linkedGroupWallpaper,setLinkedGroupWallpaper]=useState('');
+  useEffect(()=>{try{setLinkedGroupWallpaper(linkedGroupWallpaperKey?localStorage.getItem(linkedGroupWallpaperKey)??'':'');}catch{setLinkedGroupWallpaper('');}},[linkedGroupWallpaperKey]);
   const [wallpaperUploading,setWallpaperUploading] = useState(false);
   const changeSceneWallpaper = async (file?:File) => {
     if(!wallpaperKey)return;
@@ -228,13 +235,13 @@ export default function ScenesPage() {
     </form>}
     {!active&&<section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><button key={s.sceneId} onClick={()=>setSelected(s.sceneId)} className={`block w-full rounded-xl border p-3 text-left ${selected===s.sceneId?'border-primary':'border-border'}`}><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>)}</section>}
     {active&&<section className="relative isolate flex min-h-0 flex-1 flex-col gap-3 overflow-hidden bg-transparent px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
-      {sceneWallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${sceneWallpaper.startsWith("data:") ? sceneWallpaper : resolveMedia(sceneWallpaper)}")`}} />}
+      {(sceneWallpaper||linkedGroupWallpaper)&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${(sceneWallpaper||linkedGroupWallpaper).startsWith("data:") ? (sceneWallpaper||linkedGroupWallpaper) : resolveMedia(sceneWallpaper||linkedGroupWallpaper)}")`}} />}
       <div className="relative z-10 flex shrink-0 items-center justify-between gap-2 rounded-3xl bg-background/30 p-2 backdrop-blur-xl"><div className="flex min-w-0 items-center gap-2"><button type="button" onClick={()=>{setSelected(null);setEvents([]);}} aria-label={es?"Volver a escenas":"Back to scenes"} className="shrink-0 rounded-full border border-white/20 bg-background/40 px-3 py-2">‹</button><div className="flex min-w-0 flex-col items-center gap-1"><div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-black/35 text-xs font-semibold">{active.participantIds.slice(0,4).map(id=>{const c=state.characters.find(c=>c.id===id);return c?.avatar?<img key={id} src={resolveMedia(c.avatar)} alt="" className="h-full min-w-0 flex-1 object-cover"/>:<span key={id} className="flex-1 text-center">{(c?.name??"?").slice(0,1)}</span>})}</div><h2 className="max-w-[52vw] truncate text-sm font-semibold">{active.title}</h2></div></div>
         <div className="flex items-center gap-2">
           <button type="button" aria-expanded={showSceneSettings} onClick={()=>setShowSceneSettings(v=>!v)} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs">{es?"Opciones":"Options"} ···</button>
 
         </div>
-      </div>{showSceneSettings&&<div className="relative z-10 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl bg-background/50 p-2 backdrop-blur-xl"><div className="flex flex-wrap items-center gap-2">          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
+      </div>{showSceneSettings&&<div className="relative z-10 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl bg-background/50 p-2 backdrop-blur-xl"><div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={groupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="">{es?"Ninguno":"None"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
             {wallpaperUploading?(es?'Subiendo fondo…':'Uploading wallpaper…'):(es?'Cambiar fondo':'Change wallpaper')}
             <input type="file" accept="image/jpeg,image/png,image/webp" disabled={wallpaperUploading} className="sr-only" onChange={e=>{changeSceneWallpaper(e.target.files?.[0]);e.target.value='';}} />
           </label>}
