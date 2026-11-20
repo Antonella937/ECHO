@@ -28,7 +28,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
   const claimed = await db.execute(sql`UPDATE echo_group_conversations
     SET autonomy_claim_id = ${claimId}, autonomy_claim_until = now() + interval '2 minutes'
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
-      AND autonomy_enabled = true
+      AND (${sceneMode} OR autonomy_enabled = true)
       AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
       AND (CASE WHEN ${sceneMode} THEN (scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
     RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed`);
