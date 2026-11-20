@@ -140,12 +140,13 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
   const [communityFrequency, setCommunityFrequency] = useState('normal');
   const [generatingCommunity, setGeneratingCommunity] = useState(false);
   const [generatedBatches, setGeneratedBatches] = useState(0);
+  const communityEnabled = me.communityCommentsEnabled === true || (me.communityCommentsEnabled !== false && ['band', 'business', 'venue', 'artist'].includes(me.accountType ?? ''));
   const post = state.posts.find((p) => p.id === postId);
   const ref = useRef<HTMLTextAreaElement>(null);
   const target = replyTo ? character(replyTo.authorId) : undefined;
 
   const generateCommunity = async () => {
-    if (generatingCommunity || !me.communityCommentsEnabled || post?.authorId !== me.id) return;
+    if (generatingCommunity || !communityEnabled || post?.authorId !== me.id) return;
     setGeneratingCommunity(true);
     setError(null);
     try {
@@ -158,7 +159,7 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
       });
       for (const item of (result.comments ?? []).slice(0, 6)) actions.addCommunityComment(postId, item.handle, item.text);
       setGeneratedBatches(v => v + 1);
-    } catch (err) { setError(ct('No se pudieron generar comentarios.')); }
+    } catch (err) { setError(`${ct('No se pudieron generar comentarios.')} ${err instanceof Error ? err.message : String(err)}`); }
     finally { setGeneratingCommunity(false); }
   };
 
@@ -196,8 +197,8 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
         </div>
       )}
       {post?.authorId === me.id && <div className="mb-3 rounded-xl border border-border p-3 text-sm">
-        <label className="flex items-center justify-between gap-3"><span>{ct("Comentarios de comunidad ficticia")}</span><input type="checkbox" checked={!!me.communityCommentsEnabled} onChange={e => actions.setCommunityCommentsEnabled(me.id, e.target.checked)} /></label>
-        {me.communityCommentsEnabled && <div className="mt-3 space-y-2">
+        <label className="flex items-center justify-between gap-3"><span>{ct("Comentarios de comunidad ficticia")}</span><input type="checkbox" checked={communityEnabled} onChange={e => actions.setCommunityCommentsEnabled(me.id, e.target.checked)} /></label>
+        {communityEnabled && <div className="mt-3 space-y-2">
           <label className="block text-xs text-muted-foreground" htmlFor="community-frequency">{ct("Cantidad por tanda")}</label>
           <select id="community-frequency" className="w-full rounded-lg border border-input bg-background p-2" value={communityFrequency} onChange={e => setCommunityFrequency(e.target.value)}>
             <option value="occasional">{ct("Ocasional · 1–2")}</option>
