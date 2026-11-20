@@ -53,7 +53,7 @@ export function editSocialPost(state: SocialState, id: string, actor: string, pa
       JSON.stringify(post[key]) !== JSON.stringify(patch[key]))
       throw new Error('La publicación cambió en otro dispositivo. Conservá tu borrador y volvé a abrirla.');
   }
-  if (patch.caption !== undefined && patch.caption.length > 600) throw new Error('El pie de foto admite hasta 600 caracteres.');
+  if (patch.caption !== undefined && patch.caption.length > 5000) throw new Error('El pie de foto admite hasta 5000 caracteres.');
   if (patch.location !== undefined && patch.location.length > 80) throw new Error('La ubicación admite hasta 80 caracteres.');
   if (patch.taggedAccountIds?.some(id => !state.characters.some(c => c.id === id))) throw new Error('La cuenta etiquetada no existe.');
   const edited = { ...post, ...patch, editedAt: new Date().toISOString() };
