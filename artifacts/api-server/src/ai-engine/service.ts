@@ -277,7 +277,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             sharedProfileContext.push(`Profile @${profile.handle} (${profile.name}). Recent public posts:\n${observations.join('\n') || '(No published posts)'}`);
           }
           // Keep profile evidence compact; the upstream provider rejected a 4504-character DM request.
-          if (sharedProfileContext.length) outgoingPrompt += `\n[ECHO SHARED PROFILE — read-only visit. You may discuss ONLY these verified posts and their cached visual descriptions. Following is OPTIONAL and has NOT occurred. Never claim to have followed or liked the account. If images were not analyzed, do not invent clothing, colors or faces. React naturally in your established personality.]\\n${sharedProfileContext.join('\n').slice(0, 1100)}\n[END SHARED PROFILE]`;
+          if (sharedProfileContext.length) outgoingPrompt += `\n[ECHO SHARED PROFILE — read-only visit. You may discuss ONLY these verified posts and their cached visual descriptions. Following is OPTIONAL and has NOT occurred. Never claim to have followed or liked the account. If images were not analyzed, do not invent clothing, colors or faces. React naturally in your established personality.]\n${sharedProfileContext.join('\n').slice(0, 1100)}\n[END SHARED PROFILE]`;
         }
         // A character can inspect their own published ECHO stories even when they
         // have not viewed them. Keep this separate from other people's viewed stories.
