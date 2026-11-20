@@ -160,6 +160,27 @@ export default function ConversationPage() {
       setKindroidHistoryNotice('No se pudo consultar el historial de Kindroid. No se envió ningún mensaje nuevo.');
     } finally { setCheckingKindroidHistory(false); }
   };
+  const [recoveringKindroidReply, setRecoveringKindroidReply] = useState(false);
+  const [kindroidRecoveryNotice, setKindroidRecoveryNotice] = useState<string | null>(null);
+  const recoverKindroidReply = async () => {
+    if (!user?.id || !id || recoveringKindroidReply) return;
+    const latest = [...messages].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    if (!latest || latest.senderId !== identityId || latest.recipientId !== id) {
+      setKindroidRecoveryNotice('El chat cambió. No se importó nada.'); return;
+    }
+    setRecoveringKindroidReply(true); setKindroidRecoveryNotice(null);
+    try {
+      const result = await customFetch('/api/autonomy/recover-kindroid-reply', {
+        method: 'POST', responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), characterId: id, messageId: latest.id }),
+      }) as {status?: string};
+      setKindroidRecoveryNotice(result.status === 'recovered'
+        ? 'Respuesta original recuperada en ECHO. Actualizá el chat si todavía no aparece.'
+        : 'No se confirmó la recuperación. No se envió ningún mensaje a Kindroid.');
+    } catch {
+      setKindroidRecoveryNotice('No se pudo recuperar la respuesta con seguridad. No se envió ningún mensaje a Kindroid.');
+    } finally { setRecoveringKindroidReply(false); }
+  };
   const [retryingDm, setRetryingDm] = useState(false);
   const [retryDmNotice, setRetryDmNotice] = useState<string | null>(null);
   const retryLastDm = async () => {
@@ -474,6 +495,15 @@ export default function ConversationPage() {
             className="mb-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
             data-testid="button-check-kindroid-history">{checkingKindroidHistory ? 'Consultando Kindroid…' : 'Consultar respuesta existente en Kindroid (sin reenviar)'}</button>
         )}
+        {kindroidHistoryNotice?.startsWith('La respuesta está en Kindroid') && messages.length > 0 && (() => {
+          const latest = [...messages].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+          return latest?.senderId === identityId && latest?.recipientId === id;
+        })() && (
+          <button type="button" disabled={recoveringKindroidReply} onClick={() => void recoverKindroidReply()}
+            className="mb-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
+            data-testid="button-recover-kindroid-reply">{recoveringKindroidReply ? 'Recuperando respuesta…' : 'Recuperar respuesta existente en ECHO (sin reenviar)'}</button>
+        )}
+        {kindroidRecoveryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidRecoveryNotice}</div>}
         {kindroidHistoryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidHistoryNotice}</div>}
         {retryDmNotice && (
           <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{retryDmNotice}</div>
