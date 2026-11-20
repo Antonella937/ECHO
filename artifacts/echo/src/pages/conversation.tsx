@@ -545,7 +545,8 @@ export default function ConversationPage() {
           </div>
         ) : (
           <div>
-          <FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="mb-1" />
+          {([...text.matchAll(SHARED_PROFILE)].map(match => state.characters.find(c => c.id === match[1])).filter((c): c is NonNullable<typeof c> => !!c)).map(c => <div key={c.id} className="mb-2 flex items-center justify-between rounded-2xl border border-border bg-card px-3 py-2 text-sm" data-testid="composer-shared-profile"><div><span className="block font-semibold">{c.name}</span><span className="text-xs text-muted-foreground">@{c.handle} · Se enviará junto con tu mensaje</span></div><button type="button" className="rounded-lg px-2 py-1 text-xs text-muted-foreground" onClick={()=>setText(prev=>prev.replace(`[ECHO_PROFILE:${c.id}]`, '').trim())}>Quitar</button></div>))}
+           <FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="mb-1" />
           <div className="flex items-center gap-2 pb-1">
             <input ref={fileRef} type="file" multiple hidden accept="image/*,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
               onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }} data-testid="input-attachment-file" />
@@ -557,6 +558,7 @@ export default function ConversationPage() {
                   {label:'Adjuntar fotos o archivos',icon:ImagePlus,action:()=>fileRef.current?.click()},
                   {label:'Sacar foto',icon:Camera,action:()=>cameraRef.current?.click()},
                   {label:'ECHO Music',icon:Music2,action:()=>{setShowMusicLibrary(true);setMusicDraftStatus('');}},
+                  {label:'Compartir perfil',icon:Send,action:()=>setProfilePickerOpen(true)},
                 ]).map(option=><button key={option.label} type="button" role="menuitem" onClick={()=>{setAttachmentsMenuOpen(false);option.action();}} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm hover:bg-white/10"><option.icon className="h-5 w-5 shrink-0"/>{option.label}</button>)}
               </div>}
               {profilePickerOpen && <div className="absolute bottom-full left-0 z-50 mb-3 max-h-72 w-[min(19rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-border bg-background p-2 shadow-2xl" role="dialog" aria-label="Compartir perfil">
