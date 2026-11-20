@@ -211,3 +211,41 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
     },
   };
 }
+
+/** Kindroid is the sole decision-maker for founder feed likes. */
+export function kindroidLikeDecisionProvider(
+  kinId: string, situation: 'like_post' | 'like_comment', context: string,
+  request: typeof fetch = fetch, echoCharacterId?: string,
+): TextProvider {
+  return {
+    name: 'kindroid',
+    async complete(input) {
+      const key = process.env.ECHO_KINDROID_API_KEY;
+      if (!key) throw new EngineError('KINDROID_KEY_MISSING', 503);
+      if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
+      let response: Response;
+      try {
+        response = await queuedKindroidRequest(kinId, 10, () => request('https://api.kindroid.ai/v1/send-message', {
+          method: 'POST', signal: AbortSignal.timeout(90000),
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ai_id: kinId,
+            message: `[ECHO feed interaction: Decide whether YOU would like this visible ${situation === 'like_post' ? 'post' : 'comment'} based on your own personality. Reply with exactly one token: LIKE or SKIP. This is not a private message.]\n${context.slice(0, 650)}`,
+            stream: false }),
+        }), echoCharacterId);
+      } catch (error) {
+        throw new EngineError(error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+          ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
+      }
+      if (!response.ok) {
+        throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', 502);
+      }
+      const raw = (await response.text()).trim().replace(/^[\s"'.,!]+|[\s"'.,!]+$/g, '').toUpperCase();
+      if (raw !== 'LIKE' && raw !== 'SKIP') throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+      const decision = JSON.stringify({ action: raw === 'LIKE' ? 'like' : 'none', situation,
+        text: null, reaction: null, reason: 'Kindroid feed decision',
+        suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [] });
+      input.validate?.(decision);
+      return { text: decision, model: 'kindroid', usage: unknownUsage(), attempts: [] };
+    },
+  };
+}
