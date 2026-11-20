@@ -399,7 +399,7 @@ export default function GroupConversationPage() {
         <span className="mr-auto text-xs text-muted-foreground">Modo espectadora · escena grupal</span>
         {sceneRunning ? <button onClick={() => { stopSceneRef.current = true; }} className="rounded-lg bg-secondary px-3 py-2 text-xs">Detener después del turno</button> : <>
           <button onClick={() => void advanceScene(1)} disabled={sceneRunning} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">Siguiente turno</button>
-          <button onClick={() => void advanceScene(12)} disabled={sceneRunning || sceneTurnMode === 'manual'} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
+          <button onClick={() => void advanceScene(12)} disabled={sceneRunning} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
         </>}
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
