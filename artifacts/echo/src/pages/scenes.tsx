@@ -174,7 +174,6 @@ export default function ScenesPage() {
     if((presence[characterId]??'present')!=='present'){setError(es?'Ese personaje no está presente en la escena.':'That character is not present in the scene.');return;}
     setBusy(true);setError('');
     try{
-      if(!events.some(event=>event.text.trim())){setError(es?'Primero escribí el mensaje inicial de la escena. Después tocá el personaje que querés que responda.':'Write the opening scene message first, then tap a character to reply.');return;}
       if(active.turnSettings?.mode==='manual' && active.turnSettings?.nextCharacterId!==characterId){
         const result=await customFetch<{turnSettings:NonNullable<Scene['turnSettings']>}>(`/api/scenes/${encodeURIComponent(active.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:'manual',order:active.turnSettings?.order??active.participantIds,nextCharacterId:characterId,style:active.turnSettings?.style??'natural',autoReply:false})});
         setScenes(previous=>previous.map(scene=>scene.sceneId===active.sceneId?{...scene,turnSettings:result.turnSettings}:scene));
