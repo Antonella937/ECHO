@@ -89,9 +89,9 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       `You are ${speaker.name ?? "yourself"} in the private ${String(group.name ?? "band").slice(0, 80)} group chat.`,
       `Other members: ${participantIds.filter(id => id !== speakerId).map(id => characters.find(c => c.id === id)?.name ?? "Participant").join(", ").slice(0, 250)}.`,
       sceneCue ? `Situation: ${sceneCue}` : "",
-      recentGroupTurns ? `Recent chat:\\n${recentGroupTurns.slice(-1200)}` : "The chat has not started yet. Send the first natural message.",
+      recentGroupTurns ? `Recent chat:\n${recentGroupTurns.slice(-1200)}` : "The chat has not started yet. Send the first natural message.",
       "Write only your own next group message in English, naturally and briefly. Do not speak for others.",
-    ].filter(Boolean).join("\\n");
+    ].filter(Boolean).join("\n");
     let completion;
     try {
       completion = await (linkedKinId
