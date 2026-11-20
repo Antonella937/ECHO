@@ -50,17 +50,26 @@ export default function ScenesPage() {
   },[wallpaperKey]);
   useEffect(()=>{if(!selected||!user?.id){setGroupBackgroundId('');return;}const key=`echo:scene-source-group:${user.id}:${universeId}:${me.id}:${selected}`;try{setGroupBackgroundId(localStorage.getItem(key)??'');}catch{setGroupBackgroundId('');}},[selected,user?.id,universeId,me.id]);
   const effectiveGroupBackgroundId=groupBackgroundId==='none'?'':matchingGroups.some(g=>g.id===groupBackgroundId)?groupBackgroundId:(matchingGroups.length===1?matchingGroups[0].id:'');
-  const linkedGroupWallpaperKey=effectiveGroupBackgroundId&&user?.id?`echo:group-wallpaper:${user.id}:${universeId}:${me.id}:${effectiveGroupBackgroundId}`:'';
+  // A spectator can open a group using a different character identity than the
+  // one that originally customized its wallpaper. Only inspect local keys for
+  // participants of a group the API has already authorized and returned.
+  const linkedGroupWallpaperKeys=effectiveGroupBackgroundId&&user?.id
+    ? [me.id,...(matchingGroups.find(group=>group.id===effectiveGroupBackgroundId)?.participantIds??[])]
+        .filter((actorId,index,actors)=>actors.indexOf(actorId)===index)
+        .map(actorId=>`echo:group-wallpaper:${user.id}:${universeId}:${actorId}:${effectiveGroupBackgroundId}`)
+    : [];
+  const linkedGroupWallpaperKeysSignature=linkedGroupWallpaperKeys.join('|');
   const [linkedGroupWallpaper,setLinkedGroupWallpaper]=useState('');
   useEffect(()=>{
-    const refresh=()=>{try{setLinkedGroupWallpaper(linkedGroupWallpaperKey?localStorage.getItem(linkedGroupWallpaperKey)??'':'');}catch{setLinkedGroupWallpaper('');}};
+    const keys=linkedGroupWallpaperKeysSignature?linkedGroupWallpaperKeysSignature.split('|'):[];
+    const refresh=()=>{try{setLinkedGroupWallpaper(keys.map(key=>localStorage.getItem(key)).find(Boolean)??'');}catch{setLinkedGroupWallpaper('');}};
     refresh();
     window.addEventListener('focus',refresh);
     window.addEventListener('storage',refresh);
     const onVisibility=()=>{if(document.visibilityState==='visible')refresh();};
     document.addEventListener('visibilitychange',onVisibility);
     return()=>{window.removeEventListener('focus',refresh);window.removeEventListener('storage',refresh);document.removeEventListener('visibilitychange',onVisibility);};
-  },[linkedGroupWallpaperKey]);
+  },[linkedGroupWallpaperKeysSignature]);
   const [wallpaperUploading,setWallpaperUploading] = useState(false);
   const changeSceneWallpaper = async (file?:File) => {
     if(!wallpaperKey)return;
