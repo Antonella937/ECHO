@@ -53,8 +53,9 @@ export function EditPostSheet({ post, open, onClose }: { post: Post; open: boole
     <Sheet open={open} onClose={close} title={t("Editar publicación")} testId="sheet-edit-post"
       footer={<button onClick={save} className="tap h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground" data-testid="button-edit-post-save">{t("Guardar cambios")}</button>}>
       <div className="pb-2">
-        <textarea value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value.slice(0, 600) })} rows={3} aria-label={t("Pie de foto")}
+        <textarea value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value.slice(0, 5000) })} rows={3} aria-label={t("Pie de foto")}
           className="min-h-[88px] w-full resize-none rounded-2xl border border-input bg-card px-4 py-3 text-[15px] leading-relaxed focus:border-primary/60 focus:outline-none" data-testid="input-edit-caption" />
+        <p className="mt-1 text-right text-xs text-muted-foreground">{draft.caption.length}/5000</p>
         <label className="mt-3 flex items-center gap-3 rounded-2xl border border-input bg-card px-4">
           <MapPin className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} />
           <input aria-label={t("Ubicación")} value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value.slice(0, 80) })} placeholder={t("Añadir ubicación")}
