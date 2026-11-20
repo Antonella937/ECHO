@@ -74,6 +74,7 @@ export default function GroupConversationPage() {
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
   const [sceneContext, setSceneContext] = useState('');
+  const [firstSpeakerId, setFirstSpeakerId] = useState('');
   const [sceneTurnMode, setSceneTurnMode] = useState<'automatic' | 'round_robin' | 'manual'>('automatic');
   const [sceneResponseSpeed, setSceneResponseSpeed] = useState<'immediate' | 'normal' | 'slow'>('normal');
   const [sceneObserverEnabled, setSceneObserverEnabled] = useState(false);
@@ -143,7 +144,7 @@ export default function GroupConversationPage() {
       for (let turn = 0; turn < count && !stopSceneRef.current; turn++) {
         const result = await customFetch<{ status: string; reason?: string }>(`/api/group-dms/${encodeURIComponent(id)}/scene/next`, {
           method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id }),
+          body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, ...(turn === 0 && messages.length === 0 && firstSpeakerId ? { preferredSpeakerId: firstSpeakerId } : {}) }),
         });
         if (result.status !== 'sent') {
           if (turn === 0) setError(`No se generó el turno: ${result.reason ?? 'revisá la autonomía de los personajes'}`);
@@ -348,6 +349,11 @@ export default function GroupConversationPage() {
         <textarea value={sceneContext} maxLength={10000} rows={8} disabled={!sceneLoaded || sceneSaving}
           onChange={e => setSceneContext(e.target.value)} placeholder="Dónde están, qué pasó antes, qué sabe cada personaje..."
           className="mt-1 min-h-48 w-full resize-y rounded-xl border border-input bg-background p-3 text-sm" />
+        <label className="mt-3 block text-xs text-muted-foreground">Quién empieza (si el chat está vacío)</label>
+        <select value={firstSpeakerId} onChange={e => setFirstSpeakerId(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+          <option value="">Elegir automáticamente</option>
+          {group?.participantIds.filter(pid => pid !== me.id).map(pid => { const c = state.characters.find(c => c.id === pid); return c ? <option key={pid} value={pid}>{c.name}</option> : null; })}
+        </select>
         <label className="mt-3 block text-xs text-muted-foreground">Turnos para hablar</label>
         <select value={sceneTurnMode} onChange={e => setSceneTurnMode(e.target.value as typeof sceneTurnMode)} disabled={!sceneLoaded || sceneSaving} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
           <option value="automatic">Automático</option><option value="round_robin">Por turnos</option><option value="manual">Manual</option>
