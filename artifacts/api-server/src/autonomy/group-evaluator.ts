@@ -15,7 +15,7 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
   const groups = await db.execute(sql`SELECT participant_ids, autonomy_enabled, autonomy_interval_minutes, last_autonomy_at, scene_turn_mode
     FROM echo_group_conversations WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId} LIMIT 1`);
   const group = groups.rows[0];
-  if (!group || group.autonomy_enabled !== true) return { speakerId: null, reason: "GROUP_DISABLED" };
+  if (!group || (!sceneMode && group.autonomy_enabled !== true)) return { speakerId: null, reason: "GROUP_DISABLED" };
   const messages = await db.execute(sql`SELECT sender_id, body, created_at FROM echo_group_messages
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
     ORDER BY created_at DESC LIMIT 1`);
