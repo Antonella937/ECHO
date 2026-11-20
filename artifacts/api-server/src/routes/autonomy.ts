@@ -199,8 +199,18 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
     const previousIsUser = !!previous && (previous.sender_type?.toLowerCase() === "user" || previous.sender_type?.toLowerCase() === "human");
     const matchesEchoContext = !!previous?.message && previous.message.includes("[ECHO PRIVATE THREAD") &&
       (previous.message.includes("VANTA") || previous.message.includes("ECHO_PROFILE"));
+    // Return only structural diagnostics, never conversation text or provider credentials.
     res.json({ status: lastIsAi && previousIsUser && matchesEchoContext ? "reply_found_in_kindroid" : "not_verified",
-      pendingMessageId: latest.id, providerReplyPresent: lastIsAi, contextMatches: matchesEchoContext });
+      pendingMessageId: latest.id, providerReplyPresent: lastIsAi, contextMatches: matchesEchoContext,
+      diagnostics: {
+        messageCountOnLastPage: lastMessages.length,
+        lastSenderField: typeof last?.sender === "string" ? (last.sender === kinId ? "linked_kin" : last.sender.slice(0, 32)) : null,
+        lastSenderType: typeof last?.sender_type === "string" ? last.sender_type.slice(0, 32) : null,
+        previousSenderType: typeof previous?.sender_type === "string" ? previous.sender_type.slice(0, 32) : null,
+        lastKeys: last ? Object.keys(last).slice(0, 20) : [],
+        previousKeys: previous ? Object.keys(previous).slice(0, 20) : [],
+        previousHasEchoContext: !!previous?.message?.includes("[ECHO PRIVATE THREAD"),
+      } });
   } catch (error) {
     req.log.warn({ code: error instanceof Error ? error.name : "UNKNOWN" }, "Kindroid history recovery probe failed");
     res.status(502).json({ error: "KINDROID_HISTORY_CHECK_FAILED" });
