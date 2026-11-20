@@ -177,8 +177,18 @@ router.post("/autonomy/retry-dm-reply", requireAuth, async (req, res): Promise<v
     if (!link.rows.length) { res.status(409).json({ error: "KINDROID_NOT_CONNECTED" }); return; }
     // The runtime re-checks the thread after its debounce and uses a stable
     // recovery-specific idempotency key. A repeated click cannot create a second turn.
-    await triggerImmediateDmReply(ownerId, universeId, characterId, messageId, true);
-    res.json({ status: "attempted", messageId });
+    const outcome = await triggerImmediateDmReply(ownerId, universeId, characterId, messageId, true);
+    if (!outcome) { res.status(409).json({ error: "DM_RETRY_NOT_ELIGIBLE" }); return; }
+    if (outcome.status === "failed") {
+      res.status(502).json({ error: outcome.reasonCode }); return;
+    }
+    if (outcome.status === "rate_limited") {
+      res.status(429).json({ error: outcome.reasonCode }); return;
+    }
+    if (outcome.status !== "executed") {
+      res.status(409).json({ error: outcome.reasonCode, status: outcome.status }); return;
+    }
+    res.json({ status: "replied", messageId });
   } catch (error) {
     req.log.warn({ code: error instanceof Error ? error.name : "UNKNOWN" }, "Manual DM recovery failed");
     res.status(502).json({ error: "DM_RETRY_FAILED" });
