@@ -106,7 +106,7 @@ export async function triggerImmediateDmReply(ownerId: string, universeId: strin
     message.recipientId === incoming.senderId &&
     new Date(message.createdAt).getTime() > incomingAt
   )) return;
-  const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}`).digest("hex");
+  const hash = createHash("sha256").update(`incoming-dm:${ownerId}:${universeId}:${characterId}:${messageId}${recovery ? ":recovery-v1" : ""}`).digest("hex");
   const idempotencyKey = `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
   await runAutonomyLiveCycle(ownerId, { universeId, characterId, idempotencyKey }, {
     repository, provider: new MeteredTextProvider(ownerId, "autonomy", new GeminiDmProvider(undefined, fetch, ownerId)),
