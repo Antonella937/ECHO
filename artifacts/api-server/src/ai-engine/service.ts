@@ -97,7 +97,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     }
   }
   // Linked Kin IDs are stored server-side, never exposed to the client.
-  // Only the founder's direct incoming DM lane is routed; social actions stay native.
+  // The founder's linked characters use Kindroid for live DMs and social decisions;
+  // ECHO only schedules opportunities and enforces visibility/permission checks.
   let selectedProvider = dependencies.provider;
   // Linked characters use their own Kindroid voice for public text too.
   // ECHO still selects the opportunity and validates the draft before execution.
