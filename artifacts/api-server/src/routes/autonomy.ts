@@ -246,17 +246,29 @@ router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): P
     const kinId = link.rows[0]?.kin_id;
     const key = process.env.ECHO_KINDROID_API_KEY;
     if (typeof kinId !== "string" || !key) { res.status(503).json({ error: "KINDROID_RECOVERY_UNAVAILABLE" }); return; }
-    const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
-    url.searchParams.set("ai_id", kinId);
-    url.searchParams.set("limit", "100");
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20000) });
-    if (!response.ok) { res.status(502).json({ error: "KINDROID_HISTORY_UNAVAILABLE" }); return; }
-    const data = await response.json() as { messages?: Array<{id?: string | number; sender?: string; sender_type?: string; message?: string; timestamp?: number}>; pagination?: {hasMore?: boolean} };
-    if (!Array.isArray(data.messages) || data.pagination?.hasMore) {
-      res.status(409).json({ error: "KINDROID_HISTORY_NOT_UNAMBIGUOUS" }); return;
+    type HistoryMessage = {id?: string | number; sender?: string; sender_type?: string; message?: string; timestamp?: number};
+    let cursor: number | undefined;
+    let messages: HistoryMessage[] = [];
+    let finished = false;
+    for (let page = 0; page < 10; page++) {
+      const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
+      url.searchParams.set("ai_id", kinId);
+      url.searchParams.set("limit", "100");
+      if (cursor !== undefined) url.searchParams.set("start_after_timestamp", String(cursor));
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20000) });
+      if (!response.ok) { res.status(502).json({ error: "KINDROID_HISTORY_UNAVAILABLE" }); return; }
+      const data = await response.json() as {messages?: HistoryMessage[]; pagination?: {hasMore?: boolean;lastTimestamp?: number}};
+      if (!Array.isArray(data.messages)) { res.status(502).json({ error: "KINDROID_HISTORY_INVALID" }); return; }
+      messages = [...messages.slice(-1), ...data.messages].slice(-3);
+      if (!data.pagination?.hasMore) { finished = true; break; }
+      if (typeof data.pagination.lastTimestamp !== "number" || data.pagination.lastTimestamp === cursor) {
+        res.status(409).json({ error: "KINDROID_HISTORY_PAGINATION_FAILED" }); return;
+      }
+      cursor = data.pagination.lastTimestamp;
     }
-    const last = data.messages.at(-1);
-    const previous = data.messages.at(-2);
+    if (!finished) { res.status(409).json({ error: "KINDROID_HISTORY_TOO_LONG" }); return; }
+    const last = messages.at(-1);
+    const previous = messages.at(-2);
     const lastIsAi = last?.sender?.toLowerCase() === "ai" || last?.sender_type?.toLowerCase() === "ai" || last?.sender === kinId;
     const previousIsUser = previous?.sender?.toLowerCase() === "user" || previous?.sender_type?.toLowerCase() === "user";
     const matchingContext = previous?.message?.includes("[ECHO PRIVATE THREAD") && previous.message.includes("VANTA");
