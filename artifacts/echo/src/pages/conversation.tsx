@@ -148,13 +148,13 @@ export default function ConversationPage() {
     if (!user?.id || !id || checkingKindroidHistory) return;
     setCheckingKindroidHistory(true); setKindroidHistoryNotice(null);
     try {
-      const result = await customFetch(`/api/autonomy/kindroid-pending-reply?universeId=${encodeURIComponent(getActiveUniverseId(user.id))}&characterId=${encodeURIComponent(id)}`, { responseType: 'json' }) as {status?: string; error?: string; diagnostics?: {lastSenderField?: string | null; lastSenderType?: string | null; previousSenderType?: string | null; lastKeys?: string[]; previousKeys?: string[]; previousHasEchoContext?: boolean; messageCountOnLastPage?: number}};
+      const result = await customFetch(`/api/autonomy/kindroid-pending-reply?universeId=${encodeURIComponent(getActiveUniverseId(user.id))}&characterId=${encodeURIComponent(id)}`, { responseType: 'json' }) as {status?: string; error?: string; diagnostics?: {lastSenderField?: string | null; lastSenderType?: string | null; previousSenderType?: string | null; previousSenderField?: string | null; lastKeys?: string[]; previousKeys?: string[]; previousHasEchoContext?: boolean; messageCountOnLastPage?: number}};
       setKindroidHistoryNotice(result.status === 'reply_found_in_kindroid'
         ? 'La respuesta está en Kindroid, pero todavía no se importó a ECHO.'
         : result.status === 'no_pending_dm'
           ? 'No hay un mensaje pendiente de respuesta en este chat.'
           : result.status === 'not_verified' && result.diagnostics
-          ? `El historial respondió, pero ECHO no reconoció el turno. Tipo: ${result.diagnostics.lastSenderType ?? result.diagnostics.lastSenderField ?? 'desconocido'}; campos: ${(result.diagnostics.lastKeys ?? []).join(', ') || 'ninguno'}; contexto: ${result.diagnostics.previousHasEchoContext ? 'sí' : 'no'}. No se reenvió nada.`
+          ? `El historial respondió, pero ECHO no reconoció el turno. Tipo: ${result.diagnostics.lastSenderType ?? result.diagnostics.lastSenderField ?? 'desconocido'}; campos: ${(result.diagnostics.lastKeys ?? []).join(', ') || 'ninguno'}; remitente anterior: ${result.diagnostics.previousSenderField ?? result.diagnostics.previousSenderType ?? 'desconocido'}; contexto: ${result.diagnostics.previousHasEchoContext ? 'sí' : 'no'}. No se reenvió nada.`
           : 'Kindroid no pudo confirmar automáticamente la respuesta. No se envió ningún mensaje nuevo.');
     } catch {
       setKindroidHistoryNotice('No se pudo consultar el historial de Kindroid. No se envió ningún mensaje nuevo.');
