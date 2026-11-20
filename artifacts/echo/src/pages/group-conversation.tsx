@@ -305,7 +305,7 @@ export default function GroupConversationPage() {
   const send = async (event: FormEvent) => {
     event.preventDefault();
     const message = text.trim();
-    if ((!message && !pendingFiles.length) || !id || sending || uploading) return;
+    if ((!message && !pendingFiles.length) || !id || sending || uploading || !group?.participantIds.includes(me.id)) return;
     setSending(true);
     try {
       setUploading(pendingFiles.length > 0);
@@ -472,7 +472,7 @@ export default function GroupConversationPage() {
         })}
       </div>
     </div>}
-    <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
+    {group?.participantIds.includes(me.id) && <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);try{validateAttachments(files,pendingFiles.length);setPendingFiles(old=>[...old,...files]);setError('');}catch(err){setError((err as Error).message);}e.target.value='';}} />
       <div className="relative shrink-0">
@@ -488,6 +488,6 @@ export default function GroupConversationPage() {
       <button type="button" onClick={() => void recorder.start()} disabled={recorder.status !== 'idle' || sending || pendingFiles.length >= 5} aria-label="Grabar nota de voz" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-50"><Mic className="h-5 w-5" /></button>
       <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="max-h-36 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-full border border-white/20 bg-background/40 px-4 py-3 outline-none backdrop-blur-xl whitespace-pre-wrap" aria-label="Mensaje al grupo" />
       <button disabled={(!text.trim() && !pendingFiles.length) || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
-    </form>
+    </form>}
   </div>;
 }
