@@ -49,7 +49,8 @@ export default function ScenesPage() {
     try{setSceneWallpaper(localStorage.getItem(wallpaperKey)??'');}catch{setSceneWallpaper('');}
   },[wallpaperKey]);
   useEffect(()=>{if(!selected||!user?.id){setGroupBackgroundId('');return;}const key=`echo:scene-source-group:${user.id}:${universeId}:${me.id}:${selected}`;try{setGroupBackgroundId(localStorage.getItem(key)??'');}catch{setGroupBackgroundId('');}},[selected,user?.id,universeId,me.id]);
-  const linkedGroupWallpaperKey=groupBackgroundId&&matchingGroups.some(g=>g.id===groupBackgroundId)&&user?.id?`echo:group-wallpaper:${user.id}:${universeId}:${me.id}:${groupBackgroundId}`:'';
+  const effectiveGroupBackgroundId=matchingGroups.some(g=>g.id===groupBackgroundId)?groupBackgroundId:(matchingGroups.length===1?matchingGroups[0].id:'');
+  const linkedGroupWallpaperKey=effectiveGroupBackgroundId&&user?.id?`echo:group-wallpaper:${user.id}:${universeId}:${me.id}:${effectiveGroupBackgroundId}`:'';
   const [linkedGroupWallpaper,setLinkedGroupWallpaper]=useState('');
   useEffect(()=>{
     const refresh=()=>{try{setLinkedGroupWallpaper(linkedGroupWallpaperKey?localStorage.getItem(linkedGroupWallpaperKey)??'':'');}catch{setLinkedGroupWallpaper('');}};
@@ -249,7 +250,7 @@ export default function ScenesPage() {
           <button type="button" aria-expanded={showSceneSettings} onClick={()=>setShowSceneSettings(v=>!v)} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs">{es?"Opciones":"Options"} ···</button>
 
         </div>
-      </div>{showSceneSettings&&<div className="relative z-10 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl bg-background/50 p-2 backdrop-blur-xl"><div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={groupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="">{es?"Ninguno":"None"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
+      </div>{showSceneSettings&&<div className="relative z-10 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl bg-background/50 p-2 backdrop-blur-xl"><div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={effectiveGroupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="">{es?"Ninguno":"None"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
             {wallpaperUploading?(es?'Subiendo fondo…':'Uploading wallpaper…'):(es?'Cambiar fondo':'Change wallpaper')}
             <input type="file" accept="image/jpeg,image/png,image/webp" disabled={wallpaperUploading} className="sr-only" onChange={e=>{changeSceneWallpaper(e.target.files?.[0]);e.target.value='';}} />
           </label>}
