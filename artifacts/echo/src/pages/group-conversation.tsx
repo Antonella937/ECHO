@@ -391,7 +391,7 @@ export default function GroupConversationPage() {
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
       {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">{gl("Estás viendo este grupo como espectadora. No sos participante.")}</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">{gl("Salir del modo espectadora")}</button></div>}
     </div>}
-    {sceneObserverEnabled && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
+    {sceneObserverEnabled && sceneTurnMode !== 'manual' && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto text-xs text-muted-foreground">Modo espectadora · escena grupal</span>
         {sceneRunning ? <button onClick={() => { stopSceneRef.current = true; }} className="rounded-lg bg-secondary px-3 py-2 text-xs">Detener después del turno</button> : <>
@@ -402,7 +402,7 @@ export default function GroupConversationPage() {
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
     </div>}
     <main className="relative z-10 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-transparent px-4 py-5" data-testid="group-messages">
-      {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">Podés iniciar la escena desde el modo espectadora, sin mandar un mensaje.</p></div>}
+      {messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">{sceneObserverEnabled && sceneTurnMode === 'manual' ? 'Tocá la foto de un personaje para empezar la conversación.' : 'Podés iniciar la escena desde el modo espectadora, sin mandar un mensaje.'}</p></div>}
       {messages.filter(m => m.pinnedAt).length > 0 && <div className="mb-3 rounded-xl bg-secondary/70 px-3 py-2 text-xs"><Pin className="mr-1 inline h-3 w-3" /> {messages.filter(m => m.pinnedAt).length} mensaje(s) fijado(s)</div>}
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>
         {m.senderId !== me.id && <div className="shrink-0"><CharacterAvatar character={character(m.senderId) ?? me} size={30} /></div>}
@@ -462,7 +462,7 @@ export default function GroupConversationPage() {
           const participant = character(pid);
           if (!participant) return null;
           return <button key={pid} type="button" disabled={sceneRunning} onClick={() => { setFirstSpeakerId(pid); setError(''); void advanceScene(1, pid); }} aria-label={`Hacer hablar a ${participant.name}`} title={participant.name} className="flex min-w-0 shrink-0 flex-col items-center gap-1 rounded-xl px-1 py-1 text-foreground transition-transform active:scale-95 disabled:opacity-50">
-            <span className="rounded-full ring-1 ring-white/25"><CharacterAvatar character={participant} size={56} /></span>
+            <span className="block h-14 w-14 overflow-hidden rounded-full [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_img]:border-0 [&_img]:ring-0"><CharacterAvatar character={participant} size={56} /></span>
             <span className="max-w-16 truncate text-[11px] drop-shadow-md">{participant.name.split(' ')[0]}</span>
           </button>;
         })}
