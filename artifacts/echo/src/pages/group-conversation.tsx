@@ -394,12 +394,12 @@ export default function GroupConversationPage() {
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
       {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">{gl("Estás viendo este grupo como espectadora. No sos participante.")}</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">{gl("Salir del modo espectadora")}</button></div>}
     </div>}
-    {sceneObserverEnabled && sceneTurnMode !== 'manual' && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
+    {sceneObserverEnabled && <div className="shrink-0 border-b border-border bg-background px-4 py-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto text-xs text-muted-foreground">Modo espectadora · escena grupal</span>
         {sceneRunning ? <button onClick={() => { stopSceneRef.current = true; }} className="rounded-lg bg-secondary px-3 py-2 text-xs">Detener después del turno</button> : <>
           <button onClick={() => void advanceScene(1)} disabled={sceneRunning} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">Siguiente turno</button>
-          <button onClick={() => void advanceScene(12)} disabled={sceneRunning || sceneTurnMode === 'manual'} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
+          <button onClick={() => void advanceScene(12)} disabled={sceneRunning} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
         </>}
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>

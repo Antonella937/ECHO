@@ -8,6 +8,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { kindroidDmProvider } from "../ai-engine/kindroid";
+import { EngineError } from "../ai-engine/contracts";
 
 export const scenesRouter: IRouter = Router();
 scenesRouter.use(requireAuth);
@@ -491,10 +492,15 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${nextJson}::jsonb, updated_at = now()
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
     res.json({ eventId, text: result.text, characterId });
-  } catch {
+  } catch (error) {
     if (reservedId) {
       try { await db.execute(sql`DELETE FROM echo_scene_events WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
         AND scene_id = ${sceneId.data} AND event_id = ${reservedId} AND text = ''`); } catch { /* retryable reservation */ }
+    }
+    // Preserve a safe, actionable Kindroid error code without exposing prompts or replies.
+    if (error instanceof EngineError && error.code.startsWith("KINDROID_")) {
+      res.status(error.status >= 400 && error.status < 600 ? error.status : 502).json({ error: error.code });
+      return;
     }
     res.status(503).json({ error: "SCENE_REPLY_UNAVAILABLE" });
   }
