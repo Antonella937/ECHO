@@ -207,6 +207,7 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
         lastSenderField: typeof last?.sender === "string" ? (last.sender === kinId ? "linked_kin" : last.sender.slice(0, 32)) : null,
         lastSenderType: typeof last?.sender_type === "string" ? last.sender_type.slice(0, 32) : null,
         previousSenderType: typeof previous?.sender_type === "string" ? previous.sender_type.slice(0, 32) : null,
+        previousSenderField: typeof previous?.sender === "string" ? (previous.sender === kinId ? "linked_kin" : previous.sender.slice(0, 32)) : null,
         lastKeys: last ? Object.keys(last).slice(0, 20) : [],
         previousKeys: previous ? Object.keys(previous).slice(0, 20) : [],
         previousHasEchoContext: !!previous?.message?.includes("[ECHO PRIVATE THREAD"),
