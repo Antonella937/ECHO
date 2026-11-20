@@ -159,8 +159,10 @@ export default function ConversationPage() {
       setKindroidRecoveryNotice(result.status === 'recovered'
         ? 'Respuesta original recuperada en ECHO. Actualizá el chat si todavía no aparece.'
         : 'No se confirmó la recuperación. No se envió ningún mensaje a Kindroid.');
-    } catch {
-      setKindroidRecoveryNotice('No se pudo recuperar la respuesta con seguridad. No se envió ningún mensaje a Kindroid.');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      const knownCode = detail.match(/(KINDROID_[A-Z_]+|RECOVERY_[A-Z_]+|DM_ALREADY_ADVANCED|RECOVERED_MESSAGE_INVALID)/)?.[1];
+      setKindroidRecoveryNotice(`No se importó la respuesta. ${knownCode ? `Motivo: ${knownCode}.` : 'La solicitud fue rechazada; revisaremos el motivo en el servidor.'} No se envió nada a Kindroid.`);
     } finally { setRecoveringKindroidReply(false); }
   };
   useEffect(() => {
