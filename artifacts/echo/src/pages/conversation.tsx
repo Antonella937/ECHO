@@ -29,6 +29,7 @@ import { postMedia } from '@/domain/post-media';
 import type { Message, MessageAttachment } from '@/domain/types';
 
 const REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
+const SHARED_PROFILE = /\\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\\]/g;
 
 function splitVoiceTranscript(text: string, hasAudio: boolean): { visibleText: string; transcript: string | null } {
   if (!hasAudio) return { visibleText: text, transcript: null };
@@ -94,6 +95,7 @@ export default function ConversationPage() {
 
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [attachmentsMenuOpen,setAttachmentsMenuOpen] = useState(false);
+  const [profilePickerOpen,setProfilePickerOpen] = useState(false);
   const [appearanceMenuOpen,setAppearanceMenuOpen] = useState(false);
   const [eventsMenuOpen,setEventsMenuOpen] = useState(false);
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
@@ -557,6 +559,10 @@ export default function ConversationPage() {
                   {label:'ECHO Music',icon:Music2,action:()=>{setShowMusicLibrary(true);setMusicDraftStatus('');}},
                 ]).map(option=><button key={option.label} type="button" role="menuitem" onClick={()=>{setAttachmentsMenuOpen(false);option.action();}} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm hover:bg-white/10"><option.icon className="h-5 w-5 shrink-0"/>{option.label}</button>)}
               </div>}
+              {profilePickerOpen && <div className="absolute bottom-full left-0 z-50 mb-3 max-h-72 w-[min(19rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-border bg-background p-2 shadow-2xl" role="dialog" aria-label="Compartir perfil">
+                <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-xs text-muted-foreground" onClick={()=>setProfilePickerOpen(false)}>Cerrar</button>
+                {state.characters.filter(c=>!c.archived && (!c.privateAccount || c.id===me.id)).map(c=><button key={c.id} type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary" onClick={()=>{setText(prev=>[prev.trim(),`[ECHO_PROFILE:${c.id}]`].filter(Boolean).join('\\n\\n'));setProfilePickerOpen(false);composerRef.current?.focus();}}>@{c.handle} · {c.name}</button>)}
+              </div>}
               <button type="button" onClick={()=>setAttachmentsMenuOpen(v=>!v)} aria-label="Más opciones" aria-expanded={attachmentsMenuOpen} className="tap grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-background/45 shadow-sm backdrop-blur-xl" data-testid="button-attach">
                 <Plus className={cn('h-6 w-6 transition-transform',attachmentsMenuOpen&&'rotate-45')} strokeWidth={1.7}/>
               </button>
@@ -665,6 +671,8 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
   const reactions = m.reactions ?? [];
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
+  const sharedProfileIds = [...visibleText.matchAll(SHARED_PROFILE)].map(match=>match[1]);
+  const cleanVisibleText = visibleText.replace(SHARED_PROFILE, '').trim();
   return (
     <li onContextMenu={(e) => { e.preventDefault(); if (window.matchMedia('(min-width: 640px)').matches) { clearPress(); setMenuOpen(true); } }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) { clearPress(); gesture.current = { x: touch.clientX, y: touch.clientY, opened: false, swiped: false }; } }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
@@ -680,6 +688,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
           )}
         </div>
       )}
+      {sharedProfileIds.map(profileId => { const profile = state.characters.find(c=>c.id===profileId && !c.archived); return profile ? <Link key={profileId} href={`/profile/${profile.id}`} className="mb-1 block rounded-2xl border border-border bg-card px-4 py-3 text-sm" data-testid={`link-shared-profile-${m.id}`}><span className="block font-semibold">{profile.name}</span><span className="text-muted-foreground">@{profile.handle} · Ver perfil</span></Link> : null; })}
       {post && (
         <Link href={`/p/${post.id}`} className="mb-1 block w-48 overflow-hidden rounded-2xl border border-border bg-card" data-testid={`link-shared-post-${m.id}`}>
           {postMedia(post).length > 0 && <img src={resolveMedia(post.image, { sourceType: 'post', sourceContentId: post.id })} alt="" className="aspect-[4/5] w-full object-cover" />}
@@ -724,7 +733,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
               mine ? 'rounded-br-md bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/40' : 'rounded-bl-md bg-card text-card-foreground shadow-lg ring-1 ring-border',
             )}
           >
-            <SocialText text={visibleText} />
+            <SocialText text={cleanVisibleText} />
           </p>
         )}
         <span className="flex max-w-full shrink-0 flex-wrap gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
