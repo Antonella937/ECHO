@@ -19,9 +19,9 @@ const schema = { type: "object", additionalProperties: false, required: ["text"]
 /** Explicit one-group execution, never called from the HTTP read endpoints.
  * Generation is metered; the database claim prevents concurrent duplicate generation.
  */
-export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false) {
+export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false, preferredSpeakerId?: string) {
   const now = new Date();
-  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode);
+  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode, preferredSpeakerId);
   if (!choice.speakerId) return { status: "skipped", reason: choice.reason };
   const speakerId = choice.speakerId;
   const claimId = randomUUID();
