@@ -323,7 +323,7 @@ export default function GroupConversationPage() {
   return <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
     {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper.startsWith("data:") ? wallpaper : resolveMedia(wallpaper)}")`}} />}
     <header className="relative z-30 shrink-0 bg-transparent pt-safe">
-      <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2">
+      <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2 text-white">
         <button type="button" onClick={()=>navigate('/messages')} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
         <div className="flex min-w-0 max-w-full flex-col items-center gap-1 text-center">
           <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full border border-white/15 bg-background/35 backdrop-blur-xl">{group?.avatar?<img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover"/>:<Users className="h-6 w-6"/>}</div>
@@ -336,8 +336,9 @@ export default function GroupConversationPage() {
       <form onSubmit={searchMessages} className="flex gap-2"><input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar en esta conversación" className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm" /><button type="submit" className="rounded-xl bg-secondary px-3 text-sm">Buscar</button></form>
       {!!searchResults.length && <div className="mt-2 max-h-44 space-y-2 overflow-y-auto">{searchResults.map(m => <div key={m.id} className="rounded-lg bg-secondary p-2 text-xs"><strong>{character(m.senderId)?.name ?? m.senderId}</strong><p className="break-words"><SocialText text={m.text} /></p></div>)}</div>}
     </div>}
-    {settingsOpen && <div role="region" aria-label="Configuración del grupo" className="min-h-0 max-h-[min(75dvh,720px)] shrink-0 overflow-y-auto overscroll-contain border-b border-border bg-background p-4 pb-8 [-webkit-overflow-scrolling:touch]">
+    {settingsOpen && <div role="region" aria-label="Configuración del grupo" className="relative z-40 mx-3 min-h-0 max-h-[min(75dvh,720px)] shrink-0 overflow-y-auto overscroll-contain rounded-2xl border border-white/20 bg-background/90 p-4 pb-8 shadow-xl backdrop-blur-xl [-webkit-overflow-scrolling:touch]">
       <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Información del grupo</h2><button onClick={() => setSettingsOpen(false)} className="text-sm text-muted-foreground">Cerrar</button></div>
+      <button type="button" onClick={()=>{setSettingsOpen(false);setWallpaperOpen(true);}} className="mb-4 flex w-full items-center justify-between rounded-xl border border-white/20 bg-white/5 px-3 py-3 text-left text-sm">Cambiar fondo del chat <span aria-hidden="true">›</span></button>
       <label className="mb-1 block text-xs text-muted-foreground">Nombre</label>
       <div className="flex gap-2"><input value={groupName} maxLength={80} onChange={e => setGroupName(e.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3" /><button onClick={() => void editGroup()} disabled={savingSettings || !groupName.trim()} className="rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">Guardar</button></div>
       <label className="mb-1 mt-4 block text-xs text-muted-foreground">Foto del grupo</label>
