@@ -157,7 +157,13 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
         method: 'POST', responseType: 'json', body: JSON.stringify({ universeId, postId, count }),
         headers: { 'Content-Type': 'application/json' },
       });
-      for (const item of (result.comments ?? []).slice(0, 6)) actions.addCommunityComment(postId, item.handle, item.text);
+      const drafts = (result.comments ?? []).slice(0, 6);
+      if (!drafts.length) throw new Error('La IA no devolvió comentarios válidos. Intentá nuevamente.');
+      let saved = 0;
+      for (const item of drafts) {
+        try { actions.addCommunityComment(postId, item.handle, item.text); saved += 1; }
+        catch (saveError) { if (!saved) throw saveError; console.warn('[community-comments] partial save', saveError); }
+      }
       setGeneratedBatches(v => v + 1);
     } catch (err) { setError(`${ct('No se pudieron generar comentarios.')} ${err instanceof Error ? err.message : String(err)}`); }
     finally { setGeneratingCommunity(false); }
