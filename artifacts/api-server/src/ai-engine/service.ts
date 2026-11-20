@@ -235,7 +235,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         // A profile card shared in this exact private thread grants a one-time
         // read of that profile's public posts; it does not create a follow.
-        const sharedProfileIds = [...latestIncomingText.matchAll(/\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\]/g)]
+        const sharedProfileIds = [...incomingBatch.flatMap(message => [...(message.text ?? '').matchAll(/\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\]/g)])]
           .map(match => match[1]).slice(0, 2);
         if (sharedProfileIds.length) {
           const sharedProfileContext: string[] = [];
