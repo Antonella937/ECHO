@@ -89,12 +89,12 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         if (typeof parsed.text !== "string" || !parsed.text.trim() || (!linkedKinId && parsed.text.length > 800)) throw new Error("INVALID_GROUP_REPLY");
       },
     });
-    const text = (JSON.parse(completion.text) as { text: string }).text.trim().slice(0, 800);
+    const text = (linkedKinId ? completion.text : (JSON.parse(completion.text) as { text: string }).text).trim().slice(0, 800);
     const inserted = await db.execute(sql`INSERT INTO echo_group_messages
       (owner_id, universe_id, id, group_id, sender_id, body, read_by)
       SELECT ${ownerId}, ${universeId}, ${randomUUID()}, id, ${speakerId}, ${text}, ${JSON.stringify([speakerId])}::jsonb
       FROM echo_group_conversations WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
-      AND autonomy_enabled = true AND autonomy_claim_id = ${claimId}
+      AND (${sceneMode} OR autonomy_enabled = true) AND autonomy_claim_id = ${claimId}
       AND participant_ids ? ${speakerId}
       AND ((${sceneMode} AND NOT EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId})) OR EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId}
         AND universe_id = ${universeId} AND group_id = ${groupId}
