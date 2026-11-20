@@ -75,10 +75,17 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       linkedKinId = typeof linked.rows[0]?.kin_id === "string" ? linked.rows[0].kin_id : null;
       if (!linkedKinId) return { status: "skipped", reason: "KINDROID_LINK_MISSING" };
     }
-    const kinPrompt = "[ECHO group/scene message: Speak as " + (speaker.name ?? "yourself") +
-      " in English, using your established personality. Write one natural reply, maximum 800 characters. " +
-      "Do not impersonate others or invent their messages. Respect platonic relationships.]\n" +
-      "Scene context: " + String(group.scene_context ?? "").slice(0, 1200) + "\n" + context;
+    // Kindroid already holds the character personality and memory. Send only the
+    // participants, recent group turns and a short scene cue; leave the richer
+    // context untouched for the native ECHO provider.
+    const recentGroupTurns = [...messages.rows].reverse().slice(-8)
+      .map(row => `${characters.find(c => c.id === String(row.sender_id))?.name ?? "Participant"}: ${String(row.body ?? "").trim().slice(0, 350)}`)
+      .filter(line => !line.endsWith(": ")).join("\n");
+    const kinPrompt = `[ECHO group chat: You are ${speaker.name ?? "yourself"}. Reply in English as yourself only, under 800 characters. Respect established platonic relationships. Do not invent other participants\u0027 messages.]\n` +
+      `Group: ${String(group.name ?? "").slice(0, 80)}\n` +
+      `Participants: ${participantIds.map(id => characters.find(c => c.id === id)?.name ?? "Participant").join(", ").slice(0, 350)}\n` +
+      (group.scene_context ? `Scene: ${String(group.scene_context).slice(0, 350)}\n` : "") +
+      `Recent messages:\n${recentGroupTurns || "(No recent messages)"}`;
     const completion = await (linkedKinId
       ? kindroidDmProvider(kinPrompt, linkedKinId, "", undefined, "dm")
       : provider.forOwner(ownerId)).complete({
