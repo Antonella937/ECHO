@@ -280,10 +280,10 @@ export default function ScenesPage() {
             <button type="button" disabled={busy} onClick={()=>void deleteScene()} className="rounded-xl border border-destructive px-3 py-2 text-sm text-destructive disabled:opacity-50">{st("Eliminar escena definitivamente")}</button>
           </div>
         </div>
-      </details></div>}<div className="relative z-10 flex flex-wrap items-end justify-center gap-2">
-        {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="rounded-full border border-white/20 bg-primary/90 px-3 py-2 text-xs font-semibold text-primary-foreground shadow-lg disabled:opacity-50">▶ {st("Continuar escena")}</button>}
+      </details></div>}<div className="relative z-10 flex shrink-0 items-center gap-3 overflow-x-auto overscroll-x-contain rounded-2xl bg-black/20 px-2 py-2 backdrop-blur-sm">
+        {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-primary/90 px-4 py-3 text-xs font-semibold text-primary-foreground shadow-lg disabled:opacity-50">▶ {st("Continuar escena")}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present').map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
-          title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex min-w-0 flex-col items-center gap-1 rounded-2xl bg-black/25 px-1 py-2 text-xs font-semibold backdrop-blur-sm disabled:opacity-50">
+          title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-2xl bg-black/25 px-1 py-2 text-xs font-semibold backdrop-blur-sm disabled:opacity-50">
           <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{state.characters.find(c=>c.id===id)?.avatar?<img src={resolveMedia(state.characters.find(c=>c.id===id)!.avatar)} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
