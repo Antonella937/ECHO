@@ -125,7 +125,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       if (input.situation === 'comment' && !targetPost) {
         throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
       }
-      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation);
+      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation, input.characterId);
     }
   }
   if (dependencies.liveDmReply === true &&
@@ -329,7 +329,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
           socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,500);
         }
-        selectedProvider = kindroidDmProvider(outgoingPrompt, kinId, socialContext);
+        selectedProvider = kindroidDmProvider(outgoingPrompt, kinId, storyForReply ? socialContext : '', undefined, 'dm', input.characterId);
       }
     }
   }
@@ -351,7 +351,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     const author = parsed.data.state.characters.find(item => item.id === story.authorId);
     const relation = actor?.configuration?.relationships?.find(item => item.targetId === story.authorId);
     selectedProvider = kindroidStoryDecisionProvider(kinId,
-      `Author: ${(author?.name ?? 'someone').slice(0,80)}. Relationship: ${relation?.preset ?? 'unspecified'}. Caption: ${(story.caption ?? '').slice(0,500)}`);
+      `Author: ${(author?.name ?? 'someone').slice(0,80)}. Relationship: ${relation?.preset ?? 'unspecified'}. Caption: ${(story.caption ?? '').slice(0,500)}`, undefined, input.characterId);
   }
   // Likes do not require generated prose. Story interactions above are
   // Kindroid-driven and must not be replaced by a local random decision.
