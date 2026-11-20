@@ -48,7 +48,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const creatorUnread = useCreatorNotificationCount();
   const creatorDmStatus = useCreatorHubDmStatus();
   const creatorDmUnread = creatorDmStatus.enabled ? creatorDmStatus.items.filter(item => item.unread).length : 0;
-  const inConversation = /^\/messages\/.+/.test(location);
+  const inConversation = /^\/messages\/.+/.test(location) || location === '/scenes';
   // Creator Hub is a full-screen destination, not a feed panel.
   if (location === '/creator-hub') return <div className="grain min-h-[100dvh] bg-background text-foreground">{children}</div>;
 
