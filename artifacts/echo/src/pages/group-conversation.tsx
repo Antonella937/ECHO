@@ -456,6 +456,20 @@ export default function GroupConversationPage() {
     </div>
     {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="relative block cursor-pointer overflow-hidden rounded-xl border border-white/20 p-3 text-sm">{wallpaperUploading ? "Subiendo fondo..." : "Elegir foto de fondo"}<input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={e=>{void changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>void changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
     {eventsOpen && group && id && group.participantIds.includes(me.id) && <div className="relative z-40 mx-3 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><button type="button" onClick={()=>setEventsOpen(false)} className="mb-2 text-sm">✕ Cerrar acontecimientos</button><GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} /></div>}
+    {sceneObserverEnabled && group && <div className="relative z-30 shrink-0 border-t border-white/10 bg-background/45 px-3 py-2 backdrop-blur-md">
+      <div className="flex items-center gap-3 overflow-x-auto pb-1" aria-label="Elegir quién habla en el grupo">
+        {group.participantIds.filter(pid => pid !== me.id).map(pid => {
+          const participant = character(pid);
+          if (!participant) return null;
+          const selected = firstSpeakerId === pid;
+          return <button key={pid} type="button" disabled={sceneRunning} onClick={() => { setFirstSpeakerId(pid); setError(''); }} aria-label={`Elegir a ${participant.name} para el próximo turno`} aria-pressed={selected} title={participant.name} className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-1 py-1 disabled:opacity-50 ${selected ? 'text-primary' : 'text-foreground'}`}>
+            <span className={`rounded-full p-0.5 ${selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'ring-1 ring-white/20'}`}><CharacterAvatar character={participant} size={42} /></span>
+            <span className="max-w-16 truncate text-[10px]">{participant.name.split(' ')[0]}</span>
+          </button>;
+        })}
+        <button type="button" onClick={() => void advanceScene(1)} disabled={sceneRunning || !firstSpeakerId} className="ml-auto shrink-0 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{sceneRunning ? 'Generando…' : 'Hacer hablar'}</button>
+      </div>
+    </div>}
     <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);try{validateAttachments(files,pendingFiles.length);setPendingFiles(old=>[...old,...files]);setError('');}catch(err){setError((err as Error).message);}e.target.value='';}} />
