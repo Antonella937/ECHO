@@ -8,7 +8,7 @@ import {
 import { clerkClient } from "@clerk/express";
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
-import { readUniverse } from "../lib/universeRepository";
+import { readUniverse, writeUniverse } from "../lib/universeRepository";
 import { EngineError } from "../ai-engine/contracts";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { previewForOwner } from "../ai-engine/service";
@@ -215,6 +215,72 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
   } catch (error) {
     req.log.warn({ code: error instanceof Error ? error.name : "UNKNOWN" }, "Kindroid history recovery probe failed");
     res.status(502).json({ error: "KINDROID_HISTORY_CHECK_FAILED" });
+  }
+});
+
+// Recover an already-generated Kindroid answer. Never calls send-message.
+router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const body = req.body as Record<string, unknown> | null;
+  if (!body || typeof body.universeId !== "string" || typeof body.characterId !== "string" ||
+      typeof body.messageId !== "string" || Object.keys(body).sort().join("|") !== "characterId|messageId|universeId" ||
+      [body.universeId, body.characterId, body.messageId].some(v => (v as string).length < 1 || (v as string).length > 120)) {
+    res.status(400).json({ error: "INVALID_RECOVERY_INPUT" }); return;
+  }
+  const ownerId = req.userId!;
+  const universeId = body.universeId as string;
+  const characterId = body.characterId as string;
+  const messageId = body.messageId as string;
+  try {
+    const snapshot = await readUniverse(ownerId, universeId);
+    const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+    if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
+    const incoming = parsed.data.messages.find(m => m.id === messageId && m.recipientId === characterId);
+    if (!incoming || !incoming.text.includes("VANTA")) { res.status(409).json({ error: "RECOVERY_MESSAGE_MISMATCH" }); return; }
+    const thread = parsed.data.messages.filter(m => m.threadId === incoming.threadId);
+    const latest = [...thread].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    if (latest?.id !== messageId) { res.status(409).json({ error: "DM_ALREADY_ADVANCED" }); return; }
+    const link = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+      AND character_id = ${characterId} AND enabled = true LIMIT 1`);
+    const kinId = link.rows[0]?.kin_id;
+    const key = process.env.ECHO_KINDROID_API_KEY;
+    if (typeof kinId !== "string" || !key) { res.status(503).json({ error: "KINDROID_RECOVERY_UNAVAILABLE" }); return; }
+    const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
+    url.searchParams.set("ai_id", kinId);
+    url.searchParams.set("limit", "100");
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20000) });
+    if (!response.ok) { res.status(502).json({ error: "KINDROID_HISTORY_UNAVAILABLE" }); return; }
+    const data = await response.json() as { messages?: Array<{id?: string | number; sender?: string; sender_type?: string; message?: string; timestamp?: number}>; pagination?: {hasMore?: boolean} };
+    if (!Array.isArray(data.messages) || data.pagination?.hasMore) {
+      res.status(409).json({ error: "KINDROID_HISTORY_NOT_UNAMBIGUOUS" }); return;
+    }
+    const last = data.messages.at(-1);
+    const previous = data.messages.at(-2);
+    const lastIsAi = last?.sender?.toLowerCase() === "ai" || last?.sender_type?.toLowerCase() === "ai" || last?.sender === kinId;
+    const previousIsUser = previous?.sender?.toLowerCase() === "user" || previous?.sender_type?.toLowerCase() === "user";
+    const matchingContext = previous?.message?.includes("[ECHO PRIVATE THREAD") && previous.message.includes("VANTA");
+    const answer = last?.message?.trim();
+    if (!lastIsAi || !previousIsUser || !matchingContext || !answer || answer.length > 30000) {
+      res.status(409).json({ error: "KINDROID_REPLY_NOT_VERIFIED" }); return;
+    }
+    const recovered = {
+      id: `kindroid_recovered_${String(last?.id ?? last?.timestamp ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60)}_${messageId}`,
+      threadId: incoming.threadId, senderId: characterId, recipientId: incoming.senderId,
+      text: answer, createdAt: new Date().toISOString(), storyId: null, postId: null,
+      readBy: [characterId], origin: "autonomy" as const,
+    };
+    if (!last?.id && !last?.timestamp) { res.status(409).json({ error: "KINDROID_REPLY_MISSING_ID" }); return; }
+    const candidate = { ...parsed.data, messages: [...parsed.data.messages, recovered] };
+    if (!SaveUniverseBody.shape.state.safeParse(candidate).success) {
+      res.status(409).json({ error: "RECOVERED_MESSAGE_INVALID" }); return;
+    }
+    const saved = await writeUniverse(ownerId, candidate, snapshot.revision, universeId);
+    if (!saved) { res.status(409).json({ error: "RECOVERY_REVISION_CONFLICT" }); return; }
+    res.json({ status: "recovered", messageId: recovered.id });
+  } catch (error) {
+    req.log.warn({ errorType: error instanceof Error ? error.name : "unknown" }, "Kindroid reply recovery failed");
+    res.status(502).json({ error: "KINDROID_RECOVERY_FAILED" });
   }
 });
 
