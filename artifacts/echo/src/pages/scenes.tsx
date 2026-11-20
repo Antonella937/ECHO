@@ -1,4 +1,4 @@
-import { useMediaResolver } from '@/lib/media-resolver';
+import { useMediaResolver } from '@/lib/media';
 import { SceneCanonReview } from '@/components/echo/scene-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
