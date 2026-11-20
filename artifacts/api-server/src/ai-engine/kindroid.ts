@@ -26,6 +26,11 @@ async function classifyKindroidFailure(response: Response): Promise<{category:st
         if (code) providerCode = code.toLowerCase();
       }
     } catch { /* Provider may return plain text; never log it. */ }
+    // Classify provider-side generation failures without exposing their text.
+    // Kindroid can return a textual error envelope even with HTTP 400.
+    if (/(?:<<error>>|beep boop|server melted|regenerate this response|generation (?:failed|error)|failed to generate|model (?:unavailable|overloaded|busy))/.test(raw)) return result('provider_generation_failure',providerCode,errorFormat,errorFingerprint);
+    if (/(?:invalid|expired|revoked|missing|unauthorized).{0,45}(?:api[_ -]?key|token|bearer|authorization)|(?:api[_ -]?key|token|bearer|authorization).{0,45}(?:invalid|expired|revoked|missing|unauthorized)/.test(raw)) return result('credential_rejected',providerCode,errorFormat,errorFingerprint);
+    if (/(?:endpoint|route|method|send-message).{0,45}(?:invalid|unknown|unsupported|not found|disabled)|(?:invalid|unknown|unsupported|not found|disabled).{0,45}(?:endpoint|route|method|send-message)/.test(raw)) return result('endpoint_rejected',providerCode,errorFormat,errorFingerprint);
     // Categorize known provider rejections without logging raw response text,
     // Kin identifiers, API credentials, or private message content.
     if (/(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available).{0,50}(?:kin|ai[_ -]?id|character)|(?:kin|ai[_ -]?id|character).{0,50}(?:not found|does not exist|unknown|deleted|invalid|unrecognized|not accessible|not available)/.test(raw)) return result('invalid_character',providerCode,errorFormat,errorFingerprint);
