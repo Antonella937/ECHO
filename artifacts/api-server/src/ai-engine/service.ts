@@ -233,6 +233,35 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           : isDirectReply
             ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
+        // A profile card shared in this exact private thread grants a one-time
+        // read of that profile's public posts; it does not create a follow.
+        const sharedProfileIds = [...latestIncomingText.matchAll(/\\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\\]/g)]
+          .map(match => match[1]).slice(0, 2);
+        if (sharedProfileIds.length) {
+          const sharedProfileContext: string[] = [];
+          for (const profileId of sharedProfileIds) {
+            const profile = parsed.data.state.characters.find(c => c.id === profileId && !c.archived);
+            if (!profile || (profile.privateAccount && !(parsed.data.state.follows[input.characterId] ?? []).includes(profileId) && profileId !== input.characterId)) continue;
+            const profilePosts = parsed.data.state.posts.filter(p => p.authorId === profileId)
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4);
+            const observations: string[] = [];
+            for (const item of profilePosts) {
+              // Cached vision only. Never spend vision credits merely because a
+              // user shared a profile, and never claim unseen image details.
+              const cached = await visionService.loadContext(ownerId, parsed.data.state,
+                { ...input, postId: item.id }, input.universeId ?? 'primary').catch(() => null);
+              const summary = cached?.postSummaries[item.id];
+              const mediaObservations = (item.media ?? []).map(media => cached?.analyses[`post:${item.id}:${media.id}`]?.sceneDescription)
+                .filter((description): description is string => !!description).slice(0, 2);
+              const visual = mediaObservations.length ? mediaObservations.join('; ').slice(0, 350)
+                : summary ? JSON.stringify(summary).slice(0, 350)
+                : 'Image content not analyzed; do not describe its appearance.';
+              observations.push(`Caption: ${item.caption.slice(0, 240)} | Visual evidence: ${visual}`);
+            }
+            sharedProfileContext.push(`Profile @${profile.handle} (${profile.name}). Recent public posts:\\n${observations.join('\\n') || '(No published posts)'}`);
+          }
+          if (sharedProfileContext.length) outgoingPrompt += `\\n[ECHO SHARED PROFILE — read-only visit. You may discuss ONLY these verified posts and their cached visual descriptions. Following is OPTIONAL and has NOT occurred. Never claim to have followed or liked the account. If images were not analyzed, do not invent clothing, colors or faces. React naturally in your established personality.]\\n${sharedProfileContext.join('\\n').slice(0, 2600)}\\n[END SHARED PROFILE]`;
+        }
         // A character can inspect their own published ECHO stories even when they
         // have not viewed them. Keep this separate from other people's viewed stories.
         // Only attach it when the incoming message refers to a story, to protect
