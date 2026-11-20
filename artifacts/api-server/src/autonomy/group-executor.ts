@@ -99,7 +99,8 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       FROM echo_group_conversations WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
       AND (${sceneMode} OR autonomy_enabled = true) AND autonomy_claim_id = ${claimId}
       AND participant_ids ? ${speakerId}
-      AND ((${sceneMode} AND NOT EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId})) OR EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId}
+      AND (NOT EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId})
+        OR EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId}
         AND universe_id = ${universeId} AND group_id = ${groupId}
         GROUP BY group_id HAVING max(created_at) <= ${now.toISOString()}::timestamptz))
       RETURNING id`);
