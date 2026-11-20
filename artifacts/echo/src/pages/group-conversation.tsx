@@ -144,7 +144,7 @@ export default function GroupConversationPage() {
   }, [id, user?.id, me.id]);
   const [sceneStatus, setSceneStatus] = useState('');
   const advanceScene = async (count: number, preferredSpeakerOverride?: string) => {
-    if (!id || sceneRunning || (count > 1 && sceneTurnMode === 'manual')) return;
+    if (!id || sceneRunning) return;
     stopSceneRef.current = false;
     setSceneRunning(true);
     setSceneStatus(preferredSpeakerOverride ? `Generando mensaje de ${character(preferredSpeakerOverride)?.name ?? 'personaje'}…` : 'Generando siguiente turno…');
