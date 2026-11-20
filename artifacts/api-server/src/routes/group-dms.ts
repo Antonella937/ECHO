@@ -412,12 +412,13 @@ router.post("/group-dms/:groupId/scene/next", async (req, res) => {
   const { universeId, actorId } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
   const groupId = String(req.params.groupId);
+  const preferredSpeakerId = typeof req.body?.preferredSpeakerId === "string" && id.safeParse(req.body.preferredSpeakerId).success ? req.body.preferredSpeakerId : undefined;
   const allowed = await db.execute(sql`SELECT id FROM echo_group_conversations
     WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
       AND scene_observer_enabled=true LIMIT 1`);
   if (!allowed.rows.length) { res.status(403).json({ error: "SCENE_NOT_ENABLED" }); return; }
   try {
-    const result = await runGroupAutonomyOnce(req.userId!, universeId, groupId, true);
+    const result = await runGroupAutonomyOnce(req.userId!, universeId, groupId, true, preferredSpeakerId);
     res.json(result);
   } catch (error) {
     req.log.error({ err: error }, "Group scene turn failed");
