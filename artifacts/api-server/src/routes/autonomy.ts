@@ -141,7 +141,14 @@ router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> =>
     )).orderBy(desc(echoAutonomyRunsTable.createdAt)).limit(1);
     const allowed = new Set(["KINDROID_TIMEOUT_RETRY_MANUALLY","KINDROID_CONNECTION_RETRY_MANUALLY",
       "KINDROID_REQUEST_FAILED_RETRY_MANUALLY","KINDROID_RATE_LIMITED","KINDROID_GENERATION_FAILED"]);
-    res.json({ error: run && (run.status === "provider_failed" || run.status === "live_failed" || run.status === "stale_failed") &&
+    // An old failure must never be shown as the status of a newer DM.
+    const latestThreadMessage = parsed.data.state.messages
+      .filter(m => m.senderId === characterId || m.recipientId === characterId)
+      .sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    const runAt = run ? new Date(run.createdAt).getTime() : 0;
+    const latestAt = latestThreadMessage ? Date.parse(latestThreadMessage.createdAt) : 0;
+    const stale = latestAt > runAt;
+    res.json({ error: !stale && run && (run.status === "provider_failed" || run.status === "live_failed" || run.status === "stale_failed") &&
       run.code && allowed.has(run.code) ? { code: run.code, at: run.createdAt } : null });
   } catch {
     res.status(503).json({ error: "DM_STATUS_UNAVAILABLE" });
