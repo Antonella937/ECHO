@@ -21,7 +21,8 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
     const universe = state as { currentCharacterId?: string; characters?: Array<{ id: string; handle: string; name: string; accountType?: string; communityCommentsEnabled?: boolean }>; posts?: Array<{ id: string; authorId: string; caption?: string; commentsEnabled?: boolean }>; comments?: Array<{ postId: string; guestHandle?: string; text: string }> } | null;
     const post = universe?.posts?.find(p => p.id === parsed.data.postId);
     const account = universe?.characters?.find(c => c.id === post?.authorId);
-    if (!post || !account || post.authorId !== universe?.currentCharacterId || !account.communityCommentsEnabled || post.commentsEnabled === false) {
+    const communityEligible = account?.communityCommentsEnabled === true || (account?.communityCommentsEnabled !== false && ["band", "business", "venue"].includes(account?.accountType ?? ""));
+    if (!post || !account || post.authorId !== universe?.currentCharacterId || !communityEligible || post.commentsEnabled === false) {
       res.status(403).json({ error: "COMMUNITY_COMMENTS_NOT_ENABLED_OR_NOT_OWNER" }); return;
     }
     const existing = (universe?.comments ?? []).filter(c => c.postId === post.id).slice(-20).map(c => ({ handle: c.guestHandle ?? "character", text: c.text.slice(0, 180) }));
