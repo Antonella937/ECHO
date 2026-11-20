@@ -244,6 +244,22 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             if (!profile || (profile.privateAccount && !(parsed.data.state.follows[input.characterId] ?? []).includes(profileId) && profileId !== input.characterId)) continue;
             const profilePosts = parsed.data.state.posts.filter(p => p.authorId === profileId)
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 4);
+            // A profile card is an explicit request to inspect this profile.
+            // Analyze at most ONE recent image post per shared profile; reuse
+            // persisted analyses for the rest. This bounds paid vision work.
+            const firstImagePost = profilePosts.find(p => p.image && /^\\/objects\\/(?:uploads|r2)\\/[a-f0-9-]{20,}$/i.test(p.image.split('?')[0]));
+            if (firstImagePost) {
+              const alreadyAnalyzed = await visionService.loadContext(ownerId, parsed.data.state,
+                { ...input, postId: firstImagePost.id }, input.universeId ?? 'primary').catch(() => null);
+              if (!alreadyAnalyzed?.postSummaries[firstImagePost.id]) {
+                try {
+                  await visionService.analyzePost(ownerId, parsed.data.state, firstImagePost.id, input.universeId ?? 'primary');
+                } catch (error) {
+                  console.warn('[kindroid] shared profile vision unavailable', { postId: firstImagePost.id,
+                    code: error instanceof Error ? error.name : 'unknown' });
+                }
+              }
+            }
             const observations: string[] = [];
             for (const item of profilePosts) {
               // Cached vision only. Never spend vision credits merely because a
