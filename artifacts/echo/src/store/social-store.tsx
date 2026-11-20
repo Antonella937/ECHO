@@ -319,7 +319,8 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const post = cur().posts.find(p => p.id === postId);
         if (!post || post.authorId !== myId()) throw new Error('Solo podés agregar comentarios a tus publicaciones.');
         const account = cur().characters.find(c => c.id === post.authorId);
-        if (!account?.communityCommentsEnabled || post.commentsEnabled === false) throw new Error('Activá primero los comentarios de comunidad.');
+        const communityEligible = account?.communityCommentsEnabled === true || (account?.communityCommentsEnabled !== false && ['band', 'business', 'venue', 'artist'].includes(account?.accountType ?? ''));
+        if (!communityEligible || post.commentsEnabled === false) throw new Error('Activá primero los comentarios de comunidad.');
         const safeHandle = handle.trim().replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '').slice(0, 32);
         if (safeHandle.length < 3 || !text.trim() || text.length > 500) throw new Error('Ingresá un usuario válido y un comentario de hasta 500 caracteres.');
         coordinator.current?.edit(state => ({ ...state, comments: [...state.comments, { id: uid('community'), postId, authorId: post.authorId, guestHandle: safeHandle, text: text.trim(), createdAt: new Date().toISOString(), parentId: null, replyToAuthorId: null, likes: [], origin: 'user' as const }] }));
