@@ -5,6 +5,37 @@ import { readUniverse } from "../lib/universeRepository";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { GeminiDmProvider } from "../ai-engine/gemini";
 
+function parseCommunityDraft(text: string): { comments?: Array<{ handle?: unknown; text?: unknown }> } {
+  const trimmed = text.trim();
+  try { return JSON.parse(trimmed); } catch { /* The model can add a code fence or extra prose. */ }
+  // Find the first complete JSON object, respecting quoted strings and escaped braces.
+  for (let start = 0; start < trimmed.length; start++) {
+    if (trimmed[start] !== "{") continue;
+    let depth = 0;
+    let quoted = false;
+    let escaped = false;
+    for (let i = start; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') quoted = false;
+      } else if (ch === '"') quoted = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}" && --depth === 0) {
+        try {
+          const parsed: unknown = JSON.parse(trimmed.slice(start, i + 1));
+          if (parsed && typeof parsed === "object" && "comments" in parsed && Array.isArray((parsed as { comments?: unknown }).comments)) {
+            return parsed as { comments: Array<{ handle?: unknown; text?: unknown }> };
+          }
+        } catch { /* Try the next object. */ }
+        break;
+      }
+    }
+  }
+  throw new Error("COMMUNITY_COMMENT_INVALID_JSON");
+}
+
 const router: IRouter = Router();
 const input = z.object({
   universeId: z.string().min(1).max(120),
@@ -32,7 +63,7 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
       context: JSON.stringify({ account: { name: account.name, handle: account.handle, type: account.accountType }, postCaption: (post.caption ?? "").slice(0, 600), existing, count: parsed.data.count }),
       outputSchema: { type: "object", properties: { comments: { type: "array", items: { type: "object", properties: { handle: { type: "string" }, text: { type: "string" } }, required: ["handle", "text"] } } }, required: ["comments"] },
     });
-    const raw = JSON.parse(generated.text) as { comments?: Array<{ handle?: unknown; text?: unknown }> };
+    const raw = parseCommunityDraft(generated.text);
     const used = new Set(existing.map(c => c.text.toLowerCase()));
     const comments = (Array.isArray(raw.comments) ? raw.comments : []).slice(0, parsed.data.count).flatMap(c => {
       const handle = typeof c.handle === "string" ? c.handle.replace(/^@/, "").replace(/[^a-zA-Z0-9._]/g, "").slice(0, 32) : "";
