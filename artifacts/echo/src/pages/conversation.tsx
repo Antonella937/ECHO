@@ -29,7 +29,7 @@ import { postMedia } from '@/domain/post-media';
 import type { Message, MessageAttachment } from '@/domain/types';
 
 const REACTIONS = ['❤', '😂', '😮', '😢', '🔥', '👏'];
-const SHARED_PROFILE = /\\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\\]/g;
+const SHARED_PROFILE = /\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\]/g;
 
 function splitVoiceTranscript(text: string, hasAudio: boolean): { visibleText: string; transcript: string | null } {
   if (!hasAudio) return { visibleText: text, transcript: null };
@@ -561,7 +561,7 @@ export default function ConversationPage() {
               </div>}
               {profilePickerOpen && <div className="absolute bottom-full left-0 z-50 mb-3 max-h-72 w-[min(19rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-border bg-background p-2 shadow-2xl" role="dialog" aria-label="Compartir perfil">
                 <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-xs text-muted-foreground" onClick={()=>setProfilePickerOpen(false)}>Cerrar</button>
-                {state.characters.filter(c=>!c.archived && (!c.privateAccount || c.id===me.id)).map(c=><button key={c.id} type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary" onClick={()=>{setText(prev=>[prev.trim(),`[ECHO_PROFILE:${c.id}]`].filter(Boolean).join('\\n\\n'));setProfilePickerOpen(false);composerRef.current?.focus();}}>@{c.handle} · {c.name}</button>)}
+                {state.characters.filter(c=>!c.archived && (!c.privateAccount || c.id===me.id)).map(c=><button key={c.id} type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary" onClick={()=>{setText(prev=>[prev.trim(),`[ECHO_PROFILE:${c.id}]`].filter(Boolean).join('\n\n'));setProfilePickerOpen(false);composerRef.current?.focus();}}>@{c.handle} · {c.name}</button>)}
               </div>}
               <button type="button" onClick={()=>setAttachmentsMenuOpen(v=>!v)} aria-label="Más opciones" aria-expanded={attachmentsMenuOpen} className="tap grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-background/45 shadow-sm backdrop-blur-xl" data-testid="button-attach">
                 <Plus className={cn('h-6 w-6 transition-transform',attachmentsMenuOpen&&'rotate-45')} strokeWidth={1.7}/>
