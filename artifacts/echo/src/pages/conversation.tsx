@@ -452,7 +452,6 @@ export default function ConversationPage() {
             data-testid="button-recover-kindroid-reply">{recoveringKindroidReply ? 'Recuperando respuesta…' : 'Recuperar respuesta de Hyunjin (sin reenviar)'}</button>
         )}
         {kindroidRecoveryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidRecoveryNotice}</div>}
-        {kindroidHistoryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidHistoryNotice}</div>}
 
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
