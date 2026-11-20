@@ -142,24 +142,6 @@ export default function ConversationPage() {
   }, [id, user?.id]);
 
   const [kindroidFailure, setKindroidFailure] = useState<string | null>(null);
-  const [checkingKindroidHistory, setCheckingKindroidHistory] = useState(false);
-  const [kindroidHistoryNotice, setKindroidHistoryNotice] = useState<string | null>(null);
-  const checkKindroidHistory = async () => {
-    if (!user?.id || !id || checkingKindroidHistory) return;
-    setCheckingKindroidHistory(true); setKindroidHistoryNotice(null);
-    try {
-      const result = await customFetch(`/api/autonomy/kindroid-pending-reply?universeId=${encodeURIComponent(getActiveUniverseId(user.id))}&characterId=${encodeURIComponent(id)}`, { responseType: 'json' }) as {status?: string; error?: string; diagnostics?: {lastSenderField?: string | null; lastSenderType?: string | null; previousSenderType?: string | null; previousSenderField?: string | null; lastKeys?: string[]; previousKeys?: string[]; previousHasEchoContext?: boolean; messageCountOnLastPage?: number}};
-      setKindroidHistoryNotice(result.status === 'reply_found_in_kindroid'
-        ? 'La respuesta está en Kindroid, pero todavía no se importó a ECHO.'
-        : result.status === 'no_pending_dm'
-          ? 'No hay un mensaje pendiente de respuesta en este chat.'
-          : result.status === 'not_verified' && result.diagnostics
-          ? `El historial respondió, pero ECHO no reconoció el turno. Tipo: ${result.diagnostics.lastSenderType ?? result.diagnostics.lastSenderField ?? 'desconocido'}; campos: ${(result.diagnostics.lastKeys ?? []).join(', ') || 'ninguno'}; remitente anterior: ${result.diagnostics.previousSenderField ?? result.diagnostics.previousSenderType ?? 'desconocido'}; contexto: ${result.diagnostics.previousHasEchoContext ? 'sí' : 'no'}. No se reenvió nada.`
-          : 'Kindroid no pudo confirmar automáticamente la respuesta. No se envió ningún mensaje nuevo.');
-    } catch {
-      setKindroidHistoryNotice('No se pudo consultar el historial de Kindroid. No se envió ningún mensaje nuevo.');
-    } finally { setCheckingKindroidHistory(false); }
-  };
   const [recoveringKindroidReply, setRecoveringKindroidReply] = useState(false);
   const [kindroidRecoveryNotice, setKindroidRecoveryNotice] = useState<string | null>(null);
   const recoverKindroidReply = async () => {
@@ -181,24 +163,6 @@ export default function ConversationPage() {
       setKindroidRecoveryNotice('No se pudo recuperar la respuesta con seguridad. No se envió ningún mensaje a Kindroid.');
     } finally { setRecoveringKindroidReply(false); }
   };
-  const [retryingDm, setRetryingDm] = useState(false);
-  const [retryDmNotice, setRetryDmNotice] = useState<string | null>(null);
-  const retryLastDm = async () => {
-    if (!user?.id || !id || retryingDm) return;
-    const latest = [...messages].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-    if (!latest || latest.senderId !== identityId || latest.recipientId !== id) {
-      setRetryDmNotice('El chat cambió. No se reintentó ningún mensaje.'); return;
-    }
-    setRetryingDm(true); setRetryDmNotice(null);
-    try {
-      await customFetch('/api/autonomy/retry-dm-reply', { method: 'POST', responseType: 'json',
-        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), characterId: id, messageId: latest.id }) });
-      setRetryDmNotice('Kindroid generó una respuesta. Si todavía no aparece, actualizá el chat.');
-    } catch {
-      setRetryDmNotice('No se pudo recuperar la respuesta. Tu mensaje original sigue intacto.');
-    } finally { setRetryingDm(false); }
-  };
-
   useEffect(() => {
     if (!id || !user?.id) { setKindroidFailure(null); return; }
     let active = true;
@@ -480,34 +444,15 @@ export default function ConversationPage() {
           </div>
         )}
         {messages.length > 0 && (() => {
-          const latest = [...messages].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-          return latest?.senderId === identityId && latest?.recipientId === id;
-        })() && (
-          <button type="button" disabled={retryingDm} onClick={() => void retryLastDm()}
-            className="mb-2 w-full rounded-xl border border-border bg-secondary/80 px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
-            data-testid="button-retry-kindroid-dm">{retryingDm ? 'Reintentando…' : '↻ Reintentar respuesta al último mensaje'}</button>
-        )}
-        {messages.length > 0 && (() => {
-          const latest = [...messages].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-          return latest?.senderId === identityId && latest?.recipientId === id;
-        })() && (
-          <button type="button" disabled={checkingKindroidHistory} onClick={() => void checkKindroidHistory()}
-            className="mb-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
-            data-testid="button-check-kindroid-history">{checkingKindroidHistory ? 'Consultando Kindroid…' : 'Consultar respuesta existente en Kindroid (sin reenviar)'}</button>
-        )}
-        {kindroidHistoryNotice?.startsWith('La respuesta está en Kindroid') && messages.length > 0 && (() => {
           const latest = [...messages].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-          return latest?.senderId === identityId && latest?.recipientId === id;
+          return latest?.senderId === identityId && latest?.recipientId === id && latest.text.includes('VANTA');
         })() && (
           <button type="button" disabled={recoveringKindroidReply} onClick={() => void recoverKindroidReply()}
             className="mb-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
-            data-testid="button-recover-kindroid-reply">{recoveringKindroidReply ? 'Recuperando respuesta…' : 'Recuperar respuesta existente en ECHO (sin reenviar)'}</button>
+            data-testid="button-recover-kindroid-reply">{recoveringKindroidReply ? 'Recuperando respuesta…' : 'Recuperar respuesta de Hyunjin (sin reenviar)'}</button>
         )}
         {kindroidRecoveryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidRecoveryNotice}</div>}
         {kindroidHistoryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidHistoryNotice}</div>}
-        {retryDmNotice && (
-          <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{retryDmNotice}</div>
-        )}
 
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
