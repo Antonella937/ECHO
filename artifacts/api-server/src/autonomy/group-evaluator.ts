@@ -4,7 +4,7 @@ import { readOwnerControls } from "./repository";
 import { chooseGroupSpeaker } from "./group-policy";
 
 /** Read-only evaluation. It cannot generate text or mutate a group. */
-export async function evaluateGroupAutonomy(ownerId: string, universeId: string, groupId: string, now = new Date(), sceneMode = false) {
+export async function evaluateGroupAutonomy(ownerId: string, universeId: string, groupId: string, now = new Date(), sceneMode = false, preferredSpeakerId?: string) {
   const controls = await readOwnerControls(ownerId, universeId);
   if (controls.globalKillSwitchEngaged || !controls.liveExecutionEnabled) return { speakerId: null, reason: "OWNER_DISABLED" };
   const [universe] = await db.select({ state: echoUniversesTable.state, archivedAt: echoUniversesTable.archivedAt, deletedAt: echoUniversesTable.deletedAt })
@@ -32,7 +32,8 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
       sleeping: /\b(sleep|sleeping|dormir|durmiendo|descansando)\b/i.test(c.configuration?.currentState?.activity ?? ""),
     };
   });
-  const speakerId = chooseGroupSpeaker({
+  const selected = sceneMode && preferredSpeakerId ? candidates.find(c => c.id === preferredSpeakerId && c.enabled && c.dmEnabled && !c.archived && !c.sleeping) : undefined;
+  const speakerId = selected?.id ?? chooseGroupSpeaker({
     enabled: true, globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
     liveExecutionEnabled: controls.liveExecutionEnabled,
     intervalMinutes: sceneMode ? 0 : Number(group.autonomy_interval_minutes), sceneMode, turnMode: String(group.scene_turn_mode ?? 'automatic') as 'automatic' | 'round_robin' | 'manual',
