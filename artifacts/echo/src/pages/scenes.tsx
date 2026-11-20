@@ -49,9 +49,17 @@ export default function ScenesPage() {
     try{setSceneWallpaper(localStorage.getItem(wallpaperKey)??'');}catch{setSceneWallpaper('');}
   },[wallpaperKey]);
   useEffect(()=>{if(!selected||!user?.id){setGroupBackgroundId('');return;}const key=`echo:scene-source-group:${user.id}:${universeId}:${me.id}:${selected}`;try{setGroupBackgroundId(localStorage.getItem(key)??'');}catch{setGroupBackgroundId('');}},[selected,user?.id,universeId,me.id]);
-  const linkedGroupWallpaperKey=groupBackgroundId&&user?.id?`echo:group-wallpaper:${user.id}:${universeId}:${me.id}:${groupBackgroundId}`:'';
+  const linkedGroupWallpaperKey=groupBackgroundId&&matchingGroups.some(g=>g.id===groupBackgroundId)&&user?.id?`echo:group-wallpaper:${user.id}:${universeId}:${me.id}:${groupBackgroundId}`:'';
   const [linkedGroupWallpaper,setLinkedGroupWallpaper]=useState('');
-  useEffect(()=>{try{setLinkedGroupWallpaper(linkedGroupWallpaperKey?localStorage.getItem(linkedGroupWallpaperKey)??'':'');}catch{setLinkedGroupWallpaper('');}},[linkedGroupWallpaperKey]);
+  useEffect(()=>{
+    const refresh=()=>{try{setLinkedGroupWallpaper(linkedGroupWallpaperKey?localStorage.getItem(linkedGroupWallpaperKey)??'':'');}catch{setLinkedGroupWallpaper('');}};
+    refresh();
+    window.addEventListener('focus',refresh);
+    window.addEventListener('storage',refresh);
+    const onVisibility=()=>{if(document.visibilityState==='visible')refresh();};
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>{window.removeEventListener('focus',refresh);window.removeEventListener('storage',refresh);document.removeEventListener('visibilitychange',onVisibility);};
+  },[linkedGroupWallpaperKey]);
   const [wallpaperUploading,setWallpaperUploading] = useState(false);
   const changeSceneWallpaper = async (file?:File) => {
     if(!wallpaperKey)return;
