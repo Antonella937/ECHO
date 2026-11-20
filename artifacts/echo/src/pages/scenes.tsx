@@ -171,8 +171,17 @@ export default function ScenesPage() {
       target=order.length?order[(turn.cursor??0)%order.length]:null;
     }
     if(!target){
+      // A narrative opening should invite the character named in it first.
+      // Otherwise continue in round-robin order without fabricating dialogue.
+      const latest=events.at(-1);
+      const mentioned=latest && latest.actorId===me.id
+        ? ai.find(id=>{const name=state.characters.find(c=>c.id===id)?.name;return !!name && new RegExp(`\\b${name.split(' ')[0].replace(/[.*+?^${}()|[\]\\]/g,'\\    if(!target){
       const last=events.filter(e=>ai.includes(e.actorId)).at(-1)?.actorId;
       target=ai[(ai.indexOf(last??'')+1)%ai.length]??ai[0];
+    }')}\\b`,'i').test(latest.text);})
+        : undefined;
+      const last=events.filter(e=>ai.includes(e.actorId)).at(-1)?.actorId;
+      target=mentioned??ai[(ai.indexOf(last??'')+1)%ai.length]??ai[0];
     }
     if(target)await generateReply(target);
   };
