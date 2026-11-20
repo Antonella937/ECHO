@@ -21,7 +21,7 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
     const universe = state as { currentCharacterId?: string; characters?: Array<{ id: string; handle: string; name: string; accountType?: string; communityCommentsEnabled?: boolean }>; posts?: Array<{ id: string; authorId: string; caption?: string; commentsEnabled?: boolean }>; comments?: Array<{ postId: string; guestHandle?: string; text: string }> } | null;
     const post = universe?.posts?.find(p => p.id === parsed.data.postId);
     const account = universe?.characters?.find(c => c.id === post?.authorId);
-    const communityEligible = account?.communityCommentsEnabled === true || (account?.communityCommentsEnabled !== false && ["band", "business", "venue"].includes(account?.accountType ?? ""));
+    const communityEligible = account?.communityCommentsEnabled === true || (account?.communityCommentsEnabled !== false && ["band", "business", "venue", "artist"].includes(account?.accountType ?? ""));
     if (!post || !account || post.authorId !== universe?.currentCharacterId || !communityEligible || post.commentsEnabled === false) {
       res.status(403).json({ error: "COMMUNITY_COMMENTS_NOT_ENABLED_OR_NOT_OWNER" }); return;
     }
@@ -41,8 +41,11 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
       used.add(text.toLowerCase()); return [{ handle, text }];
     });
     res.json({ comments });
-  } catch {
-    res.status(503).json({ error: "COMMUNITY_COMMENT_GENERATION_UNAVAILABLE" });
+  } catch (error) {
+    const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 503;
+    const code = typeof (error as { code?: unknown })?.code === "string" ? (error as { code: string }).code : "COMMUNITY_COMMENT_GENERATION_UNAVAILABLE";
+    console.error("[community-comments] draft failed", { code, status, message: error instanceof Error ? error.message : String(error) });
+    res.status(status >= 400 && status < 600 ? status : 503).json({ error: code });
   }
 });
 
