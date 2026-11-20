@@ -171,7 +171,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
       let response: Response;
       try {
-        response = await queuedKindroidRequest(kinId, situation === 'dm' ? 30 : 10, () => request('https://api.kindroid.ai/v1/send-message', {
+        response = await queuedKindroidRequest(kinId, 10, () => request('https://api.kindroid.ai/v1/send-message', {
           method: 'POST',
           signal: AbortSignal.timeout(40000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
