@@ -43,13 +43,19 @@ export default function GroupConversationPage() {
   const [wallpaper,setWallpaper] = useState('');
   const wallpaperKey=user?.id&&id?`echo:group-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${me.id}:${id}`:'';
   useEffect(()=>{try{setWallpaper(wallpaperKey?localStorage.getItem(wallpaperKey)??'':'');}catch{setWallpaper('');}},[wallpaperKey]);
-  const changeWallpaper=(file?:File)=>{
+  const [wallpaperUploading,setWallpaperUploading] = useState(false);
+  const changeWallpaper=async (file?:File)=>{
     if(!wallpaperKey)return;
-    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setWallpaper('');return;}
-    if(!file.type.startsWith('image/')||file.size>10_000_000){setError('Elegí una imagen de hasta 10 MB.');return;}
-    const reader=new FileReader();
-    reader.onload=()=>{if(typeof reader.result!=='string')return;try{localStorage.setItem(wallpaperKey,reader.result);setWallpaper(reader.result);setError('');}catch{setError('No se pudo guardar el fondo.');}};
-    reader.readAsDataURL(file);
+    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setWallpaper('');setError('');return;}
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10_000_000){setError('Elegí una imagen JPG, PNG o WebP de hasta 10 MB.');return;}
+    setWallpaperUploading(true);
+    try {
+      const uploaded=await uploadPrivateFile(file);
+      localStorage.setItem(wallpaperKey,uploaded.url);
+      setWallpaper(uploaded.url);
+      setError('');
+    } catch {setError('No se pudo subir el fondo. Intentá nuevamente.');}
+    finally {setWallpaperUploading(false);}
   };
   const [musicDraftStatus, setMusicDraftStatus] = useState('');
   const [savingMusicDraft, setSavingMusicDraft] = useState(false);
@@ -312,7 +318,7 @@ export default function GroupConversationPage() {
     finally { setSending(false); setUploading(false); }
   };
   return <div className="relative isolate flex h-[100dvh] min-h-0 min-w-0 flex-col overflow-hidden bg-background">
-    {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper}")`}} />}
+    {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper.startsWith("data:") ? wallpaper : resolveMedia(wallpaper)}")`}} />}
     <header className="relative z-30 shrink-0 bg-transparent pt-safe">
       <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2">
         <button type="button" onClick={()=>navigate('/messages')} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
@@ -448,7 +454,7 @@ export default function GroupConversationPage() {
         }} />
       </div>}
     </div>
-    {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="relative block cursor-pointer overflow-hidden rounded-xl border border-white/20 p-3 text-sm">Elegir foto de fondo<input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={e=>{changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
+    {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="relative block cursor-pointer overflow-hidden rounded-xl border border-white/20 p-3 text-sm">{wallpaperUploading ? "Subiendo fondo..." : "Elegir foto de fondo"}<input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={e=>{void changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>void changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
     {eventsOpen && group && id && group.participantIds.includes(me.id) && <div className="relative z-40 mx-3 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><button type="button" onClick={()=>setEventsOpen(false)} className="mb-2 text-sm">✕ Cerrar acontecimientos</button><GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} /></div>}
     <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
