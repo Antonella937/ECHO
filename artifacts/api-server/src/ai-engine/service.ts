@@ -235,7 +235,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         // A profile card shared in this exact private thread grants a one-time
         // read of that profile's public posts; it does not create a follow.
-        const sharedProfileIds = [...latestIncomingText.matchAll(/\\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\\]/g)]
+        const sharedProfileIds = [...latestIncomingText.matchAll(/\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\]/g)]
           .map(match => match[1]).slice(0, 2);
         if (sharedProfileIds.length) {
           const sharedProfileContext: string[] = [];
@@ -247,7 +247,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             // A profile card is an explicit request to inspect this profile.
             // Analyze at most ONE recent image post per shared profile; reuse
             // persisted analyses for the rest. This bounds paid vision work.
-            const firstImagePost = profilePosts.find(p => p.image && /^\\/objects\\/(?:uploads|r2)\\/[a-f0-9-]{20,}$/i.test(p.image.split('?')[0]));
+            const firstImagePost = profilePosts.find(p => p.image && /^\/objects\/(?:uploads|r2)\/[a-f0-9-]{20,}$/i.test(p.image.split('?')[0]));
             if (firstImagePost) {
               const alreadyAnalyzed = await visionService.loadContext(ownerId, parsed.data.state,
                 { ...input, postId: firstImagePost.id }, input.universeId ?? 'primary').catch(() => null);
@@ -274,9 +274,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
                 : 'Image content not analyzed; do not describe its appearance.';
               observations.push(`Caption: ${item.caption.slice(0, 240)} | Visual evidence: ${visual}`);
             }
-            sharedProfileContext.push(`Profile @${profile.handle} (${profile.name}). Recent public posts:\\n${observations.join('\\n') || '(No published posts)'}`);
+            sharedProfileContext.push(`Profile @${profile.handle} (${profile.name}). Recent public posts:\n${observations.join('\n') || '(No published posts)'}`);
           }
-          if (sharedProfileContext.length) outgoingPrompt += `\\n[ECHO SHARED PROFILE — read-only visit. You may discuss ONLY these verified posts and their cached visual descriptions. Following is OPTIONAL and has NOT occurred. Never claim to have followed or liked the account. If images were not analyzed, do not invent clothing, colors or faces. React naturally in your established personality.]\\n${sharedProfileContext.join('\\n').slice(0, 2600)}\\n[END SHARED PROFILE]`;
+          if (sharedProfileContext.length) outgoingPrompt += `\n[ECHO SHARED PROFILE — read-only visit. You may discuss ONLY these verified posts and their cached visual descriptions. Following is OPTIONAL and has NOT occurred. Never claim to have followed or liked the account. If images were not analyzed, do not invent clothing, colors or faces. React naturally in your established personality.]\\n${sharedProfileContext.join('\n').slice(0, 2600)}\n[END SHARED PROFILE]`;
         }
         // A character can inspect their own published ECHO stories even when they
         // have not viewed them. Keep this separate from other people's viewed stories.
