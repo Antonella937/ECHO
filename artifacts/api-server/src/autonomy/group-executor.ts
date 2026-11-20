@@ -81,11 +81,17 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     const recentGroupTurns = [...messages.rows].reverse().slice(-8)
       .map(row => `${characters.find(c => c.id === String(row.sender_id))?.name ?? "Participant"}: ${String(row.body ?? "").trim().slice(0, 350)}`)
       .filter(line => !line.endsWith(": ")).join("\n");
-    const kinPrompt = `[ECHO group chat: You are ${speaker.name ?? "yourself"}. Reply in English as yourself only, under 800 characters. Respect established platonic relationships. Do not invent other participants\u0027 messages.]\n` +
-      `Group: ${String(group.name ?? "").slice(0, 80)}\n` +
-      `Participants: ${participantIds.map(id => characters.find(c => c.id === id)?.name ?? "Participant").join(", ").slice(0, 350)}\n` +
-      (group.scene_context ? `Scene: ${String(group.scene_context).slice(0, 350)}\n` : "") +
-      `Recent messages:\n${recentGroupTurns || "(No recent messages)"}`;
+    // Kindroid receives a concise, conversational turn request, not an entire
+    // serialized scene transcript. The Kin already owns its personality/memory.
+    // A spectator's opening narration is a scene cue, not a message from Nela.
+    const sceneCue = String(group.scene_context ?? "").trim().slice(0, 500);
+    const kinPrompt = [
+      `You are ${speaker.name ?? "yourself"} in the private ${String(group.name ?? "band").slice(0, 80)} group chat.`,
+      `Other members: ${participantIds.filter(id => id !== speakerId).map(id => characters.find(c => c.id === id)?.name ?? "Participant").join(", ").slice(0, 250)}.`,
+      sceneCue ? `Situation: ${sceneCue}` : "",
+      recentGroupTurns ? `Recent chat:\\n${recentGroupTurns.slice(-1200)}` : "The chat has not started yet. Send the first natural message.",
+      "Write only your own next group message in English, naturally and briefly. Do not speak for others.",
+    ].filter(Boolean).join("\\n");
     let completion;
     try {
       completion = await (linkedKinId
