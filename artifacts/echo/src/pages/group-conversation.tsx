@@ -46,7 +46,7 @@ export default function GroupConversationPage() {
   const changeWallpaper=(file?:File)=>{
     if(!wallpaperKey)return;
     if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setWallpaper('');return;}
-    if(!file.type.startsWith('image/')||file.size>1_500_000){setError('Elegí una imagen de menos de 1,5 MB.');return;}
+    if(!file.type.startsWith('image/')||file.size>10_000_000){setError('Elegí una imagen de hasta 10 MB.');return;}
     const reader=new FileReader();
     reader.onload=()=>{if(typeof reader.result!=='string')return;try{localStorage.setItem(wallpaperKey,reader.result);setWallpaper(reader.result);setError('');}catch{setError('No se pudo guardar el fondo.');}};
     reader.readAsDataURL(file);
@@ -383,8 +383,8 @@ export default function GroupConversationPage() {
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto text-xs text-muted-foreground">Modo espectadora · escena grupal</span>
         {sceneRunning ? <button onClick={() => { stopSceneRef.current = true; }} className="rounded-lg bg-secondary px-3 py-2 text-xs">Detener después del turno</button> : <>
-          <button onClick={() => void advanceScene(1)} disabled={!autonomyEnabled} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">Siguiente turno</button>
-          <button onClick={() => void advanceScene(12)} disabled={!autonomyEnabled || sceneTurnMode === 'manual'} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
+          <button onClick={() => void advanceScene(1)} disabled={sceneRunning} className="rounded-lg bg-secondary px-3 py-2 text-xs disabled:opacity-50">Siguiente turno</button>
+          <button onClick={() => void advanceScene(12)} disabled={sceneRunning || sceneTurnMode === 'manual'} className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Reproducir hasta 12 turnos</button>
         </>}
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
@@ -442,7 +442,7 @@ export default function GroupConversationPage() {
         }} />
       </div>}
     </div>
-    {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="block cursor-pointer rounded-xl border border-white/20 p-3 text-sm">Elegir foto de fondo<input type="file" accept="image/*" className="sr-only" onChange={e=>{changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
+    {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="relative block cursor-pointer overflow-hidden rounded-xl border border-white/20 p-3 text-sm">Elegir foto de fondo<input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={e=>{changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
     {eventsOpen && group && id && group.participantIds.includes(me.id) && <div className="relative z-40 mx-3 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><button type="button" onClick={()=>setEventsOpen(false)} className="mb-2 text-sm">✕ Cerrar acontecimientos</button><GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} /></div>}
     <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
