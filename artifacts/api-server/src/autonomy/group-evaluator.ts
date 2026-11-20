@@ -33,6 +33,8 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
     };
   });
   const selected = sceneMode && preferredSpeakerId ? candidates.find(c => c.id === preferredSpeakerId && c.enabled && c.dmEnabled && !c.archived && !c.sleeping) : undefined;
+  // A manual avatar tap must never silently substitute another character.
+  if (sceneMode && preferredSpeakerId && !selected) return { speakerId: null, reason: "SELECTED_SPEAKER_UNAVAILABLE" };
   const speakerId = selected?.id ?? chooseGroupSpeaker({
     enabled: true, globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
     liveExecutionEnabled: controls.liveExecutionEnabled,
