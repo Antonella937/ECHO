@@ -104,15 +104,15 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       try {
         response = await queuedKindroidRequest(kinId, situation === 'dm' ? 30 : 10, () => request('https://api.kindroid.ai/v1/send-message', {
           method: 'POST',
-          signal: AbortSignal.timeout(40000),
+          signal: AbortSignal.timeout(90000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ ai_id: kinId, message: requestMessage, stream: false }),
         }), echoCharacterId);
       } catch (error) {
-        console.warn('[kindroid] generation transport failure', { traceId, situation, elapsedMs: Date.now() - startedAt, kind: error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network' });
+        console.warn('[kindroid] generation transport failure', { traceId, situation, elapsedMs: Date.now() - startedAt, kind: error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError') ? 'timeout' : 'network' });
         // No automatic retry: the provider might have received the message
         // before a timeout, and retrying could duplicate a conversation turn.
-        throw new EngineError(error instanceof Error && error.name === 'TimeoutError'
+        throw new EngineError(error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
@@ -174,7 +174,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
       try {
         response = await queuedKindroidRequest(kinId, 10, () => request('https://api.kindroid.ai/v1/send-message', {
           method: 'POST',
-          signal: AbortSignal.timeout(40000),
+          signal: AbortSignal.timeout(90000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ai_id: kinId,
@@ -183,7 +183,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
           }),
         }), echoCharacterId);
       } catch (error) {
-        throw new EngineError(error instanceof Error && error.name === 'TimeoutError'
+        throw new EngineError(error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
       }
       if (!response.ok) {
