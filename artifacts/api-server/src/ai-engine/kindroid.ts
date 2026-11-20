@@ -46,6 +46,44 @@ async function classifyKindroidFailure(response: Response): Promise<{category:st
   }
 }
 
+// Shared per-process queue for all Kindroid generation and story calls.
+// The private Hyunjin Kin is prioritized within each priority class.
+// The queue does not preempt requests already in flight.
+const PRIVATE_HYUNJIN_KIN_ID = 'wzbGIRcge9bt2uxB0HSR';
+type KindroidJob = { priority: number; sequence: number; run: () => Promise<Response>; resolve: (value: Response) => void; reject: (reason: unknown) => void };
+const kindroidJobs: KindroidJob[] = [];
+const recentKindroidStarts: number[] = [];
+let kindroidSequence = 0;
+let kindroidRunning = false;
+const waitForKindroidSlot = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+async function drainKindroidQueue(): Promise<void> {
+  if (kindroidRunning) return;
+  kindroidRunning = true;
+  try {
+    while (kindroidJobs.length) {
+      const now = Date.now();
+      while (recentKindroidStarts.length && recentKindroidStarts[0] <= now - 30000) recentKindroidStarts.shift();
+      const spacing = recentKindroidStarts.length ? Math.max(0, recentKindroidStarts[recentKindroidStarts.length - 1] + 4000 - now) : 0;
+      const windowWait = recentKindroidStarts.length >= 8 ? Math.max(0, recentKindroidStarts[0] + 30000 - now) : 0;
+      const delay = Math.max(spacing, windowWait);
+      if (delay) { await waitForKindroidSlot(delay); continue; }
+      kindroidJobs.sort((a, b) => b.priority - a.priority || a.sequence - b.sequence);
+      const job = kindroidJobs.shift()!;
+      recentKindroidStarts.push(Date.now());
+      try { job.resolve(await job.run()); } catch (error) { job.reject(error); }
+    }
+  } finally {
+    kindroidRunning = false;
+    if (kindroidJobs.length) void drainKindroidQueue();
+  }
+}
+function queuedKindroidRequest(kinId: string, priority: number, run: () => Promise<Response>): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    kindroidJobs.push({ priority: priority + (kinId === PRIVATE_HYUNJIN_KIN_ID ? 100 : 0), sequence: kindroidSequence++, run, resolve, reject });
+    void drainKindroidQueue();
+  });
+}
+
 /** Private, opt-in Kindroid DM adapter. No profile changes, chat breaks, or social autonomy. */
 export function kindroidDmProvider(message: string, kinId: string, socialContext = '', request: typeof fetch = fetch, situation: 'dm' | 'comment' | 'post' = 'dm'): TextProvider {
   return {
@@ -63,12 +101,12 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       console.info('[kindroid] generation dispatch', { traceId, situation, payloadChars: requestMessage.length });
       let response: Response;
       try {
-        response = await request('https://api.kindroid.ai/v1/send-message', {
+        response = await queuedKindroidRequest(kinId, situation === 'dm' ? 30 : 10, () => request('https://api.kindroid.ai/v1/send-message', {
           method: 'POST',
           signal: AbortSignal.timeout(40000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ ai_id: kinId, message: requestMessage, stream: false }),
-        });
+        }));
       } catch (error) {
         console.warn('[kindroid] generation transport failure', { traceId, situation, elapsedMs: Date.now() - startedAt, kind: error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network' });
         // No automatic retry: the provider might have received the message
@@ -133,7 +171,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
       let response: Response;
       try {
-        response = await request('https://api.kindroid.ai/v1/send-message', {
+        response = await queuedKindroidRequest(kinId, situation === 'dm' ? 30 : 10, () => request('https://api.kindroid.ai/v1/send-message', {
           method: 'POST',
           signal: AbortSignal.timeout(40000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -142,7 +180,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
             message: '[ECHO story interaction — visible story only, not a direct message. Based on your own personality and relationship, choose whether to simply view it, like it, or react. Reply with exactly one token: VIEW, LIKE, LAUGH, SURPRISE, or FIRE. Do not write a message; a separate private conversation handles story replies.]\n' + storyContext.slice(0, 800),
             stream: false,
           }),
-        });
+        }));
       } catch (error) {
         throw new EngineError(error instanceof Error && error.name === 'TimeoutError'
           ? 'KINDROID_TIMEOUT_RETRY_MANUALLY' : 'KINDROID_CONNECTION_RETRY_MANUALLY', 502);
