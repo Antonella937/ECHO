@@ -438,8 +438,15 @@ export default function ConversationPage() {
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
-            <button type="button" disabled={retryingDm} onClick={() => void retryLastDm()} className="mt-2 block rounded-lg border border-current px-3 py-1.5 font-semibold disabled:opacity-50" data-testid="button-retry-kindroid-dm">{retryingDm ? 'Reintentando…' : 'Reintentar respuesta al último mensaje'}</button>
           </div>
+        )}
+        {messages.length > 0 && (() => {
+          const latest = [...messages].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+          return latest?.senderId === identityId && latest?.recipientId === id;
+        })() && (
+          <button type="button" disabled={retryingDm} onClick={() => void retryLastDm()}
+            className="mb-2 w-full rounded-xl border border-border bg-secondary/80 px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
+            data-testid="button-retry-kindroid-dm">{retryingDm ? 'Reintentando…' : '↻ Reintentar respuesta al último mensaje'}</button>
         )}
         {retryDmNotice && (
           <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{retryDmNotice}</div>
