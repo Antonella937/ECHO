@@ -165,10 +165,6 @@ export default function ScenesPage() {
     if(!ai.length){setError(es?'No hay personajes presentes disponibles para responder.':'No present characters are available to reply.');return;}
     const turn=active.turnSettings;
     let target=turn?.nextCharacterId && ai.includes(turn.nextCharacterId)?turn.nextCharacterId:null;
-    if(!target && turn?.mode==='manual'){
-      setError(es?'Elegí primero el próximo personaje.':'Choose the next character first.');
-      return;
-    }
     if(!target && turn?.mode==='ordered'){
       const order=(turn.order??[]).filter(id=>ai.includes(id));
       target=order.length?order[(turn.cursor??0)%order.length]:null;
@@ -226,7 +222,7 @@ export default function ScenesPage() {
           </label>
           {sceneWallpaper&&<button type="button" onClick={()=>changeSceneWallpaper()} className="rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">{es?'Quitar':'Remove'}</button>}
         </div>
-      </div><details className="relative z-10 rounded-2xl border border-white/15 bg-background/50 p-3 backdrop-blur-xl"><summary className="cursor-pointer text-xs font-medium">{es?"Descripción e instrucciones":"Description and instructions"}</summary><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{active.premise}</p></details><details className="relative z-10 rounded-2xl border border-white/15 bg-background/50 p-3 backdrop-blur-xl"><summary className="cursor-pointer text-sm font-semibold">{st("Turnos y estado")}</summary>
+      </div><details className="relative z-10 rounded-2xl border border-white/15 bg-background/35 p-2 backdrop-blur-xl"><summary className="cursor-pointer text-xs font-medium">{es?"Descripción e instrucciones":"Description and instructions"}</summary><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{active.premise}</p></details><details className="relative z-10 rounded-2xl border border-white/15 bg-background/50 p-3 backdrop-blur-xl"><summary className="cursor-pointer text-sm font-semibold">{st("Turnos y estado")}</summary>
         <div className="space-y-3 pt-3">
           <label className="block space-y-1 text-sm"><span className="font-medium">{st("Estilo de escritura de IA")}</span>
             <select disabled={busy||active.status==='finished'} value={active.turnSettings?.style??'natural'}
@@ -268,10 +264,10 @@ export default function ScenesPage() {
             <button type="button" disabled={busy} onClick={()=>void deleteScene()} className="rounded-xl border border-destructive px-3 py-2 text-sm text-destructive disabled:opacity-50">{st("Eliminar escena definitivamente")}</button>
           </div>
         </div>
-      </details><div className="relative z-10 flex flex-wrap gap-2">
-        {active.status==='active'&&<button type="button" disabled={busy||active.turnSettings?.mode==='manual'} onClick={()=>void continueScene()} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">▶ {st("Continuar escena")}</button>}
+      </details><div className="relative z-10 flex flex-wrap items-center gap-2">
+        {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void continueScene()} className="rounded-full border border-white/20 bg-primary/90 px-3 py-2 text-xs font-semibold text-primary-foreground shadow-lg disabled:opacity-50">▶ {st("Continuar escena")}</button>}
         {active.status==='active'&&active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present').map(id=><button type="button" key={id} disabled={busy} onClick={()=>void generateReply(id)}
-          title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex flex-col items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          title={es?'Tocar para responder':'Tap to reply'} aria-label={es?`Responder como ${state.characters.find(c=>c.id===id)?.name??id}`:`Reply as ${state.characters.find(c=>c.id===id)?.name??id}`} className="flex flex-col items-center gap-1 rounded-2xl bg-background/25 px-2 py-2 text-xs font-semibold backdrop-blur-sm disabled:opacity-50">
           <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-secondary text-lg">{state.characters.find(c=>c.id===id)?.avatar?<img src={state.characters.find(c=>c.id===id)!.avatar} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
