@@ -29,6 +29,7 @@ import {
   completeDryRun,
 } from "../autonomy/repository";
 import { runAutonomyDryRun } from "../autonomy/service";
+import { triggerImmediateDmReply } from "../autonomy/runtime";
 import { executeAutonomyDecision } from "../autonomy/executor";
 import type { Opportunity } from "../autonomy/policy";
 import { MeteredTextProvider } from "../lib/metered-ai";
@@ -144,6 +145,43 @@ router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> =>
       run.code && allowed.has(run.code) ? { code: run.code, at: run.createdAt } : null });
   } catch {
     res.status(503).json({ error: "DM_STATUS_UNAVAILABLE" });
+  }
+});
+
+// Manual, owner-only retry of the SAME persisted incoming DM; no new user message.
+router.post("/autonomy/retry-dm-reply", requireAuth, async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const body = req.body as Record<string, unknown> | null;
+  if (!body || typeof body !== "object" || Object.keys(body).sort().join("|") !== "characterId|messageId|universeId" ||
+      ![body.characterId, body.messageId, body.universeId].every(v => typeof v === "string" && v.length > 0 && v.length <= 120)) {
+    res.status(400).json({ error: "INVALID_DM_RETRY_INPUT" }); return;
+  }
+  const ownerId = req.userId!;
+  const universeId = body.universeId as string;
+  const characterId = body.characterId as string;
+  const messageId = body.messageId as string;
+  try {
+    const snapshot = await readUniverse(ownerId, universeId);
+    const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+    if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
+    const incoming = parsed.data.messages.find(m => m.id === messageId && m.recipientId === characterId);
+    if (!incoming) { res.status(404).json({ error: "INCOMING_DM_NOT_FOUND" }); return; }
+    const thread = parsed.data.messages.filter(m => m.threadId === incoming.threadId);
+    const latest = [...thread].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (!latest || latest.id !== messageId || latest.senderId !== incoming.senderId) {
+      res.status(409).json({ error: "DM_ALREADY_ADVANCED" }); return;
+    }
+    const link = await db.execute(sql`SELECT 1 FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+      AND character_id = ${characterId} AND enabled = true LIMIT 1`);
+    if (!link.rows.length) { res.status(409).json({ error: "KINDROID_NOT_CONNECTED" }); return; }
+    // The runtime re-checks the thread after its debounce and uses a stable
+    // recovery-specific idempotency key. A repeated click cannot create a second turn.
+    await triggerImmediateDmReply(ownerId, universeId, characterId, messageId, true);
+    res.json({ status: "attempted", messageId });
+  } catch (error) {
+    req.log.warn({ code: error instanceof Error ? error.name : "UNKNOWN" }, "Manual DM recovery failed");
+    res.status(502).json({ error: "DM_RETRY_FAILED" });
   }
 });
 
