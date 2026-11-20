@@ -149,6 +149,64 @@ router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> =>
 });
 
 // Manual, owner-only retry of the SAME persisted incoming DM; no new user message.
+// Read-only recovery probe: never sends a message to Kindroid or alters ECHO.
+router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const ownerId = req.userId!;
+  const universeId = typeof req.query.universeId === "string" ? req.query.universeId : "";
+  const characterId = typeof req.query.characterId === "string" ? req.query.characterId : "";
+  if (!universeId || !characterId || universeId.length > 120 || characterId.length > 120) {
+    res.status(400).json({ error: "INVALID_RECOVERY_TARGET" }); return;
+  }
+  try {
+    const snapshot = await readUniverse(ownerId, universeId);
+    const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+    if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
+    const link = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+      AND character_id = ${characterId} AND enabled = true LIMIT 1`);
+    const kinId = link.rows[0]?.kin_id;
+    if (typeof kinId !== "string") { res.status(404).json({ error: "KINDROID_LINK_MISSING" }); return; }
+    const thread = parsed.data.messages.filter(m => m.senderId === characterId || m.recipientId === characterId)
+      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const latest = thread[0];
+    if (!latest || latest.recipientId !== characterId) { res.json({ status: "no_pending_dm" }); return; }
+    const key = process.env.ECHO_KINDROID_API_KEY;
+    if (!key) { res.status(503).json({ error: "KINDROID_KEY_MISSING" }); return; }
+    let cursor: number | undefined;
+    let lastMessages: Array<{sender?:string;sender_type?:string;timestamp?:number;message?:string}> = [];
+    for (let page = 0; page < 10; page++) {
+      const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
+      url.searchParams.set("ai_id", kinId);
+      url.searchParams.set("limit", "100");
+      if (cursor !== undefined) url.searchParams.set("start_after_timestamp", String(cursor));
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20000) });
+      if (!response.ok) { res.status(502).json({ error: "KINDROID_HISTORY_UNAVAILABLE", upstreamStatus: response.status }); return; }
+      const data = await response.json() as {messages?: typeof lastMessages; pagination?:{hasMore?:boolean;lastTimestamp?:number}};
+      if (!Array.isArray(data.messages)) { res.status(502).json({ error: "KINDROID_HISTORY_INVALID" }); return; }
+      lastMessages = data.messages.slice(-3);
+      if (!data.pagination?.hasMore) break;
+      if (typeof data.pagination.lastTimestamp !== "number" || data.pagination.lastTimestamp === cursor) {
+        res.status(502).json({ error: "KINDROID_HISTORY_PAGINATION_FAILED" }); return;
+      }
+      cursor = data.pagination.lastTimestamp;
+      if (page === 9) { res.status(409).json({ error: "KINDROID_HISTORY_TOO_LONG" }); return; }
+    }
+    // Never return private text; only indicate whether the provider has a recent reply.
+    const last = lastMessages.at(-1);
+    const previous = lastMessages.at(-2);
+    const lastIsAi = !!last && (last.sender_type?.toLowerCase() === "ai" || last.sender === kinId);
+    const previousIsUser = !!previous && (previous.sender_type?.toLowerCase() === "user" || previous.sender_type?.toLowerCase() === "human");
+    const matchesEchoContext = !!previous?.message && previous.message.includes("[ECHO PRIVATE THREAD") &&
+      (previous.message.includes("VANTA") || previous.message.includes("ECHO_PROFILE"));
+    res.json({ status: lastIsAi && previousIsUser && matchesEchoContext ? "reply_found_in_kindroid" : "not_verified",
+      pendingMessageId: latest.id, providerReplyPresent: lastIsAi, contextMatches: matchesEchoContext });
+  } catch (error) {
+    req.log.warn({ code: error instanceof Error ? error.name : "UNKNOWN" }, "Kindroid history recovery probe failed");
+    res.status(502).json({ error: "KINDROID_HISTORY_CHECK_FAILED" });
+  }
+});
+
 router.post("/autonomy/retry-dm-reply", requireAuth, async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "private, no-store");
   const body = req.body as Record<string, unknown> | null;
