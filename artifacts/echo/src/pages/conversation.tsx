@@ -142,6 +142,24 @@ export default function ConversationPage() {
   }, [id, user?.id]);
 
   const [kindroidFailure, setKindroidFailure] = useState<string | null>(null);
+  const [retryingDm, setRetryingDm] = useState(false);
+  const [retryDmNotice, setRetryDmNotice] = useState<string | null>(null);
+  const retryLastDm = async () => {
+    if (!user?.id || !id || retryingDm) return;
+    const latest = [...messages].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (!latest || latest.senderId !== identityId || latest.recipientId !== id) {
+      setRetryDmNotice('El chat cambió. No se reintentó ningún mensaje.'); return;
+    }
+    setRetryingDm(true); setRetryDmNotice(null);
+    try {
+      await customFetch('/api/autonomy/retry-dm-reply', { method: 'POST', responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), characterId: id, messageId: latest.id }) });
+      setRetryDmNotice('Reintento solicitado para el mensaje original. No se envió otro mensaje tuyo.');
+    } catch {
+      setRetryDmNotice('No se pudo recuperar la respuesta. Tu mensaje original sigue intacto.');
+    } finally { setRetryingDm(false); }
+  };
+
   useEffect(() => {
     if (!id || !user?.id) { setKindroidFailure(null); return; }
     let active = true;
@@ -420,8 +438,13 @@ export default function ConversationPage() {
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
+            <button type="button" disabled={retryingDm} onClick={() => void retryLastDm()} className="mt-2 block rounded-lg border border-current px-3 py-1.5 font-semibold disabled:opacity-50" data-testid="button-retry-kindroid-dm">{retryingDm ? 'Reintentando…' : 'Reintentar respuesta al último mensaje'}</button>
           </div>
         )}
+        {retryDmNotice && (
+          <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{retryDmNotice}</div>
+        )}
+
         {error && (
           <div role="alert" className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="text-composer-error">
             <span className="flex-1">{error}</span>
