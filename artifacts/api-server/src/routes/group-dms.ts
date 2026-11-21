@@ -178,8 +178,7 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         const existing = await db.execute(sql`SELECT id FROM echo_group_messages
           WHERE owner_id=${ownerId} AND universe_id=${universeId} AND group_id=${groupId}
           AND sender_id=${senderId} AND body=${body}
-          AND created_at BETWEEN (${date.toISOString()}::timestamptz - interval '2 minutes')
-          AND (${date.toISOString()}::timestamptz + interval '2 minutes') LIMIT 1`);
+          LIMIT 1`);
         if (existing.rows.length) continue;
         const imported = await db.execute(sql`INSERT INTO echo_group_messages
           (owner_id, universe_id, id, group_id, sender_id, body, read_by, created_at)
