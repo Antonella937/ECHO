@@ -112,7 +112,7 @@ export function AutonomySettingsSection() {
         )}
         <details className="group" data-testid="details-social-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Autonomía social")} · {settings?.characters.filter(c=>c.enabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Autonomía social")}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">{t("Elegí quién puede publicar, comentar, dar me gusta y reaccionar por su cuenta.")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("Elegí quién puede publicar en el feed, subir historias, comentar, dar likes y reaccionar o responder historias por su cuenta.")}</p>
         </div>
         {settings?.characters.map((character) => (
           <div key={`social-${character.characterId}`} className="flex items-center gap-3 p-4">
@@ -132,7 +132,7 @@ export function AutonomySettingsSection() {
         </div></details>
         <details className="group" data-testid="details-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Mensajes autónomos")} · {settings?.characters.filter(c=>c.dmEnabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Mensajes autónomos")}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden responder mensajes privados automáticamente. Este permiso es independiente de la actividad social.")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden iniciar mensajes privados espontáneos, incluso cuando no estás usando ECHO. Las respuestas a mensajes que vos iniciás se controlan por separado.")}</p>
         </div>
         {settings?.characters.map((character) => (
           <div key={`dm-${character.characterId}`} className="p-4">
