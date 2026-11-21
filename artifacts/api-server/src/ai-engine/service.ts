@@ -102,7 +102,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   const founderSocial = dependencies.liveDmReply === true &&
     ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
     ['comment', 'post', 'story_reaction', 'like_post', 'like_comment'].includes(input.situation);
-  const isolatedSocial = founderSocial && process.env.ECHO_ISOLATED_SOCIAL_PROVIDER_ENABLED === 'true';
+  // Founder social content must remain authored by Kindroid; do not silently
+  // substitute ECHO's generic model even when an isolated provider is enabled.
+  const isolatedSocial = false;
   // Never allow a private-history bypass: the founder requested isolation.
   if (founderSocial && !isolatedSocial) {
     throw new EngineError('KINDROID_SOCIAL_ISOLATION_REQUIRED', 503);
