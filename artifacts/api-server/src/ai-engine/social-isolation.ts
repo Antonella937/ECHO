@@ -55,6 +55,10 @@ export function verifiedSocialGroupId(characterId: string): string | null {
 export function verifiedSocialGroupForActor(universeId: string, actorId: string): string | null {
   if (process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED !== 'true') return null;
   if (!/^[A-Za-z0-9_-]{1,160}$/.test(universeId) || !/^[A-Za-z0-9_-]{1,160}$/.test(actorId)) return null;
+  // These two ECHO accounts currently share one Kindroid Kin. Only the
+  // private @hyunnn account may participate in Nela's technical social group.
+  // Keep the public @hwanghyunjin account outside even if misconfigured in env.
+  if (universeId === 'primary' && actorId === 'account_mw9egnuoszyi5') return null;
   const raw = process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
   if (!raw) return null;
   try {
