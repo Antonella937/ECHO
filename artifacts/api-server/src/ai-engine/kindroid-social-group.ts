@@ -73,6 +73,13 @@ export function kindroidSocialGroupProvider(
       if (process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED !== 'true') {
         throw new EngineError('KINDROID_SOCIAL_DISTRIBUTED_LOCK_REQUIRED', 503);
       }
+      // Validate both identities before writing anything into the shared group.
+      // Previously an invalid Kin ID could leave an orphaned technical prompt
+      // in Kindroid before the group provider rejected the ID.
+      if (!/^[A-Za-z0-9_-]{8,160}$/.test(groupId) ||
+          !/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) {
+        throw new EngineError('KINDROID_GROUP_ID_INVALID', 400);
+      }
       return withGroupLock(groupId, async () => {
       const choices = situation === 'story_reaction'
         ? 'VIEW, LIKE, LAUGH, SURPRISE, FIRE'
