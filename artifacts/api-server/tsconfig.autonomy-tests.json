@@ -13,6 +13,8 @@
   "include": [
     "tests/autonomy.test.ts",
     "tests/ai-usage.test.ts",
+    "tests/kindroid-social-isolation.test.ts",
+    "tests/story-social-policy.test.ts",
     "src/types/**/*.d.ts"
   ]
 }
