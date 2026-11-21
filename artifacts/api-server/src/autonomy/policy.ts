@@ -258,7 +258,7 @@ export function chooseAutonomyOpportunity(input: {
   // impose a blanket two-minute delay or cooldown between conversational turns.
   // Idempotency and the unanswered-message check prevent duplicate replies.
   if (input.lane !== "social" && unanswered) {
-    return { situation: "dm", recipientId: unanswered.senderId,
+    return { situation: "dm", recipientId: unanswered.senderId, messageId: unanswered.id,
       reasonCode: "OPPORTUNITY_SELECTED",
       reason: "A recent incoming direct message is awaiting a reply.",
       localHour: local.hour, timezone };
