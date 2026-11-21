@@ -32,6 +32,8 @@ export function isolatedKindroidSocialReady(): boolean {
  * Kindroid's UI. The external API does not expose those switches.
  */
 export function verifiedSocialGroupId(characterId: string): string | null {
+  // Legacy flat mappings must honor the same public/private boundary.
+  if (characterId === 'account_mw9egnuoszyi5') return null;
   const raw = process.env.ECHO_KINDROID_SOCIAL_GROUP_IDS_JSON;
   const verified = process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED === 'true';
   if (!verified || !raw) return null;
