@@ -40,6 +40,24 @@ export default function ScenesPage() {
   const [showSceneSettings,setShowSceneSettings] = useState(false);
   const [kindroidGroupLink,setKindroidGroupLink] = useState('');
   const [kindroidGroupSaving,setKindroidGroupSaving] = useState(false);
+  const [kindroidPreviewLoading,setKindroidPreviewLoading] = useState(false);
+  const [kindroidPreview,setKindroidPreview] = useState<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}|null>(null);
+  useEffect(()=>{setKindroidPreview(null);},[selected]);
+  const previewKindroidGroup = async (sceneId:string) => {
+    if (kindroidPreviewLoading) return;
+    setKindroidPreviewLoading(true);
+    setKindroidPreview(null);
+    setError('');
+    try {
+      const result = await customFetch<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}>(
+        `/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-preview?${new URLSearchParams({universeId})}`,
+        {method:'GET',responseType:'json'});
+      if (result.sceneId===sceneId) setKindroidPreview(result);
+    } catch (error) {
+      setError((es?'No se pudo leer el historial del grupo. ':'Could not read group history. ') +
+        (error instanceof Error?error.message.slice(0,160):''));
+    } finally {setKindroidPreviewLoading(false);}
+  };
   useEffect(() => {
     const scene = scenes.find(item => item.sceneId === selected);
     setKindroidGroupLink(scene?.turnSettings?.kindroidGroupId
@@ -48,6 +66,7 @@ export default function ScenesPage() {
   const saveKindroidGroup = async (sceneId: string, clear = false) => {
     if (kindroidGroupSaving) return;
     setKindroidGroupSaving(true);
+    setKindroidPreview(null);
     setError('');
     try {
       await customFetch(`/api/scenes/${encodeURIComponent(sceneId)}/kindroid-group`, {
@@ -304,6 +323,20 @@ export default function ScenesPage() {
               className="rounded-lg border border-white/30 px-3 py-2 text-xs disabled:opacity-50">{es?'Desvincular':'Unlink'}</button>}
           </div>
           {active.turnSettings?.kindroidGroupId&&<p className="text-xs text-white/70">{es?'Grupo vinculado':'Linked group'}: {active.turnSettings.kindroidGroupId}</p>}
+          {active.turnSettings?.kindroidGroupId&&<div className="space-y-2">
+            <button type="button" disabled={kindroidPreviewLoading||kindroidGroupSaving}
+              onClick={()=>void previewKindroidGroup(active.sceneId)}
+              className="rounded-lg border border-white/30 px-3 py-2 text-xs disabled:opacity-50">
+              {kindroidPreviewLoading?(es?'Leyendo…':'Reading…'):(es?'Comprobar historial (solo lectura)':'Check history (read-only)')}
+            </button>
+            {kindroidPreview?.sceneId===active.sceneId&&<div className="space-y-1 rounded-lg border border-white/15 p-2 text-xs">
+              <p>{es?'Mensajes del grupo':'Group messages'}: {kindroidPreview.totalMessages} · {es?'Identificados':'Matched'}: {kindroidPreview.matchedEvents}</p>
+              {kindroidPreview.events.slice(-5).map(item=><p key={item.eventId} className="break-words text-white/80">
+                <strong>{state.characters.find(c=>c.id===item.actorId)?.name??(es?'Personaje':'Character')}</strong>: {item.text.slice(0,220)}
+              </p>)}
+              <p className="text-white/60">{es?'Vista previa: no importa mensajes ni genera respuestas.':'Preview only: no messages imported or generated.'}</p>
+            </div>}
+          </div>}
         </div>
         <div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={effectiveGroupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="none">{es?"Sin fondo de grupo":"No group background"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
             {wallpaperUploading?(es?'Subiendo fondo…':'Uploading wallpaper…'):(es?'Cambiar fondo':'Change wallpaper')}
