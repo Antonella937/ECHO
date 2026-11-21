@@ -31,6 +31,10 @@ export async function beginSceneKindroidGeneration(input:SceneGenerationClaim):P
         AND NOT EXISTS (SELECT 1 FROM echo_scene_kindroid_generations other
           WHERE other.owner_id=${input.ownerId} AND other.kindroid_group_id=${input.groupId}
             AND other.status='generating')
+        AND NOT EXISTS (SELECT 1 FROM echo_scene_kindroid_deliveries outgoing
+          WHERE outgoing.owner_id=${input.ownerId}
+            AND outgoing.kindroid_group_id=${input.groupId}
+            AND outgoing.status IN ('sending','uncertain'))
       RETURNING scene_id`);
     return result.rows.length===1;
   }catch(error){
