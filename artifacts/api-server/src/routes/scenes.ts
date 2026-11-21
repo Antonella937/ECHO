@@ -359,6 +359,10 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
         byKin.set(link.kin_id,link.character_id);
       }
     }
+    // Fail closed before calling Kindroid if no scene participant can be attributed.
+    if (!byKin.size) {
+      res.status(409).json({error:"KINDROID_SCENE_NO_LINKED_PARTICIPANTS"}); return;
+    }
     const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
     url.searchParams.set("group_id",groupId);
     url.searchParams.set("limit","100");
@@ -424,6 +428,10 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
         }
         byKin.set(link.kin_id,link.character_id);
       }
+    }
+    // Fail closed before calling Kindroid if no scene participant can be attributed.
+    if (!byKin.size) {
+      res.status(409).json({error:"KINDROID_SCENE_NO_LINKED_PARTICIPANTS"}); return;
     }
     const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
     url.searchParams.set("group_id",groupId);
