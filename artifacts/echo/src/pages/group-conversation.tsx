@@ -126,7 +126,21 @@ export default function GroupConversationPage() {
         if (!active) return;
         if (groupResult.status === 'fulfilled') {
           const found = groupResult.value.groups.find(g => g.id === id);
-          if (found) { setGroup(found); if (found.wallpaperUrl) setWallpaper(found.wallpaperUrl); }
+          if (found) {
+              setGroup(found);
+              if (found.wallpaperUrl) setWallpaper(found.wallpaperUrl);
+              else if (wallpaperKey) {
+                // Migrate the old device-local wallpaper once to shared group storage.
+                const local = localStorage.getItem(wallpaperKey);
+                if (local && /^https:\/\//.test(local)) {
+                  void customFetch(`/api/group-dms/${encodeURIComponent(id)}/wallpaper`, {
+                    method: "PUT", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ universeId: getActiveUniverseId(user.id), actorId: me.id, wallpaperUrl: local }),
+                    responseType: "json",
+                  }).catch(() => {});
+                }
+              }
+            }
         }
         if (threadResult.status === 'fulfilled') { setMessages(threadResult.value.messages); void customFetch(`/api/group-dms/${encodeURIComponent(id)}/read`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({universeId:getActiveUniverseId(user.id),actorId:me.id}),responseType:"json"}).catch(()=>{}); }
         setError(groupResult.status === 'rejected' && threadResult.status === 'rejected'
