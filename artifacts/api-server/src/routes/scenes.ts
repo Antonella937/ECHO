@@ -7,7 +7,8 @@ import { db, echoUniversesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
-import { kindroidDmProvider } from "../ai-engine/kindroid";
+import { kindroidPeerGroupProvider } from "../ai-engine/kindroid";
+import { sendKindroidSocialGroupContext } from "../ai-engine/kindroid-social-group";
 import { EngineError } from "../ai-engine/contracts";
 
 export const scenesRouter: IRouter = Router();
@@ -59,6 +60,22 @@ scenesRouter.post("/scenes", async (req, res) => {
       VALUES (${req.userId!},${universeId},${sceneId},${title},${premise},${canon},${participants}::jsonb,${turns}::jsonb)`);
     res.status(201).json({ sceneId, title, premise, canon, participantIds, status: "active" });
   } catch { res.status(503).json({ error: "SCENE_CREATE_FAILED" }); }
+});
+// Bind an existing, dedicated Kindroid group to this scene without changing its events.
+scenesRouter.put("/scenes/:sceneId/kindroid-link", async (req, res) => {
+  const parsed = scope.extend({ kindroidGroupId: z.string().regex(/^[a-zA-Z0-9_-]{10,120}$/).nullable() }).strict().safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_KINDROID_LINK" }); return; }
+  try {
+    if (!await availableCharacters(req.userId!, parsed.data.universeId)) { res.status(403).json({ error: "UNIVERSE_NOT_ACCESSIBLE" }); return; }
+    const rows = await db.execute(sql`UPDATE echo_scenes
+      SET turn_settings = jsonb_set(COALESCE(turn_settings, '{}'::jsonb), '{kindroidGroupId}', ${JSON.stringify(parsed.data.kindroidGroupId)}::jsonb),
+          updated_at = now()
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId} AND scene_id=${sceneId.data}
+      RETURNING scene_id`);
+    if (!rows.rows.length) { res.status(404).json({ error: "SCENE_NOT_FOUND" }); return; }
+    res.json({ kindroidGroupId: parsed.data.kindroidGroupId });
+  } catch { res.status(503).json({ error: "SCENE_KINDROID_LINK_FAILED" }); }
 });
 // Deleting a scene is distinct from marking a character absent or leaving the narrative.
 // Events cascade; presence and summaries are removed explicitly in the same transaction.
@@ -330,7 +347,7 @@ scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
       res.status(400).json({ error: "INVALID_TURN_PARTICIPANTS" }); return;
     }
     const completeOrder = [...order, ...participants.filter(x => !order.includes(x))];
-    const current = scene.turn_settings as { cursor?: number; style?: string; autoReply?: boolean } | null;
+    const current = scene.turn_settings as { cursor?: number; style?: string; kindroidGroupId?: string; autoReply?: boolean } | null;
     const settings = { mode, participantIds: participants, order: completeOrder, nextCharacterId,
       cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)),
       style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false };
@@ -449,38 +466,27 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
     let replyText: string;
     if (kinId) {
-      // The Kindroid DM adapter rejects messages above 2,800 characters.
-      // Reserve room for instructions and keep the newest visible scene events.
-      const sceneInstructions = [
-        "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
-        "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
-        "This is a separate scene, not a private DM. Only use the scene context below.",
-      ].join("\n");
-      const sceneTail = "\n[End scene context. Continue naturally as your character.]";
-      const sceneBudget = 2800 - sceneInstructions.length - sceneTail.length - 2;
-      const sceneEvents = visible.slice(-8).map(e => ({ actorId: e.actor_id, text: String(e.text).slice(-450) }));
-      const scenePayload = {
-        scene: { sceneId: sceneId.data, title: String(scene.title).slice(0, 100), premise: String(scene.premise).slice(0, 250), canon: scene.canon },
-        character: { id: character.id, name: character.name },
-        participants: people.map(person => ({ id: person.id, name: String(person.name).slice(0, 60) })),
-        sceneMemory: previousSummary.slice(-500),
-        visibleEvents: sceneEvents,
-      };
-      let sceneContext = JSON.stringify(scenePayload);
-      while (sceneContext.length > sceneBudget && sceneEvents.length > 1) {
-        sceneEvents.shift();
-        sceneContext = JSON.stringify(scenePayload);
+      // Scene narration belongs to a dedicated Kindroid group, NEVER the Kin's private DM.
+      const groupId = typeof turn?.kindroidGroupId === "string" ? turn.kindroidGroupId : "";
+      if (!/^[a-zA-Z0-9_-]{10,120}$/.test(groupId)) {
+        throw new EngineError("SCENE_KINDROID_GROUP_NOT_LINKED", 409);
       }
-      if (sceneContext.length > sceneBudget) {
-        scenePayload.sceneMemory = "";
-        sceneEvents.splice(0, sceneEvents.length - 1);
-        sceneEvents[0].text = sceneEvents[0].text.slice(-600);
-        sceneContext = JSON.stringify(scenePayload);
-      }
-      if (sceneContext.length > sceneBudget) throw new EngineError("KINDROID_SCENE_CONTEXT_TOO_LONG", 400);
-      const scenePrompt = [sceneInstructions, sceneContext + sceneTail].join("\n");
-      const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
-      const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
+      // A group prompt is visible to every Kin in that group. Never transmit
+      // restricted scene events, including character-specific memories, to it.
+      const sharedEvents = visible.filter(e => e.visibility === "public" ||
+        (e.visibility === "participants" && (!Array.isArray(e.audience_ids) || e.audience_ids.length === 0)));
+      const scenePrompt = [
+        "[ECHO Scene: " + String(scene.title).slice(0, 100) + "]",
+        "Setting: " + String(scene.premise).slice(0, 250),
+        "Continue as " + character.name + ". Write only your own dialogue and actions; do not speak for others.",
+        "Recent shared scene events:",
+        ...sharedEvents.slice(-5).map(e => String(e.actor_id) + ": " + String(e.text).slice(-250)),
+      ].join("\\n").slice(0, 1700);
+      await sendKindroidSocialGroupContext(groupId, scenePrompt);
+      const completion = await kindroidPeerGroupProvider(groupId, kinId, characterId, fetch, true)
+        .complete({ system: "", context: "", outputSchema: sceneOutputSchema });
+      const draft = z.object({ action: z.literal("draft"), text: z.string().trim().min(1).max(2000) })
+        .passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
     } else {
       const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
