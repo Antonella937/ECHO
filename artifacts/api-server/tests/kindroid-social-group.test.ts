@@ -79,3 +79,31 @@ test('a different Kin cannot impersonate the intended character', async () => {
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('two requests to the same social group never interleave context and responses', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    await Promise.resolve();
+    return new Response(path.endsWith('get-turn') ? 'kin123456789'
+      : path.endsWith('ai-response') ? 'LIKE' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const first = kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post', 'Mar post A', undefined, request);
+    const second = kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post', 'Mar post B', undefined, request);
+    await Promise.all([
+      first.complete({ system: '', context: '', outputSchema: {} }),
+      second.complete({ system: '', context: '', outputSchema: {} }),
+    ]);
+    const one = ['/v1/groupchats-get-turn', '/v1/groupchats-user-message',
+      '/v1/groupchats-get-turn', '/v1/groupchats-ai-response'];
+    assert.deepEqual(calls, [...one, ...one]);
+    assert.equal(calls.filter(path => path === '/v1/send-message').length, 0);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
