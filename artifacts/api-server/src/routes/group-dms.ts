@@ -103,8 +103,13 @@ router.put("/group-dms/push-preference", async (req, res) => {
 // Read-only Kindroid history reconciliation. Never requests AI generation.
 const kindroidHistoryLastCheck = new Map<string, number>();
 const kindroidHistoryPending = new Map<string, Promise<void>>();
+// A provider-wide 429 must pause ALL history readers, including UI-triggered reads.
+// This does not delay DM generation or mutate any Kindroid conversation.
+let kindroidHistoryRateLimitedUntil = 0;
+const KINDROID_HISTORY_RATE_LIMIT_BACKOFF_MS = 5 * 60_000;
 export async function reconcileKindroidGroupHistory(ownerId: string, universeId: string, groupId: string) {
   if (universeId !== "primary") return;
+  if (Date.now() < kindroidHistoryRateLimitedUntil) return;
   const apiKey = process.env.ECHO_KINDROID_API_KEY;
   if (!apiKey) return;
   const cacheKey = ownerId + ":" + universeId + ":" + groupId;
@@ -148,6 +153,13 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         signal: AbortSignal.timeout(15000),
       });
       if (!response.ok) {
+        if (response.status === 429) {
+          const retryAfter = response.headers.get("retry-after");
+          const seconds = retryAfter && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : NaN;
+          const retryDate = retryAfter && !Number.isFinite(seconds) ? Date.parse(retryAfter) : NaN;
+          const delay = Number.isFinite(seconds) ? seconds * 1000 : Number.isFinite(retryDate) ? retryDate - Date.now() : KINDROID_HISTORY_RATE_LIMIT_BACKOFF_MS;
+          kindroidHistoryRateLimitedUntil = Math.max(kindroidHistoryRateLimitedUntil, Date.now() + Math.max(KINDROID_HISTORY_RATE_LIMIT_BACKOFF_MS, Math.min(delay, 60 * 60_000)));
+        }
         console.warn("[kindroid-group] history read failed", { status: response.status, group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other" });
         return;
       }
