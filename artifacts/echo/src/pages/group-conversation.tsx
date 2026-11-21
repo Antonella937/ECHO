@@ -373,7 +373,6 @@ export default function GroupConversationPage() {
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={sceneObserverEnabled} onChange={e => setSceneObserverEnabled(e.target.checked)} disabled={!sceneLoaded || sceneSaving} /> Modo espectadora (sin participar)</label>
         <button type="button" onClick={() => void saveScene()} disabled={!sceneLoaded || sceneSaving} className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{sceneSaving ? 'Guardando…' : 'Guardar escena'}</button>
         <p className="mt-2 text-xs text-muted-foreground">La configuración se guarda en este grupo y se aplica a los próximos turnos.</p>
-      </div>
       </div></details>
       <details className="group mb-3 rounded-xl border border-border/70 bg-background/40"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">Autonomía del grupo <span className="text-muted-foreground group-open:rotate-180">⌄</span></summary><div className="border-t border-border/70 p-3">
         <p className="mt-1 text-xs text-muted-foreground">Los personajes autorizados pueden intervenir automáticamente según el intervalo seleccionado.</p>
@@ -382,13 +381,11 @@ export default function GroupConversationPage() {
         <select value={autonomyInterval} disabled={!autonomyLoaded || savingSettings} onChange={e => void saveAutonomy(autonomyEnabled, Number(e.target.value))} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
           <option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>1 hora</option><option value={180}>3 horas</option><option value={360}>6 horas</option>
         </select>
-      </div>
       </div></details>
       <details className="group mb-3 rounded-xl border border-border/70 bg-background/40"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">Preferencias de conversación <span className="text-muted-foreground group-open:rotate-180">⌄</span></summary><div className="border-t border-border/70 p-3">
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={muted} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ muted: e.target.checked })} /> Silenciar este grupo</label>
         <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={archived} disabled={!preferencesLoaded || savingSettings} onChange={e => void savePreferences({ archived: e.target.checked })} /> Archivar este grupo</label>
         <p className="mt-2 text-xs text-muted-foreground">Estas preferencias son individuales. Archivar no elimina los mensajes.</p>
-      </div>
       </div></details>
       {group?.participantIds.includes(me.id) && <button onClick={() => void leave()} disabled={savingSettings} className="mt-3 text-sm font-medium text-destructive disabled:opacity-50">{gl("Salir del grupo")}</button>}
       {group?.createdBy === me.id && <button onClick={() => void deleteGroup()} disabled={savingSettings} className="mt-3 ml-4 text-sm font-medium text-destructive disabled:opacity-50">{gl("Eliminar grupo definitivamente")}</button>}
