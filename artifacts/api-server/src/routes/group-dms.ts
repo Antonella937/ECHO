@@ -1,6 +1,6 @@
 import { privateConversationCandidates } from "../lib/canon-knowledge";
 import { runGroupAutonomyOnce } from "../autonomy/group-executor";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -59,6 +59,83 @@ router.post("/group-dms", async (req, res) => {
     VALUES (${req.userId!}, ${universeId}, ${groupId}, ${name}, ${actorId}, ${JSON.stringify(members)}::jsonb)`);
   res.status(201).json({ id: groupId, name, participantIds: members });
 });
+// Read-only Kindroid history reconciliation. Never requests AI generation.
+const kindroidGroupMappings: Record<string, string> = {
+  group_kindroid_dead_static: "uzlDUKZ5MQMnR9sBHh6p",
+  "group_748934d7-2a16-4ff9-b841-dc9b08a5d748": "UjQg67Gg2afzKO1lJBen",
+  group_kindroid_mar_noah: "lSQ59nGePEfy3nCb6Gnp",
+  group_kindroid_hyunjin_felix: "OtszoltSpfuwCBuUoQiM",
+  group_kindroid_pretty_violence: "t98WkOKxO2zunh75audT",
+};
+const kindroidHistoryLastCheck = new Map<string, number>();
+const kindroidHistoryPending = new Map<string, Promise<void>>();
+async function reconcileKindroidGroupHistory(ownerId: string, universeId: string, groupId: string) {
+  if (universeId !== "primary" || !kindroidGroupMappings[groupId]) return;
+  const apiKey = process.env.ECHO_KINDROID_API_KEY;
+  if (!apiKey) return;
+  const cacheKey = ownerId + ":" + universeId + ":" + groupId;
+  const pending = kindroidHistoryPending.get(cacheKey);
+  if (pending) return pending;
+  if (Date.now() - (kindroidHistoryLastCheck.get(cacheKey) ?? 0) < 30_000) return;
+  kindroidHistoryLastCheck.set(cacheKey, Date.now());
+  const task = (async () => {
+    const group = await db.execute(sql`SELECT participant_ids FROM echo_group_conversations
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND id=${groupId} LIMIT 1`);
+    const members = group.rows[0]?.participant_ids;
+    if (!Array.isArray(members)) return;
+    const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND enabled=true`);
+    const byKin = new Map<string, string>();
+    for (const link of links.rows) {
+      const characterId = String(link.character_id ?? "");
+      const kinId = String(link.kin_id ?? "");
+      if (members.includes(characterId) && kinId) byKin.set(kinId, characterId);
+    }
+    const groupIdOnKindroid = kindroidGroupMappings[groupId];
+    let cursor: number | undefined;
+    for (let page = 0; page < 5; page++) {
+      const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
+      url.searchParams.set("group_id", groupIdOnKindroid);
+      url.searchParams.set("limit", "100");
+      if (cursor !== undefined) url.searchParams.set("start_after_timestamp", String(cursor));
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) {
+        console.warn("[kindroid-group] history read failed", { status: response.status, group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other" });
+        return;
+      }
+      const payload: unknown = await response.json();
+      if (!payload || typeof payload !== "object") return;
+      const data = payload as { messages?: unknown; pagination?: { hasMore?: boolean; lastTimestamp?: number } };
+      if (!Array.isArray(data.messages)) return;
+      for (const raw of data.messages) {
+        if (!raw || typeof raw !== "object") continue;
+        const item = raw as Record<string, unknown>;
+        const sourceId = typeof item.id === "string" ? item.id : "";
+        const sender = typeof item.sender === "string" ? item.sender : "";
+        const senderId = byKin.get(sender);
+        const body = typeof item.message === "string" ? item.message.trim() : "";
+        const timestamp = Number(item.timestamp);
+        if (!sourceId || !senderId || !body || body.length > 10000 || !Number.isFinite(timestamp)) continue;
+        const date = new Date(timestamp < 1e11 ? timestamp * 1000 : timestamp);
+        if (!Number.isFinite(date.getTime())) continue;
+        const stableId = "kindroid_" + createHash("sha256").update(groupIdOnKindroid + ":" + sourceId).digest("hex").slice(0, 48);
+        await db.execute(sql`INSERT INTO echo_group_messages
+          (owner_id, universe_id, id, group_id, sender_id, body, read_by, created_at)
+          VALUES (${ownerId}, ${universeId}, ${stableId}, ${groupId}, ${senderId}, ${body}, '[]'::jsonb, ${date.toISOString()}::timestamptz)
+          ON CONFLICT DO NOTHING`);
+      }
+      if (!data.pagination?.hasMore || !Number.isFinite(data.pagination.lastTimestamp) || data.pagination.lastTimestamp === cursor) break;
+      cursor = data.pagination.lastTimestamp;
+    }
+  })().catch(error => {
+    console.warn("[kindroid-group] history reconciliation failed", { error: error instanceof Error ? error.name : "unknown" });
+  }).finally(() => { kindroidHistoryPending.delete(cacheKey); });
+  kindroidHistoryPending.set(cacheKey, task);
+  return task;
+}
 router.get("/group-dms/:groupId/messages", async (req, res) => {
   const parsed = scope.safeParse(req.query);
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
@@ -69,6 +146,7 @@ router.get("/group-dms/:groupId/messages", async (req, res) => {
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}
     AND (participant_ids ? ${actorId} OR scene_observer_enabled=true) LIMIT 1`);
   if (!group.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  await reconcileKindroidGroupHistory(req.userId!, universeId, groupId);
   const messages = await db.execute(sql`SELECT id, group_id AS "groupId", sender_id AS "senderId",
     body AS text, attachments, read_by AS "readBy", quote_message_id AS "quoteMessageId", pinned_at AS "pinnedAt", pinned_by AS "pinnedBy",
     created_at AS "createdAt" FROM echo_group_messages
