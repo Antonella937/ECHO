@@ -379,6 +379,83 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
   }
 });
 
+// Explicit owner-triggered import; never generates Kindroid replies or uses private DMs.
+scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({error:"INVALID_SCENE"}); return; }
+  try {
+    const [universe] = await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
+    if (!universe) { res.status(403).json({error:"UNIVERSE_NOT_ACCESSIBLE"}); return; }
+    const sceneRows = await db.execute(sql`SELECT participant_ids, turn_settings FROM echo_scenes
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND scene_id=${sceneId.data} LIMIT 1`);
+    const scene = sceneRows.rows[0];
+    if (!scene) { res.status(404).json({error:"SCENE_NOT_FOUND"}); return; }
+    const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+    if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
+    // Legacy or manually migrated bindings may predate the uniqueness checks.
+    // Never preview a group shared with another scene or an ordinary ECHO group.
+    const collisions = await db.execute(sql`SELECT 1 FROM echo_group_conversations
+      WHERE owner_id=${req.userId!} AND kindroid_group_id=${groupId}
+      UNION ALL
+      SELECT 1 FROM echo_scenes other
+      WHERE other.owner_id=${req.userId!}
+        AND NOT (other.universe_id=${parsed.data.universeId} AND other.scene_id=${sceneId.data})
+        AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+      LIMIT 1`);
+    if (collisions.rows.length) {
+      res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"}); return;
+    }
+    const apiKey = process.env.ECHO_KINDROID_API_KEY;
+    if (!apiKey) { res.status(503).json({error:"KINDROID_KEY_MISSING"}); return; }
+    const members = new Set(Array.isArray(scene.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : []);
+    const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND enabled=true AND kin_id IS NOT NULL`);
+    const byKin = new Map<string,string>();
+    for (const link of links.rows) {
+      if (typeof link.kin_id === "string" && typeof link.character_id === "string" && members.has(link.character_id)) {
+        const existing = byKin.get(link.kin_id);
+        if (existing && existing !== link.character_id) {
+          res.status(409).json({error:"KINDROID_SCENE_AMBIGUOUS_KIN_LINK"}); return;
+        }
+        byKin.set(link.kin_id,link.character_id);
+      }
+    }
+    const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
+    url.searchParams.set("group_id",groupId);
+    url.searchParams.set("limit","100");
+    const response = await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`},signal:AbortSignal.timeout(15000)});
+    if (!response.ok) {
+      res.status(response.status===429?429:502).json({error:response.status===429?"KINDROID_RATE_LIMITED":"KINDROID_SCENE_HISTORY_UNAVAILABLE"});
+      return;
+    }
+    const payload:unknown = await response.json();
+    if (!payload || typeof payload!=="object" || !Array.isArray((payload as {messages?:unknown}).messages)) {
+      res.status(502).json({error:"KINDROID_SCENE_HISTORY_FORMAT_INVALID"}); return;
+    }
+    const messages = (payload as {messages:unknown[]}).messages;
+    const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
+    // Import is an explicit action, never a side effect of the preview.
+    // Stable group-scoped IDs and ON CONFLICT make repeated imports idempotent.
+    let imported = 0;
+    for (const item of events) {
+      const inserted = await db.execute(sql`INSERT INTO echo_scene_events
+        (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text,created_at)
+        VALUES (${req.userId!},${parsed.data.universeId},${sceneId.data},
+          ${item.eventId},${item.actorId},'participants','[]'::jsonb,${item.text},
+          ${item.createdAt}::timestamptz)
+        ON CONFLICT DO NOTHING RETURNING event_id`);
+      if (inserted.rows.length) imported++;
+    }
+    res.json({sceneId:sceneId.data,matchedEvents:events.length,imported});
+  } catch {
+    res.status(503).json({error:"KINDROID_SCENE_HISTORY_IMPORT_FAILED"});
+  }
+});
+
 const sceneGroupBinding = scope.extend({
   groupId: kindroidGroupId.nullable(),
 }).strict();
