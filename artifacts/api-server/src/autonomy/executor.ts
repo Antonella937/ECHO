@@ -290,7 +290,6 @@ function recentActorActivityCount(state: SocialState, characterId: string, now: 
     ...state.posts.filter((item) => item.authorId === characterId && item.origin !== "autonomy").map((item) => item.createdAt),
     ...state.comments.filter((item) => item.authorId === characterId && item.origin !== "autonomy").map((item) => item.createdAt),
     ...state.stories.filter((item) => item.authorId === characterId && item.origin !== "autonomy").map((item) => item.createdAt),
-    ...state.messages.filter((item) => item.senderId === characterId && item.origin !== "autonomy").map((item) => item.createdAt),
   ].filter((value) => recentWithin(value, now, DAY_MS)).length;
 }
 
@@ -432,14 +431,11 @@ export async function executeAutonomyDecision(input: {
       ...state.posts.filter((item) => item.authorId === input.characterId && item.origin !== "autonomy").map((item) => toTime(item.createdAt)),
       ...state.comments.filter((item) => item.authorId === input.characterId && item.origin !== "autonomy").map((item) => toTime(item.createdAt)),
       ...state.stories.filter((item) => item.authorId === input.characterId && item.origin !== "autonomy").map((item) => toTime(item.createdAt)),
-      ...state.messages.filter((item) => item.senderId === input.characterId && item.origin !== "autonomy").map((item) => toTime(item.createdAt)),
     ].filter((time) => Number.isFinite(time) && time <= now.getTime() && now.getTime() - time < DAY_MS);
     const currentStateActivity = toTime(character.configuration?.currentState?.lastActivityAt ?? null);
     const latestActivity = Math.max(
       ...recentManualTimes,
-      Number.isFinite(currentStateActivity) && currentStateActivity <= now.getTime() &&
-        now.getTime() - currentStateActivity < DAY_MS ? currentStateActivity : 0,
-      ...history.map((item) => item.createdAt.getTime()),
+      ...history.filter((item) => item.situation !== "dm" && item.situation !== "dm_reaction").map((item) => item.createdAt.getTime()),
       0,
     );
     const typeCaps: Record<string, number> = {
@@ -464,7 +460,8 @@ export async function executeAutonomyDecision(input: {
       .map((item) => toTime(item.createdAt)).filter(Number.isFinite));
     const dmLimitHit = dmHistory.length >= 30 ||
       (latestDmAt > 0 && now.getTime() - latestDmAt < 2 * 60_000);
-    const socialLimitHit = recent + history.filter((item) => item.situation !== "dm").length >= maxActionsPerDay ||
+    // DM messages and reactions never consume social caps or reset social cooldowns.
+    const socialLimitHit = recent + history.filter((item) => item.situation !== "dm" && item.situation !== "dm_reaction").length >= maxActionsPerDay ||
       (latestActivity > 0 && now.getTime() - latestActivity < minCooldownMinutes * 60_000);
     const totalLimitHit = isDm ? dmLimitHit : socialLimitHit;
     if (totalLimitHit || (!isDm && input.opportunity.situation &&
