@@ -172,8 +172,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             // Malformed configuration cannot authorize a peer group.
           }
         }
-        const peerGroupId = peerGroupIds[pair];
+        // These founder-specific Kindroid groups must not leak into another
+        // universe that happens to reuse the same character identifiers.
+        const peerGroupId = (input.universeId ?? 'primary') === 'primary' ? peerGroupIds[pair] : undefined;
         if (!peerGroupId) throw new EngineError('KINDROID_PEER_GROUP_REQUIRED', 409);
+        if (input.storyId) {
+          const targetStory = parsed.data.state.stories.find(story =>
+            story.id === input.storyId && story.authorId === recipientId &&
+            canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId));
+          if (!targetStory) throw new EngineError('STORY_REPLY_TARGET_UNAVAILABLE', 404);
+        }
         selectedProvider = kindroidPeerGroupProvider(peerGroupId, kinId, input.characterId);
       } else {
       const thread = parsed.data.state.messages
