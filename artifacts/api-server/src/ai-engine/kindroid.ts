@@ -323,8 +323,11 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
       if (!reply || reply.includes('<<ERROR>>') || reply.includes('<<HTTP_ERROR>>')) {
         throw new EngineError('KINDROID_GROUP_GENERATION_FAILED', 502);
       }
+      if (reply.length > 8000) {
+        throw new EngineError('KINDROID_GROUP_RESPONSE_TOO_LONG', 502);
+      }
       const decision = JSON.stringify({
-        action: 'draft', situation: 'dm', text: reply.slice(0, 8000),
+        action: 'draft', situation: 'dm', text: reply,
         reason: 'Kindroid group conversation', suggestedDelayMinutes: 0,
         galleryPhotoId: null, reaction: null, contextSections: [],
       });
