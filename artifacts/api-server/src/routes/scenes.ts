@@ -307,6 +307,30 @@ scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
   } catch { res.status(503).json({ error: "SCENE_PRESENCE_UNAVAILABLE" }); }
 });
 
+// Bind an existing Kindroid group to a scene without creating or modifying a Kin DM.
+// The group must be prepared separately; this endpoint only stores its identifier.
+// Generation remains disabled until group event synchronization is implemented.
+const sceneGroupBinding = scope.extend({
+  groupId: z.string().regex(/^[A-Za-z0-9_-]{8,160}$/).nullable(),
+}).strict();
+scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
+  const parsed = sceneGroupBinding.safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_GROUP_BINDING" }); return; }
+  const { universeId, groupId } = parsed.data;
+  try {
+    const rows = await db.execute(sql`UPDATE echo_scenes
+      SET turn_settings = jsonb_set(COALESCE(turn_settings, '{}'::jsonb),
+        '{kindroidGroupId}', ${JSON.stringify(groupId)}::jsonb, true),
+        updated_at = now()
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+        AND scene_id = ${sceneId.data} AND status <> 'finished'
+      RETURNING scene_id`);
+    if (!rows.rows.length) { res.status(404).json({ error: "SCENE_NOT_ACTIVE" }); return; }
+    res.json({ sceneId: sceneId.data, linked: groupId !== null });
+  } catch { res.status(503).json({ error: "SCENE_GROUP_BINDING_UNAVAILABLE" }); }
+});
+
 const turnUpdate = scope.extend({
   mode: z.enum(["automatic","manual","ordered"]),
   order: z.array(id).max(20),
@@ -330,10 +354,11 @@ scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
       res.status(400).json({ error: "INVALID_TURN_PARTICIPANTS" }); return;
     }
     const completeOrder = [...order, ...participants.filter(x => !order.includes(x))];
-    const current = scene.turn_settings as { cursor?: number; style?: string; autoReply?: boolean } | null;
+    const current = scene.turn_settings as { cursor?: number; style?: string; autoReply?: boolean; kindroidGroupId?: string | null } | null;
     const settings = { mode, participantIds: participants, order: completeOrder, nextCharacterId,
       cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)),
-      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false };
+      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false,
+      kindroidGroupId: current?.kindroidGroupId ?? null };
     const payload = JSON.stringify(settings);
     await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${payload}::jsonb, updated_at = now()
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
