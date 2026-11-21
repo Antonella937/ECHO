@@ -12,7 +12,7 @@
   "theme_color": "#30233d",
   "icons": [
     {
-      "src": "./apple-touch-icon.png",
+      "src": "./ECHO-icono-iPhone-180.png",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
