@@ -126,7 +126,7 @@ export default function MessagesPage() {
       {view !== 'inbox' && <div className="px-4 pt-4"><h2 className="text-lg font-semibold">{({ requests: 'Solicitudes', archived: 'Archivados', favorites: 'Mensajes destacados', groups: 'Mis grupos', 'observer-groups': 'Grupos de espectadora', 'observer-dms': 'DMs de espectadora' } as Record<string,string>)[view] ?? 'Mensajes'}</h2></div>}
       {requestError && <p role="alert" className="px-4 py-2 text-xs text-destructive">{requestError}</p>}
       {groupLoadError && <div role="alert" className="mx-4 my-2 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 p-3 text-xs"><span>No se pudieron cargar los grupos. Tus conversaciones no se borraron.</span><button type="button" onClick={() => setGroupRefresh(v => v + 1)} className="shrink-0 rounded-lg bg-secondary px-3 py-2 font-semibold">Reintentar</button></div>}
-      {requestLoading && view === 'requests' && <p className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
+      {requestLoading && view === 'requests' && <p role="status" className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
       {view === 'observer-dms' ? <section className="px-4 py-12 text-center text-sm text-muted-foreground">Las conversaciones entre personajes se consultan desde sus perfiles. La lista unificada de espectadora requiere una consulta de conversaciones autorizadas.</section> : view === 'observer-groups' || view === 'groups' ? <section className="px-2 pt-4"><ul>{(view === 'groups' ? inboxGroups : observerGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3 rounded-2xl px-3 py-3 hover:bg-secondary/60"><Users className="h-6 w-6"/><div><p className="font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(', ')}</p></div>{view === 'observer-groups' && <Eye className="ml-auto h-4 w-4"/>}</Link></li>)}</ul>{(view === 'groups' ? inboxGroups : observerGroups).length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">No hay grupos para mostrar.</p>}</section> : showSaved || view === 'favorites' ? (
         <section className="px-3 pt-4" data-testid="list-saved-messages">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Mensajes favoritos')}</h2><span className="text-xs text-muted-foreground">{savedMessages.length}</span></div>
@@ -138,7 +138,7 @@ export default function MessagesPage() {
             </li>; })}</ul>
           )}
         </section>
-      ) : (view === 'requests' ? requests.length === 0 : view === 'archived' ? inboxGroups.filter(g => g.archived).length === 0 : view === 'inbox' ? orderedThreads.length === 0 && inboxGroups.filter(g => !g.archived).length === 0 : true) ? (
+      ) : (view === 'requests' ? !requestLoading && requests.length === 0 : view === 'archived' ? inboxGroups.filter(g => g.archived).length === 0 : view === 'inbox' ? orderedThreads.length === 0 && inboxGroups.filter(g => !g.archived).length === 0 : true) ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
