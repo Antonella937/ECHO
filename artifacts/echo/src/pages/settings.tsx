@@ -65,7 +65,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <details className="group mb-6 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid="settings-ai-controls">
+        <details className="group mt-4 mb-6 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid="settings-ai-controls">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2.5"><Sparkles className="h-5 w-5 text-primary" strokeWidth={1.8} aria-hidden="true" />{language === 'es' ? 'IA y autonomía' : 'AI & autonomy'}</span>
             <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -104,9 +104,9 @@ export default function SettingsPage() {
 
         <section className="mt-9" aria-labelledby="creator-h">
           <h2 id="creator-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Creator y privacidad")}</h2>
-          <div className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/60 text-sm font-semibold">
-            <Link href="/creator-preview/universes" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">{st("Mis universos y personajes")}</Link>
-            <Link href="/creator-preview/privacy" className="flex min-h-12 items-center px-4 hover:bg-secondary/50">{st("Privacidad de personajes")}</Link>
+          <div className="mt-3 flex flex-col gap-2 text-sm font-semibold">
+            <Link href="/creator-preview/universes" className="flex min-h-12 items-center rounded-2xl border border-border bg-card/60 px-4 hover:bg-secondary/50">{st("Mis universos y personajes")}</Link>
+            <Link href="/creator-preview/privacy" className="flex min-h-12 items-center rounded-2xl border border-border bg-card/60 px-4 hover:bg-secondary/50">{st("Privacidad de personajes")}</Link>
           </div>
         </section>
 
