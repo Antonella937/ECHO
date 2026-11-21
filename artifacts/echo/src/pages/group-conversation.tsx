@@ -323,7 +323,7 @@ export default function GroupConversationPage() {
     {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper.startsWith("data:") ? wallpaper : resolveMedia(wallpaper)}")`}} />}
     <header className="relative z-30 shrink-0 bg-transparent pt-safe">
       <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2 text-white">
-        <button type="button" onClick={()=>navigate('/messages')} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
+        <button type="button" onClick={()=>navigate(group && !group.participantIds.includes(me.id) ? '/messages?view=observer-groups' : '/messages?view=groups')} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
         <div className="flex min-w-0 max-w-full flex-col items-center gap-1 text-center">
           <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full border border-white/15 bg-background/35 backdrop-blur-xl">{group?.avatar?<img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover"/>:<Users className="h-6 w-6"/>}</div>
           <h1 className="max-w-full truncate text-sm font-semibold">{group?.name??'Grupo'}</h1>
@@ -401,7 +401,7 @@ export default function GroupConversationPage() {
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">Cada intervención utiliza IA y puede consumir presupuesto. La reproducción se detiene tras 12 turnos o al pulsar detener.</p>
     </div>}
-    {sceneObserverEnabled && sceneTurnMode === 'manual' && group && <div className="relative z-30 shrink-0 px-3 py-2">
+    {sceneObserverEnabled && group && <div className="relative z-30 shrink-0 px-3 py-2">
       <div className="flex items-center justify-around gap-2 overflow-x-auto" aria-label="Tocá un personaje para hacerlo hablar">
         {group.participantIds.filter(pid => pid !== me.id).map(pid => {
           const participant = character(pid);
