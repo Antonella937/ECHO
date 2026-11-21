@@ -228,7 +228,7 @@ test("owner incoming reply is blocked without reply authorization", () => {
   const { state, mar } = fixture();
   const ownerId = state.primaryCharacterId;
   state.messages.push({
-    id: "owner-blocked", threadId: "owner-thread", senderId: ownerId,
+    id: "owner-blocked", threadId: "owner-thread", senderId: ownerId!,
     recipientId: mar.id, text: "Hola", createdAt: new Date(NOW.getTime() - 60_000),
     storyId: null, postId: null, readBy: [], reactions: [], origin: "user",
   });
