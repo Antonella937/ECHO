@@ -221,8 +221,15 @@ export function chooseAutonomyOpportunity(input: {
   const local = clockParts(now, timezone);
   // Social posting and conversational DM replies have independent budgets.
   // Otherwise frequent DMs permanently suppress posts, likes and comments.
-  const history = countRecentHistory(input.history, now).filter(event =>
-    input.lane === "social" ? event.situation !== "dm" : event.situation === "dm");
+  const allRecentHistory = countRecentHistory(input.history, now);
+  // Feed actions have their own quota. Story likes and message reactions are
+  // personal interactions and must not consume a character's posting budget.
+  const history = allRecentHistory.filter(event =>
+    input.lane === "social"
+      ? event.situation !== "dm"
+      : event.situation === "dm");
+  const feedHistory = history.filter(event =>
+    !["story_reaction", "dm_reaction"].includes(event.situation ?? ""));
   // Only autonomous executions determine autonomous cooldown and daily caps.
   // Manual account management never postpones the character's own activity.
   const recentSocial: number[] = [];
@@ -371,7 +378,7 @@ export function chooseAutonomyOpportunity(input: {
   }
   // Executed autonomous actions are already in history; do not count them twice
   // merely because their resulting posts/messages also exist in the state.
-  if (history.length >= (input.maxActionsPerDay ?? 2)) {
+  if (feedHistory.length >= (input.maxActionsPerDay ?? 2)) {
     return { situation: null, reasonCode: "DAILY_CAP", reason: "Character daily action cap reached.", localHour: local.hour, timezone };
   }
 
