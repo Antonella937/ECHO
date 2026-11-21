@@ -61,3 +61,29 @@ test('technical social groups route by actor and universe, not by post author', 
     else process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = oldVerified;
   }
 });
+
+test('multiple actors may share one verified social group without admitting unlisted actors', async () => {
+  const { verifiedSocialGroupForActor } = await import('../src/ai-engine/social-isolation');
+  const oldMapping = process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
+  const oldVerified = process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED;
+  try {
+    process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = 'true';
+    process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON = JSON.stringify({
+      primary: {
+        noah: '5YkgmIc2nG4UUBVNK9TZ',
+        mar: '5YkgmIc2nG4UUBVNK9TZ',
+      },
+    });
+    assert.equal(verifiedSocialGroupForActor('primary', 'noah'), '5YkgmIc2nG4UUBVNK9TZ');
+    assert.equal(verifiedSocialGroupForActor('primary', 'mar'), '5YkgmIc2nG4UUBVNK9TZ');
+    assert.equal(verifiedSocialGroupForActor('primary', 'felix'), null);
+    assert.equal(verifiedSocialGroupForActor('blackthorne', 'noah'), null);
+    process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = 'false';
+    assert.equal(verifiedSocialGroupForActor('primary', 'noah'), null);
+  } finally {
+    if (oldMapping === undefined) delete process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
+    else process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON = oldMapping;
+    if (oldVerified === undefined) delete process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED;
+    else process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = oldVerified;
+  }
+});
