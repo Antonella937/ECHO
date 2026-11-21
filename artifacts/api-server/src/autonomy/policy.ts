@@ -188,6 +188,8 @@ export function chooseAutonomyOpportunity(input: {
   dmFrequency?: "rarely" | "sometimes" | "frequently";
   /** Recipients allowed by server-side mutual DM permissions. */
   allowedDmRecipientIds?: ReadonlySet<string>;
+  /** Story replies may reach the owner without spontaneous outreach permission. */
+  allowOwnerStoryReplies?: boolean;
   /** Restrict an immediate reply to the exact incoming DM, never another thread. */
   targetIncomingMessageId?: string;
 }): Opportunity {
@@ -270,7 +272,7 @@ export function chooseAutonomyOpportunity(input: {
     const following = new Set(state.follows[character.id] ?? []);
     const candidate = prioritizeHumanAccount([...state.stories].reverse(), state, story => story.authorId, random).find(story =>
       story.authorId !== character.id && following.has(story.authorId) &&
-      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(story.authorId)) &&
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(story.authorId) || (input.allowOwnerStoryReplies && story.authorId === state.primaryCharacterId)) &&
       (character.configuration?.relationships?.some(relation => relation.targetId === story.authorId) ||
         hasDmThread(state, character.id, story.authorId)) &&
       canCharacterViewCloseFriendsStory(state, story, character.id) &&
