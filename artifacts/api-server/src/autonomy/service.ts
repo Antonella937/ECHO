@@ -478,7 +478,7 @@ export async function runAutonomyLiveCycle(
           (linkedInboundReply || control.dmEnabled);
         const ownerStoryReply = recipientIsOwnerIdentity && control.enabled && Boolean(opportunity.storyId);
         permitted = (recipientIsOwnerIdentity &&
-          (incomingOwnerReply || ownerStoryReply || (control.dmEnabled && sender?.enabled === true))) ||
+          (incomingOwnerReply || ownerStoryReply || control.dmEnabled)) ||
           (sender?.enabled === true && !recipientIsOwnerIdentity && (
             Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
             receiver?.enabled === true &&
