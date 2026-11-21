@@ -6,7 +6,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { Link, useLocation } from 'wouter';
-import { Bookmark, PenSquare, Search, X, Users, Archive, BellOff, MoreHorizontal, Pin, Eye, Sparkles, MessageSquare } from 'lucide-react';
+import { Bookmark, PenSquare, Search, X, Users, Archive, BellOff, MoreHorizontal, Pin, Eye } from 'lucide-react';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useSocial } from '@/store/social-store';
 import { useThreads } from '@/hooks/use-social-selectors';
@@ -74,7 +74,7 @@ export default function MessagesPage() {
     void load();
     return () => { active = false; };
   }, [user?.id, me.id, groupComposer, groupRefresh]);
-  const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get("tab") === "favorites");
+  const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get('view') === 'favorites' || new URLSearchParams(window.location.search).get('tab') === 'favorites');
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
   const followed = new Set(state.follows[me.id] ?? []);
@@ -83,7 +83,7 @@ export default function MessagesPage() {
     !requestDecisions[other.id] &&
     !state.messages.some(m => m.senderId === me.id && m.recipientId === other.id)
   );
-  const visibleThreads = threads.filter(({ other }) => showRequests
+  const visibleThreads = threads.filter(({ other }) => (showRequests || new URLSearchParams(window.location.search).get('view') === 'requests')
     ? requests.some(r => r.other.id === other.id)
     : requestDecisions[other.id] !== 'rejected' && requestDecisions[other.id] !== 'blocked');
   const [composing, setComposing] = useState(false);
@@ -97,7 +97,7 @@ export default function MessagesPage() {
   const inboxGroups = groups.filter(g => g.participantIds.includes(me.id));
   const observerGroups = groups.filter(g => !g.participantIds.includes(me.id) && g.participantIds.length >= 3);
   const backToInbox = () => { if (view !== 'inbox' || showSaved) openView('inbox'); else navigate('/'); };
-  const toggleFavorites = () => { setShowSaved(value => { const next = !value; window.history.replaceState(null, "", next ? "/messages?tab=favorites" : "/messages"); return next; }); };
+
 
   return (
     <div>
