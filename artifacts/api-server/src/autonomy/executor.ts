@@ -318,6 +318,9 @@ export async function executeAutonomyDecision(input: {
       eq(echoAutonomyRunsTable.id, Number(input.runId)),
     )).for("update").limit(1);
     if (!run || run.characterId !== input.characterId) return { status: "blocked", reasonCode: "RUN_NOT_OWNED" };
+    // The reserved run must belong to this exact source revision. Never let a
+    // caller swap the revision associated with a persisted idempotency key.
+    if (run.sourceRevision !== input.sourceRevision) return { status: "blocked", reasonCode: "RUN_SOURCE_REVISION_MISMATCH" };
     if (run.status === "executed") return { status: "duplicate", reasonCode: "ALREADY_EXECUTED" };
     if (run.status !== "running") return { status: "blocked", reasonCode: "RUN_NOT_RUNNING" };
 
