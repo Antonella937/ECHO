@@ -107,7 +107,7 @@ test('two requests to the same social group never interleave context and respons
   }
 });
 
-test('malformed Kindroid group reply fails closed without a private fallback', async () => {
+test('invalid Kindroid social choice fails closed without a private fallback', async () => {
   const previous = process.env.ECHO_KINDROID_API_KEY;
   process.env.ECHO_KINDROID_API_KEY = 'test-key';
   const calls: string[] = [];
@@ -115,7 +115,7 @@ test('malformed Kindroid group reply fails closed without a private fallback', a
     const path = new URL(String(url)).pathname;
     calls.push(path);
     return new Response(path.endsWith('get-turn') ? 'kin123456789'
-      : path.endsWith('ai-response') ? '{not-json' : '', { status: 200 });
+      : path.endsWith('ai-response') ? 'NOT_A_VALID_SOCIAL_CHOICE' : '', { status: 200 });
   }) as typeof fetch;
   try {
     await assert.rejects(
@@ -123,7 +123,7 @@ test('malformed Kindroid group reply fails closed without a private fallback', a
         'Visible post', undefined, request).complete({
           system: '', context: '', outputSchema: {},
         }),
-      /KINDROID_SOCIAL_RESPONSE_INVALID/,
+      /KINDROID_SOCIAL_DECISION_INVALID/,
     );
     assert.deepEqual(calls, [
       '/v1/groupchats-user-message',
