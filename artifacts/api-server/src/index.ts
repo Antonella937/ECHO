@@ -1,3 +1,4 @@
+import { reconcileActiveKindroidGroups } from "./routes/group-dms";
 import app from "./app";
 import { publishDueScheduledPosts } from "./lib/scheduledPosts";
 import { logger } from "./lib/logger";
@@ -41,3 +42,17 @@ const scheduledInterval = setInterval(() => { void publishDueScheduledPosts(); }
 void publishDueScheduledPosts();
 process.on("SIGTERM", () => clearInterval(scheduledInterval));
 process.on("SIGINT", () => clearInterval(scheduledInterval));
+
+// Read-only Kindroid group history polling: never generates messages or modifies Kindroid.
+let kindroidSyncRunning = false;
+async function pollKindroidGroupHistory() {
+  if (kindroidSyncRunning) return;
+  kindroidSyncRunning = true;
+  try { await reconcileActiveKindroidGroups(); }
+  catch (error) { logger.warn({ kind: error instanceof Error ? error.name : "unknown" }, "Kindroid history poll skipped"); }
+  finally { kindroidSyncRunning = false; }
+}
+const kindroidSyncInterval = setInterval(() => { void pollKindroidGroupHistory(); }, 60_000);
+void pollKindroidGroupHistory();
+process.on("SIGTERM", () => clearInterval(kindroidSyncInterval));
+process.on("SIGINT", () => clearInterval(kindroidSyncInterval));
