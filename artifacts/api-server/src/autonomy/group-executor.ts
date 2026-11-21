@@ -79,6 +79,14 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     // private /send-message endpoint for a group, even when a Kin is linked.
     let kindroidGroupId: string | null = null;
     if (linkedKinId) {
+      const verifiedFounderGroups: Record<string, string> = universeId === "primary" ? {
+        "group_kindroid_mar_noah": "lSQ59nGePEfy3nCb6Gnp",
+        "group_kindroid_hyunjin_felix": "OtszoltSpfuwCBuUoQiM",
+        "group_748934d7-2a16-4ff9-b841-dc9b08a5d748": "UjQg67Gg2afzKO1lJBen",
+        "group_kindroid_pretty_violence": "t98WkOKxO2zunh75audT",
+        "group_kindroid_dead_static": "uzlDUKZ5MQMnR9sBHh6p",
+      } : {};
+      kindroidGroupId = verifiedFounderGroups[groupId] ?? null;
       const raw = process.env.ECHO_KINDROID_GROUP_IDS_JSON;
       if (raw) {
         try {
