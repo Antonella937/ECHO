@@ -1,6 +1,6 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film, Sparkles } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
@@ -51,7 +51,7 @@ export default function SettingsPage() {
       <div className="px-4 pb-12 pt-5">
         <details className="group mb-6 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid="settings-ai-controls">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-            <span>{language === 'es' ? 'IA y autonomía' : 'AI & autonomy'}</span>
+            <span className="flex items-center gap-2.5"><Sparkles className="h-5 w-5 text-primary" strokeWidth={1.8} aria-hidden="true" />{language === 'es' ? 'IA y autonomía' : 'AI & autonomy'}</span>
             <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" />
           </summary>
           <div className="space-y-2 border-t border-border px-3 pb-4">
