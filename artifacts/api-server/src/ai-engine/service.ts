@@ -28,6 +28,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   const parsed = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
   if (!parsed.success) throw new EngineError('INVALID_STORED_UNIVERSE', 422);
   const actor = parsed.data.state.characters.find(c => c.id === input.characterId);
+  if (!actor) throw new EngineError('CHARACTER_NOT_FOUND', 404);
   const personId = actor?.personId || actor?.id || input.characterId;
   const linkedAccountIds = parsed.data.state.characters
     .filter(c => (c.personId || c.id) === personId)
