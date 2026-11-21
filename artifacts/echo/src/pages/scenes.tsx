@@ -71,13 +71,10 @@ export default function ScenesPage() {
     setKindroidImportResult(null);
     setError('');
     try {
-      const result = await customFetch<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}>(
+      const result = await customFetch<{sceneId:string;kindroidGroupId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}>(
         `/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-preview?${new URLSearchParams({universeId})}`,
         {method:'GET',responseType:'json'});
-      if (result.sceneId===sceneId) {
-        const groupId=scenes.find(item=>item.sceneId===sceneId)?.turnSettings?.kindroidGroupId;
-        if (groupId) setKindroidPreview({...result,kindroidGroupId:groupId});
-      }
+      if (result.sceneId===sceneId && result.kindroidGroupId) setKindroidPreview(result);
     } catch (error) {
       setError((es?'No se pudo leer el historial del grupo. ':'Could not read group history. ') +
         (error instanceof Error?error.message.slice(0,160):''));
