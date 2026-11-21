@@ -121,7 +121,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         ? `Visible feed post: ${(targetPost.caption ?? '').slice(0, 500)}${targetComment ? '\nReplying to comment by ' + (parsed.data.state.characters.find(c => c.id === targetComment.authorId)?.name ?? 'another person') + ': ' + targetComment.text.slice(0, 300) : ''}`
         : '';
       const prompt = input.situation === 'comment'
-        ? `[ECHO social action: Write ONE short, natural public comment on the visible post, in your established voice and in English. Stay in character; no narration or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
+        ? `[ECHO social action: Write a natural public comment on the visible post, in your established voice and in English. Preserve your personality and expressive style; format it as a public comment, not a private DM or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
         : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
       if (input.situation === 'comment' && !targetPost) {
         throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
