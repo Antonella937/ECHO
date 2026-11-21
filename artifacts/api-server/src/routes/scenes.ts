@@ -8,7 +8,6 @@ import { db, echoUniversesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
-import { kindroidDmProvider } from "../ai-engine/kindroid";
 import { EngineError } from "../ai-engine/contracts";
 
 export const scenesRouter: IRouter = Router();
@@ -533,32 +532,6 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       // never use that transport until a separate group is bound and synced.
       // Fail closed rather than contaminating a real character's DM history.
       throw new EngineError("KINDROID_SCENE_GROUP_REQUIRED", 409);
-      /* Legacy scene DM transport disabled pending group synchronization.
-      const sceneInstructions = [
-        "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
-        "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
-        "This is a separate scene, not a private DM. Only use the scene context below.",
-      ].join("\n");
-      const sceneEnding = "\n[End scene context. Continue naturally as your character.]";
-      // The shared Kindroid DM transport rejects messages over 2,800 chars.
-      // Keep the latest visible events rather than truncating the entire prompt
-      // (which previously could discard the trigger and fail before dispatch).
-      const maxScenePromptChars = 2800;
-      const promptBudget = maxScenePromptChars - sceneInstructions.length - sceneEnding.length - 2;
-      const baseContext = { scene: { sceneId: sceneId.data, title: scene.title, premise: scene.premise, canon: scene.canon },
-        character: { id: character.id, name: character.name }, participants: people, sceneMemory: previousSummary };
-      const recentEvents = visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text }));
-      let sceneContext = JSON.stringify({ ...baseContext, visibleEvents: recentEvents });
-      while (sceneContext.length > promptBudget && recentEvents.length > 1) {
-        recentEvents.shift();
-        sceneContext = JSON.stringify({ ...baseContext, visibleEvents: recentEvents });
-      }
-      if (sceneContext.length > promptBudget) throw new EngineError("KINDROID_SCENE_CONTEXT_TOO_LONG", 400);
-      const scenePrompt = [sceneInstructions, sceneContext, sceneEnding].join("\n");
-      const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
-      const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
-      replyText = draft.text;
-      */
     } else {
       const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
       const decoded: unknown = JSON.parse(completion.text);
