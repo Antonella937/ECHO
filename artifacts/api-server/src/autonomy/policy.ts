@@ -390,10 +390,10 @@ export function chooseAutonomyOpportunity(input: {
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
   // The zero-cost story policy records a view, not a generated reaction.
-  // Target only unseen stories, otherwise already-seen stories repeatedly
-  // consume the opportunity without producing any visible change.
+  // Already-seen stories may still be liked later; the recent-target guard
+  // prevents repeatedly selecting the same story within the action history.
   const targetStory = prioritizeHumanAccount([...state.stories].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0)), state, story => story.authorId, random)
-    .find(item => !item.seenBy.includes(character.id) && recent24h(item.createdAt) && item.authorId !== character.id &&
+    .find(item => recent24h(item.createdAt) && item.authorId !== character.id &&
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
       !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
