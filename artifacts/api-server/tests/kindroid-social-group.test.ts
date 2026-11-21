@@ -106,3 +106,33 @@ test('two requests to the same social group never interleave context and respons
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('malformed Kindroid group reply fails closed without a private fallback', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    return new Response(path.endsWith('get-turn') ? 'kin123456789'
+      : path.endsWith('ai-response') ? '{not-json' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post',
+        'Visible post', undefined, request).complete({
+          system: '', context: '', outputSchema: {},
+        }),
+      /KINDROID_SOCIAL_RESPONSE_INVALID/,
+    );
+    assert.deepEqual(calls, [
+      '/v1/groupchats-user-message',
+      '/v1/groupchats-get-turn',
+      '/v1/groupchats-ai-response',
+    ]);
+    assert.equal(calls.some(path => path === '/v1/send-message'), false);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
