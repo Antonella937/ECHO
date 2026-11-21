@@ -264,6 +264,23 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(groupId) || !/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) {
         throw new EngineError('KINDROID_GROUP_ID_INVALID', 400);
       }
+      // Ask Kindroid which Kin owns the next turn before generating. A group
+      // response must never be attributed to a different ECHO character.
+      let turnResponse: Response;
+      try {
+        turnResponse = await queuedKindroidRequest(kinId, 30, () => request('https://api.kindroid.ai/v1/groupchats-get-turn', {
+          method: 'POST',
+          signal: AbortSignal.timeout(90000),
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: groupId, allow_user: true }),
+        }), echoCharacterId);
+      } catch {
+        throw new EngineError('KINDROID_GROUP_TURN_CONNECTION_FAILED', 502);
+      }
+      if (!turnResponse.ok) throw new EngineError('KINDROID_GROUP_TURN_FAILED', turnResponse.status === 429 ? 429 : 502);
+      const nextKinId = (await turnResponse.text()).trim();
+      if (!nextKinId) throw new EngineError('KINDROID_GROUP_USER_TURN', 409);
+      if (nextKinId !== kinId) throw new EngineError('KINDROID_GROUP_SPEAKER_MISMATCH', 409);
       let response: Response;
       try {
         response = await queuedKindroidRequest(kinId, 30, () => request('https://api.kindroid.ai/v1/groupchats-ai-response', {
