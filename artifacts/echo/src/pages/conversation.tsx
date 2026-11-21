@@ -56,6 +56,9 @@ export default function ConversationPage() {
   const legacyAppearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
   // Only the universe's original identity inherits legacy wallpapers. Never share them with other personas.
   const isOriginalIdentity = identityId === state.characters[0]?.id;
+  // Founder's original identity uses Kindroid immediate replies; the AI timing panel
+  // remains available for other identities and other ECHO accounts.
+  const showAiPreferences = !(user?.id === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" && isOriginalIdentity);
   const [appearance,setAppearance] = useState(()=>readDmAppearance(appearanceKey));
   const resolveWallpaper = useMediaResolver();
   const wallpaperAppearance = appearance.background === 'photo' && appearance.image
@@ -376,11 +379,11 @@ export default function ConversationPage() {
             </div>
           </Link>
 
-          <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="z-10 ml-auto tap flex h-11 min-w-[58px] items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-3 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>
+          {showAiPreferences && <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="z-10 ml-auto tap flex h-11 min-w-[58px] items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-3 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>}
         </div>
       </header>
 
-      <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />
+      {showAiPreferences && <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />}
 
       <div className="relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-3 pb-4 pt-6 sm:px-4 [scrollbar-color:theme(colors.muted.foreground)_transparent] [scrollbar-width:thin]" data-testid="list-conversation-messages">
         <div className="mb-8 flex flex-col items-center text-center">
