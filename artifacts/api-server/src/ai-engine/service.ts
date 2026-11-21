@@ -6,7 +6,7 @@ import { visionService } from '../vision/service';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
 import { db, echoMemoryArchiveTable, echoCharacterGalleryTable } from '@workspace/db';
-import { kindroidDmProvider, kindroidStoryDecisionProvider, kindroidLikeDecisionProvider } from './kindroid';
+import { kindroidDmProvider, kindroidStoryDecisionProvider, kindroidLikeDecisionProvider, kindroidPeerGroupProvider } from './kindroid';
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
@@ -147,8 +147,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       // separate Kindroid group_id is mapped to this peer thread, never send
       // character-to-character traffic into that private conversation.
       if (recipientId !== parsed.data.state.primaryCharacterId) {
-        throw new EngineError('KINDROID_PEER_GROUP_REQUIRED', 409);
-      }
+        const pair = [input.characterId, recipientId].sort().join(':');
+        const marNoahPair = ['account_mw6yjhc8v41bp', 'account_mw71qlrfmy74i'].sort().join(':');
+        if (pair !== marNoahPair) throw new EngineError('KINDROID_PEER_GROUP_REQUIRED', 409);
+        selectedProvider = kindroidPeerGroupProvider('lSQ59nGePEfy3nCb6Gnp', kinId, input.characterId);
+      } else {
       const thread = parsed.data.state.messages
         .filter(m => (m.senderId === recipientId && m.recipientId === input.characterId) ||
                      (m.senderId === input.characterId && m.recipientId === recipientId))
@@ -392,6 +395,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           // Only a story reply may require fresh visual/social context. Ordinary
           // DMs rely on Kindroid's own memory instead of replaying ECHO history.
           storyForReply ? socialContext : '', undefined, 'dm', input.characterId);
+      }
       }
     }
   }
