@@ -452,6 +452,25 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
       if (shared.rows.length) {
         throw new KindroidSceneHistoryError("KINDROID_SCENE_GROUP_SHARED",409);
       }
+      // Kin links can change while remote history is being fetched. Refuse to
+      // attribute old group messages to characters under a stale mapping.
+      const currentLinks = await tx.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+        WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+          AND enabled=true AND kin_id IS NOT NULL`);
+      const currentByKin = new Map<string,string>();
+      for (const link of currentLinks.rows) {
+        if (typeof link.kin_id !== "string" || typeof link.character_id !== "string" ||
+            !members.has(link.character_id)) continue;
+        const previous = currentByKin.get(link.kin_id);
+        if (previous && previous !== link.character_id) {
+          throw new KindroidSceneHistoryError("KINDROID_SCENE_AMBIGUOUS_KIN_LINK",409);
+        }
+        currentByKin.set(link.kin_id,link.character_id);
+      }
+      if (currentByKin.size !== byKin.size ||
+          [...byKin].some(([kin,character]) => currentByKin.get(kin) !== character)) {
+        throw new KindroidSceneHistoryError("KINDROID_SCENE_KIN_LINKS_CHANGED",409);
+      }
       let count = 0;
       for (const item of events) {
         const inserted = await tx.execute(sql`INSERT INTO echo_scene_events
