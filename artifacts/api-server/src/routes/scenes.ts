@@ -366,7 +366,7 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
     }
     const messages = await readKindroidScenePages(groupId,apiKey);
     const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
-    res.json({sceneId:sceneId.data,matchedEvents:events.length,totalMessages:messages.length,events});
+    res.json({sceneId:sceneId.data,kindroidGroupId:groupId,matchedEvents:events.length,totalMessages:messages.length,events});
   } catch (error) {
     if (error instanceof KindroidSceneHistoryError) {res.status(error.status).json({error:error.code});return;}
     res.status(503).json({error:"KINDROID_SCENE_HISTORY_PREVIEW_FAILED"});
