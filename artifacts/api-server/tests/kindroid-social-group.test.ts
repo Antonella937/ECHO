@@ -251,3 +251,42 @@ test('Kindroid message delimiters around LIKE are normalized safely', async () =
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('social context reports network failures without falling back to a private DM', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    calls.push(new URL(String(url)).pathname);
+    throw new TypeError('network disconnected');
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      sendKindroidSocialGroupContext('group12345678', 'Visible post', request),
+      /KINDROID_SOCIAL_GROUP_CONTEXT_CONNECTION_FAILED/,
+    );
+    assert.deepEqual(calls, ['/v1/groupchats-user-message']);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
+
+test('social context reports timeouts distinctly without a private DM fallback', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const request = (async () => {
+    const error = new Error('request timed out');
+    error.name = 'TimeoutError';
+    throw error;
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      sendKindroidSocialGroupContext('group12345678', 'Visible post', request),
+      /KINDROID_SOCIAL_GROUP_CONTEXT_TIMEOUT/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
