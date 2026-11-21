@@ -432,7 +432,6 @@ export async function executeAutonomyDecision(input: {
       ...state.comments.filter((item) => item.authorId === input.characterId && item.origin !== "autonomy").map((item) => toTime(item.createdAt)),
       ...state.stories.filter((item) => item.authorId === input.characterId && item.origin !== "autonomy").map((item) => toTime(item.createdAt)),
     ].filter((time) => Number.isFinite(time) && time <= now.getTime() && now.getTime() - time < DAY_MS);
-    const currentStateActivity = toTime(character.configuration?.currentState?.lastActivityAt ?? null);
     const latestActivity = Math.max(
       ...recentManualTimes,
       ...history.filter((item) => item.situation !== "dm" && item.situation !== "dm_reaction").map((item) => item.createdAt.getTime()),
