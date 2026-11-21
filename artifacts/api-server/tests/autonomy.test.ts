@@ -205,6 +205,41 @@ test("DM autonomy does not reply to an unauthorized sender", () => {
   assert.equal(permitted.recipientId, noah.id);
 });
 
+test("owner-initiated DM can be answered while spontaneous outreach is disabled", () => {
+  const { state, mar } = fixture();
+  const ownerId = state.primaryCharacterId;
+  assert.ok(ownerId);
+  state.messages.push({
+    id: "owner-incoming", threadId: "owner-thread", senderId: ownerId,
+    recipientId: mar.id, text: "Hola, Mar", createdAt: new Date(NOW.getTime() - 60_000),
+    storyId: null, postId: null, readBy: [], reactions: [], origin: "user",
+  });
+  const result = chooseAutonomyOpportunity({
+    state, character: mar, history: [], now: NOW, random: () => 0.99,
+    lane: "dm", allowedDmRecipientIds: new Set<string>(),
+    allowOwnerIncomingReplies: true, allowOwnerSpontaneousDm: false,
+  });
+  assert.equal(result.situation, "dm");
+  assert.equal(result.recipientId, ownerId);
+  assert.equal(result.storyId, undefined);
+});
+
+test("owner incoming reply is blocked without reply authorization", () => {
+  const { state, mar } = fixture();
+  const ownerId = state.primaryCharacterId;
+  state.messages.push({
+    id: "owner-blocked", threadId: "owner-thread", senderId: ownerId,
+    recipientId: mar.id, text: "Hola", createdAt: new Date(NOW.getTime() - 60_000),
+    storyId: null, postId: null, readBy: [], reactions: [], origin: "user",
+  });
+  const result = chooseAutonomyOpportunity({
+    state, character: mar, history: [], now: NOW, random: () => 0.99,
+    lane: "dm", allowedDmRecipientIds: new Set<string>(),
+    allowOwnerIncomingReplies: false, allowOwnerSpontaneousDm: false,
+  });
+  assert.notEqual(result.recipientId, ownerId);
+});
+
 test("planner chooses silence before spending a model call", () => {
   const { state, mar } = fixture();
   const result = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0.99 });
