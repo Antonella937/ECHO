@@ -406,10 +406,12 @@ export async function executeAutonomyDecision(input: {
     ));
     const [ownerHour] = await tx.select({ value: sql<number>`count(*)::int` }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, input.ownerId), eq(echoAutonomyRunsTable.status, "executed"),
+      sql`${echoAutonomyRunsTable.situation} NOT IN ('dm', 'dm_reaction')`,
       gte(echoAutonomyRunsTable.createdAt, new Date(now.getTime() - 60 * 60_000)),
     ));
     const [ownerDay] = await tx.select({ value: sql<number>`count(*)::int` }).from(echoAutonomyRunsTable).where(and(
       eq(echoAutonomyRunsTable.ownerId, input.ownerId), eq(echoAutonomyRunsTable.status, "executed"),
+      sql`${echoAutonomyRunsTable.situation} NOT IN ('dm', 'dm_reaction')`,
       gte(echoAutonomyRunsTable.createdAt, since),
     ));
     if (input.opportunity.situation !== "dm" && ((ownerHour?.value ?? 0) >= 6 || (ownerDay?.value ?? 0) >= 35)) {
