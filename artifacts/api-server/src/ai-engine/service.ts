@@ -96,11 +96,14 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       console.warn('DM preference lookup skipped', { reason: error instanceof Error ? error.name : 'UNKNOWN' });
     }
   }
-  // /v1/send-message mutates the Kin's private conversation. Social actions
-  // must not call it until a verified isolated provider is available.
-  if (dependencies.liveDmReply === true &&
-      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      ['comment', 'post', 'story_reaction', 'like_post', 'like_comment'].includes(input.situation) &&
+  // Independent social generation uses the ECHO character context and an
+  // explicitly enabled stateless provider; it never calls Kindroid /send-message.
+  // Opt-in is required because this provider can be metered.
+  const founderSocial = dependencies.liveDmReply === true &&
+    ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+    ['comment', 'post', 'story_reaction', 'like_post', 'like_comment'].includes(input.situation);
+  const isolatedSocial = founderSocial && process.env.ECHO_ISOLATED_SOCIAL_PROVIDER_ENABLED === 'true';
+  if (founderSocial && !isolatedSocial &&
       process.env.ECHO_KINDROID_SOCIAL_PRIVATE_HISTORY_OPT_IN !== 'true') {
     throw new EngineError('KINDROID_SOCIAL_ISOLATION_REQUIRED', 503);
   }
@@ -112,7 +115,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // ECHO still selects the opportunity and validates the draft before execution.
   if (dependencies.liveDmReply === true &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      (input.situation === 'comment' || input.situation === 'post')) {
+      (input.situation === 'comment' || input.situation === 'post') && !isolatedSocial) {
     const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
@@ -462,7 +465,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Founder: every like decision belongs to Kindroid, never a local automatic policy.
   if (dependencies.liveDmReply === true &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      (input.situation === 'like_post' || input.situation === 'like_comment')) {
+      (input.situation === 'like_post' || input.situation === 'like_comment') && !isolatedSocial) {
     const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
@@ -503,7 +506,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     const linkCheck = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
-    if (!linkCheck.rows.length || selectedProvider.name !== 'kindroid') {
+    if (!linkCheck.rows.length || (!isolatedSocial && selectedProvider.name !== 'kindroid')) {
       throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
     }
   }
