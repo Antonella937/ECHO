@@ -55,13 +55,18 @@ export async function deliverSceneKindroidEventOnce(
   }
   if(!await reserveSceneKindroidDelivery(input)) return "already_claimed";
   if(!await beginSceneKindroidDelivery(input)) return "already_claimed";
-  try{
+  try {
     await sendKindroidSceneGroupMessage(input.groupId,message,apiKey,request);
-    await finishSceneKindroidDelivery(input,"sent");
-    return "sent";
-  }catch{
-    // Even a rejected HTTP request could have been accepted upstream. Fail closed.
-    await finishSceneKindroidDelivery(input,"uncertain");
+  } catch {
+    // A remote write may have succeeded despite a failed response.
+    // If recording uncertainty fails, surface that DB error for reconciliation.
+    const recorded = await finishSceneKindroidDelivery(input,"uncertain");
+    if (!recorded) throw new Error("SCENE_DELIVERY_STATE_LOST");
     return "uncertain";
   }
+  // Do not report success if the database cannot confirm the sent state.
+  // Never resend: the remote write has already succeeded.
+  const recorded = await finishSceneKindroidDelivery(input,"sent");
+  if (!recorded) throw new Error("SCENE_DELIVERY_STATE_LOST");
+  return "sent";
 }
