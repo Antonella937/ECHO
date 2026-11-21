@@ -79,3 +79,18 @@ test("private DM removes Kindroid transport markers without altering prose", asy
   const parsed = JSON.parse(String(result.text));
   assert.equal(parsed.text, "Hello Nela!");
 }));
+
+test("private DM transport refuses social instructions before any API request", async () => withTestKey(async () => {
+  let calls = 0;
+  const request = (async () => { calls++; return new Response("unexpected"); }) as typeof fetch;
+  const input = { system: "", context: "", outputSchema: {}, validate: () => undefined };
+  await assert.rejects(
+    () => kindroidDmProvider("[ECHO feed interaction: Decide whether to LIKE]", kinId, "", request).complete(input),
+    /KINDROID_PRIVATE_DM_SOCIAL_PROMPT_BLOCKED/,
+  );
+  await assert.rejects(
+    () => kindroidDmProvider("Write a caption", kinId, "", request, "post").complete(input),
+    /KINDROID_PRIVATE_DM_SOCIAL_PROMPT_BLOCKED/,
+  );
+  assert.equal(calls, 0);
+}));
