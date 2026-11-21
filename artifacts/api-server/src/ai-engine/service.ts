@@ -1,3 +1,4 @@
+import { requiresIsolatedKindroidSocial, isolatedKindroidSocialReady } from './social-isolation';
 import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionInput } from '@workspace/api-zod';
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
@@ -99,12 +100,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Independent social generation uses the ECHO character context and an
   // explicitly enabled stateless provider; it never calls Kindroid /send-message.
   // Opt-in is required because this provider can be metered.
-  const founderSocial = dependencies.liveDmReply === true &&
-    ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-    ['comment', 'post', 'story_reaction', 'like_post', 'like_comment'].includes(input.situation);
-  // Founder social content must remain authored by Kindroid; do not silently
-  // substitute ECHO's generic model even when an isolated provider is enabled.
-  const isolatedSocial = false;
+  const founderSocial = requiresIsolatedKindroidSocial({
+    live: dependencies.liveDmReply === true, ownerId, situation: input.situation,
+  });
+  const isolatedSocial = isolatedKindroidSocialReady();
   // Never allow a private-history bypass: the founder requested isolation.
   if (founderSocial && !isolatedSocial) {
     throw new EngineError('KINDROID_SOCIAL_ISOLATION_REQUIRED', 503);
