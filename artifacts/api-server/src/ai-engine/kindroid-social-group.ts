@@ -62,6 +62,7 @@ export function kindroidSocialGroupProvider(
   context: string,
   echoCharacterId?: string,
   request: typeof fetch = fetch,
+  allowedGalleryPhotoIds: readonly string[] = [],
 ): TextProvider {
   return {
     name: 'kindroid',
@@ -84,9 +85,12 @@ export function kindroidSocialGroupProvider(
       const choices = situation === 'story_reaction'
         ? 'VIEW, LIKE, LAUGH, SURPRISE, FIRE'
         : situation.startsWith('like_') ? 'LIKE, SKIP' : '';
+      const galleryInstruction = situation === 'post' && allowedGalleryPhotoIds.length
+        ? ` If attaching a photo, put PHOTO_ID: followed by exactly one of these verified gallery IDs on the LAST line: ${allowedGalleryPhotoIds.join(', ')}. Otherwise write a text-only caption. Never invent a photo ID.`
+        : ' No photo is available for verified attachment; write a text-only caption.';
       const instruction = choices
         ? `ECHO social event for ${situation}. Respond with exactly one of: ${choices}. No narration.`
-        : `ECHO social event for ${situation}. Write only a natural English ${situation === 'post' ? 'feed caption' : 'public comment'} in your voice, or SKIP if you would not engage. No narration.`;
+        : `ECHO social event for ${situation}. Write only a natural English ${situation === 'post' ? 'feed caption' : 'public comment'} in your voice, or SKIP if you would not engage. No narration.${situation === 'post' ? galleryInstruction : ''}`;
       // Kindroid determines the next Kin after receiving the group user message.
       // Do not preflight get-turn here: an idle group may legitimately have
       // the user turn, which would reject every first social event.
@@ -107,6 +111,17 @@ export function kindroidSocialGroupProvider(
         .replace(/^\s*(?:<<\s*)?START MESSAGE(?:\s*>>)?\s*\n/i, '')
         .replace(/\n\s*(?:<<\s*)?END MESSAGE(?:\s*>>)?\s*$/i, '')
         .trim();
+      let galleryPhotoId: string | null = null;
+      let publishText = cleaned;
+      if (situation === 'post') {
+        const photoMatch = cleaned.match(/(?:^|\n)PHOTO_ID:\s*([A-Za-z0-9_-]{8,120})\s*$/i);
+        if (photoMatch) {
+          if (!allowedGalleryPhotoIds.includes(photoMatch[1])) throw new EngineError('KINDROID_SOCIAL_GALLERY_ID_NOT_ALLOWED', 422);
+          galleryPhotoId = photoMatch[1];
+          publishText = cleaned.slice(0, photoMatch.index).trim();
+        }
+        if (!galleryPhotoId && /(?:^|\n)PHOTO_ID:/i.test(cleaned)) throw new EngineError('KINDROID_SOCIAL_GALLERY_ID_INVALID', 422);
+      }
       let action: string = 'draft';
       let text: string | null = null;
       let reaction: string | null = null;
@@ -119,20 +134,20 @@ export function kindroidSocialGroupProvider(
         } else {
           action = token === 'LIKE' ? 'like' : 'none';
         }
-      } else if (cleaned.toUpperCase() === 'SKIP') {
+      } else if (publishText.toUpperCase() === 'SKIP') {
         action = 'none';
       } else {
         const maxLength = situation === 'post' ? 600 : 1000;
         // Never silently publish a chopped-off sentence as the Kin's words.
         // Reject and leave the social action unexecuted instead.
-        if (!cleaned || cleaned.length > maxLength) {
+        if (!publishText || publishText.length > maxLength) {
           throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
         }
-        text = cleaned;
+        text = publishText;
       }
       const decision = JSON.stringify({
         action, situation, text, reaction, reason: 'Isolated Kindroid social group',
-        suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [],
+        suggestedDelayMinutes: 0, galleryPhotoId, contextSections: [],
       });
       input.validate?.(decision);
       return { ...generated, text: decision };
