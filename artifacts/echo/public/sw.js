@@ -62,3 +62,34 @@ self.addEventListener('fetch', (event) => {
     }),
   );
 });
+
+/* Display server-sent Web Push messages and open the relevant ECHO conversation. */
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch { payload = {}; }
+  const title = typeof payload.title === 'string' ? payload.title.slice(0, 100) : 'ECHO';
+  const body = typeof payload.body === 'string' ? payload.body.slice(0, 240) : 'Tenés un mensaje nuevo.';
+  const groupId = typeof payload.groupId === 'string' && /^[a-zA-Z0-9_-]{1,120}$/.test(payload.groupId) ? payload.groupId : '';
+  const target = new URL(groupId ? 'messages/group/' + encodeURIComponent(groupId) + '?from=messages' : 'messages', ROOT);
+  event.waitUntil(self.registration.showNotification(title, {
+    body, icon: new URL('icon.svg', ROOT).href,
+    tag: groupId ? 'echo-group-' + groupId : 'echo-message',
+    data: { url: target.href },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || new URL('messages', ROOT).href);
+  if (target.origin !== ROOT.origin) return;
+  event.waitUntil((async () => {
+    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of clientsList) {
+      if (new URL(client.url).origin === target.origin) {
+        await client.navigate(target.href);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(target.href);
+  })());
+});
