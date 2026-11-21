@@ -446,7 +446,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // like or react to a visible story. Never substitute local random choices.
   if (dependencies.liveDmReply === true &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      input.situation === 'story_reaction') {
+      input.situation === 'story_reaction' && !isolatedSocial) {
     const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
       AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
