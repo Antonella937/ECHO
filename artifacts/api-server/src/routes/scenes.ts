@@ -325,6 +325,14 @@ scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
         updated_at = now()
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
         AND scene_id = ${sceneId.data} AND status <> 'finished'
+        AND (
+          COALESCE(turn_settings ->> 'kindroidGroupId', '') = COALESCE(${groupId}::text, '')
+          OR NOT EXISTS (
+            SELECT 1 FROM echo_scene_events prior
+            WHERE prior.owner_id = ${req.userId!} AND prior.universe_id = ${universeId}
+              AND prior.scene_id = ${sceneId.data} AND prior.text <> ''
+          )
+        )
         AND (${groupId}::text IS NULL OR NOT EXISTS (
           SELECT 1 FROM echo_scenes other
           WHERE other.owner_id = ${req.userId!} AND other.universe_id = ${universeId}
@@ -337,7 +345,7 @@ scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
         WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
           AND scene_id = ${sceneId.data} AND status <> 'finished' LIMIT 1`);
       res.status(existing.rows.length ? 409 : 404).json({
-        error: existing.rows.length ? "KINDROID_GROUP_ALREADY_BOUND_TO_SCENE" : "SCENE_NOT_ACTIVE",
+        error: existing.rows.length ? "SCENE_GROUP_BINDING_CONFLICT" : "SCENE_NOT_ACTIVE",
       });
       return;
     }
