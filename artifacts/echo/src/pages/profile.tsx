@@ -218,7 +218,7 @@ export default function ProfilePage() {
           action={isMe && <Link href="/create" className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground" data-testid="link-profile-empty-create">{t("Publicar")}</Link>}
         />
       ) : (
-        <PhotoGrid posts={posts} showPinned />
+        <PhotoGrid posts={posts} showPinned continuous />
       )}
       <AccountEditor open={editing} accountId={person.id} onClose={() => setEditing(false)} />
     </div>
