@@ -360,15 +360,14 @@ scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
         )
         AND (${groupId}::text IS NULL OR NOT EXISTS (
           SELECT 1 FROM echo_scenes other
-          WHERE other.owner_id = ${req.userId!} AND other.universe_id = ${universeId}
-            AND other.scene_id <> ${sceneId.data}
+          WHERE other.owner_id = ${req.userId!}
+            AND NOT (other.universe_id = ${universeId} AND other.scene_id = ${sceneId.data})
             AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
         ))
         -- Keep scene groups isolated from ordinary ECHO group conversations.
         AND (${groupId}::text IS NULL OR NOT EXISTS (
           SELECT 1 FROM echo_group_conversations existing_group
           WHERE existing_group.owner_id = ${req.userId!}
-            AND existing_group.universe_id = ${universeId}
             AND existing_group.kindroid_group_id = ${groupId}
         ))
       RETURNING scene_id`);
