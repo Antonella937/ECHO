@@ -13,17 +13,18 @@ import { useThreads } from '@/hooks/use-social-selectors';
 import { TopBar } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { Sheet } from '@/components/echo/sheet';
-import { timeAgo } from '@/lib/media';
+import { timeAgo, useMediaResolver } from '@/lib/media';
 import { cn } from '@/lib/utils';
 
 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-type InboxGroup = { id: string; name: string; participantIds: string[]; archived?: boolean; muted?: boolean };
+type InboxGroup = { id: string; name: string; avatar?: string | null; participantIds: string[]; archived?: boolean; muted?: boolean };
 // Keep the last confirmed group list across inbox remounts. Scoped by account and identity.
 const inboxGroupCache = new Map<string, InboxGroup[]>();
 
 export default function MessagesPage() {
   const t = useMessagesText();
+  const resolveMedia = useMediaResolver();
   const { user } = useUser();
   const { me, state, character, actions } = useSocial();
   const groupCacheKey = user?.id ? `${user.id}:${getActiveUniverseId(user.id)}:${me.id}` : '';
@@ -159,7 +160,7 @@ export default function MessagesPage() {
       {requestError && <p role="alert" className="px-4 py-2 text-xs text-destructive">{requestError}</p>}
       {groupLoadError && <div role="alert" className="mx-4 my-2 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 p-3 text-xs"><span>No se pudieron cargar los grupos. Tus conversaciones no se borraron.</span><button type="button" onClick={() => setGroupRefresh(v => v + 1)} className="shrink-0 rounded-lg bg-secondary px-3 py-2 font-semibold">Reintentar</button></div>}
       {requestLoading && view === 'requests' && <p role="status" className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
-      {view === 'observer-dms' ? <section className="px-4 py-12 text-center text-sm text-muted-foreground">Las conversaciones entre personajes se consultan desde sus perfiles. La lista unificada de espectadora requiere una consulta de conversaciones autorizadas.</section> : view === 'observer-groups' || view === 'groups' ? <section className="px-2 pt-4"><ul>{(view === 'groups' ? inboxGroups : observerGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3 rounded-2xl px-3 py-3 hover:bg-secondary/60"><Users className="h-6 w-6"/><div><p className="font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(', ')}</p></div>{view === 'observer-groups' && <Eye className="ml-auto h-4 w-4"/>}</Link></li>)}</ul>{(view === 'groups' ? inboxGroups : observerGroups).length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">No hay grupos para mostrar.</p>}</section> : showSaved || view === 'favorites' ? (
+      {view === 'observer-dms' ? <section className="px-4 py-12 text-center text-sm text-muted-foreground">Las conversaciones entre personajes se consultan desde sus perfiles. La lista unificada de espectadora requiere una consulta de conversaciones autorizadas.</section> : view === 'observer-groups' || view === 'groups' ? <section className="px-2 pt-4"><ul>{(view === 'groups' ? inboxGroups : observerGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-full bg-secondary">{group.avatar ? <img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover" /> : <Users className="h-6 w-6" />}</div><div><p className="font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(', ')}</p></div>{view === 'observer-groups' && <Eye className="ml-auto h-4 w-4"/>}</Link></li>)}</ul>{(view === 'groups' ? inboxGroups : observerGroups).length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">No hay grupos para mostrar.</p>}</section> : showSaved || view === 'favorites' ? (
         <section className="px-3 pt-4" data-testid="list-saved-messages">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Mensajes favoritos')}</h2><span className="text-xs text-muted-foreground">{savedMessages.length}</span></div>
           {savedMessages.length === 0 ? <p className="py-12 text-center text-sm text-muted-foreground">{t('Todavía no guardaste ningún mensaje. Tocá el marcador de un mensaje para encontrarlo aquí.')}</p> : (
@@ -190,7 +191,7 @@ export default function MessagesPage() {
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
           {view === 'inbox' && renderThreads(orderedThreads.filter(thread => pinnedIds.includes(thread.other.id)))}
-          {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
+          {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-full bg-secondary">{group.avatar ? <img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover" /> : <Users className="h-6 w-6" />}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
           {view === 'inbox' ? renderThreads(orderedThreads.filter(thread => !pinnedIds.includes(thread.other.id))) : view === 'requests' ? renderThreads(requests) : null}
         </ul>
       )}
