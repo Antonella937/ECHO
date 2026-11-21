@@ -87,8 +87,8 @@ export function kindroidSocialGroupProvider(
       }
       const reply = (envelope as { text: string }).text.trim();
       const cleaned = reply
-        .replace(/^\\s*(?:<<\\s*)?START MESSAGE(?:\\s*>>)?\\s*\\n/i, '')
-        .replace(/\\n\\s*(?:<<\\s*)?END MESSAGE(?:\\s*>>)?\\s*$/i, '')
+        .replace(/^\s*(?:<<\s*)?START MESSAGE(?:\s*>>)?\s*\n/i, '')
+        .replace(/\n\s*(?:<<\s*)?END MESSAGE(?:\s*>>)?\s*$/i, '')
         .trim();
       let action: string = 'draft';
       let text: string | null = null;
