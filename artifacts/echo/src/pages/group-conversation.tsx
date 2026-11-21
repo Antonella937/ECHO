@@ -19,7 +19,7 @@ import { useVoiceRecorder } from '@/lib/use-voice-recorder';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import type { MessageAttachment } from '@/domain/types';
 
-type Group = { id: string; name: string; avatar?: string | null; createdBy: string; participantIds: string[] };
+type Group = { id: string; name: string; avatar?: string | null; wallpaperUrl?: string | null; createdBy: string; participantIds: string[] };
 type MusicAttachment = { id: string; type: 'music'; trackId: string; title: string; durationSeconds: number };
 type GroupMessage = { id: string; senderId: string; text: string; attachments?: Array<MessageAttachment | MusicAttachment>; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
 
@@ -61,11 +61,12 @@ export default function GroupConversationPage() {
   const [wallpaperUploading,setWallpaperUploading] = useState(false);
   const changeWallpaper=async (file?:File)=>{
     if(!wallpaperKey)return;
-    if(!file){try{localStorage.removeItem(wallpaperKey);}catch{}setWallpaper('');setError('');return;}
+    if(!file){try{await customFetch(`/api/group-dms/${encodeURIComponent(id!)}/wallpaper`,{method:"PUT",body:JSON.stringify({universeId:getActiveUniverseId(user!.id),actorId:me.id,wallpaperUrl:null}),headers:{"Content-Type":"application/json"},responseType:"json"});localStorage.removeItem(wallpaperKey);setWallpaper("");setError("");}catch{setError("No se pudo quitar el fondo en todos los dispositivos.");}return;}
     if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10_000_000){setError('Elegí una imagen JPG, PNG o WebP de hasta 10 MB.');return;}
     setWallpaperUploading(true);
     try {
       const uploaded=await uploadPrivateFile(file);
+      await customFetch(`/api/group-dms/${encodeURIComponent(id!)}/wallpaper`,{method:"PUT",body:JSON.stringify({universeId:getActiveUniverseId(user!.id),actorId:me.id,wallpaperUrl:uploaded.url}),headers:{"Content-Type":"application/json"},responseType:"json"});
       localStorage.setItem(wallpaperKey,uploaded.url);
       setWallpaper(uploaded.url);
       setError('');
@@ -125,7 +126,7 @@ export default function GroupConversationPage() {
         if (!active) return;
         if (groupResult.status === 'fulfilled') {
           const found = groupResult.value.groups.find(g => g.id === id);
-          if (found) setGroup(found);
+          if (found) { setGroup(found); if (found.wallpaperUrl) setWallpaper(found.wallpaperUrl); }
         }
         if (threadResult.status === 'fulfilled') setMessages(threadResult.value.messages);
         setError(groupResult.status === 'rejected' && threadResult.status === 'rejected'
@@ -338,7 +339,7 @@ export default function GroupConversationPage() {
     {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper.startsWith("data:") ? wallpaper : resolveMedia(wallpaper)}")`}} />}
     <header className="relative z-30 shrink-0 bg-transparent pt-safe">
       <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2 text-white">
-        <button type="button" onClick={()=>{const from=new URLSearchParams(window.location.search).get('from');navigate(from==='observer-groups'?'/messages?view=observer-groups':from==='groups'?'/messages?view=groups':group && !group.participantIds.includes(me.id)?'/messages?view=observer-groups':'/messages?view=groups');}} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
+        <button type="button" onClick={()=>{const from=new URLSearchParams(window.location.search).get('from');navigate(from==='observer-groups'?'/messages?view=observer-groups':from==='groups'?'/messages?view=groups':from==='dm'||from==='messages'?'/messages':group && !group.participantIds.includes(me.id)?'/messages?view=observer-groups':'/messages');}} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
         <div className="flex min-w-0 max-w-full flex-col items-center gap-1 text-center">
           <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full border border-white/15 bg-background/35 backdrop-blur-xl">{group?.avatar?<img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover"/>:<Users className="h-6 w-6"/>}</div>
           <h1 className="max-w-full truncate text-sm font-semibold">{group?.name??'Grupo'}</h1>
