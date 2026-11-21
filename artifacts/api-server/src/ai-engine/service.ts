@@ -178,7 +178,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
 
       'Use only this visible ECHO event; do not infer unseen image content or private messages.',
     ].filter(Boolean).join(String.fromCharCode(10));
-    selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId);
+    selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId, fetch, analyzedGallery.map(item => item.id));
   }
   // Public social actions must only use the isolated Kindroid group above.
   // Never route social prompts through an individual Kin DM history.
