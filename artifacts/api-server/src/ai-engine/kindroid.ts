@@ -176,6 +176,15 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
   };
 }
 
+/** Normalize a short Kindroid social choice without accepting explanatory prose. */
+function parseKindroidSocialChoice(raw: string, allowed: readonly string[]): string {
+  const cleaned = raw.split('\\n')
+    .filter(line => !/^\\s*(?:(?:<<|\\[|<)\\s*)?(?:start|end)[ _-]*message\\s*(?:(?:>>|\\]|>))?\\s*:?\\s*$/i.test(line))
+    .join('\\n').trim().replace(/^[\\s"'.,!]+|[\\s"'.,!]+$/g, '').toUpperCase();
+  if (!allowed.includes(cleaned)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+  return cleaned;
+}
+
 /**
  * Ask the linked Kin whether to interact with an already-authorized story.
  * The API is conversational: this request may enter Kindroid's history.
@@ -210,7 +219,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', response.status === 429 ? 429 : 502);
       }
       const raw = (await response.text()).trim();
-      const choice = raw.replace(/^[\s"'.,!]+|[\s"'.,!]+$/g, '').toUpperCase();
+      const choice = parseKindroidSocialChoice(raw, ['VIEW', 'LIKE', 'LAUGH', 'SURPRISE', 'FIRE']);
       if (!['VIEW', 'LIKE', 'LAUGH', 'SURPRISE', 'FIRE'].includes(choice)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
       const reaction = ({ LIKE: '❤', LAUGH: '😂', SURPRISE: '😮', FIRE: '🔥' } as Record<string, string>)[choice] ?? null;
       const decision = JSON.stringify({
@@ -251,7 +260,7 @@ export function kindroidLikeDecisionProvider(
       if (!response.ok) {
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', 502);
       }
-      const raw = (await response.text()).trim().replace(/^[\s"'.,!]+|[\s"'.,!]+$/g, '').toUpperCase();
+      const raw = parseKindroidSocialChoice(await response.text(), ['LIKE', 'SKIP']);
       if (raw !== 'LIKE' && raw !== 'SKIP') throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
       const decision = JSON.stringify({ action: raw === 'LIKE' ? 'like' : 'none', situation,
         text: null, reaction: null, reason: 'Kindroid feed decision',
