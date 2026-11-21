@@ -1,4 +1,5 @@
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
+import { parseKindroidGroupId } from "../lib/kindroid-group-id";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -310,19 +311,8 @@ scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
 // Bind an existing Kindroid group to a scene without creating or modifying a Kin DM.
 // The group must be prepared separately; this endpoint only stores its identifier.
 // Generation remains disabled until group event synchronization is implemented.
-// Accept a Kindroid group URL pasted from its UI, or the raw group ID.
-// Reject lookalike domains, query parameters and unrelated Kindroid URLs.
-const kindroidGroupId = z.string().trim().transform(value => {
-  if (/^https?:\/\//i.test(value)) {
-    let url: URL;
-    try { url = new URL(value); } catch { return ""; }
-    if (url.protocol !== "https:" || url.hostname !== "kindroid.ai" ||
-        url.username || url.password || url.search || url.hash || url.port) return "";
-    const match = /^\/v2\/chat\/group\/([A-Za-z0-9_-]{8,160})\/?$/.exec(url.pathname);
-    return match?.[1] ?? "";
-  }
-  return value;
-}).pipe(z.string().regex(/^[A-Za-z0-9_-]{8,160}$/));
+const kindroidGroupId = z.string().transform(value => parseKindroidGroupId(value) ?? "")
+  .pipe(z.string().regex(/^[A-Za-z0-9_-]{8,160}$/));
 const sceneGroupBinding = scope.extend({
   groupId: kindroidGroupId.nullable(),
 }).strict();
