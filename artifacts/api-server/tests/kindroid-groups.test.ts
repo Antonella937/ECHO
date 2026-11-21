@@ -46,3 +46,30 @@ test("a different Kin turn never triggers group generation or a private DM", asy
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+
+test("rejected group turn preserves privacy and never attempts generation", async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = "test-key";
+  const paths: string[] = [];
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+  console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(" ")); };
+  const request = (async (url: string | URL | Request) => {
+    paths.push(new URL(String(url)).pathname);
+    return new Response("Invalid group or unavailable group turn", { status: 400 });
+  }) as typeof fetch;
+  try {
+    await assert.rejects(() => kindroidPeerGroupProvider(groupId, kinId, undefined, request).complete({
+      system: "", context: "", outputSchema: {}, validate: () => undefined,
+    }), /KINDROID_GROUP_TURN_FAILED/);
+    assert.deepEqual(paths, ["/v1/groupchats-get-turn"]);
+    assert.ok(warnings.some(w => w.includes('"status":400')));
+    assert.ok(warnings.some(w => w.includes('"category":"bad_request_unknown"')));
+    assert.ok(warnings.every(w => !w.includes(groupId) && !w.includes(kinId) && !w.includes("Invalid group or unavailable group turn")));
+  } finally {
+    console.warn = originalWarn;
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
