@@ -641,6 +641,15 @@ export async function runAutonomyLiveCycle(
       characterId: character.id, runId, model: preview.model,
     };
   } catch (error) {
+    // Preserve the selected target and lane for diagnosis without logging any
+    // private Kindroid text or exposing the character's conversation history.
+    console.warn("AUTONOMY_LIVE_FAILURE_CONTEXT", {
+      universeId, characterId: character.id, lane: dependencies.lane ?? "social",
+      selectedSituation: opportunity.situation,
+      selectedRecipientId: opportunity.recipientId ?? null,
+      hasStoryTrigger: Boolean(opportunity.storyId),
+      hasIncomingMessageTrigger: Boolean(opportunity.messageId),
+    });
     const code = error instanceof EngineError
       ? error.code
       : error instanceof Error && /^[A-Z0-9_]{1,80}$/.test(error.message)
