@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
+import { sendKindroidSceneGroupMessage } from "./scene-kindroid-group-send";
 import { sceneKindroidDeliveryKey } from "./scene-kindroid-sync-policy";
 
 export type SceneDelivery = {
@@ -41,4 +42,26 @@ export async function finishSceneKindroidDelivery(
       AND kindroid_group_id=${input.groupId} AND status='sending'
     RETURNING delivery_key`);
   return result.rows.length===1;
+}
+
+/** Prepared but not wired into scene routes until migration and group sync are verified.
+ * A failure after beginning a network attempt remains uncertain, never retried.
+ */
+export async function deliverSceneKindroidEventOnce(
+  input:SceneDelivery,message:string,apiKey:string,request:typeof fetch=fetch,
+):Promise<"sent"|"already_claimed"|"uncertain">{
+  if(!message.trim() || message.length>5000 || !apiKey) {
+    throw new Error("SCENE_DELIVERY_INVALID_INPUT");
+  }
+  if(!await reserveSceneKindroidDelivery(input)) return "already_claimed";
+  if(!await beginSceneKindroidDelivery(input)) return "already_claimed";
+  try{
+    await sendKindroidSceneGroupMessage(input.groupId,message,apiKey,request);
+    await finishSceneKindroidDelivery(input,"sent");
+    return "sent";
+  }catch{
+    // Even a rejected HTTP request could have been accepted upstream. Fail closed.
+    await finishSceneKindroidDelivery(input,"uncertain");
+    return "uncertain";
+  }
 }
