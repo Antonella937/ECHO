@@ -92,6 +92,13 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       const key = process.env.ECHO_KINDROID_API_KEY;
       if (!key) throw new EngineError('KINDROID_KEY_MISSING', 503);
       if (!message.trim()) throw new EngineError('KINDROID_MESSAGE_MISSING', 400);
+      // Defense in depth: technical social commands must never be written into
+      // an individual's persistent Kindroid conversation, even if a future
+      // caller accidentally routes them through the DM adapter.
+      if (situation !== 'dm' ||
+          /^\s*\[ECHO\s+(?:social action|feed interaction|social event)\s*:/i.test(message)) {
+        throw new EngineError('KINDROID_PRIVATE_DM_SOCIAL_PROMPT_BLOCKED', 409);
+      }
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
       // The caller supplies social context only for an explicitly resolved story.
       // Do not infer a reference from incidental words in a DM.
