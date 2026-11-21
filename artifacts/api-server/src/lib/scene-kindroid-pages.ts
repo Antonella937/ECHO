@@ -25,6 +25,9 @@ export async function readKindroidScenePages(
       throw new KindroidSceneHistoryError("KINDROID_SCENE_HISTORY_FORMAT_INVALID",502);
     }
     const batch=(payload as {messages:unknown[]}).messages;
+    if (batch.length > 100) {
+      throw new KindroidSceneHistoryError("KINDROID_SCENE_HISTORY_PAGE_TOO_LARGE",502);
+    }
     messages.push(...batch);
     const pagination=(payload as {pagination?:unknown}).pagination;
     if (!pagination || typeof pagination!=="object" || typeof (pagination as {hasMore?:unknown}).hasMore!=="boolean") {
