@@ -382,13 +382,13 @@ export async function runAutonomyLiveCycle(
       const permissionFor = (id: string) => permissionsByCharacter.get(id);
       const sender = permissionFor(character.id);
       liveAllowedDmRecipientIds = new Set(state.characters.filter(peer =>
-        !peer.archived && peer.id !== character.id && sender?.enabled === true &&
-        ((peer.id === state.primaryCharacterId && control.dmEnabled) || (
+        !peer.archived && peer.id !== character.id &&
+        ((peer.id === state.primaryCharacterId && control.dmEnabled) || (sender?.enabled === true && (
           Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(peer.id) &&
           permissionFor(peer.id)?.enabled === true &&
           Array.isArray(permissionFor(peer.id)?.allowed_peer_ids) &&
           (permissionFor(peer.id)?.allowed_peer_ids as string[]).includes(character.id)
-        ))).map(peer => peer.id));
+        )))).map(peer => peer.id));
     }
     const opportunity = chooseAutonomyOpportunity({
       state, character, history, now, random: dependencies.random,
