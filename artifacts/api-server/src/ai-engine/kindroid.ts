@@ -99,7 +99,10 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       // Keep the newest user turn intact. Optional visual/story context must
       // never push any part of the actual DM out of the request.
       const maxChars = 2800;
-      const userTurn = message.length > maxChars ? message.slice(-maxChars) : message;
+      // Never silently discard a user's words. Let the caller surface a
+      // recoverable error rather than send a misleading partial DM to Kindroid.
+      if (message.length > maxChars) throw new EngineError('KINDROID_MESSAGE_TOO_LONG', 400);
+      const userTurn = message;
       const contextHead = '[ECHO observed context]\n';
       const contextTail = '\n[End context]\n\n';
       const availableContextChars = Math.max(0, maxChars - userTurn.length - contextHead.length - contextTail.length);
