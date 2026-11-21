@@ -407,10 +407,14 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             recentSocial?: { posts?: Array<{ id?:string; author?: {name?:string}; caption?:string; createdAt?:string; visionSummary?:string|null }>;
               comments?: Array<{author?:{name?:string};text?:string;postId?:string}> }; memory?: { historicalRecalled?: Array<{kind?:string;targetId?:string|null;text?:string}> };
           };
+          // Social context is imported from multiple sources; captions and names may
+          // be rich-text objects rather than strings. Never crash a DM for that.
+          const safeExcerpt = (value: unknown, max: number): string =>
+            typeof value === "string" ? value.slice(0, max) : "";
           const posts = (data.recentSocial?.posts ?? []).slice(-1).map(p =>
-            `Post by ${(p.author?.name ?? 'Unknown').slice(0,60)}: ${(p.caption ?? '').slice(0,220)}${p.visionSummary ? ' | Image: '+p.visionSummary.slice(0,150):''}`);
+            `Post by ${safeExcerpt(p.author?.name, 60) || 'Unknown'}: ${safeExcerpt(p.caption, 220)}${safeExcerpt(p.visionSummary, 150) ? ' | Image: '+safeExcerpt(p.visionSummary, 150):''}`);
           const comments = (data.recentSocial?.comments ?? []).slice(-1).map(m =>
-            `Comment by ${(m.author?.name ?? 'Unknown').slice(0,60)}: ${(m.text ?? '').slice(0,180)}`);
+            `Comment by ${safeExcerpt(m.author?.name, 60) || 'Unknown'}: ${safeExcerpt(m.text, 180)}`);
           // Recover older public posts on demand from persisted ECHO history.
           // The author must be followed by the actor (or be the actor); never
           // retrieve private messages, restricted stories, or unrelated accounts.
