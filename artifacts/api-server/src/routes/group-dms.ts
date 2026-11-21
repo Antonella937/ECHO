@@ -180,6 +180,23 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
           AND sender_id=${senderId} AND body=${body}
           LIMIT 1`);
         if (existing.rows.length) continue;
+        // Older live group replies were forcibly truncated at 800 characters.
+        // When Kindroid has the complete original, restore that exact message
+        // instead of importing a second copy of the same turn.
+        if (body.length > 800) {
+          const truncated = await db.execute(sql`SELECT id FROM echo_group_messages
+            WHERE owner_id=${ownerId} AND universe_id=${universeId} AND group_id=${groupId}
+              AND sender_id=${senderId} AND length(body)=800
+              AND body=left(${body}, 800)
+              AND abs(extract(epoch from (created_at - ${date.toISOString()}::timestamptz))) < 600
+            ORDER BY created_at DESC LIMIT 1`);
+          if (truncated.rows.length) {
+            await db.execute(sql`UPDATE echo_group_messages SET body=${body}
+              WHERE owner_id=${ownerId} AND universe_id=${universeId}
+                AND id=${String(truncated.rows[0].id)} AND length(body)=800`);
+            continue;
+          }
+        }
         const imported = await db.execute(sql`INSERT INTO echo_group_messages
           (owner_id, universe_id, id, group_id, sender_id, body, read_by, created_at)
           VALUES (${ownerId}, ${universeId}, ${stableId}, ${groupId}, ${senderId}, ${body}, '[]'::jsonb, ${date.toISOString()}::timestamptz)
