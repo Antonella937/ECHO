@@ -28,7 +28,7 @@ async function getUniverse(ownerId: string, universeId: string, actorId: string)
 }
 const serializeGroup = (row: Record<string, unknown>) => ({
   id: row.id, name: row.name, avatar: row.avatar, wallpaperUrl: row.wallpaper_url ?? null, createdBy: row.created_by, muted: row.muted === true, archived: row.archived === true,
-  participantIds: row.participant_ids, createdAt: row.created_at, updatedAt: row.updated_at,
+  participantIds: row.participant_ids, unreadCount: Number(row.unread_count ?? 0), createdAt: row.created_at, updatedAt: row.updated_at,
 });
 router.get("/group-dms", async (req, res) => {
   const parsed = scope.safeParse(req.query);
@@ -36,7 +36,8 @@ router.get("/group-dms", async (req, res) => {
   const { universeId, actorId } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
   const result = await db.execute(sql`SELECT g.id, g.name, g.avatar, g.wallpaper_url, g.created_by, g.participant_ids, g.created_at, g.updated_at,
-    COALESCE(p.muted, false) AS muted, COALESCE(p.archived, false) AS archived
+    COALESCE(p.muted, false) AS muted, COALESCE(p.archived, false) AS archived,
+    (SELECT count(*)::integer FROM echo_group_messages m WHERE m.owner_id=g.owner_id AND m.universe_id=g.universe_id AND m.group_id=g.id AND m.sender_id <> ${actorId} AND NOT (COALESCE(m.read_by,'[]'::jsonb) ? ${actorId})) AS unread_count
     FROM echo_group_conversations g LEFT JOIN echo_group_member_preferences p
       ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
     WHERE g.owner_id = ${req.userId!} AND g.universe_id = ${universeId}
@@ -202,6 +203,20 @@ router.get("/group-dms/:groupId/messages", async (req, res) => {
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND group_id = ${groupId}
     ORDER BY created_at DESC LIMIT 100`);
   res.json({ messages: [...messages.rows].reverse() });
+});
+// Mark only the current participant's messages as read; spectator views do not clear badges.
+router.put("/group-dms/:groupId/read", async (req, res) => {
+  const parsed = scope.safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({error:"INVALID_QUERY"});return; }
+  const {universeId,actorId}=parsed.data;
+  if (!await getUniverse(req.userId!,universeId,actorId)) {res.status(403).json({error:"INVALID_IDENTITY"});return;}
+  const groupId=String(req.params.groupId);
+  const group=await db.execute(sql`SELECT id FROM echo_group_conversations WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId} AND participant_ids ? ${actorId} LIMIT 1`);
+  if (!group.rows.length) {res.status(404).json({error:"GROUP_NOT_FOUND"});return;}
+  await db.execute(sql`UPDATE echo_group_messages SET read_by=COALESCE(read_by,'[]'::jsonb) || jsonb_build_array(${actorId})
+    WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND group_id=${groupId}
+    AND sender_id <> ${actorId} AND NOT (COALESCE(read_by,'[]'::jsonb) ? ${actorId})`);
+  res.json({ok:true});
 });
 // Review-only suggestions: group conversation events are never published as global canon.
 router.get("/group-dms/:groupId/canon-candidates", async (req, res) => {
