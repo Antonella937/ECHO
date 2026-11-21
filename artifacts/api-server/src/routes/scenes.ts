@@ -1,4 +1,9 @@
+import { isKindroidGroupSyncableEvent } from "../lib/scene-kindroid-sync-policy";
+import { deliverSceneKindroidEventOnce } from "../lib/scene-kindroid-delivery";
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
+import { parseKindroidGroupId } from "../lib/kindroid-group-id";
+import { mapKindroidSceneHistory } from "../lib/scene-kindroid-history";
+import { readKindroidScenePages, KindroidSceneHistoryError } from "../lib/scene-kindroid-pages";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -7,7 +12,6 @@ import { db, echoUniversesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
-import { kindroidDmProvider } from "../ai-engine/kindroid";
 import { EngineError } from "../ai-engine/contracts";
 
 export const scenesRouter: IRouter = Router();
@@ -237,6 +241,112 @@ scenesRouter.post("/scenes/events", async (req, res) => {
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
 
+// Read-only delivery state for reconciliation after timeouts or server restarts.
+scenesRouter.get("/scenes/:sceneId/kindroid-deliveries", async(req,res)=>{
+  const parsed=scope.safeParse(req.query);
+  const sceneId=id.safeParse(req.params.sceneId);
+  if(!parsed.success || !sceneId.success){res.status(400).json({error:"INVALID_SCENE_DELIVERY_QUERY"});return;}
+  const ownerId=req.userId!,universeId=parsed.data.universeId;
+  try{
+    const scenes=await db.execute(sql`SELECT scene_id FROM echo_scenes
+      WHERE owner_id=${ownerId} AND universe_id=${universeId}
+        AND scene_id=${sceneId.data} LIMIT 1`);
+    if(!scenes.rows.length){res.status(404).json({error:"SCENE_NOT_FOUND"});return;}
+    const result=await db.execute(sql`SELECT event_id AS "eventId",
+      kindroid_group_id AS "kindroidGroupId",status,reserved_at AS "reservedAt",
+      attempted_at AS "attemptedAt",completed_at AS "completedAt"
+      FROM echo_scene_kindroid_deliveries
+      WHERE owner_id=${ownerId} AND universe_id=${universeId}
+        AND scene_id=${sceneId.data}
+      ORDER BY reserved_at DESC LIMIT 100`);
+    res.json({deliveries:result.rows});
+  }catch{res.status(503).json({error:"SCENE_DELIVERY_STATUS_UNAVAILABLE"});}
+});
+
+// Explicit opt-in scene event delivery. Never sends private events or uses Kin DMs.
+// Disabled until the delivery ledger migration is applied and the feature is enabled.
+scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
+  if (process.env.ECHO_KINDROID_SCENE_SEND_ENABLED !== "true") {
+    res.status(503).json({error:"KINDROID_SCENE_SEND_NOT_ENABLED"}); return;
+  }
+  const parsed=scope.extend({eventId:id,expectedKindroidGroupId:z.string().min(8).max(240)}).strict().safeParse(req.body);
+  const sceneId=id.safeParse(req.params.sceneId);
+  if(!parsed.success || !sceneId.success){res.status(400).json({error:"INVALID_SCENE_DELIVERY"});return;}
+  const {universeId,eventId,expectedKindroidGroupId}=parsed.data;
+  const ownerId=req.userId!;
+  try {
+    const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,ownerId),eq(echoUniversesTable.universeId,universeId))).limit(1);
+    const identity=(universe?.state as {currentCharacterId?:string}|null)?.currentCharacterId;
+    if(!identity){res.status(403).json({error:"SCENE_IDENTITY_REQUIRED"});return;}
+    const scenes=await db.execute(sql`SELECT status,participant_ids,turn_settings FROM echo_scenes
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND scene_id=${sceneId.data} LIMIT 1`);
+    const scene=scenes.rows[0];
+    const participants=Array.isArray(scene?.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : [];
+    const groupId=parseKindroidGroupId(String((scene?.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+    if(scene?.status!=="active" || !groupId || groupId!==parseKindroidGroupId(expectedKindroidGroupId) || !participants.includes(identity)){
+      res.status(409).json({error:"KINDROID_SCENE_GROUP_NOT_READY"});return;
+    }
+    const events=await db.execute(sql`SELECT event_id,actor_id,text,visibility,audience_ids FROM echo_scene_events
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND scene_id=${sceneId.data}
+        AND event_id=${eventId} LIMIT 1`);
+    const eventRow=events.rows[0];
+    if(!eventRow || !isKindroidGroupSyncableEvent({
+      eventId:String(eventRow.event_id),actorId:String(eventRow.actor_id),text:String(eventRow.text),
+      visibility:String(eventRow.visibility),audienceIds:eventRow.audience_ids,
+    },identity,participants)){res.status(403).json({error:"SCENE_EVENT_NOT_GROUP_SYNCABLE"});return;}
+    const collisions=await db.execute(sql`SELECT 1 FROM echo_group_conversations
+      WHERE owner_id=${ownerId} AND kindroid_group_id=${groupId}
+      UNION ALL SELECT 1 FROM echo_scenes other WHERE other.owner_id=${ownerId}
+        AND NOT (other.universe_id=${universeId} AND other.scene_id=${sceneId.data})
+        AND other.turn_settings ->> 'kindroidGroupId' = ${groupId} LIMIT 1`);
+    if(collisions.rows.length){res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"});return;}
+    // A scene's Kindroid membership must still be fully linked at send time.
+    // Binding-time validation alone is insufficient if links were later removed.
+    const linked=await db.execute(sql`SELECT character_id,kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${universeId}
+        AND enabled=true AND kin_id IS NOT NULL AND character_id = ANY(${participants}::text[])`);
+    const kinByCharacter=new Map<string,string>();
+    const seenKinIds=new Set<string>();
+    for(const link of linked.rows){
+      if(typeof link.character_id!=="string" || typeof link.kin_id!=="string")continue;
+      if(seenKinIds.has(link.kin_id)){
+        res.status(409).json({error:"KINDROID_SCENE_AMBIGUOUS_KIN_LINK"});return;
+      }
+      seenKinIds.add(link.kin_id);
+      kinByCharacter.set(link.character_id,link.kin_id);
+    }
+    if(participants.some(character=>character!==identity && !kinByCharacter.has(character))){
+      res.status(409).json({error:"SCENE_PARTICIPANT_KINDROID_LINK_MISSING"});return;
+    }
+    const apiKey=process.env.ECHO_KINDROID_API_KEY;
+    if(!apiKey){res.status(503).json({error:"KINDROID_KEY_MISSING"});return;}
+    // A stale scene event must not be delivered after a different group turn.
+    // Require all prior unrestricted human events to have been sent first.
+    const earlier=await db.execute(sql`SELECT e.event_id FROM echo_scene_events e
+      LEFT JOIN echo_scene_kindroid_deliveries d
+        ON d.owner_id=e.owner_id AND d.universe_id=e.universe_id
+        AND d.scene_id=e.scene_id AND d.event_id=e.event_id
+      WHERE e.owner_id=${ownerId} AND e.universe_id=${universeId}
+        AND e.scene_id=${sceneId.data} AND e.actor_id=${identity}
+        AND e.visibility IN ('public','participants')
+        AND e.audience_ids='[]'::jsonb AND e.text <> ''
+        AND (e.created_at < (SELECT created_at FROM echo_scene_events
+          WHERE owner_id=${ownerId} AND universe_id=${universeId}
+            AND scene_id=${sceneId.data} AND event_id=${eventId})
+          OR (e.created_at = (SELECT created_at FROM echo_scene_events
+          WHERE owner_id=${ownerId} AND universe_id=${universeId}
+            AND scene_id=${sceneId.data} AND event_id=${eventId}) AND e.event_id < ${eventId}))
+        AND (d.status IS DISTINCT FROM 'sent') LIMIT 1`);
+    if(earlier.rows.length){res.status(409).json({error:"KINDROID_SCENE_EARLIER_EVENT_UNSYNCED"});return;}
+    const result=await deliverSceneKindroidEventOnce(
+      {ownerId,universeId,sceneId:sceneId.data,eventId,groupId},String(eventRow.text),apiKey);
+    res.status(result==="sent"?200:409).json({status:result});
+  }catch{
+    res.status(503).json({error:"KINDROID_SCENE_DELIVERY_UNAVAILABLE"});
+  }
+});
+
 const globalAiStyle = scope.extend({
   style: z.enum(["natural", "narrative", "mixed"]),
   responseLength: z.enum(["short", "balanced", "detailed"]),
@@ -307,6 +417,259 @@ scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
   } catch { res.status(503).json({ error: "SCENE_PRESENCE_UNAVAILABLE" }); }
 });
 
+// Bind an existing Kindroid group to a scene without creating or modifying a Kin DM.
+// The group must be prepared separately; this endpoint only stores its identifier.
+// Generation remains disabled until group event synchronization is implemented.
+const kindroidGroupId = z.string().transform(value => parseKindroidGroupId(value) ?? "")
+  .pipe(z.string().regex(/^[A-Za-z0-9_-]{8,160}$/));
+// Read-only inspection: no scene writes, no Kindroid generation, no private DM calls.
+// Explicitly invoked by the owner when validating a dedicated scene group.
+scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({error:"INVALID_SCENE"}); return; }
+  try {
+    const [universe] = await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
+    if (!universe) { res.status(403).json({error:"UNIVERSE_NOT_ACCESSIBLE"}); return; }
+    const sceneRows = await db.execute(sql`SELECT participant_ids, turn_settings FROM echo_scenes
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND scene_id=${sceneId.data} LIMIT 1`);
+    const scene = sceneRows.rows[0];
+    if (!scene) { res.status(404).json({error:"SCENE_NOT_FOUND"}); return; }
+    const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+    if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
+    // Legacy or manually migrated bindings may predate the uniqueness checks.
+    // Never preview a group shared with another scene or an ordinary ECHO group.
+    const collisions = await db.execute(sql`SELECT 1 FROM echo_group_conversations
+      WHERE owner_id=${req.userId!} AND kindroid_group_id=${groupId}
+      UNION ALL
+      SELECT 1 FROM echo_scenes other
+      WHERE other.owner_id=${req.userId!}
+        AND NOT (other.universe_id=${parsed.data.universeId} AND other.scene_id=${sceneId.data})
+        AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+      LIMIT 1`);
+    if (collisions.rows.length) {
+      res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"}); return;
+    }
+    const apiKey = process.env.ECHO_KINDROID_API_KEY;
+    if (!apiKey) { res.status(503).json({error:"KINDROID_KEY_MISSING"}); return; }
+    const members = new Set(Array.isArray(scene.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : []);
+    const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND enabled=true AND kin_id IS NOT NULL`);
+    const byKin = new Map<string,string>();
+    for (const link of links.rows) {
+      if (typeof link.kin_id === "string" && typeof link.character_id === "string" && members.has(link.character_id)) {
+        const existing = byKin.get(link.kin_id);
+        if (existing && existing !== link.character_id) {
+          res.status(409).json({error:"KINDROID_SCENE_AMBIGUOUS_KIN_LINK"}); return;
+        }
+        byKin.set(link.kin_id,link.character_id);
+      }
+    }
+    // Fail closed before calling Kindroid if no scene participant can be attributed.
+    if (!byKin.size) {
+      res.status(409).json({error:"KINDROID_SCENE_NO_LINKED_PARTICIPANTS"}); return;
+    }
+    const messages = await readKindroidScenePages(groupId,apiKey);
+    const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
+    res.json({sceneId:sceneId.data,kindroidGroupId:groupId,matchedEvents:events.length,totalMessages:messages.length,events});
+  } catch (error) {
+    if (error instanceof KindroidSceneHistoryError) {res.status(error.status).json({error:error.code});return;}
+    res.status(503).json({error:"KINDROID_SCENE_HISTORY_PREVIEW_FAILED"});
+  }
+});
+
+// Explicit owner-triggered import; never generates Kindroid replies or uses private DMs.
+scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) => {
+  const parsed = scope.extend({expectedKindroidGroupId:z.string().regex(/^[A-Za-z0-9_-]{8,160}$/)}).safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({error:"INVALID_SCENE"}); return; }
+  try {
+    const [universe] = await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
+    if (!universe) { res.status(403).json({error:"UNIVERSE_NOT_ACCESSIBLE"}); return; }
+    const sceneRows = await db.execute(sql`SELECT participant_ids, turn_settings, status FROM echo_scenes
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND scene_id=${sceneId.data} LIMIT 1`);
+    const scene = sceneRows.rows[0];
+    if (!scene) { res.status(404).json({error:"SCENE_NOT_FOUND"}); return; }
+    if (scene.status !== "active") { res.status(409).json({error:"SCENE_NOT_ACTIVE"}); return; }
+    const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+    if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
+    if (groupId !== parsed.data.expectedKindroidGroupId) {res.status(409).json({error:"KINDROID_SCENE_GROUP_CHANGED"});return;}
+    // Legacy or manually migrated bindings may predate the uniqueness checks.
+    // Never preview a group shared with another scene or an ordinary ECHO group.
+    const collisions = await db.execute(sql`SELECT 1 FROM echo_group_conversations
+      WHERE owner_id=${req.userId!} AND kindroid_group_id=${groupId}
+      UNION ALL
+      SELECT 1 FROM echo_scenes other
+      WHERE other.owner_id=${req.userId!}
+        AND NOT (other.universe_id=${parsed.data.universeId} AND other.scene_id=${sceneId.data})
+        AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+      LIMIT 1`);
+    if (collisions.rows.length) {
+      res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"}); return;
+    }
+    const apiKey = process.env.ECHO_KINDROID_API_KEY;
+    if (!apiKey) { res.status(503).json({error:"KINDROID_KEY_MISSING"}); return; }
+    const members = new Set(Array.isArray(scene.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : []);
+    const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND enabled=true AND kin_id IS NOT NULL`);
+    const byKin = new Map<string,string>();
+    for (const link of links.rows) {
+      if (typeof link.kin_id === "string" && typeof link.character_id === "string" && members.has(link.character_id)) {
+        const existing = byKin.get(link.kin_id);
+        if (existing && existing !== link.character_id) {
+          res.status(409).json({error:"KINDROID_SCENE_AMBIGUOUS_KIN_LINK"}); return;
+        }
+        byKin.set(link.kin_id,link.character_id);
+      }
+    }
+    // Fail closed before calling Kindroid if no scene participant can be attributed.
+    if (!byKin.size) {
+      res.status(409).json({error:"KINDROID_SCENE_NO_LINKED_PARTICIPANTS"}); return;
+    }
+    const messages = await readKindroidScenePages(groupId,apiKey);
+    const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
+    // Import is an explicit action, never a side effect of the preview.
+    // Stable group-scoped IDs and ON CONFLICT make repeated imports idempotent.
+    const imported = await db.transaction(async tx => {
+      // A scene may be finished or rebound while Kindroid history is being read.
+      // Lock and verify the authoritative scene state before writing any events.
+      const current = await tx.execute(sql`SELECT status,turn_settings FROM echo_scenes
+        WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+          AND scene_id=${sceneId.data} FOR UPDATE`);
+      const locked = current.rows[0];
+      if (!locked || locked.status !== "active" ||
+          parseKindroidGroupId(String((locked.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? "")) !== groupId) {
+        throw new KindroidSceneHistoryError("KINDROID_SCENE_CHANGED_DURING_IMPORT",409);
+      }
+      // Recheck group ownership after the external history read: a different
+      // scene or ordinary group could have claimed the binding meanwhile.
+      const shared = await tx.execute(sql`SELECT 1 FROM echo_group_conversations
+        WHERE owner_id=${req.userId!} AND kindroid_group_id=${groupId}
+        UNION ALL
+        SELECT 1 FROM echo_scenes other
+        WHERE other.owner_id=${req.userId!}
+          AND NOT (other.universe_id=${parsed.data.universeId} AND other.scene_id=${sceneId.data})
+          AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+        LIMIT 1`);
+      if (shared.rows.length) {
+        throw new KindroidSceneHistoryError("KINDROID_SCENE_GROUP_SHARED",409);
+      }
+      // Kin links can change while remote history is being fetched. Refuse to
+      // attribute old group messages to characters under a stale mapping.
+      const currentLinks = await tx.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+        WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+          AND enabled=true AND kin_id IS NOT NULL`);
+      const currentByKin = new Map<string,string>();
+      for (const link of currentLinks.rows) {
+        if (typeof link.kin_id !== "string" || typeof link.character_id !== "string" ||
+            !members.has(link.character_id)) continue;
+        const previous = currentByKin.get(link.kin_id);
+        if (previous && previous !== link.character_id) {
+          throw new KindroidSceneHistoryError("KINDROID_SCENE_AMBIGUOUS_KIN_LINK",409);
+        }
+        currentByKin.set(link.kin_id,link.character_id);
+      }
+      if (currentByKin.size !== byKin.size ||
+          [...byKin].some(([kin,character]) => currentByKin.get(kin) !== character)) {
+        throw new KindroidSceneHistoryError("KINDROID_SCENE_KIN_LINKS_CHANGED",409);
+      }
+      let count = 0;
+      for (const item of events) {
+        const inserted = await tx.execute(sql`INSERT INTO echo_scene_events
+          (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text,created_at)
+          VALUES (${req.userId!},${parsed.data.universeId},${sceneId.data},
+            ${item.eventId},${item.actorId},'participants','[]'::jsonb,${item.text},
+            ${item.createdAt}::timestamptz)
+          ON CONFLICT DO NOTHING RETURNING event_id`);
+        if (inserted.rows.length) count++;
+      }
+      return count;
+    });
+    res.json({sceneId:sceneId.data,matchedEvents:events.length,imported});
+  } catch (error) {
+    if (error instanceof KindroidSceneHistoryError) {res.status(error.status).json({error:error.code});return;}
+    res.status(503).json({error:"KINDROID_SCENE_HISTORY_IMPORT_FAILED"});
+  }
+});
+
+const sceneGroupBinding = scope.extend({
+  groupId: kindroidGroupId.nullable(),
+}).strict();
+scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
+  const parsed = sceneGroupBinding.safeParse(req.body);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_GROUP_BINDING" }); return; }
+  const { universeId, groupId } = parsed.data;
+  try {
+    if (groupId !== null) {
+      const sceneRows = await db.execute(sql`SELECT participant_ids FROM echo_scenes
+        WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+          AND scene_id = ${sceneId.data} AND status <> 'finished' LIMIT 1`);
+      const participants = sceneRows.rows[0]?.participant_ids;
+      if (!Array.isArray(participants)) { res.status(404).json({ error: "SCENE_NOT_ACTIVE" }); return; }
+      const linked = await db.execute(sql`SELECT character_id FROM echo_kindroid_character_links
+        WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+          AND enabled = true AND kin_id IS NOT NULL`);
+      const linkedIds = new Set(linked.rows.map(row => row.character_id));
+      // The owner's playable identity does not require a Kin link; every AI
+      // participant must have an enabled Kin before a group can be bound.
+      const [universe] = await db.select({ state: echoUniversesTable.state })
+        .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, req.userId!),
+          eq(echoUniversesTable.universeId, universeId))).limit(1);
+      const ownerIdentity = (universe?.state as { currentCharacterId?: string } | null)?.currentCharacterId;
+      const missing = participants.filter((participant): participant is string =>
+        typeof participant === "string" && participant !== ownerIdentity && !linkedIds.has(participant));
+      if (missing.length) {
+        res.status(409).json({ error: "SCENE_PARTICIPANT_KINDROID_LINK_MISSING", characterIds: missing });
+        return;
+      }
+    }
+    const rows = await db.execute(sql`UPDATE echo_scenes
+      SET turn_settings = jsonb_set(COALESCE(turn_settings, '{}'::jsonb),
+        '{kindroidGroupId}', ${JSON.stringify(groupId)}::jsonb, true),
+        updated_at = now()
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+        AND scene_id = ${sceneId.data} AND status <> 'finished'
+        AND (
+          COALESCE(turn_settings ->> 'kindroidGroupId', '') = COALESCE(${groupId}::text, '')
+          OR NOT EXISTS (
+            SELECT 1 FROM echo_scene_events prior
+            WHERE prior.owner_id = ${req.userId!} AND prior.universe_id = ${universeId}
+              AND prior.scene_id = ${sceneId.data} AND prior.text <> ''
+          )
+        )
+        AND (${groupId}::text IS NULL OR NOT EXISTS (
+          SELECT 1 FROM echo_scenes other
+          WHERE other.owner_id = ${req.userId!}
+            AND NOT (other.universe_id = ${universeId} AND other.scene_id = ${sceneId.data})
+            AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+        ))
+        -- Keep scene groups isolated from ordinary ECHO group conversations.
+        AND (${groupId}::text IS NULL OR NOT EXISTS (
+          SELECT 1 FROM echo_group_conversations existing_group
+          WHERE existing_group.owner_id = ${req.userId!}
+            AND existing_group.kindroid_group_id = ${groupId}
+        ))
+      RETURNING scene_id`);
+    if (!rows.rows.length) {
+      const existing = await db.execute(sql`SELECT scene_id FROM echo_scenes
+        WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+          AND scene_id = ${sceneId.data} AND status <> 'finished' LIMIT 1`);
+      res.status(existing.rows.length ? 409 : 404).json({
+        error: existing.rows.length ? "SCENE_GROUP_BINDING_CONFLICT" : "SCENE_NOT_ACTIVE",
+      });
+      return;
+    }
+    res.json({ sceneId: sceneId.data, linked: groupId !== null });
+  } catch { res.status(503).json({ error: "SCENE_GROUP_BINDING_UNAVAILABLE" }); }
+});
+
 const turnUpdate = scope.extend({
   mode: z.enum(["automatic","manual","ordered"]),
   order: z.array(id).max(20),
@@ -330,10 +693,11 @@ scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
       res.status(400).json({ error: "INVALID_TURN_PARTICIPANTS" }); return;
     }
     const completeOrder = [...order, ...participants.filter(x => !order.includes(x))];
-    const current = scene.turn_settings as { cursor?: number; style?: string; autoReply?: boolean } | null;
+    const current = scene.turn_settings as { cursor?: number; style?: string; autoReply?: boolean; kindroidGroupId?: string | null } | null;
     const settings = { mode, participantIds: participants, order: completeOrder, nextCharacterId,
       cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)),
-      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false };
+      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false,
+      kindroidGroupId: current?.kindroidGroupId ?? null };
     const payload = JSON.stringify(settings);
     await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${payload}::jsonb, updated_at = now()
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
@@ -414,6 +778,39 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const oldEvents = unsummarized.length > 30 ? unsummarized.slice(0, -20) : [];
     const trigger = visible.at(-1);
     if (!trigger || trigger.actor_id === characterId) { res.status(409).json({ error: "NO_NEW_SCENE_TURN" }); return; }
+    // Fail before reserving a turn when the linked Kin cannot safely answer in its scene group.
+    // A Kindroid private-DM endpoint is never an acceptable fallback.
+    const linkedKin = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND character_id=${characterId}
+        AND enabled=true LIMIT 1`);
+    const kinId = typeof linkedKin.rows[0]?.kin_id === "string" ? linkedKin.rows[0].kin_id : null;
+    if (kinId) {
+      const boundGroup = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+      if (!boundGroup) {
+        res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return;
+      }
+      // A Kin may only generate from the isolated group after every eligible
+      // human scene event has a confirmed delivery. Otherwise the Kin would
+      // answer from an incomplete history or inadvertently use its private DM.
+      const identity=(state as {currentCharacterId?:string}|null)?.currentCharacterId;
+      if (!identity || !participants.includes(identity)) {
+        res.status(409).json({error:"KINDROID_SCENE_IDENTITY_REQUIRED"}); return;
+      }
+      const pending=await db.execute(sql`SELECT 1 FROM echo_scene_events e
+        LEFT JOIN echo_scene_kindroid_deliveries d
+          ON d.owner_id=e.owner_id AND d.universe_id=e.universe_id
+          AND d.scene_id=e.scene_id AND d.event_id=e.event_id
+          AND d.kindroid_group_id=${boundGroup}
+        WHERE e.owner_id=${ownerId} AND e.universe_id=${universeId}
+          AND e.scene_id=${sceneId.data} AND e.actor_id=${identity}
+          AND e.visibility IN ('public','participants')
+          AND e.audience_ids='[]'::jsonb AND e.text <> ''
+          AND (d.status IS DISTINCT FROM 'sent') LIMIT 1`);
+      res.status(409).json({error:pending.rows.length
+        ? "KINDROID_SCENE_GROUP_SYNC_REQUIRED"
+        : "KINDROID_SCENE_GROUP_GENERATION_NOT_ENABLED"});
+      return;
+    }
     const eventId = randomUUID();
     // Reserve the (character, triggering event) pair before calling a paid model.
     const reservation = await db.execute(sql`INSERT INTO echo_scene_events
@@ -441,29 +838,10 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       character: { ...character, avatar: undefined, identity: undefined, referenceImages: undefined },
       participants: people, sceneMemory: previousSummary,
       visibleEvents: visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text })) }).slice(0,18000);
-    // Linked Kindroid characters use their existing voice for scene dialogue.
-    // Do not silently fall back to another model if the external provider fails.
-    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
-      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND character_id=${characterId}
-        AND enabled=true LIMIT 1`);
-    const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
-    let replyText: string;
-    if (kinId) {
-      const scenePrompt = [
-        "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
-        "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
-        "This is a separate scene, not a private DM. Only use the scene context below.",
-        context,
-        "[End scene context. Continue naturally as your character.]",
-      ].join("\n").slice(0,6000);
-      const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
-      const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
-      replyText = draft.text;
-    } else {
-      const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
-      const decoded: unknown = JSON.parse(completion.text);
-      replyText = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded).text;
-    }
+    // Non-Kindroid participants may still use the local scene model.
+    const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
+    const decoded: unknown = JSON.parse(completion.text);
+    const replyText = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded).text;
     const result = {text:replyText};
     await db.execute(sql`UPDATE echo_scene_events SET text = ${result.text} WHERE owner_id = ${ownerId}
       AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND event_id = ${eventId}`);

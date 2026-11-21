@@ -144,9 +144,9 @@ router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> =>
     // An old failure must never be shown as the status of a newer DM.
     const latestThreadMessage = parsed.data.state.messages
       .filter(m => m.senderId === characterId || m.recipientId === characterId)
-      .sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
     const runAt = run ? new Date(run.createdAt).getTime() : 0;
-    const latestAt = latestThreadMessage ? Date.parse(latestThreadMessage.createdAt) : 0;
+    const latestAt = latestThreadMessage ? new Date(latestThreadMessage.createdAt).getTime() : 0;
     const stale = latestAt > runAt;
     res.json({ error: !stale && run && (run.status === "provider_failed" || run.status === "live_failed" || run.status === "stale_failed") &&
       run.code && allowed.has(run.code) ? { code: run.code, at: run.createdAt } : null });
@@ -245,7 +245,7 @@ router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): P
     const incoming = parsed.data.messages.find(m => m.id === messageId && m.recipientId === characterId);
     if (!incoming || !incoming.text.includes("VANTA")) { res.status(409).json({ error: "RECOVERY_MESSAGE_MISMATCH" }); return; }
     const thread = parsed.data.messages.filter(m => m.threadId === incoming.threadId);
-    const latest = [...thread].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    const latest = [...thread].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
     if (latest?.id !== messageId) { res.status(409).json({ error: "DM_ALREADY_ADVANCED" }); return; }
     const link = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
@@ -331,18 +331,10 @@ router.post("/autonomy/retry-dm-reply", requireAuth, async (req, res): Promise<v
     if (!link.rows.length) { res.status(409).json({ error: "KINDROID_NOT_CONNECTED" }); return; }
     // The runtime re-checks the thread after its debounce and uses a stable
     // recovery-specific idempotency key. A repeated click cannot create a second turn.
-    const outcome = await triggerImmediateDmReply(ownerId, universeId, characterId, messageId, true);
-    if (!outcome) { res.status(409).json({ error: "DM_RETRY_NOT_ELIGIBLE" }); return; }
-    if (outcome.status === "failed") {
-      res.status(502).json({ error: outcome.reasonCode }); return;
-    }
-    if (outcome.status === "rate_limited") {
-      res.status(429).json({ error: outcome.reasonCode }); return;
-    }
-    if (outcome.status !== "executed") {
-      res.status(409).json({ error: outcome.reasonCode, status: outcome.status }); return;
-    }
-    res.json({ status: "replied", messageId });
+    await triggerImmediateDmReply(ownerId, universeId, characterId, messageId, true);
+    // The trigger schedules/attempts the reply and returns void. Never infer
+    // delivery from its return value; clients should re-read the thread.
+    res.json({ status: "triggered", messageId });
   } catch (error) {
     req.log.warn({ code: error instanceof Error ? error.name : "UNKNOWN" }, "Manual DM recovery failed");
     res.status(502).json({ error: "DM_RETRY_FAILED" });
