@@ -1,5 +1,6 @@
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
 import { parseKindroidGroupId } from "../lib/kindroid-group-id";
+import { mapKindroidSceneHistory } from "../lib/scene-kindroid-history";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -312,6 +313,55 @@ scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
 // Generation remains disabled until group event synchronization is implemented.
 const kindroidGroupId = z.string().transform(value => parseKindroidGroupId(value) ?? "")
   .pipe(z.string().regex(/^[A-Za-z0-9_-]{8,160}$/));
+// Read-only inspection: no scene writes, no Kindroid generation, no private DM calls.
+// Explicitly invoked by the owner when validating a dedicated scene group.
+scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  const sceneId = id.safeParse(req.params.sceneId);
+  if (!parsed.success || !sceneId.success) { res.status(400).json({error:"INVALID_SCENE"}); return; }
+  try {
+    const [universe] = await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
+    if (!universe) { res.status(403).json({error:"UNIVERSE_NOT_ACCESSIBLE"}); return; }
+    const sceneRows = await db.execute(sql`SELECT participant_ids, turn_settings FROM echo_scenes
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND scene_id=${sceneId.data} LIMIT 1`);
+    const scene = sceneRows.rows[0];
+    if (!scene) { res.status(404).json({error:"SCENE_NOT_FOUND"}); return; }
+    const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+    if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
+    const apiKey = process.env.ECHO_KINDROID_API_KEY;
+    if (!apiKey) { res.status(503).json({error:"KINDROID_KEY_MISSING"}); return; }
+    const members = new Set(Array.isArray(scene.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : []);
+    const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+        AND enabled=true AND kin_id IS NOT NULL`);
+    const byKin = new Map<string,string>();
+    for (const link of links.rows) {
+      if (typeof link.kin_id === "string" && typeof link.character_id === "string" && members.has(link.character_id)) {
+        byKin.set(link.kin_id,link.character_id);
+      }
+    }
+    const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
+    url.searchParams.set("group_id",groupId);
+    url.searchParams.set("limit","100");
+    const response = await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`},signal:AbortSignal.timeout(15000)});
+    if (!response.ok) {
+      res.status(response.status===429?429:502).json({error:response.status===429?"KINDROID_RATE_LIMITED":"KINDROID_SCENE_HISTORY_UNAVAILABLE"});
+      return;
+    }
+    const payload:unknown = await response.json();
+    if (!payload || typeof payload!=="object" || !Array.isArray((payload as {messages?:unknown}).messages)) {
+      res.status(502).json({error:"KINDROID_SCENE_HISTORY_FORMAT_INVALID"}); return;
+    }
+    const messages = (payload as {messages:unknown[]}).messages;
+    const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
+    res.json({sceneId:sceneId.data,matchedEvents:events.length,totalMessages:messages.length,events});
+  } catch {
+    res.status(503).json({error:"KINDROID_SCENE_HISTORY_PREVIEW_FAILED"});
+  }
+});
+
 const sceneGroupBinding = scope.extend({
   groupId: kindroidGroupId.nullable(),
 }).strict();
