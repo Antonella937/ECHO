@@ -680,10 +680,14 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
     let replyText: string;
     if (kinId) {
-      // /send-message persists to the Kin's private conversation. A scene must
-      // never use that transport until a separate group is bound and synced.
-      // Fail closed rather than contaminating a real character's DM history.
-      throw new EngineError("KINDROID_SCENE_GROUP_REQUIRED", 409);
+      // /send-message would persist to this Kin's PRIVATE conversation.
+      // Even with a dedicated group bound, scene events must be synced to that
+      // group before asking Kindroid to generate its next turn.
+      // Never generate against stale context or silently use private DM transport.
+      const boundGroup = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+      throw new EngineError(boundGroup
+        ? "KINDROID_SCENE_GROUP_SYNC_REQUIRED"
+        : "KINDROID_SCENE_GROUP_REQUIRED", 409);
     } else {
       const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
       const decoded: unknown = JSON.parse(completion.text);
