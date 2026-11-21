@@ -110,7 +110,7 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
       if (!payload || typeof payload !== "object") return;
       const data = payload as { messages?: unknown; pagination?: { hasMore?: boolean; lastTimestamp?: number } };
       if (!Array.isArray(data.messages)) { console.warn("[kindroid-group] unsupported history payload", { group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", topLevel: Object.keys(data).slice(0,12) }); return; }
-      console.info("[kindroid-group] history schema", { group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", count: data.messages.length, fields: data.messages.length && data.messages[0] && typeof data.messages[0] === "object" ? Object.keys(data.messages[0]).slice(0,20) : [] });
+      console.info("[kindroid-group] history schema " + JSON.stringify({ group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", count: data.messages.length, fields: data.messages.length && data.messages[0] && typeof data.messages[0] === "object" ? Object.keys(data.messages[0]).slice(0,20) : [], senderMatchesKin: data.messages.length && data.messages[0] && typeof data.messages[0] === "object" ? byKin.has(String((data.messages[0] as Record<string,unknown>).sender ?? "")) : false, senderType: data.messages.length && data.messages[0] && typeof data.messages[0] === "object" ? typeof (data.messages[0] as Record<string,unknown>).sender : "none" }));
       let accepted = 0;
       const rejected = { missingId: 0, unmatchedSender: 0, missingBody: 0, badTimestamp: 0 };
       for (const raw of data.messages) {
