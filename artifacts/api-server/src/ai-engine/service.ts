@@ -143,6 +143,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     }
     if (typeof kinId === 'string' && kinId.length > 0) {
       const recipientId = input.recipientId!;
+      // Kindroid /send-message writes into the Kin's individual chat. Until a
+      // separate Kindroid group_id is mapped to this peer thread, never send
+      // character-to-character traffic into that private conversation.
+      if (recipientId !== parsed.data.state.primaryCharacterId) {
+        throw new EngineError('KINDROID_PEER_GROUP_REQUIRED', 409);
+      }
       const thread = parsed.data.state.messages
         .filter(m => (m.senderId === recipientId && m.recipientId === input.characterId) ||
                      (m.senderId === input.characterId && m.recipientId === recipientId))
