@@ -429,6 +429,16 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
     // Import is an explicit action, never a side effect of the preview.
     // Stable group-scoped IDs and ON CONFLICT make repeated imports idempotent.
     const imported = await db.transaction(async tx => {
+      // A scene may be finished or rebound while Kindroid history is being read.
+      // Lock and verify the authoritative scene state before writing any events.
+      const current = await tx.execute(sql`SELECT status,turn_settings FROM echo_scenes
+        WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
+          AND scene_id=${sceneId.data} FOR UPDATE`);
+      const locked = current.rows[0];
+      if (!locked || locked.status !== "active" ||
+          parseKindroidGroupId(String((locked.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? "")) !== groupId) {
+        throw new KindroidSceneHistoryError("KINDROID_SCENE_CHANGED_DURING_IMPORT",409);
+      }
       let count = 0;
       for (const item of events) {
         const inserted = await tx.execute(sql`INSERT INTO echo_scene_events
