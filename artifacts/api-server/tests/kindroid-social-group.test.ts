@@ -48,7 +48,7 @@ test('social group converts the selected Kin response to an ECHO like without pr
     const result = await kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post', 'Noah posted a guitar photo', undefined, request).complete({
       system: '', context: '', outputSchema: {},
     });
-    assert.deepEqual(calls, ['/v1/groupchats-get-turn', '/v1/groupchats-user-message', '/v1/groupchats-get-turn', '/v1/groupchats-ai-response']);
+    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-get-turn', '/v1/groupchats-ai-response']);
     assert.equal(JSON.parse(result.text).action, 'like');
   } finally {
     if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
@@ -73,7 +73,7 @@ test('a different Kin cannot impersonate the intended character', async () => {
         }),
       /KINDROID_GROUP_SPEAKER_MISMATCH/,
     );
-    assert.deepEqual(calls, ['/v1/groupchats-get-turn']);
+    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-get-turn']);
   } finally {
     if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
     else process.env.ECHO_KINDROID_API_KEY = previous;
@@ -98,8 +98,7 @@ test('two requests to the same social group never interleave context and respons
       first.complete({ system: '', context: '', outputSchema: {} }),
       second.complete({ system: '', context: '', outputSchema: {} }),
     ]);
-    const one = ['/v1/groupchats-get-turn', '/v1/groupchats-user-message',
-      '/v1/groupchats-get-turn', '/v1/groupchats-ai-response'];
+    const one = ['/v1/groupchats-user-message', '/v1/groupchats-get-turn', '/v1/groupchats-ai-response'];
     assert.deepEqual(calls, [...one, ...one]);
     assert.equal(calls.filter(path => path === '/v1/send-message').length, 0);
   } finally {
