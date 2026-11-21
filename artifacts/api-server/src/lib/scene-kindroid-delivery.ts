@@ -73,7 +73,11 @@ export async function deliverSceneKindroidEventOnce(
       AND status='sending' LIMIT 1`);
   if(busy.rows.length) return "already_claimed";
   if(!await reserveSceneKindroidDelivery(input)) return "already_claimed";
-  if(!await beginSceneKindroidDelivery(input)) return "already_claimed";
+  if(!await beginSceneKindroidDelivery(input)) {
+    // The event has a durable reservation but was never sent. It may be
+    // attempted later only after explicit reconciliation; no automatic retry.
+    return "already_claimed";
+  }
   try {
     await sendKindroidSceneGroupMessage(input.groupId,message,apiKey,request);
   } catch {
