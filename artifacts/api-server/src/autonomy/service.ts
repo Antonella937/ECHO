@@ -258,6 +258,16 @@ export async function runAutonomyDryRun(
       createdAt: now,
     });
   } catch (error) {
+    // Preserve the underlying exception class and safe stack location in
+    // server diagnostics; LIVE_CYCLE_FAILED alone hides actionable failures.
+    console.warn("AUTONOMY_LIVE_CYCLE_FAILED", {
+      characterId: character.id,
+      universeId,
+      lane: dependencies.lane,
+      code,
+      errorName: error instanceof Error ? error.name : "UNKNOWN",
+      stackLocation: error instanceof Error ? error.stack?.split("\\n").slice(1, 3).map(line => line.trim()) : undefined,
+    });
     if (isAutonomyBudgetProtected(error)) {
       await dependencies.repository.complete(ownerId, runId, {
         status: "rate_limited",
