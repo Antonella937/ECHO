@@ -1397,7 +1397,7 @@ test("worker tick uses deterministic per-slot keys, continues after a target fai
   assert.deepEqual(first, { status: "completed", evaluated: 3, executed: 1, noAction: 1, failed: 1 });
   const firstKeys = [...seenKeys];
   assert.equal(firstKeys.length, 3);
-  assert.ok(firstKeys.every((entry) => /^.+:.+:worker:\d+:[a-f0-9]{24}$/.test(entry)));
+  assert.ok(firstKeys.every((entry) => /^.+:.+:[a-f0-9]{8}-[a-f0-9]{4}-5[a-f0-9]{3}-a[a-f0-9]{3}-[a-f0-9]{12}$/.test(entry)));
   assert.deepEqual(released, ["synthetic-worker-token"]);
 
   seenKeys.length = 0;
