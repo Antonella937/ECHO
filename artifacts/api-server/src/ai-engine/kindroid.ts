@@ -249,3 +249,47 @@ export function kindroidLikeDecisionProvider(
     },
   };
 }
+
+/**
+ * Generate a peer-to-peer DM inside a dedicated Kindroid group, never in a
+ * Kin's private /send-message history. The group owns its own context.
+ * Streaming is essential: the non-streaming endpoint returns an empty body.
+ */
+export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCharacterId?: string, request: typeof fetch = fetch): TextProvider {
+  return {
+    name: 'kindroid',
+    async complete(input) {
+      const key = process.env.ECHO_KINDROID_API_KEY;
+      if (!key) throw new EngineError('KINDROID_KEY_MISSING', 503);
+      if (!/^[A-Za-z0-9_-]{8,160}$/.test(groupId) || !/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) {
+        throw new EngineError('KINDROID_GROUP_ID_INVALID', 400);
+      }
+      let response: Response;
+      try {
+        response = await queuedKindroidRequest(kinId, 30, () => request('https://api.kindroid.ai/v1/groupchats-ai-response', {
+          method: 'POST',
+          signal: AbortSignal.timeout(90000),
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: groupId, ai_id: kinId, stream: true }),
+        }), echoCharacterId);
+      } catch (error) {
+        throw new EngineError(error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+          ? 'KINDROID_GROUP_TIMEOUT' : 'KINDROID_GROUP_CONNECTION_FAILED', 502);
+      }
+      if (!response.ok) {
+        throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_GROUP_REQUEST_FAILED', response.status === 429 ? 429 : 502);
+      }
+      const reply = (await response.text()).trim();
+      if (!reply || reply.includes('<<ERROR>>') || reply.includes('<<HTTP_ERROR>>')) {
+        throw new EngineError('KINDROID_GROUP_GENERATION_FAILED', 502);
+      }
+      const decision = JSON.stringify({
+        action: 'draft', situation: 'dm', text: reply.slice(0, 8000),
+        reason: 'Kindroid group conversation', suggestedDelayMinutes: 0,
+        galleryPhotoId: null, reaction: null, contextSections: [],
+      });
+      input.validate?.(decision);
+      return { text: decision, model: 'kindroid', usage: unknownUsage(), attempts: [] };
+    },
+  };
+}
