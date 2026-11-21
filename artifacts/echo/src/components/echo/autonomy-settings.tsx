@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import { customFetch } from "@workspace/api-client-react";
 import { useAdvancedSettingsText } from '@/lib/advanced-settings-translations';
 import { useState } from "react";
 import { useEffect } from "react";
@@ -12,6 +13,42 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { getActiveUniverseId } from "@/store/persistence";
+
+function PeerDmPermissions({ universeId, characterId, characters }: { universeId: string; characterId: string; characters: Array<{ characterId: string; displayName: string }> }) {
+  const [enabled, setEnabled] = useState(false);
+  const [allowed, setAllowed] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    customFetch<{ enabled: boolean; allowedPeerIds: string[] }>(`/api/dm/character-permissions?${new URLSearchParams({ universeId, characterId })}`, { method: 'GET', responseType: 'json', cache: 'no-store' })
+      .then(data => { if (active) { setEnabled(data.enabled); setAllowed(data.allowedPeerIds); } })
+      .catch(() => { if (active) setError('No se pudieron cargar los permisos.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [universeId, characterId]);
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await customFetch('/api/dm/character-permissions', { method: 'PUT', responseType: 'json', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ universeId, characterId, enabled, allowedPeerIds: allowed }) });
+      toast({ title: 'Permisos entre personajes guardados' });
+    } catch {
+      setError('No se pudieron guardar los permisos.');
+    } finally { setSaving(false); }
+  };
+  if (loading) return <p className="p-3 text-xs text-muted-foreground">Cargando permisos…</p>;
+  return <div className="space-y-3 p-3">
+    <label className="flex items-center justify-between gap-3 text-sm"><span>Permitir DMs con otros personajes</span><Switch checked={enabled} onCheckedChange={setEnabled} /></label>
+    {enabled && <div className="space-y-2">{characters.filter(peer => peer.characterId !== characterId).map(peer => <label key={peer.characterId} className="flex items-center gap-3 text-sm"><input type="checkbox" checked={allowed.includes(peer.characterId)} onChange={e => setAllowed(old => e.target.checked ? [...old, peer.characterId] : old.filter(id => id !== peer.characterId))} /><span>{peer.displayName}</span></label>)}</div>}
+    <p className="text-xs text-muted-foreground">Para conversar, ambos personajes deben autorizarse mutuamente.</p>
+    {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    <button type="button" disabled={saving || !!error && loading} onClick={() => void save()} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar permisos'}</button>
+  </div>;
+}
 
 export function AutonomySettingsSection() {
   const t = useAdvancedSettingsText();
@@ -130,6 +167,7 @@ export function AutonomySettingsSection() {
           </div>
         ))}
         </div></details>
+        <details className="group" data-testid="details-peer-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>DMs entre personajes</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border p-4"><p className="mb-3 text-xs text-muted-foreground">Elegí con quién puede hablar cada personaje. Estos permisos son independientes de los mensajes espontáneos hacia tu cuenta.</p>{settings?.characters.map(character => <details key={character.characterId} className="mb-2 rounded-xl border border-border"><summary className="cursor-pointer p-3 text-sm font-medium">{character.displayName}</summary><PeerDmPermissions universeId={universeId} characterId={character.characterId} characters={settings.characters} /></details>)}</div></details>
         <details className="group" data-testid="details-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Mensajes autónomos")} · {settings?.characters.filter(c=>c.dmEnabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Mensajes autónomos")}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden iniciar mensajes privados espontáneos, incluso cuando no estás usando ECHO. Las respuestas a mensajes que vos iniciás se controlan por separado.")}</p>
