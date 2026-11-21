@@ -247,10 +247,10 @@ scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
   if (process.env.ECHO_KINDROID_SCENE_SEND_ENABLED !== "true") {
     res.status(503).json({error:"KINDROID_SCENE_SEND_NOT_ENABLED"}); return;
   }
-  const parsed=scope.extend({eventId:id}).strict().safeParse(req.body);
+  const parsed=scope.extend({eventId:id,expectedKindroidGroupId:z.string().min(8).max(240)}).strict().safeParse(req.body);
   const sceneId=id.safeParse(req.params.sceneId);
   if(!parsed.success || !sceneId.success){res.status(400).json({error:"INVALID_SCENE_DELIVERY"});return;}
-  const {universeId,eventId}=parsed.data;
+  const {universeId,eventId,expectedKindroidGroupId}=parsed.data;
   const ownerId=req.userId!;
   try {
     const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
@@ -262,7 +262,7 @@ scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
     const scene=scenes.rows[0];
     const participants=Array.isArray(scene?.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : [];
     const groupId=parseKindroidGroupId(String((scene?.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
-    if(scene?.status!=="active" || !groupId || !participants.includes(identity)){
+    if(scene?.status!=="active" || !groupId || groupId!==parseKindroidGroupId(expectedKindroidGroupId) || !participants.includes(identity)){
       res.status(409).json({error:"KINDROID_SCENE_GROUP_NOT_READY"});return;
     }
     const events=await db.execute(sql`SELECT event_id,actor_id,text,visibility,audience_ids FROM echo_scene_events
