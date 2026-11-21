@@ -76,7 +76,6 @@ export default function GroupConversationPage() {
   }, setError);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
   const [sceneContext, setSceneContext] = useState('');
@@ -233,7 +232,7 @@ export default function GroupConversationPage() {
         method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, avatar }),
       });
-      setGroup({ ...group, avatar }); setAvatarUrl(avatar ?? ''); setError('');
+      setGroup({ ...group, avatar }); setError('');
     } catch { setError('No se pudo actualizar la foto. Usá un enlace HTTPS válido.'); }
     finally { setSavingSettings(false); }
   };
@@ -249,7 +248,7 @@ export default function GroupConversationPage() {
         method: 'PATCH', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, avatar: uploaded.url }),
       });
-      setGroup({ ...group, avatar: uploaded.url }); setAvatarUrl(uploaded.url); setError('');
+      setGroup({ ...group, avatar: uploaded.url }); setError('');
     } catch { setError('No se pudo subir la foto del grupo.'); }
     finally { setSavingSettings(false); }
   };
@@ -329,7 +328,7 @@ export default function GroupConversationPage() {
           <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full border border-white/15 bg-background/35 backdrop-blur-xl">{group?.avatar?<img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover"/>:<Users className="h-6 w-6"/>}</div>
           <h1 className="max-w-full truncate text-sm font-semibold">{group?.name??'Grupo'}</h1>
         </div>
-        <button type="button" onClick={()=>{setGroupName(group?.name??'');setAvatarUrl(group?.avatar??'');setSettingsOpen(true);}} aria-label="Opciones del grupo" className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><MoreHorizontal className="h-5 w-5"/></button>
+        <button type="button" onClick={()=>{setGroupName(group?.name??'');setSettingsOpen(true);}} aria-label="Opciones del grupo" className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><MoreHorizontal className="h-5 w-5"/></button>
       </div>
     </header>
     {searchOpen && <div className="shrink-0 border-b border-border bg-background p-3">
@@ -345,8 +344,6 @@ export default function GroupConversationPage() {
       <label className="mb-1 mt-4 block text-xs text-muted-foreground">Foto del grupo</label>
       <input ref={avatarFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void uploadGroupAvatar(file); e.target.value = ''; }} />
       <button type="button" onClick={() => avatarFileRef.current?.click()} disabled={savingSettings} className="mb-2 rounded-xl bg-secondary px-3 py-2 text-sm disabled:opacity-50">Elegir foto de la galería</button>
-      <label className="mb-1 block text-xs text-muted-foreground">O usar un enlace HTTPS</label>
-      <div className="flex gap-2"><input type="url" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3" /><button onClick={() => void saveAvatar(avatarUrl.trim() || null)} disabled={savingSettings || (!!avatarUrl.trim() && !avatarUrl.trim().startsWith('https://'))} className="rounded-xl bg-secondary px-3 text-sm disabled:opacity-50">Aplicar</button></div>
       {group?.avatar && <button onClick={() => void saveAvatar(null)} className="mt-1 text-xs text-muted-foreground">Quitar foto</button>}
       <p className="mt-4 text-xs font-medium">{group?.participantIds.length ?? 0} participantes</p>
       <div className="mt-2 max-h-28 overflow-y-auto text-sm">{group?.participantIds.map(memberId => <div key={memberId} className="py-1">{character(memberId)?.name ?? memberId}</div>)}</div>
