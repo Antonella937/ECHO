@@ -96,6 +96,38 @@ export default function MessagesPage() {
   const backToInbox = () => { if (view !== 'inbox' || showSaved) openView('inbox'); else navigate('/'); };
 
 
+  const renderThreads = (threads: typeof orderedThreads) => (
+    <>
+      {threads.map(({ other, last, unread }) => (
+            <li key={other.id} className="relative">
+              <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 pr-11 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
+                <span className="relative shrink-0"><CharacterAvatar character={other} size={52} />{recentlyActive(state, other.id) && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-[3px] border-background bg-emerald-500" aria-label="Recently active" data-testid={`activity-thread-${other.id}`} />}</span>
+                <div className="min-w-0 flex-1">
+                  <div className={cn('flex min-w-0 items-center gap-1 text-[15px]', unread ? 'font-semibold' : 'font-medium')}>
+                    <span className="truncate">{other.name}</span>
+                    <VerifiedBadge account={other} className="h-3.5 w-3.5 shrink-0" />
+                  </div>
+                  <div className={cn('truncate text-[13.5px]', unread ? 'text-foreground' : 'text-muted-foreground')}>
+                    {last
+                      ? `${last.senderId === me.id ? t("Tú: ") : ''}${last.storyId ? t("Respondió a una historia · ") : last.postId ? t("Compartió una foto · ") : ''}${last.text || (last.attachments?.length ? (last.attachments[0].type === 'image' ? t("Foto") : last.attachments[0].type === 'video' ? t("Video") : t("Nota de voz")) : '')}`
+                      : `@${other.handle}`}
+                    {last && <span className="text-muted-foreground"> · {timeAgo(last.createdAt)}</span>}
+                  </div>
+                </div>
+                {unread > 0 && (
+                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground" data-testid={`badge-unread-${other.id}`}>
+                    {unread}
+                  </span>
+                )}
+              </Link>
+
+              {view === 'inbox' && <button type="button" onClick={() => togglePin(other.id)} aria-label={pinnedIds.includes(other.id) ? "Desfijar conversación" : "Fijar conversación"} title={pinnedIds.includes(other.id) ? "Desfijar" : "Fijar"} className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full text-muted-foreground/70 hover:bg-secondary hover:text-foreground" data-testid={`button-pin-thread-${other.id}`}><Pin className={cn("h-3.5 w-3.5", pinnedIds.includes(other.id) && "fill-current text-primary")} /></button>}
+              {view === 'requests' && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => void updateRequest(other.id, 'accepted')} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => void updateRequest(other.id, 'rejected')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button><button type="button" onClick={() => void updateRequest(other.id, 'blocked')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-destructive">Bloquear</button></div>}
+            </li>
+          ))}
+    </>
+  );
+
   return (
     <div>
       <TopBar
@@ -157,33 +189,9 @@ export default function MessagesPage() {
         </div>
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
+          {view === 'inbox' && renderThreads(orderedThreads.filter(thread => pinnedIds.includes(thread.other.id)))}
           {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
-          {(view === 'requests' ? requests : view === 'inbox' ? orderedThreads : []).map(({ other, last, unread }) => (
-            <li key={other.id}>
-              <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
-                <span className="relative shrink-0"><CharacterAvatar character={other} size={52} />{recentlyActive(state, other.id) && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-[3px] border-background bg-emerald-500" aria-label="Recently active" data-testid={`activity-thread-${other.id}`} />}</span>
-                <div className="min-w-0 flex-1">
-                  <div className={cn('flex min-w-0 items-center gap-1 text-[15px]', unread ? 'font-semibold' : 'font-medium')}>
-                    <span className="truncate">{other.name}</span>
-                    <VerifiedBadge account={other} className="h-3.5 w-3.5 shrink-0" />
-                  </div>
-                  <div className={cn('truncate text-[13.5px]', unread ? 'text-foreground' : 'text-muted-foreground')}>
-                    {last
-                      ? `${last.senderId === me.id ? t("Tú: ") : ''}${last.storyId ? t("Respondió a una historia · ") : last.postId ? t("Compartió una foto · ") : ''}${last.text || (last.attachments?.length ? (last.attachments[0].type === 'image' ? t("Foto") : last.attachments[0].type === 'video' ? t("Video") : t("Nota de voz")) : '')}`
-                      : `@${other.handle}`}
-                    {last && <span className="text-muted-foreground"> · {timeAgo(last.createdAt)}</span>}
-                  </div>
-                </div>
-                {unread > 0 && (
-                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground" data-testid={`badge-unread-${other.id}`}>
-                    {unread}
-                  </span>
-                )}
-              </Link>
-              {view === 'inbox' && <button type="button" onClick={() => togglePin(other.id)} aria-label={pinnedIds.includes(other.id) ? "Desfijar conversación" : "Fijar conversación"} className="ml-3 mb-2 rounded-full px-3 py-1 text-xs text-muted-foreground hover:bg-secondary"><Pin className={cn("mr-1 inline h-3.5 w-3.5", pinnedIds.includes(other.id) && "fill-current")} />{pinnedIds.includes(other.id) ? "Fijado" : "Fijar"}</button>}
-              {view === 'requests' && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => void updateRequest(other.id, 'accepted')} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => void updateRequest(other.id, 'rejected')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button><button type="button" onClick={() => void updateRequest(other.id, 'blocked')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-destructive">Bloquear</button></div>}
-            </li>
-          ))}
+          {view === 'inbox' ? renderThreads(orderedThreads.filter(thread => !pinnedIds.includes(thread.other.id))) : view === 'requests' ? renderThreads(requests) : null}
         </ul>
       )}
       <p className="px-6 pt-6 text-center text-[11.5px] leading-relaxed text-muted-foreground/70">
