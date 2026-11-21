@@ -1,4 +1,5 @@
-import { requiresIsolatedKindroidSocial, isolatedKindroidSocialReady } from './social-isolation';
+import { requiresIsolatedKindroidSocial, verifiedSocialGroupForActor } from './social-isolation';
+import { kindroidSocialGroupProvider } from './kindroid-social-group';
 import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionInput } from '@workspace/api-zod';
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
@@ -103,18 +104,43 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   const founderSocial = requiresIsolatedKindroidSocial({
     live: dependencies.liveDmReply === true, ownerId, situation: input.situation,
   });
-  const isolatedSocial = isolatedKindroidSocialReady();
+  const isolatedSocial = founderSocial && !!verifiedSocialGroupForActor(input.universeId ?? 'primary', input.characterId);
   // Never allow a private-history bypass: the founder requested isolation.
   if (founderSocial && !isolatedSocial) {
     throw new EngineError('KINDROID_SOCIAL_ISOLATION_REQUIRED', 503);
   }
-  if (isolatedSocial && dependencies.provider.name === 'kindroid') {
-    throw new EngineError('KINDROID_SOCIAL_ISOLATED_PROVIDER_REQUIRED', 503);
-  }
+
   // Linked Kin IDs are stored server-side, never exposed to the client.
   // The founder's linked characters use Kindroid for live DMs and social decisions;
   // ECHO only schedules opportunities and enforces visibility/permission checks.
   let selectedProvider = dependencies.provider;
+  if (founderSocial && isolatedSocial) {
+    const groupId = verifiedSocialGroupForActor(input.universeId ?? 'primary', input.characterId);
+    if (!groupId) throw new EngineError('KINDROID_SOCIAL_GROUP_NOT_VERIFIED', 503);
+    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
+      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
+    const kinId = links.rows[0]?.kin_id;
+    if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
+    const post = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
+    const comment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
+    const story = input.storyId ? parsed.data.state.stories.find(st => st.id === input.storyId) : undefined;
+    if (input.situation !== 'post' && !post && !comment && !story) {
+      throw new EngineError('SOCIAL_TARGET_NOT_FOUND', 404);
+    }
+    if (story && (!canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId) ||
+        !parsed.data.state.follows[input.characterId]?.includes(story.authorId))) {
+      throw new EngineError('STORY_NOT_VISIBLE', 403);
+    }
+    const context = [
+      `Actor: ${actor?.name ?? input.characterId} (${input.characterId})`,
+      post ? `Visible post by ${parsed.data.state.characters.find(c => c.id === post.authorId)?.name ?? post.authorId}: ${(post.caption ?? '[image or post without caption; visual content not analyzed]').slice(0,500)}` : '',
+      comment ? `Visible comment by ${parsed.data.state.characters.find(c => c.id === comment.authorId)?.name ?? comment.authorId}: ${comment.text.slice(0,300)}` : '',
+      story ? `Visible story by ${parsed.data.state.characters.find(c => c.id === story.authorId)?.name ?? story.authorId}: ${(story.caption ?? '[story without caption; visual content not analyzed]').slice(0,400)}` : '',
+      'Use only this visible ECHO event; do not infer unseen image content or private messages.',
+    ].filter(Boolean).join('\\n');
+    selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId);
+  }
   // Linked characters use their own Kindroid voice for public text too.
   // ECHO still selects the opportunity and validates the draft before execution.
   if (dependencies.liveDmReply === true &&
