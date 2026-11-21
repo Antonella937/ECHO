@@ -6,7 +6,7 @@ import { customFetch } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { Link, useLocation } from 'wouter';
-import { Bookmark, PenSquare, Search, X, Users, Archive, BellOff } from 'lucide-react';
+import { Bookmark, PenSquare, Search, X, Users, Archive, BellOff, MoreHorizontal, Pin, Eye, Sparkles, MessageSquare } from 'lucide-react';
 import { VerifiedBadge } from '@/components/echo/verified-badge';
 import { useSocial } from '@/store/social-store';
 import { useThreads } from '@/hooks/use-social-selectors';
@@ -33,6 +33,8 @@ export default function MessagesPage() {
   const [groupLoadError, setGroupLoadError] = useState(false);
   const [groupRefresh, setGroupRefresh] = useState(0);
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showRequests, setShowRequests] = useState(false);
   const [requestDecisions, setRequestDecisions] = useState<Record<string, 'accepted' | 'rejected' | 'blocked'>>({});
   const [requestError, setRequestError] = useState('');
@@ -86,7 +88,15 @@ export default function MessagesPage() {
     : requestDecisions[other.id] !== 'rejected' && requestDecisions[other.id] !== 'blocked');
   const [composing, setComposing] = useState(false);
   const [, navigate] = useLocation();
-  const backToInbox = () => { if (showSaved) { setShowSaved(false); window.history.replaceState(null, "", "/messages"); } else navigate("/"); };
+  const view = new URLSearchParams(window.location.search).get('view') ?? 'inbox';
+  const pinStorageKey = user?.id ? `echo:pinned:${user.id}:${getActiveUniverseId(user.id)}:${me.id}` : '';
+  useEffect(() => { try { setPinnedIds(pinStorageKey ? JSON.parse(localStorage.getItem(pinStorageKey) || '[]') : []); } catch { setPinnedIds([]); } }, [pinStorageKey]);
+  const togglePin = (id: string) => { setPinnedIds(previous => { const next = previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]; if (pinStorageKey) localStorage.setItem(pinStorageKey, JSON.stringify(next)); return next; }); };
+  const openView = (next: string) => { setMenuOpen(false); setShowSaved(next === 'favorites'); setShowRequests(next === 'requests'); setShowArchivedGroups(next === 'archived'); navigate(next === 'inbox' ? '/messages' : `/messages?view=${next}`); };
+  const orderedThreads = [...visibleThreads].sort((a,b) => Number(pinnedIds.includes(b.other.id)) - Number(pinnedIds.includes(a.other.id)));
+  const inboxGroups = groups.filter(g => g.participantIds.includes(me.id));
+  const observerGroups = groups.filter(g => !g.participantIds.includes(me.id) && g.participantIds.length >= 3);
+  const backToInbox = () => { if (view !== 'inbox' || showSaved) openView('inbox'); else navigate('/'); };
   const toggleFavorites = () => { setShowSaved(value => { const next = !value; window.history.replaceState(null, "", next ? "/messages?tab=favorites" : "/messages"); return next; }); };
 
   return (
@@ -97,10 +107,13 @@ export default function MessagesPage() {
         sub={`${t("Bandeja de")} ${me.name}`}
         right={
           <div className="flex items-center gap-1">
-          <button type="button" onClick={toggleFavorites} aria-label={t('Mensajes favoritos')} aria-pressed={showSaved} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold', showSaved ? 'bg-primary text-primary-foreground' : 'bg-secondary')} data-testid="button-saved-messages"><Bookmark className="h-[18px] w-[18px]" /> <span className="hidden min-[430px]:inline">{t('Favoritos')}</span></button>
-          <button type="button" onClick={() => setShowRequests(v => !v)} aria-label={showRequests ? 'Mostrar conversaciones' : 'Solicitudes de mensajes'} aria-pressed={showRequests} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm', showRequests ? 'bg-primary text-primary-foreground' : 'bg-secondary')}><span>Solicitudes{requests.length > 0 ? ` (${requests.length})` : ''}</span></button>
-          <button type="button" onClick={() => setShowArchivedGroups(v => !v)} aria-label={showArchivedGroups ? 'Mostrar grupos activos' : 'Mostrar grupos archivados'} aria-pressed={showArchivedGroups} className={cn('tap flex h-11 items-center gap-2 rounded-full px-3 text-sm', showArchivedGroups ? 'bg-primary text-primary-foreground' : 'bg-secondary')}><Archive className="h-[18px] w-[18px]" /></button>
-          <button type="button" onClick={() => setGroupComposer(true)} aria-label="Nuevo grupo" className="tap flex h-11 items-center gap-2 rounded-full bg-secondary px-3 text-sm font-semibold"><Users className="h-[18px] w-[18px]" /><span className="hidden min-[430px]:inline">Grupo</span></button>
+          <div className="relative">
+            <button type="button" aria-label="Más opciones de mensajes" aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)} className="tap flex h-11 w-11 items-center justify-center rounded-full bg-secondary"><MoreHorizontal className="h-5 w-5" /></button>
+            {menuOpen && <div className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-border bg-background p-2 shadow-xl">
+              {([{ id: 'requests', label: 'Solicitudes' }, { id: 'archived', label: 'Archivados' }, { id: 'favorites', label: 'Mensajes destacados' }, { id: 'groups', label: 'Mis grupos' }, { id: 'observer-groups', label: 'Grupos de espectadora' }, { id: 'observer-dms', label: 'DMs de espectadora' }, { id: 'scenes', label: 'ECHO Scenes' }] as const).map(item => <button key={item.id} type="button" onClick={() => item.id === 'scenes' ? (setMenuOpen(false), navigate('/scenes')) : openView(item.id)} className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm hover:bg-secondary">{item.label}</button>)}
+              <button type="button" onClick={() => { setMenuOpen(false); setGroupComposer(true); }} className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm hover:bg-secondary">Nuevo grupo</button>
+            </div>}
+          </div>
           <button
             onClick={() => setComposing(true)}
             aria-label={t("Nueva conversación")}
@@ -113,11 +126,11 @@ export default function MessagesPage() {
           </div>
         }
       />
-      <div className="px-4 py-2"><Link href="/scenes" className="inline-flex rounded-xl border border-border px-4 py-2 text-sm font-semibold">✦ ECHO Scenes</Link></div>
+      {view !== 'inbox' && <div className="px-4 pt-4"><h2 className="text-lg font-semibold">{({ requests: 'Solicitudes', archived: 'Archivados', favorites: 'Mensajes destacados', groups: 'Mis grupos', 'observer-groups': 'Grupos de espectadora', 'observer-dms': 'DMs de espectadora' } as Record<string,string>)[view] ?? 'Mensajes'}</h2></div>}
       {requestError && <p role="alert" className="px-4 py-2 text-xs text-destructive">{requestError}</p>}
       {groupLoadError && <div role="alert" className="mx-4 my-2 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 p-3 text-xs"><span>No se pudieron cargar los grupos. Tus conversaciones no se borraron.</span><button type="button" onClick={() => setGroupRefresh(v => v + 1)} className="shrink-0 rounded-lg bg-secondary px-3 py-2 font-semibold">Reintentar</button></div>}
       {requestLoading && showRequests && <p className="px-4 py-2 text-xs text-muted-foreground">Cargando solicitudes…</p>}
-      {showSaved ? (
+      {view === 'observer-dms' ? <section className="px-4 py-12 text-center text-sm text-muted-foreground">Las conversaciones entre personajes se consultan desde sus perfiles. La lista unificada de espectadora requiere una consulta de conversaciones autorizadas.</section> : view === 'observer-groups' || view === 'groups' ? <section className="px-2 pt-4"><ul>{(view === 'groups' ? inboxGroups : observerGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3 rounded-2xl px-3 py-3 hover:bg-secondary/60"><Users className="h-6 w-6"/><div><p className="font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(', ')}</p></div>{view === 'observer-groups' && <Eye className="ml-auto h-4 w-4"/>}</Link></li>)}</ul>{(view === 'groups' ? inboxGroups : observerGroups).length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">No hay grupos para mostrar.</p>}</section> : showSaved || view === 'favorites' ? (
         <section className="px-3 pt-4" data-testid="list-saved-messages">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Mensajes favoritos')}</h2><span className="text-xs text-muted-foreground">{savedMessages.length}</span></div>
           {savedMessages.length === 0 ? <p className="py-12 text-center text-sm text-muted-foreground">{t('Todavía no guardaste ningún mensaje. Tocá el marcador de un mensaje para encontrarlo aquí.')}</p> : (
@@ -128,7 +141,7 @@ export default function MessagesPage() {
             </li>; })}</ul>
           )}
         </section>
-      ) : visibleThreads.length === 0 && (showRequests || groups.filter(g => Boolean(g.archived) === showArchivedGroups).length === 0) ? (
+      ) : (view === 'groups' || view === 'observer-groups' ? false : (view === 'requests' ? requests.length === 0 : orderedThreads.length === 0 && (view === 'archived' || inboxGroups.filter(g => !g.archived).length === 0))) ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
@@ -147,8 +160,8 @@ export default function MessagesPage() {
         </div>
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
-          {!showRequests && groups.filter(group => Boolean(group.archived) === showArchivedGroups).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
-          {visibleThreads.map(({ other, last, unread }) => (
+          {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
+          {(view === 'requests' ? requests : view === 'archived' ? [] : orderedThreads).map(({ other, last, unread }) => (
             <li key={other.id}>
               <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
                 <span className="relative shrink-0"><CharacterAvatar character={other} size={52} />{recentlyActive(state, other.id) && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-[3px] border-background bg-emerald-500" aria-label="Recently active" data-testid={`activity-thread-${other.id}`} />}</span>
@@ -170,7 +183,8 @@ export default function MessagesPage() {
                   </span>
                 )}
               </Link>
-              {showRequests && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => void updateRequest(other.id, 'accepted')} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => void updateRequest(other.id, 'rejected')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button><button type="button" onClick={() => void updateRequest(other.id, 'blocked')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-destructive">Bloquear</button></div>}
+              <button type="button" onClick={() => togglePin(other.id)} aria-label={pinnedIds.includes(other.id) ? "Desfijar conversación" : "Fijar conversación"} className="ml-3 mb-2 rounded-full px-3 py-1 text-xs text-muted-foreground hover:bg-secondary"><Pin className={cn("mr-1 inline h-3.5 w-3.5", pinnedIds.includes(other.id) && "fill-current")} />{pinnedIds.includes(other.id) ? "Fijado" : "Fijar"}</button>
+              {view === 'requests' && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => void updateRequest(other.id, 'accepted')} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => void updateRequest(other.id, 'rejected')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button><button type="button" onClick={() => void updateRequest(other.id, 'blocked')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-destructive">Bloquear</button></div>}
             </li>
           ))}
         </ul>
