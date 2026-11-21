@@ -88,6 +88,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         "group_kindroid_dead_static": "uzlDUKZ5MQMnR9sBHh6p",
       } : {};
       kindroidGroupId = verifiedFounderGroups[groupId] ?? null;
+      let groupMappingSource: "verified" | "environment" = "verified";
       const raw = process.env.ECHO_KINDROID_GROUP_IDS_JSON;
       if (raw) {
         try {
@@ -96,6 +97,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
             const candidate = (mappings as Record<string, unknown>)[groupId];
             if (typeof candidate === "string" && /^[A-Za-z0-9_-]{8,160}$/.test(candidate)) {
               kindroidGroupId = candidate;
+              groupMappingSource = "environment";
             }
           }
         } catch {
@@ -103,6 +105,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         }
       }
       if (!kindroidGroupId) return { status: "skipped", reason: "KINDROID_GROUP_MAPPING_MISSING" };
+      console.info("[kindroid-group] mapping resolved " + JSON.stringify({ source: groupMappingSource, group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other" }));
     }
     // NOTE: The current Kindroid group adapter only calls get-turn and
     // ai-response with group_id/ai_id; it does NOT transmit the prompt below.
