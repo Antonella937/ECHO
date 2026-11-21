@@ -155,7 +155,7 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
         throw new EngineError('KINDROID_GENERATION_FAILED', 502);
       }
       const decision = JSON.stringify({
-        action: 'draft', situation, text: reply.slice(0, situation === 'dm' ? 2000 : situation === 'post' ? 600 : 1000), reason: 'Kindroid character text',
+        action: 'draft', situation, text: reply.slice(0, situation === 'dm' ? 8000 : situation === 'post' ? 600 : 1000), reason: 'Kindroid character text',
         suggestedDelayMinutes: 0, galleryPhotoId: null, reaction: null, contextSections: [],
       });
       input.validate?.(decision);
