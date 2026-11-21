@@ -43,3 +43,18 @@ test("provider error markers never become displayed DM replies", async () => wit
     system: "", context: "", outputSchema: {}, validate: () => undefined,
   }), /KINDROID_GENERATION_FAILED/);
 }));
+
+test("story context never truncates the actual short DM", async () => withTestKey(async () => {
+  let body: Record<string, unknown> = {};
+  const request = (async (_url: string | URL | Request, init?: RequestInit) => {
+    body = JSON.parse(String(init?.body));
+    return new Response("I saw it.", { status: 200 });
+  }) as typeof fetch;
+  const message = "M".repeat(2600);
+  await kindroidDmProvider(message, kinId, "Visual analysis ".repeat(200), request).complete({
+    system: "", context: "", outputSchema: {}, validate: () => undefined,
+  });
+  const sent = String(body.message);
+  assert.ok(sent.length <= 2800);
+  assert.ok(sent.endsWith(message), "The actual message must remain intact");
+}));
