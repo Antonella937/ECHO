@@ -18,7 +18,13 @@ function formatInline(source: string, renderPlain: (text: string, key: string) =
     const key = `${prefix}-${at}`;
     if (token.startsWith('***')) output.push(<strong key={key}><em>{formatInline(token.slice(3, -3), renderPlain, key)}</em></strong>);
     else if (token.startsWith('**')) output.push(<strong key={key}>{formatInline(token.slice(2, -2), renderPlain, key)}</strong>);
-    else if (token.startsWith('*')) output.push(<em key={key}>{formatInline(token.slice(1, -1), renderPlain, key)}</em>);
+    else if (token.startsWith('*')) {
+      const inner = token.slice(1, -1);
+      // Longer italic passages are Kindroid's narrative/action segments;
+      // brief italic emphasis in dialogue keeps its normal text color.
+      const narrative = inner.trim().split(/\s+/).length >= 5;
+      output.push(<em key={key} className={narrative ? 'text-muted-foreground/75' : undefined}>{formatInline(inner, renderPlain, key)}</em>);
+    }
     else if (token.startsWith('__')) output.push(<u key={key}>{formatInline(token.slice(2, -2), renderPlain, key)}</u>);
     else output.push(<u key={key}>{formatInline(token.slice(3, -4), renderPlain, key)}</u>);
     last = at + token.length;
