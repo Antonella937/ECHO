@@ -375,7 +375,7 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
 
 // Explicit owner-triggered import; never generates Kindroid replies or uses private DMs.
 scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) => {
-  const parsed = scope.safeParse(req.body);
+  const parsed = scope.extend({expectedKindroidGroupId:z.string().regex(/^[A-Za-z0-9_-]{8,160}$/)}).safeParse(req.body);
   const sceneId = id.safeParse(req.params.sceneId);
   if (!parsed.success || !sceneId.success) { res.status(400).json({error:"INVALID_SCENE"}); return; }
   try {
@@ -390,6 +390,7 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
     if (scene.status !== "active") { res.status(409).json({error:"SCENE_NOT_ACTIVE"}); return; }
     const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
     if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
+    if (groupId !== parsed.data.expectedKindroidGroupId) {res.status(409).json({error:"KINDROID_SCENE_GROUP_CHANGED"});return;}
     // Legacy or manually migrated bindings may predate the uniqueness checks.
     // Never preview a group shared with another scene or an ordinary ECHO group.
     const collisions = await db.execute(sql`SELECT 1 FROM echo_group_conversations
