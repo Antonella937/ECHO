@@ -326,8 +326,21 @@ export async function runAutonomyLiveCycle(
         AND character_id = ${character.id} AND enabled = true LIMIT 1`);
     linkedInboundReply = link.rows.length > 0;
   }
+  // Peer DM autonomy is authorized by the separate bilateral permissions table.
+  // The dmEnabled switch only controls spontaneous outreach to the human owner.
+  let peerDmEnabled = false;
+  if (dependencies.lane === "dm" && !control.dmEnabled) {
+    const permissions = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
+      FROM echo_character_dm_permissions
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId}`);
+    const sender = permissions.rows.find(row => row.character_id === character.id);
+    peerDmEnabled = sender?.enabled === true && permissions.rows.some(row =>
+      row.character_id !== character.id && row.enabled === true &&
+      Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(row.character_id) &&
+      Array.isArray(row.allowed_peer_ids) && row.allowed_peer_ids.includes(character.id));
+  }
   if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged ||
-      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply) : control.enabled)) {
+      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply || peerDmEnabled) : control.enabled)) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
@@ -369,7 +382,7 @@ export async function runAutonomyLiveCycle(
       const sender = permissionFor(character.id);
       liveAllowedDmRecipientIds = new Set(state.characters.filter(peer =>
         !peer.archived && peer.id !== character.id && sender?.enabled === true &&
-        (peer.id === state.primaryCharacterId || (
+        ((peer.id === state.primaryCharacterId && control.dmEnabled) || (
           Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(peer.id) &&
           permissionFor(peer.id)?.enabled === true &&
           Array.isArray(permissionFor(peer.id)?.allowed_peer_ids) &&
@@ -457,7 +470,7 @@ export async function runAutonomyLiveCycle(
         // DM opt-in authorizes replies to the owner without a separate AI-to-AI
         // allowlist entry. AI-to-AI conversations still require mutual opt-in.
         permitted = sender?.enabled === true &&
-          (recipientIsOwnerIdentity || (
+          ((recipientIsOwnerIdentity && control.dmEnabled) || (
             Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
             receiver?.enabled === true &&
             Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id)
