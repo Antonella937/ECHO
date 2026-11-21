@@ -138,7 +138,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       comment ? `Visible comment by ${parsed.data.state.characters.find(c => c.id === comment.authorId)?.name ?? comment.authorId}: ${comment.text.slice(0,300)}` : '',
       story ? `Visible story by ${parsed.data.state.characters.find(c => c.id === story.authorId)?.name ?? story.authorId}: ${(story.caption ?? '[story without caption; visual content not analyzed]').slice(0,400)}` : '',
       'Use only this visible ECHO event; do not infer unseen image content or private messages.',
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join(String.fromCharCode(10));
     selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId);
   }
   // Linked characters use their own Kindroid voice for public text too.
