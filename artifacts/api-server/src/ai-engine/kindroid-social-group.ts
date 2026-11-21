@@ -71,8 +71,14 @@ export function kindroidSocialGroupProvider(
       const generated = await kindroidPeerGroupProvider(groupId, kinId, echoCharacterId, request).complete({
         ...input, validate: undefined,
       });
-      const envelope = JSON.parse(generated.text) as { text?: unknown };
-      const reply = typeof envelope.text === 'string' ? envelope.text.trim() : '';
+      let envelope: unknown;
+      try { envelope = JSON.parse(generated.text); }
+      catch { throw new EngineError('KINDROID_SOCIAL_RESPONSE_INVALID', 502); }
+      if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) ||
+          typeof (envelope as { text?: unknown }).text !== 'string') {
+        throw new EngineError('KINDROID_SOCIAL_RESPONSE_INVALID', 502);
+      }
+      const reply = (envelope as { text: string }).text.trim();
       const cleaned = reply.replace(/^START MESSAGE\s*\n/i, '').replace(/\n\s*END MESSAGE$/i, '').trim();
       let action: string = 'draft';
       let text: string | null = null;
