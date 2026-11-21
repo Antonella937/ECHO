@@ -383,6 +383,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,500);
         }
         selectedProvider = kindroidDmProvider(outgoingPrompt, kinId,
+          // Only a story reply may require fresh visual/social context. Ordinary
+          // DMs rely on Kindroid's own memory instead of replaying ECHO history.
           storyForReply ? socialContext : '', undefined, 'dm', input.characterId);
       }
     }
