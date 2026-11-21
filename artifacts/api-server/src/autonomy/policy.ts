@@ -235,7 +235,7 @@ export function chooseAutonomyOpportunity(input: {
   const recentSocial: number[] = [];
   const latestActivity = Math.max(
     ...recentSocial,
-    ...history.map((event) => event.createdAt.getTime()),
+    ...(input.lane === "social" ? feedHistory : history).map((event) => event.createdAt.getTime()),
     0,
   );
   // Reply to the latest unanswered incoming DM before considering unsolicited social activity.
