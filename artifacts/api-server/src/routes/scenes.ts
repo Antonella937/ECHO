@@ -451,13 +451,6 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     if (kinId) {
       // The Kindroid DM adapter rejects messages above 2,800 characters.
       // Reserve room for instructions and keep the newest visible scene events.
-      const sceneContext = JSON.stringify({
-        scene: { sceneId: sceneId.data, title: scene.title, premise: scene.premise, canon: scene.canon },
-        character: { id: character.id, name: character.name },
-        participants: people,
-        sceneMemory: previousSummary.slice(-600),
-        visibleEvents: visible.slice(-8).map(e => ({ actorId: e.actor_id, text: String(e.text).slice(-450) })),
-      });
       const sceneInstructions = [
         "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
         "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
@@ -465,7 +458,27 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       ].join("\n");
       const sceneTail = "\n[End scene context. Continue naturally as your character.]";
       const sceneBudget = 2800 - sceneInstructions.length - sceneTail.length - 2;
-      const scenePrompt = [sceneInstructions, sceneContext.slice(0, sceneBudget) + sceneTail].join("\n");
+      const sceneEvents = visible.slice(-8).map(e => ({ actorId: e.actor_id, text: String(e.text).slice(-450) }));
+      const scenePayload = {
+        scene: { sceneId: sceneId.data, title: String(scene.title).slice(0, 100), premise: String(scene.premise).slice(0, 250), canon: scene.canon },
+        character: { id: character.id, name: character.name },
+        participants: people.map(person => ({ id: person.id, name: String(person.name).slice(0, 60) })),
+        sceneMemory: previousSummary.slice(-500),
+        visibleEvents: sceneEvents,
+      };
+      let sceneContext = JSON.stringify(scenePayload);
+      while (sceneContext.length > sceneBudget && sceneEvents.length > 1) {
+        sceneEvents.shift();
+        sceneContext = JSON.stringify(scenePayload);
+      }
+      if (sceneContext.length > sceneBudget) {
+        scenePayload.sceneMemory = "";
+        sceneEvents.splice(0, sceneEvents.length - 1);
+        sceneEvents[0].text = sceneEvents[0].text.slice(-600);
+        sceneContext = JSON.stringify(scenePayload);
+      }
+      if (sceneContext.length > sceneBudget) throw new EngineError("KINDROID_SCENE_CONTEXT_TOO_LONG", 400);
+      const scenePrompt = [sceneInstructions, sceneContext + sceneTail].join("\n");
       const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
       const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
