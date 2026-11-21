@@ -125,6 +125,17 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     const post = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
     const comment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
     const story = input.storyId ? parsed.data.state.stories.find(st => st.id === input.storyId) : undefined;
+    // Reject mismatched targets before sending anything to Kindroid.
+    if (input.situation === 'comment' && !post) throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
+    if (input.situation === 'like_post' && !post) throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
+    if (input.situation === 'like_comment' && !comment) throw new EngineError('SOCIAL_TARGET_COMMENT_NOT_FOUND', 404);
+    if (input.situation === 'story_reaction' && !story) throw new EngineError('STORY_NOT_VISIBLE', 403);
+    if (comment && post && comment.postId !== post.id) throw new EngineError('SOCIAL_COMMENT_POST_MISMATCH', 409);
+    if (post && input.situation !== 'post' &&
+        post.authorId !== input.characterId &&
+        !parsed.data.state.follows[input.characterId]?.includes(post.authorId)) {
+      throw new EngineError('SOCIAL_POST_NOT_VISIBLE', 403);
+    }
     if (input.situation !== 'post' && !post && !comment && !story) {
       throw new EngineError('SOCIAL_TARGET_NOT_FOUND', 404);
     }
