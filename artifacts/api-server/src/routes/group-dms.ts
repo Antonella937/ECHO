@@ -345,7 +345,7 @@ router.patch("/group-dms/:groupId/avatar", async (req, res) => {
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
   const result = await db.execute(sql`UPDATE echo_group_conversations SET avatar = ${avatar}, updated_at = now()
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${String(req.params.groupId)}
-    AND participant_ids ? ${actorId} RETURNING avatar`);
+    AND (participant_ids ? ${actorId} OR scene_observer_enabled = true) RETURNING avatar`);
   if (!result.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ avatar: result.rows[0].avatar });
 });
