@@ -186,3 +186,28 @@ test('SKIP suppresses a public comment without posting or using private history'
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('overlong Kindroid comment is rejected instead of publishing truncated speech', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    return new Response(path.endsWith('get-turn') ? 'kin123456789'
+      : path.endsWith('ai-response') ? 'x'.repeat(1001) : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      kindroidSocialGroupProvider('group12345678', 'kin123456789', 'comment',
+        'Visible post', undefined, request).complete({
+          system: '', context: '', outputSchema: {},
+        }),
+      /KINDROID_SOCIAL_DECISION_INVALID/,
+    );
+    assert.equal(calls.includes('/v1/send-message'), false);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
