@@ -28,6 +28,12 @@ test('social group mapping requires explicit memory verification', () => {
     process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = 'true';
     assert.equal(verifiedSocialGroupId('mar'), 'group12345678');
     assert.equal(verifiedSocialGroupId('noah'), null);
+    process.env.ECHO_KINDROID_SOCIAL_GROUP_IDS_JSON = JSON.stringify({
+      account_mw7bvivjs2rpd: 'group12345678',
+      account_mw9egnuoszyi5: 'group12345678',
+    });
+    assert.equal(verifiedSocialGroupId('account_mw7bvivjs2rpd'), 'group12345678');
+    assert.equal(verifiedSocialGroupId('account_mw9egnuoszyi5'), null);
     process.env.ECHO_KINDROID_SOCIAL_GROUP_IDS_JSON = '{broken';
     assert.equal(verifiedSocialGroupId('mar'), null);
   } finally {
