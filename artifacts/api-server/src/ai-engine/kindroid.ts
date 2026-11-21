@@ -283,7 +283,7 @@ export function kindroidLikeDecisionProvider(
 /**
  * Generate a peer-to-peer DM inside a dedicated Kindroid group, never in a
  * Kin's private /send-message history. The group owns its own context.
- * Streaming is essential: the non-streaming endpoint returns an empty body.
+ * Streaming is essential: Kindroid saves non-streamed group replies to history but returns an empty body.
  */
 export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCharacterId?: string, request: typeof fetch = fetch, explicitSpeaker = false): TextProvider {
   return {
@@ -338,7 +338,7 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
           method: 'POST',
           signal: AbortSignal.timeout(90000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ group_id: groupId, ai_id: kinId, stream: false }),
+          body: JSON.stringify({ group_id: groupId, ai_id: kinId, stream: true }),
         }), echoCharacterId);
       } catch (error) {
         throw new EngineError(error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
