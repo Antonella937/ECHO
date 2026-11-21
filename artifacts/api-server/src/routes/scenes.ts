@@ -299,6 +299,24 @@ scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
     }
     const apiKey=process.env.ECHO_KINDROID_API_KEY;
     if(!apiKey){res.status(503).json({error:"KINDROID_KEY_MISSING"});return;}
+    // A stale scene event must not be delivered after a different group turn.
+    // Require all prior unrestricted human events to have been sent first.
+    const earlier=await db.execute(sql`SELECT e.event_id FROM echo_scene_events e
+      LEFT JOIN echo_scene_kindroid_deliveries d
+        ON d.owner_id=e.owner_id AND d.universe_id=e.universe_id
+        AND d.scene_id=e.scene_id AND d.event_id=e.event_id
+      WHERE e.owner_id=${ownerId} AND e.universe_id=${universeId}
+        AND e.scene_id=${sceneId.data} AND e.actor_id=${identity}
+        AND e.visibility IN ('public','participants')
+        AND e.audience_ids='[]'::jsonb AND e.text <> ''
+        AND (e.created_at < (SELECT created_at FROM echo_scene_events
+          WHERE owner_id=${ownerId} AND universe_id=${universeId}
+            AND scene_id=${sceneId.data} AND event_id=${eventId})
+          OR (e.created_at = (SELECT created_at FROM echo_scene_events
+          WHERE owner_id=${ownerId} AND universe_id=${universeId}
+            AND scene_id=${sceneId.data} AND event_id=${eventId}) AND e.event_id < ${eventId}))
+        AND (d.status IS DISTINCT FROM 'sent') LIMIT 1`);
+    if(earlier.rows.length){res.status(409).json({error:"KINDROID_SCENE_EARLIER_EVENT_UNSYNCED"});return;}
     const result=await deliverSceneKindroidEventOnce(
       {ownerId,universeId,sceneId:sceneId.data,eventId,groupId},String(eventRow.text),apiKey);
     res.status(result==="sent"?200:409).json({status:result});
