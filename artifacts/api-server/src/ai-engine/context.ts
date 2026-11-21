@@ -49,8 +49,13 @@ export function buildCharacterContext(state: SocialState, input: CharacterDecisi
       }
       break;
     case 'dm':
-      rejectUnexpected('recipientId', 'storyId');
-      if (!recipient || personIdOf(recipient) === personIdOf(actor) || (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
+      // An incoming DM may carry its messageId for exact-turn reply grounding.
+      // Validate it as belonging to the selected sender/recipient pair rather
+      // than rejecting the field as an unrelated social target.
+      rejectUnexpected('recipientId', 'storyId', 'messageId');
+      if (!recipient || personIdOf(recipient) === personIdOf(actor) ||
+        (input.messageId && (!message || message.senderId !== recipient.id || message.recipientId !== actor.id)) ||
+        (input.storyId && (!story || story.authorId !== recipient.id || !state.follows[actor.id]?.includes(story.authorId) || !canCharacterViewCloseFriendsStory(state, story, actor.id)))) throw new EngineError('INVALID_DM_TARGET');
       break;
     case 'like_post':
       rejectUnexpected('postId');
