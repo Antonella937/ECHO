@@ -220,6 +220,7 @@ export function kindroidStoryDecisionProvider(kinId: string, storyContext: strin
       }
       const raw = (await response.text()).trim();
       const choice = parseKindroidSocialChoice(raw, ['VIEW', 'LIKE', 'LAUGH', 'SURPRISE', 'FIRE']);
+      console.info('[kindroid-social] story decision accepted', { situation: 'story_reaction', choice, hasReaction: choice !== 'VIEW' });
       if (!['VIEW', 'LIKE', 'LAUGH', 'SURPRISE', 'FIRE'].includes(choice)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
       const reaction = ({ LIKE: '❤', LAUGH: '😂', SURPRISE: '😮', FIRE: '🔥' } as Record<string, string>)[choice] ?? null;
       const decision = JSON.stringify({
@@ -261,6 +262,7 @@ export function kindroidLikeDecisionProvider(
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_REQUEST_FAILED_RETRY_MANUALLY', 502);
       }
       const raw = parseKindroidSocialChoice(await response.text(), ['LIKE', 'SKIP']);
+      console.info('[kindroid-social] feed decision accepted', { situation, choice: raw });
       if (raw !== 'LIKE' && raw !== 'SKIP') throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
       const decision = JSON.stringify({ action: raw === 'LIKE' ? 'like' : 'none', situation,
         text: null, reaction: null, reason: 'Kindroid feed decision',
