@@ -205,10 +205,14 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             latestTime - new Date(m.createdAt).getTime() <= 120_000
           )).slice(0, 4) : [];
         const previousTurns = activeThread.slice(incomingBatch.length, incomingBatch.length + 2);
-        const peerHistory = previousTurns.reverse().map(m =>
-          `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
+        const peerHistory = recipientId === parsed.data.state.primaryCharacterId
+          ? '' // The owner's existing Kindroid conversation already holds its own history.
+          : previousTurns.reverse().map(m =>
+              `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
         const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n').slice(0, 3000);
-        const peerContext = `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
+        const peerContext = recipientId === parsed.data.state.primaryCharacterId
+          ? '' // Do not inject a role-boundary lecture into the owner's natural Kin chat.
+          : `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
         // Reuse cached, access-controlled vision observations; never request a new
         // paid analysis just to generate an autonomous story reply.
         const storyVisual = storyForReply
