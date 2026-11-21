@@ -33,6 +33,19 @@ export async function sendKindroidSocialGroupContext(
  * for serializing requests per group; concurrent social events must not
  * interleave their prompts and responses.
  */
+const groupQueues = new Map<string, Promise<void>>();
+
+async function withGroupLock<T>(groupId: string, run: () => Promise<T>): Promise<T> {
+  const previous = groupQueues.get(groupId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>(resolve => { release = resolve; });
+  const tail = previous.then(() => current);
+  groupQueues.set(groupId, tail);
+  await previous;
+  try { return await run(); }
+  finally { release(); if (groupQueues.get(groupId) === tail) groupQueues.delete(groupId); }
+}
+
 export function kindroidSocialGroupProvider(
   groupId: string,
   kinId: string,
@@ -44,6 +57,7 @@ export function kindroidSocialGroupProvider(
   return {
     name: 'kindroid',
     async complete(input) {
+      return withGroupLock(groupId, async () => {
       const choices = situation === 'story_reaction'
         ? 'VIEW, LIKE, LAUGH, SURPRISE, FIRE'
         : situation.startsWith('like_') ? 'LIKE, SKIP' : '';
@@ -81,6 +95,7 @@ export function kindroidSocialGroupProvider(
       });
       input.validate?.(decision);
       return { ...generated, text: decision };
+      });
     },
   };
 }
