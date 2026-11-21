@@ -29,14 +29,14 @@ async function getUniverse(ownerId: string, universeId: string, actorId: string)
 }
 const serializeGroup = (row: Record<string, unknown>) => ({
   id: row.id, name: row.name, avatar: row.avatar, wallpaperUrl: row.wallpaper_url ?? null, createdBy: row.created_by, muted: row.muted === true, archived: row.archived === true,
-  participantIds: row.participant_ids, unreadCount: Number(row.unread_count ?? 0), createdAt: row.created_at, updatedAt: row.updated_at,
+  participantIds: row.participant_ids, kindroidGroupId: row.kindroid_group_id ?? null, unreadCount: Number(row.unread_count ?? 0), createdAt: row.created_at, updatedAt: row.updated_at,
 });
 router.get("/group-dms", async (req, res) => {
   const parsed = scope.safeParse(req.query);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
   const { universeId, actorId } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
-  const result = await db.execute(sql`SELECT g.id, g.name, g.avatar, g.wallpaper_url, g.created_by, g.participant_ids, g.created_at, g.updated_at,
+  const result = await db.execute(sql`SELECT g.id, g.name, g.avatar, g.wallpaper_url, g.kindroid_group_id, g.created_by, g.participant_ids, g.created_at, g.updated_at,
     COALESCE(p.muted, false) AS muted, COALESCE(p.archived, false) AS archived,
     (SELECT count(*)::integer FROM echo_group_messages m WHERE m.owner_id=g.owner_id AND m.universe_id=g.universe_id AND m.group_id=g.id AND m.sender_id <> ${actorId} AND NOT (COALESCE(m.read_by,'[]'::jsonb) ? ${actorId})) AS unread_count
     FROM echo_group_conversations g LEFT JOIN echo_group_member_preferences p
@@ -60,6 +60,19 @@ router.post("/group-dms", async (req, res) => {
     (owner_id, universe_id, id, name, created_by, participant_ids)
     VALUES (${req.userId!}, ${universeId}, ${groupId}, ${name}, ${actorId}, ${JSON.stringify(members)}::jsonb)`);
   res.status(201).json({ id: groupId, name, participantIds: members });
+});
+// Any new participant or observer group can be linked to its Kindroid group.
+router.put("/group-dms/:groupId/kindroid-link", async (req, res) => {
+  const parsed = scope.extend({ kindroidGroupId: z.string().regex(/^[a-zA-Z0-9_-]{10,120}$/).nullable() }).safeParse(req.body);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) {res.status(400).json({error:"INVALID_KINDROID_GROUP"});return;}
+  const {universeId,actorId,kindroidGroupId}=parsed.data;
+  if (!await getUniverse(req.userId!,universeId,actorId)) {res.status(403).json({error:"INVALID_IDENTITY"});return;}
+  const groupId=String(req.params.groupId);
+  const result=await db.execute(sql`UPDATE echo_group_conversations SET kindroid_group_id=${kindroidGroupId},updated_at=now()
+    WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
+    AND (created_by=${actorId} OR participant_ids ? ${actorId}) RETURNING id`);
+  if (!result.rows.length) {res.status(404).json({error:"GROUP_NOT_FOUND"});return;}
+  res.json({kindroidGroupId});
 });
 // Group appearance is stored centrally, so it follows the group across devices.
 router.put("/group-dms/:groupId/wallpaper", async (req, res) => {
@@ -88,17 +101,10 @@ router.put("/group-dms/push-preference", async (req, res) => {
   res.json({ enabled: parsed.data.enabled });
 });
 // Read-only Kindroid history reconciliation. Never requests AI generation.
-const kindroidGroupMappings: Record<string, string> = {
-  group_kindroid_dead_static: "uzlDUKZ5MQMnR9sBHh6p",
-  "group_748934d7-2a16-4ff9-b841-dc9b08a5d748": "UjQg67Gg2afzKO1lJBen",
-  group_kindroid_mar_noah: "lSQ59nGePEfy3nCb6Gnp",
-  group_kindroid_hyunjin_felix: "OtszoltSpfuwCBuUoQiM",
-  group_kindroid_pretty_violence: "t98WkOKxO2zunh75audT",
-};
 const kindroidHistoryLastCheck = new Map<string, number>();
 const kindroidHistoryPending = new Map<string, Promise<void>>();
 export async function reconcileKindroidGroupHistory(ownerId: string, universeId: string, groupId: string) {
-  if (universeId !== "primary" || !kindroidGroupMappings[groupId]) return;
+  if (universeId !== "primary") return;
   const apiKey = process.env.ECHO_KINDROID_API_KEY;
   if (!apiKey) return;
   const cacheKey = ownerId + ":" + universeId + ":" + groupId;
@@ -107,10 +113,11 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
   if (Date.now() - (kindroidHistoryLastCheck.get(cacheKey) ?? 0) < 30_000) return;
   kindroidHistoryLastCheck.set(cacheKey, Date.now());
   const task = (async () => {
-    const group = await db.execute(sql`SELECT participant_ids FROM echo_group_conversations
+    const group = await db.execute(sql`SELECT participant_ids, kindroid_group_id FROM echo_group_conversations
       WHERE owner_id=${ownerId} AND universe_id=${universeId} AND id=${groupId} LIMIT 1`);
     const members = group.rows[0]?.participant_ids;
-    if (!Array.isArray(members)) return;
+    const groupIdOnKindroid = String(group.rows[0]?.kindroid_group_id ?? "");
+    if (!/^[a-zA-Z0-9_-]{10,120}$/.test(groupIdOnKindroid) || !Array.isArray(members)) return;
     const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
       WHERE owner_id=${ownerId} AND universe_id=${universeId} AND enabled=true`);
     const byKin = new Map<string, string>();
@@ -130,7 +137,6 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
       const kinId = String(link.kin_id ?? "");
       if (members.includes(characterId) && kinId) byKin.set(kinId, characterId);
     }
-    const groupIdOnKindroid = kindroidGroupMappings[groupId];
     let cursor: number | undefined;
     for (let page = 0; page < 5; page++) {
       const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
@@ -199,10 +205,9 @@ export async function reconcileActiveKindroidGroups() {
   const ownerId = "user_3LeoBfUicTthDVixNbkPlqXFkdZ";
   const universeId = "primary";
   const groups = await db.execute(sql`SELECT id FROM echo_group_conversations
-    WHERE owner_id=${ownerId} AND universe_id=${universeId}`);
+    WHERE owner_id=${ownerId} AND universe_id=${universeId} AND kindroid_group_id IS NOT NULL`);
   for (const row of groups.rows) {
     const groupId = String(row.id);
-    if (!kindroidGroupMappings[groupId]) continue;
     await reconcileKindroidGroupHistory(ownerId, universeId, groupId);
   }
 }
