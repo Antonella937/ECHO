@@ -83,7 +83,8 @@ export async function generateSceneKindroidOnce(
     let text:string;
     try{
       text=await generateGroupReply();
-      if(!text.trim())throw new Error("KINDROID_SCENE_EMPTY_GROUP_REPLY");
+      if(typeof text!=="string" || !text.trim() || text.length>8000)
+        throw new Error("KINDROID_SCENE_INVALID_GROUP_REPLY");
     }catch{
       const recorded=await finishSceneKindroidGeneration(input,"uncertain");
       await markSceneGroupLeaseUncertain(lease);
