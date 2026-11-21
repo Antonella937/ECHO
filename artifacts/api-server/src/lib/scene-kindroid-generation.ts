@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { acquireSceneGroupLease, markSceneGroupLeaseUncertain, releaseSceneGroupLease } from "./scene-kindroid-group-lease";
 import { parseKindroidSceneGroupReply } from "./scene-kindroid-reply";
+import { persistKindroidSceneReply } from "./scene-kindroid-persist";
 
 export type SceneGenerationClaim={
   ownerId:string;universeId:string;sceneId:string;sourceEventId:string;
@@ -131,4 +132,13 @@ export async function generateParsedSceneKindroidOnce(
     if(!text)throw new Error("KINDROID_SCENE_GROUP_DRAFT_INVALID");
     return text;
   },persistSceneReply);
+}
+
+/** Group-only orchestration entry point. Does not call Kindroid private DMs. */
+export async function generateAndPersistSceneKindroidOnce(
+  input:SceneGenerationClaim,
+  completeGroup:()=>Promise<{text:string}>,
+){
+  return generateParsedSceneKindroidOnce(input,completeGroup,
+    async text=>{await persistKindroidSceneReply(input,text);});
 }
