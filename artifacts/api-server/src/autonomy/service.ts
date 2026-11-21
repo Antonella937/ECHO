@@ -661,6 +661,12 @@ export async function runAutonomyLiveCycle(
       characterId: character.id, runId, model: preview.model,
     };
   } catch (error) {
+    console.warn("AUTONOMY_LIVE_EXECUTION_DIAGNOSTIC", {
+      characterId: character.id, universeId, lane: dependencies.lane,
+      errorName: error instanceof Error ? error.name : "UNKNOWN",
+      safeCode: error instanceof EngineError ? error.code : error instanceof Error && /^[A-Z0-9_]{1,80}$/.test(error.message) ? error.message : "UNCLASSIFIED",
+      stackLocation: error instanceof Error ? error.stack?.split("\n").slice(1, 3).map(line => line.trim()) : undefined,
+    });
     const code = error instanceof EngineError
       ? error.code
       : error instanceof Error && /^[A-Z0-9_]{1,80}$/.test(error.message)
