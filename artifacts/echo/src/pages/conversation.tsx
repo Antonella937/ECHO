@@ -82,6 +82,19 @@ export default function ConversationPage() {
   },[appearanceKey,legacyAppearanceKey,isOriginalIdentity,user?.id,id,identityId]);
   const other = character(id);
   const messages = useThreadMessages(id);
+  // Opening a DM should reconcile messages written by server-side autonomy
+  // even when this browser has been idle on an older universe revision.
+  // The existing sync coordinator merges remote messages with unsaved local edits;
+  // never replace the thread state or mark an incoming message read here.
+  const refreshDmRef = useRef(actions.refreshAfterApproval);
+  refreshDmRef.current = actions.refreshAfterApproval;
+  useEffect(() => {
+    if (!id || !user?.id) return;
+    void refreshDmRef.current().catch(() => {
+      // The sync coordinator retains and surfaces conflicts/errors globally.
+      // A failed refresh must not discard locally composed messages.
+    });
+  }, [id, user?.id, identityId]);
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
   const [text, setText] = useState('');
