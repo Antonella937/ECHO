@@ -1,3 +1,5 @@
+import { isKindroidGroupSyncableEvent } from "../lib/scene-kindroid-sync-policy";
+import { deliverSceneKindroidEventOnce } from "../lib/scene-kindroid-delivery";
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
 import { parseKindroidGroupId } from "../lib/kindroid-group-id";
 import { mapKindroidSceneHistory } from "../lib/scene-kindroid-history";
@@ -237,6 +239,54 @@ scenesRouter.post("/scenes/events", async (req, res) => {
       VALUES (${req.userId!},${universeId},${sceneId},${eventId},${actorId},${visibility},${audience}::jsonb,${text})`);
     res.status(201).json({ eventId });
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
+});
+
+// Explicit opt-in scene event delivery. Never sends private events or uses Kin DMs.
+// Disabled until the delivery ledger migration is applied and the feature is enabled.
+scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
+  if (process.env.ECHO_KINDROID_SCENE_SEND_ENABLED !== "true") {
+    res.status(503).json({error:"KINDROID_SCENE_SEND_NOT_ENABLED"}); return;
+  }
+  const parsed=scope.extend({eventId:id}).strict().safeParse(req.body);
+  const sceneId=id.safeParse(req.params.sceneId);
+  if(!parsed.success || !sceneId.success){res.status(400).json({error:"INVALID_SCENE_DELIVERY"});return;}
+  const {universeId,eventId}=parsed.data;
+  const ownerId=req.userId!;
+  try {
+    const [universe]=await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
+      .where(and(eq(echoUniversesTable.ownerId,ownerId),eq(echoUniversesTable.universeId,universeId))).limit(1);
+    const identity=(universe?.state as {currentCharacterId?:string}|null)?.currentCharacterId;
+    if(!identity){res.status(403).json({error:"SCENE_IDENTITY_REQUIRED"});return;}
+    const scenes=await db.execute(sql`SELECT status,participant_ids,turn_settings FROM echo_scenes
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND scene_id=${sceneId.data} LIMIT 1`);
+    const scene=scenes.rows[0];
+    const participants=Array.isArray(scene?.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : [];
+    const groupId=parseKindroidGroupId(String((scene?.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+    if(scene?.status!=="active" || !groupId || !participants.includes(identity)){
+      res.status(409).json({error:"KINDROID_SCENE_GROUP_NOT_READY"});return;
+    }
+    const events=await db.execute(sql`SELECT event_id,actor_id,text,visibility,audience_ids FROM echo_scene_events
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND scene_id=${sceneId.data}
+        AND event_id=${eventId} LIMIT 1`);
+    const eventRow=events.rows[0];
+    if(!eventRow || !isKindroidGroupSyncableEvent({
+      eventId:String(eventRow.event_id),actorId:String(eventRow.actor_id),text:String(eventRow.text),
+      visibility:String(eventRow.visibility),audienceIds:eventRow.audience_ids,
+    },identity,participants)){res.status(403).json({error:"SCENE_EVENT_NOT_GROUP_SYNCABLE"});return;}
+    const collisions=await db.execute(sql`SELECT 1 FROM echo_group_conversations
+      WHERE owner_id=${ownerId} AND kindroid_group_id=${groupId}
+      UNION ALL SELECT 1 FROM echo_scenes other WHERE other.owner_id=${ownerId}
+        AND NOT (other.universe_id=${universeId} AND other.scene_id=${sceneId.data})
+        AND other.turn_settings ->> 'kindroidGroupId' = ${groupId} LIMIT 1`);
+    if(collisions.rows.length){res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"});return;}
+    const apiKey=process.env.ECHO_KINDROID_API_KEY;
+    if(!apiKey){res.status(503).json({error:"KINDROID_KEY_MISSING"});return;}
+    const result=await deliverSceneKindroidEventOnce(
+      {ownerId,universeId,sceneId:sceneId.data,eventId,groupId},String(eventRow.text),apiKey);
+    res.status(result==="sent"?200:409).json({status:result});
+  }catch{
+    res.status(503).json({error:"KINDROID_SCENE_DELIVERY_UNAVAILABLE"});
+  }
 });
 
 const globalAiStyle = scope.extend({
