@@ -338,7 +338,7 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
           method: 'POST',
           signal: AbortSignal.timeout(90000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ group_id: groupId, ai_id: kinId, stream: true }),
+          body: JSON.stringify({ group_id: groupId, ai_id: kinId, stream: false }),
         }), echoCharacterId);
       } catch (error) {
         throw new EngineError(error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
