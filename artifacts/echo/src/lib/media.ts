@@ -147,7 +147,7 @@ function fetchPrivateMedia(url: string) {
         privateMediaRetryTimers.set(url, timer);
       }
       privateMediaListeners.forEach(notify => notify());
-      console.warn('No se pudo mostrar un archivo privado de ECHO.', error);
+      console.warn('No se pudo mostrar un archivo privado de ECHO.', { reason: error instanceof Error ? error.message : 'UNKNOWN', storage: url.includes('/objects/r2/') ? 'r2' : 'supabase' });
     })
     .finally(() => {
       privateMediaPending.delete(url);
