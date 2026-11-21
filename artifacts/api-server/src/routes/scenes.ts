@@ -1,6 +1,7 @@
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
 import { parseKindroidGroupId } from "../lib/kindroid-group-id";
 import { mapKindroidSceneHistory } from "../lib/scene-kindroid-history";
+import { readKindroidScenePages, KindroidSceneHistoryError } from "../lib/scene-kindroid-pages";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -363,22 +364,11 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
     if (!byKin.size) {
       res.status(409).json({error:"KINDROID_SCENE_NO_LINKED_PARTICIPANTS"}); return;
     }
-    const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
-    url.searchParams.set("group_id",groupId);
-    url.searchParams.set("limit","100");
-    const response = await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`},signal:AbortSignal.timeout(15000)});
-    if (!response.ok) {
-      res.status(response.status===429?429:502).json({error:response.status===429?"KINDROID_RATE_LIMITED":"KINDROID_SCENE_HISTORY_UNAVAILABLE"});
-      return;
-    }
-    const payload:unknown = await response.json();
-    if (!payload || typeof payload!=="object" || !Array.isArray((payload as {messages?:unknown}).messages)) {
-      res.status(502).json({error:"KINDROID_SCENE_HISTORY_FORMAT_INVALID"}); return;
-    }
-    const messages = (payload as {messages:unknown[]}).messages;
+    const messages = await readKindroidScenePages(groupId,apiKey);
     const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
     res.json({sceneId:sceneId.data,matchedEvents:events.length,totalMessages:messages.length,events});
-  } catch {
+  } catch (error) {
+    if (error instanceof KindroidSceneHistoryError) {res.status(error.status).json({error:error.code});return;}
     res.status(503).json({error:"KINDROID_SCENE_HISTORY_PREVIEW_FAILED"});
   }
 });
@@ -433,26 +423,7 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
     if (!byKin.size) {
       res.status(409).json({error:"KINDROID_SCENE_NO_LINKED_PARTICIPANTS"}); return;
     }
-    const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
-    url.searchParams.set("group_id",groupId);
-    url.searchParams.set("limit","100");
-    const response = await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`},signal:AbortSignal.timeout(15000)});
-    if (!response.ok) {
-      res.status(response.status===429?429:502).json({error:response.status===429?"KINDROID_RATE_LIMITED":"KINDROID_SCENE_HISTORY_UNAVAILABLE"});
-      return;
-    }
-    const payload:unknown = await response.json();
-    if (!payload || typeof payload!=="object" || !Array.isArray((payload as {messages?:unknown}).messages)) {
-      res.status(502).json({error:"KINDROID_SCENE_HISTORY_FORMAT_INVALID"}); return;
-    }
-    const messages = (payload as {messages:unknown[]}).messages;
-    // Do not silently import only the newest page of a longer Kindroid history.
-    // A partial import could make a scene appear to have complete context.
-    const pagination = (payload as {pagination?:unknown}).pagination;
-    if (pagination && typeof pagination === "object" &&
-        (pagination as {hasMore?:unknown}).hasMore === true) {
-      res.status(409).json({error:"KINDROID_SCENE_HISTORY_PAGINATION_REQUIRED"}); return;
-    }
+    const messages = await readKindroidScenePages(groupId,apiKey);
     const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
     // Import is an explicit action, never a side effect of the preview.
     // Stable group-scoped IDs and ON CONFLICT make repeated imports idempotent.
@@ -467,7 +438,8 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
       if (inserted.rows.length) imported++;
     }
     res.json({sceneId:sceneId.data,matchedEvents:events.length,imported});
-  } catch {
+  } catch (error) {
+    if (error instanceof KindroidSceneHistoryError) {res.status(error.status).json({error:error.code});return;}
     res.status(503).json({error:"KINDROID_SCENE_HISTORY_IMPORT_FAILED"});
   }
 });
