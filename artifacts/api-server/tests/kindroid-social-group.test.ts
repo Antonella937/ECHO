@@ -290,3 +290,26 @@ test('social context reports timeouts distinctly without a private DM fallback',
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('invalid Kin identity never leaves an orphaned technical prompt in Kindroid', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    calls.push(String(url));
+    throw new Error('network must not be called');
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      kindroidSocialGroupProvider('group12345678', 'invalid!', 'comment',
+        'Visible post', undefined, request).complete({
+          system: '', context: '', outputSchema: {},
+        }),
+      /KINDROID_GROUP_ID_INVALID/,
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
