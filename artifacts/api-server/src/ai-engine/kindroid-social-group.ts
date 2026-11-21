@@ -86,7 +86,10 @@ export function kindroidSocialGroupProvider(
         throw new EngineError('KINDROID_SOCIAL_RESPONSE_INVALID', 502);
       }
       const reply = (envelope as { text: string }).text.trim();
-      const cleaned = reply.replace(/^START MESSAGE\s*\n/i, '').replace(/\n\s*END MESSAGE$/i, '').trim();
+      const cleaned = reply
+        .replace(/^\\s*(?:<<\\s*)?START MESSAGE(?:\\s*>>)?\\s*\\n/i, '')
+        .replace(/\\n\\s*(?:<<\\s*)?END MESSAGE(?:\\s*>>)?\\s*$/i, '')
+        .trim();
       let action: string = 'draft';
       let text: string | null = null;
       let reaction: string | null = null;
