@@ -462,8 +462,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     if (typeof kinId !== 'string' || !kinId) throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
     const post = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
     const comment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
-    const visibleContext = [post?.caption, comment?.text].filter(Boolean).join('\n');
-    if (!visibleContext) throw new EngineError('SOCIAL_TARGET_NOT_FOUND', 404);
+    // Image-only posts and emoji-only comments are legitimate social targets.
+    // Do not invent a visual description when no cached vision was requested.
+    if (!post && !comment) throw new EngineError('SOCIAL_TARGET_NOT_FOUND', 404);
+    const visibleContext = [post?.caption?.trim() || (post ? 'Visible post with no caption (image contents unknown).' : ''),
+      comment?.text?.trim() || ''].filter(Boolean).join('\n');
     selectedProvider = kindroidLikeDecisionProvider(kinId, input.situation, visibleContext, undefined, input.characterId);
   }
   // Keep the previous non-text policy only for other owners.
