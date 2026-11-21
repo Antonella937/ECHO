@@ -312,7 +312,7 @@ export function chooseAutonomyOpportunity(input: {
   // select locally before calling a model, honor relationships, daily caps and
   // cooldowns, and avoid outreach during sleeping hours.
   if (input.lane === "dm" && !unanswered &&
-      history.length < (input.maxActionsPerDay ?? 2) &&
+      history.length < 30 &&
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
       local.hour >= 8 && local.hour < 23) {
     // The worker runs every two minutes. Tiny per-tick probabilities made
@@ -322,7 +322,8 @@ export function chooseAutonomyOpportunity(input: {
     const recipients = availableTargets(state, character).filter(candidate =>
       (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(candidate.id)) &&
       (candidate.id !== state.primaryCharacterId || input.allowOwnerSpontaneousDm !== false) &&
-      !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
+      !history.some(item => item.situation === "dm" && item.targetId === candidate.id &&
+        now.getTime() - item.createdAt.getTime() < (input.minCooldownMinutes ?? 360) * 60_000));
     // Only roll for spontaneous outreach when an eligible contact exists.
     // Keep the selected frequency and cooldown unchanged; do not fabricate a
     // message or call Kindroid when there is nobody authorized to receive it.
