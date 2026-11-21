@@ -96,6 +96,14 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       console.warn('DM preference lookup skipped', { reason: error instanceof Error ? error.name : 'UNKNOWN' });
     }
   }
+  // /v1/send-message mutates the Kin's private conversation. Social actions
+  // must not call it until a verified isolated provider is available.
+  if (dependencies.liveDmReply === true &&
+      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
+      ['comment', 'post', 'story_reaction', 'like_post', 'like_comment'].includes(input.situation) &&
+      process.env.ECHO_KINDROID_SOCIAL_PRIVATE_HISTORY_OPT_IN !== 'true') {
+    throw new EngineError('KINDROID_SOCIAL_ISOLATION_REQUIRED', 503);
+  }
   // Linked Kin IDs are stored server-side, never exposed to the client.
   // The founder's linked characters use Kindroid for live DMs and social decisions;
   // ECHO only schedules opportunities and enforces visibility/permission checks.
