@@ -39,3 +39,20 @@ test("rejects an oversized Kindroid history page",async()=>{
   await assert.rejects(readKindroidScenePages(group,"test-key",request),
     (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_SCENE_HISTORY_PAGE_TOO_LARGE");
 });
+
+test("preserves Kindroid rate-limit status without returning partial history",async()=>{
+  const request=(async()=>new Response("rate limited",{status:429})) as typeof fetch;
+  await assert.rejects(readKindroidScenePages(group,"test-key",request),
+    (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_RATE_LIMITED" && error.status===429);
+});
+test("rejects an empty continuation page",async()=>{
+  let calls=0;
+  const request=(async()=>{
+    calls++;
+    return reply(calls===1
+      ? {messages:[{id:"first"}],pagination:{hasMore:true,lastTimestamp:10}}
+      : {messages:[],pagination:{hasMore:true,lastTimestamp:11}});
+  }) as typeof fetch;
+  await assert.rejects(readKindroidScenePages(group,"test-key",request),
+    (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_SCENE_HISTORY_CURSOR_INVALID");
+});
