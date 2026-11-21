@@ -207,7 +207,9 @@ export async function reserveDryRun(
         )).returning({ id: echoAutonomyRunsTable.id });
         if (reclaimed) return { kind: "created", runId: String(existing.id) };
       }
-      if (existing.status === "running" && Date.now() - existing.updatedAt.getTime() >= 120_000 &&
+      // Social group prompts are not idempotent on Kindroid: never replay a
+      // potentially delivered prompt after a timeout or server restart.
+      if (lane === "dm" && existing.status === "running" && Date.now() - existing.updatedAt.getTime() >= 120_000 &&
         existing.attemptCount < 3) {
         const [reclaimed] = await tx.update(echoAutonomyRunsTable).set({
           status: "running", sourceRevision, updatedAt: new Date(),
