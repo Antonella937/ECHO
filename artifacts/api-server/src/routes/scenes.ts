@@ -365,6 +365,14 @@ scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
             AND other.scene_id <> ${sceneId.data}
             AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
         ))
+        // A scene must never share a Kindroid group with a regular ECHO group:
+        // both would independently import or generate the same history.
+        AND (${groupId}::text IS NULL OR NOT EXISTS (
+          SELECT 1 FROM echo_group_conversations existing_group
+          WHERE existing_group.owner_id = ${req.userId!}
+            AND existing_group.universe_id = ${universeId}
+            AND existing_group.kindroid_group_id = ${groupId}
+        ))
       RETURNING scene_id`);
     if (!rows.rows.length) {
       const existing = await db.execute(sql`SELECT scene_id FROM echo_scenes
