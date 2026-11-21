@@ -36,3 +36,14 @@ test("different group IDs yield different event IDs for identical message IDs", 
   const second = mapKindroidSceneHistory("anotherGroupId123", [message("one", "kin-mar", "Hi")], kinToCharacter, allowed);
   assert.notEqual(first[0].eventId, second[0].eventId);
 });
+
+test("rejects blank and oversized source IDs without dropping valid messages", () => {
+  const result = mapKindroidSceneHistory(groupId, [
+    message("   ", "kin-mar", "blank"),
+    message("x".repeat(257), "kin-mar", "oversized"),
+    message("valid", "kin-noah", "Safe."),
+  ], kinToCharacter, allowed);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].actorId, "noah");
+  assert.equal(result[0].text, "Safe.");
+});
