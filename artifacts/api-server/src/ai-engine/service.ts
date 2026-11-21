@@ -435,7 +435,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .filter(x => x.score > 0)
             .sort((a,b) => b.score-a.score || new Date(b.p.createdAt).getTime()-new Date(a.p.createdAt).getTime())
             .slice(0,1)
-            .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${(x.author?.name ?? 'Unknown').slice(0,60)}: ${x.p.caption.slice(0,260)}`) : [];
+            .map(x => `Older ECHO post (${new Date(x.p.createdAt).toISOString().slice(0,10)}) by ${safeExcerpt(x.author?.name, 60) || 'Unknown'}: ${safeExcerpt(x.p.caption, 260)}`) : [];
           // Stories are only remembered if this actor actually viewed them.
           // Never infer story viewing from a follow alone.
           const seenStories = visibleSeenStoriesForKindroid(freshState, input.characterId)
@@ -443,13 +443,13 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .slice(0,1)
             .map(s => {
               const author = parsed.data.state.characters.find(ch => ch.id === s.authorId);
-              return `Story actually viewed by this character, posted by ${(author?.name ?? 'Unknown').slice(0,60)}: ${s.caption.slice(0,200)}`;
+              return `Story actually viewed by this character, posted by ${safeExcerpt(author?.name, 60) || 'Unknown'}: ${safeExcerpt(s.caption, 200)}`;
             });
           // The shared context builder already ranks archived memories and
           // scopes private conversation memories to this exact DM recipient.
           const memories = (data.memory?.historicalRecalled ?? []).slice(0,1)
             .filter(m => kindroidMemoryAllowed(m, 'nela'))
-            .map(m => `Earlier ECHO memory (${(m.kind ?? 'event').slice(0,32)}): ${(m.text ?? '').slice(0,350)}`);
+            .map(m => `Earlier ECHO memory (${safeExcerpt(m.kind, 32) || 'event'}): ${safeExcerpt(m.text, 350)}`);
           const journalFacts = await relevantWorldJournals(ownerId, input.universeId ?? 'primary', input.characterId, outgoingPrompt)
             .then(entries => entries.map(entry => `Known world journal (${entry.truthStatus}; ${entry.title}): ${entry.content}`))
             .catch(() => [] as string[]);
