@@ -96,7 +96,21 @@ export async function listLiveOptInTargets() {
     eq(echoUniversesTable.universeId, echoAutonomyCharactersTable.universeId),
   )
   ).where(and(
-    sql`(${echoAutonomyCharactersTable.enabled} = true OR ${echoAutonomyCharactersTable.dmEnabled} = true)`,
+    // Include peer-only DM characters even when social and unsolicited owner DMs are off.
+    // Both sides must have enabled permission rows that allow each other.
+    sql`(${echoAutonomyCharactersTable.enabled} = true OR ${echoAutonomyCharactersTable.dmEnabled} = true
+      OR EXISTS (
+        SELECT 1 FROM echo_character_dm_permissions sender
+        JOIN echo_character_dm_permissions peer
+          ON peer.owner_id = sender.owner_id AND peer.universe_id = sender.universe_id
+          AND peer.character_id <> sender.character_id
+        WHERE sender.owner_id = ${echoAutonomyCharactersTable.ownerId}
+          AND sender.universe_id = ${echoAutonomyCharactersTable.universeId}
+          AND sender.character_id = ${echoAutonomyCharactersTable.characterId}
+          AND sender.enabled = true AND peer.enabled = true
+          AND sender.allowed_peer_ids @> jsonb_build_array(peer.character_id)
+          AND peer.allowed_peer_ids @> jsonb_build_array(sender.character_id)
+      ))`,
     eq(echoAutonomyOwnersTable.killSwitchEngaged, false),
     isNull(echoUniversesTable.archivedAt),
     isNull(echoUniversesTable.deletedAt),
