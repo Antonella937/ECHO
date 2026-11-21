@@ -214,15 +214,16 @@ export default function ScenesPage() {
     }
     if(target)await generateReply(target);
   };
-  const deleteScene = async () => {
-    if (!active || busy || !window.confirm(es
+  const deleteScene = async (sceneToDelete?: Scene) => {
+    const target = sceneToDelete ?? active;
+    if (!target || busy || !window.confirm(es
       ? '¿Eliminar esta escena definitivamente? Se borrarán también sus mensajes y recuerdos. Esta acción no se puede deshacer.'
       : 'Permanently delete this scene? Its messages and memories will also be erased. This cannot be undone.')) return;
     setBusy(true); setError('');
     try {
-      await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}?${new URLSearchParams({universeId})}`, { method:'DELETE', responseType:'json' });
-      setScenes(previous => previous.filter(scene => scene.sceneId !== active.sceneId));
-      setSelected(null); setEvents([]); setPresence({});
+      await customFetch(`/api/scenes/${encodeURIComponent(target.sceneId)}?${new URLSearchParams({universeId})}`, { method:'DELETE', responseType:'json' });
+      setScenes(previous => previous.filter(scene => scene.sceneId !== target.sceneId));
+      if (selected === target.sceneId) { setSelected(null); setEvents([]); setPresence({}); }
     } catch { setError(es ? 'No se pudo eliminar la escena.' : 'Could not delete scene.'); }
     finally { setBusy(false); }
   };
@@ -250,7 +251,10 @@ export default function ScenesPage() {
       </fieldset>
       <button disabled={busy||!title.trim()||!participants.length} className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">{st("Crear")}</button>
     </form>}
-    {!active&&<section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><button key={s.sceneId} onClick={()=>setSelected(s.sceneId)} className={`block w-full rounded-xl border p-3 text-left ${selected===s.sceneId?'border-primary':'border-border'}`}><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>)}</section>}
+    {!active&&<section className="space-y-2"><h2 className="font-semibold">{st("Mis escenas")}</h2>{scenes.map(s=><div key={s.sceneId} className={`flex items-center gap-2 rounded-xl border p-2 ${selected===s.sceneId?'border-primary':'border-border'}`}>
+      <button type="button" onClick={()=>setSelected(s.sceneId)} className="min-w-0 flex-1 p-1 text-left"><strong>{s.title}</strong><div className="text-xs text-muted-foreground">{s.canon==='main'?(es?'Principal':'Main'):(es?'Alternativo':'Alternate')} · {s.status}</div></button>
+      <button type="button" disabled={busy} onClick={()=>void deleteScene(s)} aria-label={es?`Eliminar escena ${s.title}`:`Delete scene ${s.title}`} title={es?'Eliminar escena':'Delete scene'} className="shrink-0 rounded-lg border border-destructive/50 px-3 py-2 text-xs text-destructive disabled:opacity-50">{es?'Eliminar':'Delete'}</button>
+    </div>)}</section>}
     {active&&<section className="relative isolate flex min-h-0 flex-1 flex-col gap-2 overflow-hidden bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-[calc(env(safe-area-inset-top,0px)+12px)]">
       {(sceneWallpaper||linkedGroupWallpaper)&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.28)),url("${(sceneWallpaper||linkedGroupWallpaper).startsWith("data:") ? (sceneWallpaper||linkedGroupWallpaper) : resolveMedia(sceneWallpaper||linkedGroupWallpaper)}")`}} />}
       <div className="relative z-20 grid shrink-0 grid-cols-[48px_minmax(0,1fr)_48px] items-center gap-2 px-1 py-1 text-white">
