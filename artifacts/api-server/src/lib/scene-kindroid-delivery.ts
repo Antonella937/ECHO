@@ -22,13 +22,26 @@ export async function reserveSceneKindroidDelivery(input:SceneDelivery):Promise<
 
 /** Claim the right to attempt the network write exactly once. */
 export async function beginSceneKindroidDelivery(input:SceneDelivery):Promise<boolean>{
-  const result=await db.execute(sql`UPDATE echo_scene_kindroid_deliveries
-    SET status='sending',attempted_at=now()
-    WHERE owner_id=${input.ownerId} AND universe_id=${input.universeId}
-      AND scene_id=${input.sceneId} AND event_id=${input.eventId}
-      AND kindroid_group_id=${input.groupId} AND status='reserved'
-    RETURNING delivery_key`);
-  return result.rows.length===1;
+  try {
+    const result=await db.execute(sql`UPDATE echo_scene_kindroid_deliveries
+      SET status='sending',attempted_at=now()
+      WHERE owner_id=${input.ownerId} AND universe_id=${input.universeId}
+        AND scene_id=${input.sceneId} AND event_id=${input.eventId}
+        AND kindroid_group_id=${input.groupId} AND status='reserved'
+        AND NOT EXISTS (
+          SELECT 1 FROM echo_scene_kindroid_deliveries other
+          WHERE other.owner_id=${input.ownerId}
+            AND other.kindroid_group_id=${input.groupId}
+            AND other.status='sending'
+        )
+      RETURNING delivery_key`);
+    return result.rows.length===1;
+  } catch (error) {
+    // Concurrent claims can both pass NOT EXISTS; the partial unique index
+    // resolves that race. SQLSTATE 23505 means this group is already sending.
+    if (error && typeof error==="object" && "code" in error && error.code==="23505") return false;
+    throw error;
+  }
 }
 
 /** A failed/unknown network write is never automatically eligible for retry. */
