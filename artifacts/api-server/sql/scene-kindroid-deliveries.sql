@@ -52,3 +52,24 @@ CREATE TABLE IF NOT EXISTS echo_scene_kindroid_generations (
 CREATE UNIQUE INDEX IF NOT EXISTS echo_scene_kindroid_one_generation_per_group
   ON echo_scene_kindroid_generations (owner_id,kindroid_group_id)
   WHERE status = 'generating';
+
+-- A shared per-group lease serializes both human messages and Kin generations.
+-- The per-operation partial indexes above remain defense in depth.
+CREATE TABLE IF NOT EXISTS echo_scene_kindroid_group_leases (
+  owner_id text NOT NULL,
+  kindroid_group_id text NOT NULL,
+  operation_kind text NOT NULL,
+  scene_id text NOT NULL,
+  operation_id text NOT NULL,
+  status text NOT NULL DEFAULT 'active',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  resolved_at timestamptz,
+  CONSTRAINT echo_scene_kindroid_group_leases_pk
+    PRIMARY KEY (owner_id,kindroid_group_id),
+  CONSTRAINT echo_scene_kindroid_group_leases_kind_check
+    CHECK (operation_kind IN ('send','generate')),
+  CONSTRAINT echo_scene_kindroid_group_leases_status_check
+    CHECK (status IN ('active','uncertain','resolved'))
+);
+-- A lease in 'uncertain' state must be manually reconciled, never timed out
+-- and silently reused. Do not delete these rows as routine cleanup.
