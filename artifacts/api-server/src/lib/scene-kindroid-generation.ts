@@ -89,8 +89,8 @@ export async function generateSceneKindroidOnce(
         throw new Error("KINDROID_SCENE_INVALID_GROUP_REPLY");
     }catch{
       const recorded=await finishSceneKindroidGeneration(input,"uncertain");
-      await markSceneGroupLeaseUncertain(lease);
-      if(!recorded)throw new Error("SCENE_GENERATION_STATE_LOST");
+      const blocked=await markSceneGroupLeaseUncertain(lease);
+      if(!recorded || !blocked)throw new Error("SCENE_GENERATION_STATE_LOST");
       return {status:"uncertain"};
     }
     // The group response may already be durable in Kindroid. Persist the
