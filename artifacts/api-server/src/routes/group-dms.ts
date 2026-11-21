@@ -27,7 +27,7 @@ async function getUniverse(ownerId: string, universeId: string, actorId: string)
   return characters;
 }
 const serializeGroup = (row: Record<string, unknown>) => ({
-  id: row.id, name: row.name, avatar: row.avatar, createdBy: row.created_by, muted: row.muted === true, archived: row.archived === true,
+  id: row.id, name: row.name, avatar: row.avatar, wallpaperUrl: row.wallpaper_url ?? null, createdBy: row.created_by, muted: row.muted === true, archived: row.archived === true,
   participantIds: row.participant_ids, createdAt: row.created_at, updatedAt: row.updated_at,
 });
 router.get("/group-dms", async (req, res) => {
@@ -35,7 +35,7 @@ router.get("/group-dms", async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: "INVALID_QUERY" }); return; }
   const { universeId, actorId } = parsed.data;
   if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
-  const result = await db.execute(sql`SELECT g.id, g.name, g.avatar, g.created_by, g.participant_ids, g.created_at, g.updated_at,
+  const result = await db.execute(sql`SELECT g.id, g.name, g.avatar, g.wallpaper_url, g.created_by, g.participant_ids, g.created_at, g.updated_at,
     COALESCE(p.muted, false) AS muted, COALESCE(p.archived, false) AS archived
     FROM echo_group_conversations g LEFT JOIN echo_group_member_preferences p
       ON p.owner_id = g.owner_id AND p.universe_id = g.universe_id AND p.group_id = g.id AND p.actor_id = ${actorId}
@@ -58,6 +58,23 @@ router.post("/group-dms", async (req, res) => {
     (owner_id, universe_id, id, name, created_by, participant_ids)
     VALUES (${req.userId!}, ${universeId}, ${groupId}, ${name}, ${actorId}, ${JSON.stringify(members)}::jsonb)`);
   res.status(201).json({ id: groupId, name, participantIds: members });
+});
+// Group appearance is stored centrally, so it follows the group across devices.
+router.put("/group-dms/:groupId/wallpaper", async (req, res) => {
+  const parsed = scope.extend({ wallpaperUrl: z.string().url().max(2048).nullable() }).safeParse({
+    ...req.body, universeId: req.body?.universeId, actorId: req.body?.actorId,
+  });
+  if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_WALLPAPER" }); return; }
+  const { universeId, actorId, wallpaperUrl } = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({ error: "INVALID_IDENTITY" }); return; }
+  const groupId = String(req.params.groupId);
+  const updated = await db.execute(sql`UPDATE echo_group_conversations
+    SET wallpaper_url=${wallpaperUrl}, updated_at=now()
+    WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
+    AND (participant_ids ? ${actorId} OR created_by=${actorId})
+    RETURNING wallpaper_url`);
+  if (!updated.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
+  res.json({ wallpaperUrl: updated.rows[0].wallpaper_url });
 });
 // Read-only Kindroid history reconciliation. Never requests AI generation.
 const kindroidGroupMappings: Record<string, string> = {
