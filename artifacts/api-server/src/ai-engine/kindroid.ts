@@ -345,6 +345,17 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
           ? 'KINDROID_GROUP_TIMEOUT' : 'KINDROID_GROUP_CONNECTION_FAILED', 502);
       }
       if (!response.ok) {
+        // Record only a categorized, non-reversible diagnostic; never expose the
+        // Kindroid response body, group ID, Kin ID or private conversation.
+        const failure = await classifyKindroidFailure(response);
+        console.warn('[kindroid-group] ai-response rejected ' + JSON.stringify({
+          status: response.status,
+          category: failure.category,
+          providerCode: failure.providerCode,
+          errorFormat: failure.errorFormat,
+          errorFingerprint: failure.errorFingerprint,
+          explicitSpeaker,
+        }));
         throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_GROUP_REQUEST_FAILED', response.status === 429 ? 429 : 502);
       }
       const reply = (await response.text()).trim();
