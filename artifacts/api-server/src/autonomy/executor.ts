@@ -516,8 +516,14 @@ export async function executeAutonomyDecision(input: {
         eq(echoCharacterGalleryTable.characterId,input.characterId),
         eq(echoCharacterGalleryTable.reserved,false),
       )).for("update").limit(1);
-      if (selected && (selected.reusable || selected.usedCount === 0) &&
-          (selected.usedCount === 0 || !selected.lastUsedAt || now.getTime()-selected.lastUsedAt.getTime()>=30*DAY_MS)) {
+      if (!selected || selected.visionStatus !== 'complete' || !selected.visionAnalysis ||
+          !(selected.reusable || selected.usedCount === 0) ||
+          !(selected.usedCount === 0 || !selected.lastUsedAt || now.getTime()-selected.lastUsedAt.getTime()>=30*DAY_MS)) {
+        // The Kin explicitly chose a photo. Do not silently publish the caption
+        // without it if another worker reserved/used it or analysis is missing.
+        throw new SocialExecutionError('GALLERY_PHOTO_UNAVAILABLE');
+      }
+      {
         const post = mutation.state.posts.find(item => item.id === mutation.targetId);
         const story = mutation.state.stories.find(item => item.id === mutation.targetId);
         if (post || story) {
