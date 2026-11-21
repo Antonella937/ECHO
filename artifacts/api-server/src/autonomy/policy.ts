@@ -306,6 +306,17 @@ export function chooseAutonomyOpportunity(input: {
     return { situation: null, reasonCode: "NO_SOCIAL_TARGET",
       reason: "Unsolicited DM cooldown is active.", localHour: local.hour, timezone };
   }
+  // Quiet hours remain the default. A character with an explicitly scheduled
+  // late-night activity can still initiate an occasional DM while awake.
+  // Never infer wakefulness merely from a missing routine.
+  const spontaneousRoutine = config?.routine?.entries?.length
+    ? activeRoutineEntry(config.routine.entries, now, timezone)
+    : undefined;
+  const scheduledAwake = spontaneousRoutine &&
+    !/\b(sleep|sleeping|dormir|durmiendo|descansando|rest)\b/i.test(
+      `${spontaneousRoutine.activity ?? ""} ${spontaneousRoutine.title ?? ""}`);
+  const spontaneousHourAllowed = (local.hour >= 8 && local.hour < 23) ||
+    (local.hour >= 23 || local.hour < 3) && Boolean(scheduledAwake);
   // Ordinary spontaneous outreach is separate from story replies. Previously the
   // DM lane could only reply to an incoming message or a recent story, leaving
   // characters silent whenever nobody posted a story. Keep this inexpensive:
@@ -314,7 +325,7 @@ export function chooseAutonomyOpportunity(input: {
   if (input.lane === "dm" && !unanswered &&
       history.length < 30 &&
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
-      local.hour >= 8 && local.hour < 23) {
+      spontaneousHourAllowed) {
     // The worker runs every two minutes. Tiny per-tick probabilities made
     // opted-in characters appear inactive for hours even before cooldowns.
     // Keep outreach probabilistic and let the existing daily caps, cooldowns,
