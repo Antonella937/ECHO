@@ -15,12 +15,22 @@ export async function sendKindroidSocialGroupContext(
   if (!key) throw new EngineError('KINDROID_KEY_MISSING', 503);
   if (!/^[A-Za-z0-9_-]{8,160}$/.test(groupId)) throw new EngineError('KINDROID_GROUP_ID_INVALID', 400);
   if (!context.trim() || context.length > 1500) throw new EngineError('KINDROID_SOCIAL_CONTEXT_INVALID', 400);
-  const response = await request('https://api.kindroid.ai/v1/groupchats-user-message', {
-    method: 'POST',
-    signal: AbortSignal.timeout(90000),
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ group_id: groupId, message: context }),
-  });
+  let response: Response;
+  try {
+    response = await request('https://api.kindroid.ai/v1/groupchats-user-message', {
+      method: 'POST',
+      signal: AbortSignal.timeout(90000),
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_id: groupId, message: context }),
+    });
+  } catch (error) {
+    throw new EngineError(
+      error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+        ? 'KINDROID_SOCIAL_GROUP_CONTEXT_TIMEOUT'
+        : 'KINDROID_SOCIAL_GROUP_CONTEXT_CONNECTION_FAILED',
+      502,
+    );
+  }
   if (!response.ok) {
     throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_SOCIAL_GROUP_CONTEXT_FAILED', response.status === 429 ? 429 : 502);
   }
