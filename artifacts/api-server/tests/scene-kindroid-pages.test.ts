@@ -33,3 +33,9 @@ test("rejects histories beyond five pages without returning a partial result",as
   await assert.rejects(readKindroidScenePages(group,"test-key",request),
     (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_SCENE_HISTORY_PAGE_LIMIT");
 });
+
+test("rejects an oversized Kindroid history page",async()=>{
+  const request=(async()=>reply({messages:Array.from({length:101},(_,i)=>({id:String(i)})),pagination:{hasMore:false}})) as typeof fetch;
+  await assert.rejects(readKindroidScenePages(group,"test-key",request),
+    (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_SCENE_HISTORY_PAGE_TOO_LARGE");
+});
