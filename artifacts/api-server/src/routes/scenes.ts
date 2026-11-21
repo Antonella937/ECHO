@@ -449,6 +449,11 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
     let replyText: string;
     if (kinId) {
+      // /send-message persists to the Kin's private conversation. A scene must
+      // never use that transport until a separate group is bound and synced.
+      // Fail closed rather than contaminating a real character's DM history.
+      throw new EngineError("KINDROID_SCENE_GROUP_REQUIRED", 409);
+      /* Legacy scene DM transport disabled pending group synchronization.
       const sceneInstructions = [
         "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
         "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
@@ -473,6 +478,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
       const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
+      */
     } else {
       const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
       const decoded: unknown = JSON.parse(completion.text);
