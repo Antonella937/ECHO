@@ -352,6 +352,10 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
     const byKin = new Map<string,string>();
     for (const link of links.rows) {
       if (typeof link.kin_id === "string" && typeof link.character_id === "string" && members.has(link.character_id)) {
+        const existing = byKin.get(link.kin_id);
+        if (existing && existing !== link.character_id) {
+          res.status(409).json({error:"KINDROID_SCENE_AMBIGUOUS_KIN_LINK"}); return;
+        }
         byKin.set(link.kin_id,link.character_id);
       }
     }
