@@ -32,10 +32,8 @@ export default function MessagesPage() {
   const [groupComposer, setGroupComposer] = useState(false);
   const [groupLoadError, setGroupLoadError] = useState(false);
   const [groupRefresh, setGroupRefresh] = useState(0);
-  const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const [showRequests, setShowRequests] = useState(false);
   const [requestDecisions, setRequestDecisions] = useState<Record<string, 'accepted' | 'rejected' | 'blocked'>>({});
   const [requestError, setRequestError] = useState('');
   const [requestLoading, setRequestLoading] = useState(true);
@@ -90,9 +88,10 @@ export default function MessagesPage() {
   const pinStorageKey = user?.id ? `echo:pinned:${user.id}:${getActiveUniverseId(user.id)}:${me.id}` : '';
   useEffect(() => { try { setPinnedIds(pinStorageKey ? JSON.parse(localStorage.getItem(pinStorageKey) || '[]') : []); } catch { setPinnedIds([]); } }, [pinStorageKey]);
   const togglePin = (id: string) => { setPinnedIds(previous => { const next = previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]; if (pinStorageKey) localStorage.setItem(pinStorageKey, JSON.stringify(next)); return next; }); };
-  const openView = (next: string) => { setMenuOpen(false); setShowSaved(next === 'favorites'); setShowRequests(next === 'requests'); setShowArchivedGroups(next === 'archived'); navigate(next === 'inbox' ? '/messages' : `/messages?view=${next}`); };
+  const openView = (next: string) => { setMenuOpen(false); setShowSaved(next === 'favorites'); navigate(next === 'inbox' ? '/messages' : `/messages?view=${next}`); };
   const orderedThreads = [...visibleThreads].sort((a,b) => Number(pinnedIds.includes(b.other.id)) - Number(pinnedIds.includes(a.other.id)));
   const inboxGroups = groups.filter(g => g.participantIds.includes(me.id));
+  // The authenticated group API already includes observer-enabled groups; keep them out of the ordinary inbox.
   const observerGroups = groups.filter(g => !g.participantIds.includes(me.id) && g.participantIds.length >= 3);
   const backToInbox = () => { if (view !== 'inbox' || showSaved) openView('inbox'); else navigate('/'); };
 
@@ -181,7 +180,7 @@ export default function MessagesPage() {
                   </span>
                 )}
               </Link>
-              <button type="button" onClick={() => togglePin(other.id)} aria-label={pinnedIds.includes(other.id) ? "Desfijar conversación" : "Fijar conversación"} className="ml-3 mb-2 rounded-full px-3 py-1 text-xs text-muted-foreground hover:bg-secondary"><Pin className={cn("mr-1 inline h-3.5 w-3.5", pinnedIds.includes(other.id) && "fill-current")} />{pinnedIds.includes(other.id) ? "Fijado" : "Fijar"}</button>
+              {view === 'inbox' && <button type="button" onClick={() => togglePin(other.id)} aria-label={pinnedIds.includes(other.id) ? "Desfijar conversación" : "Fijar conversación"} className="ml-3 mb-2 rounded-full px-3 py-1 text-xs text-muted-foreground hover:bg-secondary"><Pin className={cn("mr-1 inline h-3.5 w-3.5", pinnedIds.includes(other.id) && "fill-current")} />{pinnedIds.includes(other.id) ? "Fijado" : "Fijar"}</button>}
               {view === 'requests' && <div className="mb-2 flex gap-2 px-3"><button type="button" onClick={() => void updateRequest(other.id, 'accepted')} className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Aceptar</button><button type="button" onClick={() => void updateRequest(other.id, 'rejected')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold">Rechazar</button><button type="button" onClick={() => void updateRequest(other.id, 'blocked')} className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-destructive">Bloquear</button></div>}
             </li>
           ))}
