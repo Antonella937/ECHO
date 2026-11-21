@@ -88,16 +88,20 @@ export class UniverseSync {
       this.base = recovery && !same(recovery.base, recovery.state) ? recovery.base : remote.state;
       this.view.state = recovery && !same(recovery.base, recovery.state)
         ? recovery.state : remote.state ?? this.seed();
-      // Recovery snapshots may predate highlights restored on the server.
-      // Hydrate server-owned collections before displaying the local draft:
-      // otherwise the UI stays empty while waiting for a sync (or conflicts).
+      // A mobile device can have an old pending recovery snapshot while
+      // server-side Kindroid autonomy has added new DMs. Show remote-only
+      // messages immediately without replacing local drafts or edited messages.
+      // The subsequent three-way sync still resolves edits and deletions.
       if (remote.state && this.view.state) {
         const localHighlights = this.view.state.highlights ?? [];
         const remoteHighlights = remote.state.highlights ?? [];
-        const known = new Set(localHighlights.map(h => h.id));
+        const knownHighlights = new Set(localHighlights.map(h => h.id));
+        const localMessages = this.view.state.messages ?? [];
+        const knownMessages = new Set(localMessages.map(m => m.id));
         this.view.state = {
           ...this.view.state,
-          highlights: [...localHighlights, ...remoteHighlights.filter(h => !known.has(h.id))],
+          highlights: [...localHighlights, ...remoteHighlights.filter(h => !knownHighlights.has(h.id))],
+          messages: [...localMessages, ...remote.state.messages.filter(m => !knownMessages.has(m.id))],
         };
       }
       this.view.state = repairOrphanedCharacterLinks(upgradeAccounts(this.view.state));
