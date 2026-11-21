@@ -89,3 +89,33 @@ export async function sendCreatorHubDmPush(input: {
     console.warn("Creator Hub push failed", { reason: error instanceof Error ? error.name : "UNKNOWN" });
   }
 }
+
+/** Send one push for a newly committed group message. Historical backfills must not alert. */
+export async function sendGroupMessagePush(input: {
+  ownerId: string; groupId: string; groupName: string; senderName: string; messageId: string;
+}): Promise<void> {
+  const key = process.env.ECHO_ONESIGNAL_REST_API_KEY;
+  if (!key) return;
+  try {
+    const { clerkClient } = await import("@clerk/express");
+    const owner = await clerkClient.users.getUser(input.ownerId);
+    if (owner.privateMetadata?.echoGroupPushEnabled === false) return;
+    const response = await fetch("https://api.onesignal.com/notifications", {
+      method: "POST",
+      headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        app_id: APP_ID, target_channel: "push",
+        include_aliases: { external_id: [input.ownerId] },
+        headings: { en: input.groupName },
+        contents: { en: `${input.senderName} envió un mensaje al grupo` },
+        url: `https://echo-3o2.pages.dev/messages/group/${encodeURIComponent(input.groupId)}?from=messages`,
+        data: { event_id: input.messageId, category: "groups", group_id: input.groupId },
+        idempotency_key: input.messageId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? input.messageId : undefined,
+      }),
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!response.ok) console.warn("Group push rejected", { status: response.status });
+  } catch (error) {
+    console.warn("Group push transport failed", { reason: error instanceof Error ? error.name : "UNKNOWN" });
+  }
+}
