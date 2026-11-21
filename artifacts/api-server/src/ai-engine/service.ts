@@ -163,35 +163,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     ].filter(Boolean).join(String.fromCharCode(10));
     selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId);
   }
-  // Linked characters use their own Kindroid voice for public text too.
-  // ECHO still selects the opportunity and validates the draft before execution.
-  if (dependencies.liveDmReply === true &&
-      ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
-      (input.situation === 'comment' || input.situation === 'post') && !isolatedSocial) {
-    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
-      WHERE owner_id = ${ownerId} AND universe_id = ${input.universeId ?? 'primary'}
-      AND character_id = ${input.characterId} AND enabled = true LIMIT 1`);
-    const kinId = links.rows[0]?.kin_id;
-    // Founder live social text must never silently fall back to a metered model.
-    if (typeof kinId !== 'string' || kinId.length === 0) {
-      throw new EngineError('KINDROID_ONLY_NO_FALLBACK', 503);
-    }
-    {
-      const targetPost = input.postId ? parsed.data.state.posts.find(p => p.id === input.postId) : undefined;
-      const targetComment = input.commentId ? parsed.data.state.comments.find(c => c.id === input.commentId) : undefined;
-      // Do not pass private messages, hidden stories, or unrelated account data.
-      const publicContext = targetPost
-        ? `Visible feed post: ${(targetPost.caption ?? '').slice(0, 500)}${targetComment ? '\nReplying to comment by ' + (parsed.data.state.characters.find(c => c.id === targetComment.authorId)?.name ?? 'another person') + ': ' + targetComment.text.slice(0, 300) : ''}`
-        : '';
-      const prompt = input.situation === 'comment'
-        ? `[ECHO social action: Write a natural public comment on the visible post, in your established voice and in English. Preserve your personality and expressive style; format it as a public comment, not a private DM or JSON. Do not invent private knowledge.]${publicContext ? '\n' + publicContext : ''}`
-        : '[ECHO social action: Write ONE natural feed caption in your established voice and in English. No JSON or stage directions. Do not invent private events.]';
-      if (input.situation === 'comment' && !targetPost) {
-        throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
-      }
-      selectedProvider = kindroidDmProvider(prompt, kinId, '', undefined, input.situation, input.characterId);
-    }
-  }
+  // Public social actions must only use the isolated Kindroid group above.
+  // Never route social prompts through an individual Kin DM history.
   if (dependencies.liveDmReply === true &&
       ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' && input.situation === 'dm' &&
       !!input.recipientId && input.recipientId !== input.characterId) {
