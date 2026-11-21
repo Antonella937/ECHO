@@ -279,6 +279,24 @@ scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
         AND NOT (other.universe_id=${universeId} AND other.scene_id=${sceneId.data})
         AND other.turn_settings ->> 'kindroidGroupId' = ${groupId} LIMIT 1`);
     if(collisions.rows.length){res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"});return;}
+    // A scene's Kindroid membership must still be fully linked at send time.
+    // Binding-time validation alone is insufficient if links were later removed.
+    const linked=await db.execute(sql`SELECT character_id,kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${universeId}
+        AND enabled=true AND kin_id IS NOT NULL`);
+    const kinByCharacter=new Map<string,string>();
+    const seenKinIds=new Set<string>();
+    for(const link of linked.rows){
+      if(typeof link.character_id!=="string" || typeof link.kin_id!=="string")continue;
+      if(seenKinIds.has(link.kin_id)){
+        res.status(409).json({error:"KINDROID_SCENE_AMBIGUOUS_KIN_LINK"});return;
+      }
+      seenKinIds.add(link.kin_id);
+      kinByCharacter.set(link.character_id,link.kin_id);
+    }
+    if(participants.some(character=>character!==identity && !kinByCharacter.has(character))){
+      res.status(409).json({error:"SCENE_PARTICIPANT_KINDROID_LINK_MISSING"});return;
+    }
     const apiKey=process.env.ECHO_KINDROID_API_KEY;
     if(!apiKey){res.status(503).json({error:"KINDROID_KEY_MISSING"});return;}
     const result=await deliverSceneKindroidEventOnce(
