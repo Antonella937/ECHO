@@ -616,6 +616,15 @@ export async function runAutonomyLiveCycle(
         console.warn("Optional autonomous voice delivery skipped", { reason: error instanceof Error ? error.name : "UNKNOWN" });
       }
     }
+    // Audit cold outreach separately from replies to stories or incoming DMs.
+    // Never log generated private message text or Kindroid prompts.
+    if (outcome.status === "executed" && opportunity.situation === "dm") {
+      console.info("AUTONOMY_DM_DELIVERED", {
+        universeId, characterId: character.id, recipientId: opportunity.recipientId,
+        kind: opportunity.storyId ? "story_reply" : opportunity.messageId ? "incoming_reply" : "spontaneous",
+        runId,
+      });
+    }
     if (outcome.status === "executed" && process.env.ECHO_ONESIGNAL_REST_API_KEY) {
       // Delivery is best-effort, after the universe transaction has committed.
       try {
