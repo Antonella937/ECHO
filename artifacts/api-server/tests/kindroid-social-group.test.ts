@@ -55,3 +55,27 @@ test('social group converts the selected Kin response to an ECHO like without pr
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('a different Kin cannot impersonate the intended character', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    return new Response(path.endsWith('get-turn') ? 'otherKin1234' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      kindroidSocialGroupProvider('group12345678', 'kin123456789', 'comment',
+        'Mar commented on Noah post', undefined, request).complete({
+          system: '', context: '', outputSchema: {},
+        }),
+      /KINDROID_GROUP_SPEAKER_MISMATCH/,
+    );
+    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-get-turn']);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
