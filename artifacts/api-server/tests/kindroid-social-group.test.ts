@@ -231,3 +231,23 @@ test('social group refuses generation when single-instance safety is not verifie
     /KINDROID_SOCIAL_DISTRIBUTED_LOCK_REQUIRED/,
   );
 });
+
+test('Kindroid message delimiters around LIKE are normalized safely', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    return new Response(path.endsWith('get-turn') ? 'kin123456789'
+      : path.endsWith('ai-response') ? '<<START MESSAGE>>\nLIKE\n<<END MESSAGE>>' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const result = await kindroidSocialGroupProvider('group12345678', 'kin123456789',
+      'like_post', 'Visible post', undefined, request).complete({
+        system: '', context: '', outputSchema: {},
+      });
+    assert.equal(JSON.parse(result.text).action, 'like');
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
