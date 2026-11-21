@@ -241,6 +241,28 @@ scenesRouter.post("/scenes/events", async (req, res) => {
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
 
+// Read-only delivery state for reconciliation after timeouts or server restarts.
+scenesRouter.get("/scenes/:sceneId/kindroid-deliveries", async(req,res)=>{
+  const parsed=scope.safeParse(req.query);
+  const sceneId=id.safeParse(req.params.sceneId);
+  if(!parsed.success || !sceneId.success){res.status(400).json({error:"INVALID_SCENE_DELIVERY_QUERY"});return;}
+  const ownerId=req.userId!,universeId=parsed.data.universeId;
+  try{
+    const scenes=await db.execute(sql`SELECT scene_id FROM echo_scenes
+      WHERE owner_id=${ownerId} AND universe_id=${universeId}
+        AND scene_id=${sceneId.data} LIMIT 1`);
+    if(!scenes.rows.length){res.status(404).json({error:"SCENE_NOT_FOUND"});return;}
+    const result=await db.execute(sql`SELECT event_id AS "eventId",
+      kindroid_group_id AS "kindroidGroupId",status,reserved_at AS "reservedAt",
+      attempted_at AS "attemptedAt",completed_at AS "completedAt"
+      FROM echo_scene_kindroid_deliveries
+      WHERE owner_id=${ownerId} AND universe_id=${universeId}
+        AND scene_id=${sceneId.data}
+      ORDER BY reserved_at DESC LIMIT 100`);
+    res.json({deliveries:result.rows});
+  }catch{res.status(503).json({error:"SCENE_DELIVERY_STATUS_UNAVAILABLE"});}
+});
+
 // Explicit opt-in scene event delivery. Never sends private events or uses Kin DMs.
 // Disabled until the delivery ledger migration is applied and the feature is enabled.
 scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
