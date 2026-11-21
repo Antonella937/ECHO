@@ -58,3 +58,15 @@ test("story context never truncates the actual short DM", async () => withTestKe
   assert.ok(sent.length <= 2800);
   assert.ok(sent.endsWith(message), "The actual message must remain intact");
 }));
+
+test("oversized DM fails before contacting Kindroid, never sending partial text", async () => withTestKey(async () => {
+  let called = false;
+  const request = (async () => {
+    called = true;
+    return new Response("Unexpected", { status: 200 });
+  }) as typeof fetch;
+  await assert.rejects(() => kindroidDmProvider("X".repeat(2801), kinId, "", request).complete({
+    system: "", context: "", outputSchema: {}, validate: () => undefined,
+  }), /KINDROID_MESSAGE_TOO_LONG/);
+  assert.equal(called, false);
+}));
