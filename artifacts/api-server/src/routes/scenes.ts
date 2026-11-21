@@ -428,16 +428,19 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
     const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
     // Import is an explicit action, never a side effect of the preview.
     // Stable group-scoped IDs and ON CONFLICT make repeated imports idempotent.
-    let imported = 0;
-    for (const item of events) {
-      const inserted = await db.execute(sql`INSERT INTO echo_scene_events
-        (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text,created_at)
-        VALUES (${req.userId!},${parsed.data.universeId},${sceneId.data},
-          ${item.eventId},${item.actorId},'participants','[]'::jsonb,${item.text},
-          ${item.createdAt}::timestamptz)
-        ON CONFLICT DO NOTHING RETURNING event_id`);
-      if (inserted.rows.length) imported++;
-    }
+    const imported = await db.transaction(async tx => {
+      let count = 0;
+      for (const item of events) {
+        const inserted = await tx.execute(sql`INSERT INTO echo_scene_events
+          (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text,created_at)
+          VALUES (${req.userId!},${parsed.data.universeId},${sceneId.data},
+            ${item.eventId},${item.actorId},'participants','[]'::jsonb,${item.text},
+            ${item.createdAt}::timestamptz)
+          ON CONFLICT DO NOTHING RETURNING event_id`);
+        if (inserted.rows.length) count++;
+      }
+      return count;
+    });
     res.json({sceneId:sceneId.data,matchedEvents:events.length,imported});
   } catch (error) {
     if (error instanceof KindroidSceneHistoryError) {res.status(error.status).json({error:error.code});return;}
