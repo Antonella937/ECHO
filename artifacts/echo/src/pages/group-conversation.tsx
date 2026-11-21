@@ -41,8 +41,23 @@ export default function GroupConversationPage() {
   const [eventsOpen,setEventsOpen] = useState(false);
   const cameraRef=useRef<HTMLInputElement>(null);
   const [wallpaper,setWallpaper] = useState('');
-  const wallpaperKey=user?.id&&id?`echo:group-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${me.id}:${id}`:'';
-  useEffect(()=>{try{setWallpaper(wallpaperKey?localStorage.getItem(wallpaperKey)??'':'');}catch{setWallpaper('');}},[wallpaperKey]);
+  const wallpaperKey=user?.id&&id?`echo:group-wallpaper:${user.id}:${getActiveUniverseId(user.id)}:${id}`:'';
+  // Keep the wallpaper independent of the currently selected identity. Recover the
+  // previous per-identity key without deleting it, so existing choices survive upgrades.
+  useEffect(()=>{
+    if(!wallpaperKey){setWallpaper('');return;}
+    try {
+      let saved=localStorage.getItem(wallpaperKey)??'';
+      if(!saved){
+        const prefix=`echo:group-wallpaper:${user!.id}:${getActiveUniverseId(user!.id)}:`;
+        const suffix=`:${id}`;
+        const previousKey=Array.from({length:localStorage.length},(_,index)=>localStorage.key(index))
+          .find(key=>key?.startsWith(prefix)&&key.endsWith(suffix)&&key!==wallpaperKey);
+        if(previousKey){saved=localStorage.getItem(previousKey)??'';if(saved)localStorage.setItem(wallpaperKey,saved);}
+      }
+      setWallpaper(saved);
+    }catch{setWallpaper('');}
+  },[wallpaperKey,id,user?.id]);
   const [wallpaperUploading,setWallpaperUploading] = useState(false);
   const changeWallpaper=async (file?:File)=>{
     if(!wallpaperKey)return;
@@ -323,7 +338,7 @@ export default function GroupConversationPage() {
     {wallpaper&&<div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{backgroundImage:`linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.45)),url("${wallpaper.startsWith("data:") ? wallpaper : resolveMedia(wallpaper)}")`}} />}
     <header className="relative z-30 shrink-0 bg-transparent pt-safe">
       <div className="relative flex min-h-[104px] items-center justify-center px-16 py-2 text-white">
-        <button type="button" onClick={()=>navigate(group && !group.participantIds.includes(me.id) ? '/messages?view=observer-groups' : '/messages?view=groups')} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
+        <button type="button" onClick={()=>{const from=new URLSearchParams(window.location.search).get('from');navigate(from==='observer-groups'?'/messages?view=observer-groups':from==='groups'?'/messages?view=groups':group && !group.participantIds.includes(me.id)?'/messages?view=observer-groups':'/messages?view=groups');}} aria-label="Volver" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"><ChevronLeft className="h-6 w-6"/></button>
         <div className="flex min-w-0 max-w-full flex-col items-center gap-1 text-center">
           <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full border border-white/15 bg-background/35 backdrop-blur-xl">{group?.avatar?<img src={resolveMedia(group.avatar)} alt="" className="h-full w-full object-cover"/>:<Users className="h-6 w-6"/>}</div>
           <h1 className="max-w-full truncate text-sm font-semibold">{group?.name??'Grupo'}</h1>
