@@ -32,8 +32,8 @@ export async function readOwnerControls(ownerId: string, universeId = "primary")
       dmFrequency: (['rarely', 'sometimes', 'frequently'].includes(row.dmFrequency) ? row.dmFrequency : 'sometimes') as 'rarely' | 'sometimes' | 'frequently',
       dmMediaPreference: (['text', 'mixed', 'voice'].includes(row.dmMediaPreference) ? row.dmMediaPreference : 'text') as 'text' | 'mixed' | 'voice',
       dmInstructions: row.dmInstructions,
-      maxActionsPerDay: Math.max(1, Math.min(4, row.maxActionsPerDay)),
-      minCooldownMinutes: Math.max(60, Math.min(1440, row.minCooldownMinutes)),
+      maxActionsPerDay: Math.max(1, Math.min(24, row.maxActionsPerDay)),
+      minCooldownMinutes: Math.max(15, Math.min(1440, row.minCooldownMinutes)),
     }])),
   };
 }
