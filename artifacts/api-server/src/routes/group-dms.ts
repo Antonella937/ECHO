@@ -68,6 +68,17 @@ router.put("/group-dms/:groupId/kindroid-link", async (req, res) => {
   const {universeId,actorId,kindroidGroupId}=parsed.data;
   if (!await getUniverse(req.userId!,universeId,actorId)) {res.status(403).json({error:"INVALID_IDENTITY"});return;}
   const groupId=String(req.params.groupId);
+  if (kindroidGroupId !== null) {
+    const conflict=await db.execute(sql`SELECT 1 FROM echo_scenes scene
+      WHERE scene.owner_id=${req.userId!}
+        AND scene.turn_settings ->> 'kindroidGroupId' = ${kindroidGroupId}
+      UNION ALL
+      SELECT 1 FROM echo_group_conversations other
+      WHERE other.owner_id=${req.userId!} AND other.kindroid_group_id=${kindroidGroupId}
+        AND NOT (other.universe_id=${universeId} AND other.id=${groupId})
+      LIMIT 1`);
+    if (conflict.rows.length) {res.status(409).json({error:"KINDROID_GROUP_ALREADY_BOUND"});return;}
+  }
   const result=await db.execute(sql`UPDATE echo_group_conversations SET kindroid_group_id=${kindroidGroupId},updated_at=now()
     WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId}
     AND (created_by=${actorId} OR participant_ids ? ${actorId}) RETURNING id`);
