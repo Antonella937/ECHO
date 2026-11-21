@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sendKindroidSocialGroupContext } from '../src/ai-engine/kindroid-social-group';
+import { sendKindroidSocialGroupContext, kindroidSocialGroupProvider } from '../src/ai-engine/kindroid-social-group';
 
 test('social context is posted only to the group endpoint', async () => {
   const previous = process.env.ECHO_KINDROID_API_KEY;
@@ -29,6 +29,27 @@ test('invalid group and empty context are rejected before network use', async ()
   try {
     await assert.rejects(sendKindroidSocialGroupContext('invalid!', 'context', request));
     await assert.rejects(sendKindroidSocialGroupContext('group12345678', '  ', request));
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
+
+test('social group converts the selected Kin response to an ECHO like without private DM calls', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    return new Response(path.endsWith('get-turn') ? 'kin123456789' : path.endsWith('ai-response') ? 'LIKE' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const result = await kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post', 'Noah posted a guitar photo', undefined, request).complete({
+      system: '', context: '', outputSchema: {},
+    });
+    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-get-turn', '/v1/groupchats-ai-response']);
+    assert.equal(JSON.parse(result.text).action, 'like');
   } finally {
     if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
     else process.env.ECHO_KINDROID_API_KEY = previous;
