@@ -6,7 +6,7 @@ import { useSocial } from '@/store/social-store';
 import { useMediaResolver } from '@/lib/media';
 import type { Post } from '@/domain/types';
 
-export function PhotoGrid({ posts, showPinned = false }: { posts: Post[]; showPinned?: boolean }) {
+export function PhotoGrid({ posts, showPinned = false, continuous = false }: { posts: Post[]; showPinned?: boolean; continuous?: boolean }) {
   const resolveMedia = useMediaResolver();
   const { state } = useSocial();
   const initialImageIds = useMemo(() => posts.slice(0, 12)
@@ -37,7 +37,7 @@ export function PhotoGrid({ posts, showPinned = false }: { posts: Post[]; showPi
         const inInitialBatch = initialImageIds.includes(p.id);
         const holdImage = inInitialBatch && !batchReady;
         return (
-          <Link key={p.id} href={`/p/${p.id}`} className="group relative block overflow-hidden bg-card sm:rounded-xl" data-testid={`link-grid-post-${p.id}`}>
+          <Link key={p.id} href={continuous ? `/p/${p.id}?from=profile&account=${encodeURIComponent(p.authorId)}` : `/p/${p.id}`} className="group relative block overflow-hidden bg-card sm:rounded-xl" data-testid={`link-grid-post-${p.id}`}>
             {!cover ? (
               <div className="grid aspect-[4/5] place-items-center px-3 py-2 text-center text-xs leading-snug text-muted-foreground" data-testid={`text-grid-post-${p.id}`}>
                 <span className="line-clamp-7">{p.caption || 'Publicación de texto'}</span>
