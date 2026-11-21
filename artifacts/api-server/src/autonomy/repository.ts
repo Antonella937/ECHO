@@ -114,6 +114,9 @@ export async function listLiveOptInTargets() {
     eq(echoAutonomyOwnersTable.killSwitchEngaged, false),
     isNull(echoUniversesTable.archivedAt),
     isNull(echoUniversesTable.deletedAt),
+    // The owner's own identity is not an autonomous Kin. Never schedule it
+    // as an AI actor, even if legacy autonomy/DM permission rows exist.
+    sql`${echoAutonomyCharactersTable.characterId} <> COALESCE(${echoUniversesTable.state}::jsonb ->> 'primaryCharacterId', '')`,
     // Per-universe pause is independent of the account-wide emergency stop.
     // Missing setting defaults to running, preserving existing worlds.
     sql`COALESCE((${echoUniversesTable.state}::jsonb #>> '{settings,autonomyPaused}')::boolean, false) = false`,
