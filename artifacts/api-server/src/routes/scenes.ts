@@ -283,7 +283,7 @@ scenesRouter.post("/scenes/:sceneId/kindroid-send-event", async (req,res) => {
     // Binding-time validation alone is insufficient if links were later removed.
     const linked=await db.execute(sql`SELECT character_id,kin_id FROM echo_kindroid_character_links
       WHERE owner_id=${ownerId} AND universe_id=${universeId}
-        AND enabled=true AND kin_id IS NOT NULL`);
+        AND enabled=true AND kin_id IS NOT NULL AND character_id = ANY(${participants}::text[])`);
     const kinByCharacter=new Map<string,string>();
     const seenKinIds=new Set<string>();
     for(const link of linked.rows){
