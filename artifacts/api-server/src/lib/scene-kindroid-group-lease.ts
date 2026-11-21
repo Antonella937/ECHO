@@ -40,3 +40,18 @@ export async function releaseSceneGroupLease(input:SceneGroupLease):Promise<bool
     RETURNING operation_id`);
   return result.rows.length===1;
 }
+
+/** Read-only lease status for support and manual reconciliation. */
+export async function inspectSceneGroupLease(ownerId:string,groupId:string):Promise<{
+  operationKind:string;sceneId:string;operationId:string;status:string;createdAt:string;
+}|null>{
+  if(!ownerId || !/^[A-Za-z0-9_-]{8,160}$/.test(groupId))return null;
+  const result=await db.execute(sql`SELECT operation_kind,scene_id,operation_id,status,created_at
+    FROM echo_scene_kindroid_group_leases
+    WHERE owner_id=${ownerId} AND kindroid_group_id=${groupId} LIMIT 1`);
+  const row=result.rows[0];
+  if(!row)return null;
+  return {operationKind:String(row.operation_kind),sceneId:String(row.scene_id),
+    operationId:String(row.operation_id),status:String(row.status),
+    createdAt:String(row.created_at)};
+}
