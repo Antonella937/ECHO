@@ -76,7 +76,7 @@ router.put("/group-dms/:groupId/kindroid-link", async (req, res) => {
 });
 // Group appearance is stored centrally, so it follows the group across devices.
 router.put("/group-dms/:groupId/wallpaper", async (req, res) => {
-  const parsed = scope.extend({ wallpaperUrl: z.string().url().max(2048).nullable() }).safeParse({
+  const parsed = scope.extend({ wallpaperUrl: z.union([z.string().url().max(2048), z.string().regex(/^\/(?:objects|api\/storage\/objects)\/[a-zA-Z0-9/_-]+$/).max(2048)]).nullable() }).safeParse({
     ...req.body, universeId: req.body?.universeId, actorId: req.body?.actorId,
   });
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_WALLPAPER" }); return; }
