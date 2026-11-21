@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS echo_scene_kindroid_deliveries (
 );
 CREATE INDEX IF NOT EXISTS echo_scene_kindroid_deliveries_pending_idx
   ON echo_scene_kindroid_deliveries (owner_id, universe_id, scene_id, status);
+
+-- Serialize outbound writes per owner and Kindroid group across concurrent requests.
+-- A second in-flight message cannot enter 'sending' until the first has settled.
+CREATE UNIQUE INDEX IF NOT EXISTS echo_scene_kindroid_one_sending_per_group
+  ON echo_scene_kindroid_deliveries (owner_id, kindroid_group_id)
+  WHERE status = 'sending';
