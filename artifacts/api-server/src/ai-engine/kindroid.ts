@@ -100,8 +100,8 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       // never push any part of the actual DM out of the request.
       const maxChars = 2800;
       const userTurn = message.length > maxChars ? message.slice(-maxChars) : message;
-      const contextHead = '[ECHO observed context]\\n';
-      const contextTail = '\\n[End context]\\n\\n';
+      const contextHead = '[ECHO observed context]\n';
+      const contextTail = '\n[End context]\n\n';
       const availableContextChars = Math.max(0, maxChars - userTurn.length - contextHead.length - contextTail.length);
       const contextPrefix = relevantSocialContext && availableContextChars > 0
         ? contextHead + relevantSocialContext.slice(0, Math.min(500, availableContextChars)) + contextTail
