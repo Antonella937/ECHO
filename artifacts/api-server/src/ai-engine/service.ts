@@ -156,7 +156,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     }
     const context = [
       `Actor: ${actor?.name ?? input.characterId} (${input.characterId})`,
-      post ? `Visible post by ${parsed.data.state.characters.find(c => c.id === post.authorId)?.name ?? post.authorId}: ${(post.caption ?? '[image or post without caption; visual content not analyzed]').slice(0,500)}` : '',
+      (post ?? commentParentPost) ? `Visible post by ${parsed.data.state.characters.find(c => c.id === (post ?? commentParentPost)!.authorId)?.name ?? (post ?? commentParentPost)!.authorId}: ${((post ?? commentParentPost)!.caption ?? '[image or post without caption; visual content not analyzed]').slice(0,500)}` : '',
       comment ? `Visible comment by ${parsed.data.state.characters.find(c => c.id === comment.authorId)?.name ?? comment.authorId}: ${comment.text.slice(0,300)}` : '',
       story ? `Visible story by ${parsed.data.state.characters.find(c => c.id === story.authorId)?.name ?? story.authorId}: ${(story.caption ?? '[story without caption; visual content not analyzed]').slice(0,400)}` : '',
       'Use only this visible ECHO event; do not infer unseen image content or private messages.',
