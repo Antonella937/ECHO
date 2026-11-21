@@ -148,9 +148,33 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       // character-to-character traffic into that private conversation.
       if (recipientId !== parsed.data.state.primaryCharacterId) {
         const pair = [input.characterId, recipientId].sort().join(':');
-        const marNoahPair = ['account_mw6yjhc8v41bp', 'account_mw71qlrfmy74i'].sort().join(':');
-        if (pair !== marNoahPair) throw new EngineError('KINDROID_PEER_GROUP_REQUIRED', 409);
-        selectedProvider = kindroidPeerGroupProvider('lSQ59nGePEfy3nCb6Gnp', kinId, input.characterId);
+        // Peer groups are explicitly allowlisted. Never fall back to /send-message:
+        // that endpoint would put a private peer conversation in Nela's Kin chat.
+        const peerGroupIds: Record<string, string> = {
+          [['account_mw6yjhc8v41bp', 'account_mw71qlrfmy74i'].sort().join(':')]: 'lSQ59nGePEfy3nCb6Gnp',
+        };
+        // Additional verified two-person group mappings can be configured without
+        // changing this service. Invalid/missing mappings fail closed.
+        const configuredGroups = process.env.ECHO_KINDROID_PEER_GROUPS_JSON;
+        if (configuredGroups) {
+          try {
+            const parsedGroups: unknown = JSON.parse(configuredGroups);
+            if (parsedGroups && typeof parsedGroups === 'object' && !Array.isArray(parsedGroups)) {
+              for (const [key, value] of Object.entries(parsedGroups)) {
+                const ids = key.split(':');
+                if (ids.length !== 2 || ids.some(id => !/^[A-Za-z0-9_-]{2,160}$/.test(id)) ||
+                    ids[0] === ids[1] || ids.slice().sort().join(':') !== key ||
+                    typeof value !== 'string' || !/^[A-Za-z0-9_-]{8,160}$/.test(value)) continue;
+                peerGroupIds[key] = value;
+              }
+            }
+          } catch {
+            // Malformed configuration cannot authorize a peer group.
+          }
+        }
+        const peerGroupId = peerGroupIds[pair];
+        if (!peerGroupId) throw new EngineError('KINDROID_PEER_GROUP_REQUIRED', 409);
+        selectedProvider = kindroidPeerGroupProvider(peerGroupId, kinId, input.characterId);
       } else {
       const thread = parsed.data.state.messages
         .filter(m => (m.senderId === recipientId && m.recipientId === input.characterId) ||
