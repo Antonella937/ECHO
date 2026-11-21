@@ -190,6 +190,10 @@ export function chooseAutonomyOpportunity(input: {
   allowedDmRecipientIds?: ReadonlySet<string>;
   /** Story replies may reach the owner without spontaneous outreach permission. */
   allowOwnerStoryReplies?: boolean;
+  /** Owner-initiated DM replies remain available without unsolicited DM opt-in. */
+  allowOwnerIncomingReplies?: boolean;
+  /** Whether cold outreach to the owner is enabled. */
+  allowOwnerSpontaneousDm?: boolean;
   /** Restrict an immediate reply to the exact incoming DM, never another thread. */
   targetIncomingMessageId?: string;
 }): Opportunity {
@@ -216,7 +220,7 @@ export function chooseAutonomyOpportunity(input: {
   const incoming = [...state.messages]
     .filter((message) => message.recipientId === character.id &&
       message.senderId !== character.id &&
-      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(message.senderId)) &&
+      (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(message.senderId) || (input.allowOwnerIncomingReplies && message.senderId === state.primaryCharacterId)) &&
       !message.hiddenForIds?.includes(character.id) &&
       (message.text.trim().length > 0 || (message.attachments?.length ?? 0) > 0 || Boolean(message.musicTrackId)) &&
       (asTime(message.createdAt) ?? 0) <= now.getTime() &&
@@ -308,6 +312,7 @@ export function chooseAutonomyOpportunity(input: {
     // recipient eligibility and mutual DM permissions enforce pacing.
     const recipients = availableTargets(state, character).filter(candidate =>
       (!input.allowedDmRecipientIds || input.allowedDmRecipientIds.has(candidate.id)) &&
+      (candidate.id !== state.primaryCharacterId || input.allowOwnerSpontaneousDm !== false) &&
       !history.some(item => item.situation === "dm" && item.targetId === candidate.id));
     // Only roll for spontaneous outreach when an eligible contact exists.
     // Keep the selected frequency and cooldown unchanged; do not fabricate a
