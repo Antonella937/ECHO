@@ -21,6 +21,20 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 import { NelaEasterEgg } from '@/components/branding/echo-brand';
 
+function CollapsibleSettings({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+  return (
+    <details className="group mb-4 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid={testId}>
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-border px-3 pb-4 [&>section]:mt-4 [&>section>h2]:hidden [&>section>div]:mt-0">
+        {children}
+      </div>
+    </details>
+  );
+}
+
 export default function SettingsPage() {
   const { state, me, actions, storageError, lastSavedAt } = useSocial();
   const { user } = useUser();
@@ -112,15 +126,25 @@ export default function SettingsPage() {
           </div></details>
         </section>
 
-        <AppearanceSection />
+        <CollapsibleSettings title={st("Apariencia")} testId="settings-appearance">
+          <AppearanceSection />
+        </CollapsibleSettings>
 
-        <div id="echo-ai-style" className="scroll-mt-20"><ImageGenerationStyleSection /></div>
+        <div id="echo-ai-style" className="scroll-mt-20">
+          <CollapsibleSettings title={st("Generación de imágenes IA")} testId="settings-image-style">
+            <ImageGenerationStyleSection />
+          </CollapsibleSettings>
+        </div>
 
-        <MessageSoundSettings />
+        <CollapsibleSettings title={st("Sonidos de mensajes")} testId="settings-message-sounds">
+          <MessageSoundSettings />
+        </CollapsibleSettings>
 
         <MusicConnectionsSection />
 
-        <PushNotificationSettings />
+        <CollapsibleSettings title={st("Notificaciones del celular")} testId="settings-push-notifications">
+          <PushNotificationSettings />
+        </CollapsibleSettings>
 
         <section className="mt-9" aria-labelledby="support-h">
           <h2 id="support-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Ayuda y seguridad")}</h2>
