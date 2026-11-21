@@ -1,6 +1,5 @@
 import { kindroidPeerGroupProvider } from './kindroid';
 import { EngineError, type TextProvider } from './contracts';
-import { EngineError } from './contracts';
 
 /**
  * Context injection for a dedicated, manually provisioned Kindroid social
