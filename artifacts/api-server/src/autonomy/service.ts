@@ -329,6 +329,7 @@ export async function runAutonomyLiveCycle(
   // Peer DM autonomy is authorized by the separate bilateral permissions table.
   // The dmEnabled switch only controls spontaneous outreach to the human owner.
   let peerDmEnabled = false;
+  const storyReplyEligible = dependencies.lane === "dm" && control.enabled;
   if (dependencies.lane === "dm" && !control.dmEnabled) {
     const permissions = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
       FROM echo_character_dm_permissions
@@ -340,7 +341,7 @@ export async function runAutonomyLiveCycle(
       Array.isArray(row.allowed_peer_ids) && row.allowed_peer_ids.includes(character.id));
   }
   if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged ||
-      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply || peerDmEnabled) : control.enabled)) {
+      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply || peerDmEnabled || storyReplyEligible) : control.enabled)) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
@@ -393,6 +394,7 @@ export async function runAutonomyLiveCycle(
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
+      allowOwnerStoryReplies: control.enabled,
       targetIncomingMessageId: dependencies.targetIncomingMessageId,
     });
     if (dependencies.targetIncomingMessageId) {
@@ -470,7 +472,7 @@ export async function runAutonomyLiveCycle(
         // DM opt-in authorizes replies to the owner without a separate AI-to-AI
         // allowlist entry. AI-to-AI conversations still require mutual opt-in.
         permitted = sender?.enabled === true &&
-          ((recipientIsOwnerIdentity && control.dmEnabled) || (
+          ((recipientIsOwnerIdentity && (control.dmEnabled || (control.enabled && Boolean(opportunity.storyId)))) || (
             Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
             receiver?.enabled === true &&
             Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id)
