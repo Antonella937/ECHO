@@ -446,6 +446,13 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
       res.status(502).json({error:"KINDROID_SCENE_HISTORY_FORMAT_INVALID"}); return;
     }
     const messages = (payload as {messages:unknown[]}).messages;
+    // Do not silently import only the newest page of a longer Kindroid history.
+    // A partial import could make a scene appear to have complete context.
+    const pagination = (payload as {pagination?:unknown}).pagination;
+    if (pagination && typeof pagination === "object" &&
+        (pagination as {hasMore?:unknown}).hasMore === true) {
+      res.status(409).json({error:"KINDROID_SCENE_HISTORY_PAGINATION_REQUIRED"}); return;
+    }
     const events = mapKindroidSceneHistory(groupId,messages,byKin,members);
     // Import is an explicit action, never a side effect of the preview.
     // Stable group-scoped IDs and ON CONFLICT make repeated imports idempotent.
