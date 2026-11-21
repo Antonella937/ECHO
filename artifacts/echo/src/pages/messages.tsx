@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-type InboxGroup = { id: string; name: string; avatar?: string | null; participantIds: string[]; archived?: boolean; muted?: boolean };
+type InboxGroup = { id: string; name: string; avatar?: string | null; participantIds: string[]; archived?: boolean; muted?: boolean; unreadCount?: number };
 // Keep the last confirmed group list across inbox remounts. Scoped by account and identity.
 const inboxGroupCache = new Map<string, InboxGroup[]>();
 
@@ -82,7 +82,8 @@ export default function MessagesPage() {
       setGroupLoadError(false);
     }).catch(() => { if (active) setGroupLoadError(true); });
     void load();
-    return () => { active = false; };
+    const interval = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 20000);
+    return () => { active = false; window.clearInterval(interval); };
   }, [user?.id, me.id, groupComposer, groupRefresh]);
   const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get('view') === 'favorites' || new URLSearchParams(window.location.search).get('tab') === 'favorites');
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
@@ -202,7 +203,7 @@ export default function MessagesPage() {
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
           {view === 'inbox' && renderThreads(orderedThreads.filter(thread => pinnedIds.includes(thread.other.id)))}
-          {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><GroupInboxAvatar avatar={group.avatar} name={group.name} resolveMedia={resolveMedia} /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
+          {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><GroupInboxAvatar avatar={group.avatar} name={group.name} resolveMedia={resolveMedia} /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{!group.muted && !!group.unreadCount && <span aria-label={`${group.unreadCount} mensajes sin leer`} className="grid h-6 min-w-6 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">{group.unreadCount > 99 ? "99+" : group.unreadCount}</span>}{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
           {view === 'inbox' ? renderThreads(orderedThreads.filter(thread => !pinnedIds.includes(thread.other.id))) : view === 'requests' ? renderThreads(requests) : null}
         </ul>
       )}
