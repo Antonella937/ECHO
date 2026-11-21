@@ -95,8 +95,13 @@ export function kindroidSocialGroupProvider(
       } else if (cleaned.toUpperCase() === 'SKIP') {
         action = 'none';
       } else {
-        text = cleaned.slice(0, situation === 'post' ? 600 : 1000);
-        if (!text) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+        const maxLength = situation === 'post' ? 600 : 1000;
+        // Never silently publish a chopped-off sentence as the Kin's words.
+        // Reject and leave the social action unexecuted instead.
+        if (!cleaned || cleaned.length > maxLength) {
+          throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+        }
+        text = cleaned;
       }
       const decision = JSON.stringify({
         action, situation, text, reaction, reason: 'Isolated Kindroid social group',
