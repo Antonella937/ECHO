@@ -1392,7 +1392,7 @@ test("worker tick uses deterministic per-slot keys, continues after a target fai
     throw new Error("SYNTHETIC_TARGET_FAILURE");
   };
   const first = await runAutonomyWorkerTick({
-    enabled: true, repository, processCharacter, now, tokenFactory: () => "synthetic-worker-token",
+    enabled: true, repository, processCharacter, now, socialTickDue: false, tokenFactory: () => "synthetic-worker-token",
   });
   assert.deepEqual(first, { status: "completed", evaluated: 3, executed: 1, noAction: 1, failed: 1 });
   const firstKeys = [...seenKeys];
@@ -1402,7 +1402,7 @@ test("worker tick uses deterministic per-slot keys, continues after a target fai
 
   seenKeys.length = 0;
   const second = await runAutonomyWorkerTick({
-    enabled: true, repository, processCharacter, now, tokenFactory: () => "synthetic-worker-token",
+    enabled: true, repository, processCharacter, now, socialTickDue: false, tokenFactory: () => "synthetic-worker-token",
   });
   assert.equal(second.status, "completed");
   assert.deepEqual(seenKeys, firstKeys);
