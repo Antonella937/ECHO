@@ -70,3 +70,12 @@ test("oversized DM fails before contacting Kindroid, never sending partial text"
   }), /KINDROID_MESSAGE_TOO_LONG/);
   assert.equal(called, false);
 }));
+
+test("private DM removes Kindroid transport markers without altering prose", async () => withTestKey(async () => {
+  const request = (async () => new Response("START MESSAGE\nHello Nela!\nEND MESSAGE", { status: 200 })) as typeof fetch;
+  const result = await kindroidDmProvider("Hello", kinId, "", request).complete({
+    system: "", context: "", outputSchema: {}, validate: () => undefined,
+  });
+  const parsed = JSON.parse(String(result.text));
+  assert.equal(parsed.text, "Hello Nela!");
+}));
