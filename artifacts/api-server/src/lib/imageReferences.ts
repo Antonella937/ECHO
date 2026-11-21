@@ -28,11 +28,18 @@ export async function loadImageReferences(ownerId: string, paths: string[]): Pro
     const chunks: Buffer[] = [];
     let size = 0;
     if (!response.body) throw Error('IMAGE_REFERENCE_EMPTY');
-    for await (const part of response.body.values()) {
-      const chunk = Buffer.from(part);
-      size += chunk.length;
-      if (size > 15_000_000 || total + size > 40_000_000) throw Error('IMAGE_REFERENCE_TOO_LARGE');
-      chunks.push(chunk);
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = Buffer.from(value);
+        size += chunk.length;
+        if (size > 15_000_000 || total + size > 40_000_000) throw Error('IMAGE_REFERENCE_TOO_LARGE');
+        chunks.push(chunk);
+      }
+    } finally {
+      reader.releaseLock();
     }
     const bytes = Buffer.concat(chunks);
     if (!bytes.length || !validMediaHeader(bytes, mimeType)) throw Error('INVALID_IMAGE_REFERENCE_BYTES');
