@@ -56,6 +56,13 @@ export function kindroidSocialGroupProvider(
   return {
     name: 'kindroid',
     async complete(input) {
+      // The in-process queue is NOT a distributed lock. Until a cross-instance
+      // group lease is implemented and tested, refuse live social generation
+      // unless the deployment explicitly confirms a single API instance.
+      // This protects Kindroid group turn attribution across Render replicas.
+      if (process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED !== 'true') {
+        throw new EngineError('KINDROID_SOCIAL_DISTRIBUTED_LOCK_REQUIRED', 503);
+      }
       return withGroupLock(groupId, async () => {
       const choices = situation === 'story_reaction'
         ? 'VIEW, LIKE, LAUGH, SURPRISE, FIRE'
