@@ -638,6 +638,17 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const oldEvents = unsummarized.length > 30 ? unsummarized.slice(0, -20) : [];
     const trigger = visible.at(-1);
     if (!trigger || trigger.actor_id === characterId) { res.status(409).json({ error: "NO_NEW_SCENE_TURN" }); return; }
+    // Fail before reserving a turn when the linked Kin cannot safely answer in its scene group.
+    // A Kindroid private-DM endpoint is never an acceptable fallback.
+    const linkedKin = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
+      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND character_id=${characterId}
+        AND enabled=true LIMIT 1`);
+    const kinId = typeof linkedKin.rows[0]?.kin_id === "string" ? linkedKin.rows[0].kin_id : null;
+    if (kinId) {
+      const boundGroup = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
+      res.status(409).json({error:boundGroup ? "KINDROID_SCENE_GROUP_SYNC_REQUIRED" : "KINDROID_SCENE_GROUP_REQUIRED"});
+      return;
+    }
     const eventId = randomUUID();
     // Reserve the (character, triggering event) pair before calling a paid model.
     const reservation = await db.execute(sql`INSERT INTO echo_scene_events
@@ -665,27 +676,10 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       character: { ...character, avatar: undefined, identity: undefined, referenceImages: undefined },
       participants: people, sceneMemory: previousSummary,
       visibleEvents: visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text })) }).slice(0,18000);
-    // Linked Kindroid characters use their existing voice for scene dialogue.
-    // Do not silently fall back to another model if the external provider fails.
-    const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
-      WHERE owner_id=${ownerId} AND universe_id=${universeId} AND character_id=${characterId}
-        AND enabled=true LIMIT 1`);
-    const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
-    let replyText: string;
-    if (kinId) {
-      // /send-message would persist to this Kin's PRIVATE conversation.
-      // Even with a dedicated group bound, scene events must be synced to that
-      // group before asking Kindroid to generate its next turn.
-      // Never generate against stale context or silently use private DM transport.
-      const boundGroup = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
-      throw new EngineError(boundGroup
-        ? "KINDROID_SCENE_GROUP_SYNC_REQUIRED"
-        : "KINDROID_SCENE_GROUP_REQUIRED", 409);
-    } else {
-      const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
-      const decoded: unknown = JSON.parse(completion.text);
-      replyText = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded).text;
-    }
+    // Non-Kindroid participants may still use the local scene model.
+    const completion = await provider.complete({ system, context, outputSchema: sceneOutputSchema });
+    const decoded: unknown = JSON.parse(completion.text);
+    const replyText = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(decoded).text;
     const result = {text:replyText};
     await db.execute(sql`UPDATE echo_scene_events SET text = ${result.text} WHERE owner_id = ${ownerId}
       AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND event_id = ${eventId}`);
