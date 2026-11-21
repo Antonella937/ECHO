@@ -25,3 +25,22 @@ export function requiresIsolatedKindroidSocial(input: {
 export function isolatedKindroidSocialReady(): boolean {
   return false;
 }
+
+/**
+ * Explicit opt-in per social group. No existing peer/group conversation is
+ * automatically eligible: the owner must first confirm memory controls in
+ * Kindroid's UI. The external API does not expose those switches.
+ */
+export function verifiedSocialGroupId(characterId: string): string | null {
+  const raw = process.env.ECHO_KINDROID_SOCIAL_GROUP_IDS_JSON;
+  const verified = process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED === 'true';
+  if (!verified || !raw) return null;
+  try {
+    const mappings: unknown = JSON.parse(raw);
+    if (!mappings || typeof mappings !== 'object' || Array.isArray(mappings)) return null;
+    const id = (mappings as Record<string, unknown>)[characterId];
+    return typeof id === 'string' && /^[A-Za-z0-9_-]{8,160}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
