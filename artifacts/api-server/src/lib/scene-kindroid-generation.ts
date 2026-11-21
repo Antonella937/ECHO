@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
+import { acquireSceneGroupLease, markSceneGroupLeaseUncertain, releaseSceneGroupLease } from "./scene-kindroid-group-lease";
 
 export type SceneGenerationClaim={
   ownerId:string;universeId:string;sceneId:string;sourceEventId:string;
@@ -55,4 +56,49 @@ export async function finishSceneKindroidGeneration(
       AND kindroid_group_id=${input.groupId} AND status='generating'
     RETURNING scene_id`);
   return result.rows.length===1;
+}
+
+/** Execute exactly one already-authorized Kin group generation.
+ * The caller supplies the group-only transport; private DM providers are forbidden.
+ * A timeout is uncertain, so never automatically repeat the remote generation.
+ */
+export async function generateSceneKindroidOnce(
+  input:SceneGenerationClaim,
+  generateGroupReply:()=>Promise<string>,
+):Promise<{status:"generated";text:string}|{status:"already_claimed"|"uncertain"}>{
+  const lease={ownerId:input.ownerId,groupId:input.groupId,sceneId:input.sceneId,
+    operationId:input.sourceEventId+":"+input.characterId,kind:"generate" as const};
+  if(!await acquireSceneGroupLease(lease))return {status:"already_claimed"};
+  let attempted=false;
+  try{
+    if(!await reserveSceneKindroidGeneration(input)){
+      await releaseSceneGroupLease(lease);
+      return {status:"already_claimed"};
+    }
+    if(!await beginSceneKindroidGeneration(input)){
+      await releaseSceneGroupLease(lease);
+      return {status:"already_claimed"};
+    }
+    attempted=true;
+    let text:string;
+    try{
+      text=await generateGroupReply();
+      if(!text.trim())throw new Error("KINDROID_SCENE_EMPTY_GROUP_REPLY");
+    }catch{
+      const recorded=await finishSceneKindroidGeneration(input,"uncertain");
+      await markSceneGroupLeaseUncertain(lease);
+      if(!recorded)throw new Error("SCENE_GENERATION_STATE_LOST");
+      return {status:"uncertain"};
+    }
+    if(!await finishSceneKindroidGeneration(input,"generated")){
+      await markSceneGroupLeaseUncertain(lease);
+      throw new Error("SCENE_GENERATION_STATE_LOST");
+    }
+    if(!await releaseSceneGroupLease(lease))throw new Error("SCENE_GENERATION_LEASE_RELEASE_FAILED");
+    return {status:"generated",text};
+  }catch(error){
+    if(attempted)await markSceneGroupLeaseUncertain(lease).catch(()=>false);
+    else await releaseSceneGroupLease(lease).catch(()=>false);
+    throw error;
+  }
 }
