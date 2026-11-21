@@ -153,6 +153,11 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
           throw new EngineError('KINDROID_RESPONSE_FORMAT_UNSUPPORTED', 502);
         }
       }
+      // Kindroid occasionally includes transport delimiters in its text output.
+      // Remove only standalone marker lines, never words inside actual prose.
+      reply = reply.split('\\n')
+        .filter(line => !/^\\s*(?:(?:<<|\\[|<)\\s*)?(?:start|end)[ _-]*message\\s*(?:(?:>>|\\]|>))?\\s*:?\\s*$/i.test(line))
+        .join('\\n').trim();
       if (!reply || reply.startsWith('<<ERROR>>') || reply.startsWith('<<HTTP_ERROR>>')) {
         console.warn('[kindroid] generation returned failure marker', {
           traceId, situation, elapsedMs: Date.now() - startedAt,
