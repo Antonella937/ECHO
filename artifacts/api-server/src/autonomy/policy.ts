@@ -86,13 +86,20 @@ function activeRoutineEntry(entries: RoutineEntry[], now: Date, timezone: string
   const local = clockParts(now, timezone);
   const minuteOfDay = local.hour * 60 + local.minute;
   return entries.find((entry) => {
-    if (entry.recurrence === "once" && entry.date !== local.date) return false;
-    if (entry.recurrence !== "once" && !entry.weekdays.includes(local.weekday)) return false;
     const start = minutes(entry.start), end = minutes(entry.end);
     if (start === null || end === null) return false;
-    return start <= end
-      ? minuteOfDay >= start && minuteOfDay < end
-      : minuteOfDay >= start || minuteOfDay < end;
+    const crossesMidnight = start > end;
+    const afterMidnight = crossesMidnight && minuteOfDay < end;
+    const inWindow = crossesMidnight
+      ? minuteOfDay >= start || minuteOfDay < end
+      : minuteOfDay >= start && minuteOfDay < end;
+    if (!inWindow) return false;
+    // The post-midnight portion belongs to the previous calendar day's
+    // schedule (e.g. Friday 22:00–Saturday 02:00 is a Friday routine).
+    const scheduledDay = afterMidnight ? new Date(now.getTime() - DAY_MS) : now;
+    const scheduledLocal = afterMidnight ? clockParts(scheduledDay, timezone) : local;
+    if (entry.recurrence === "once") return entry.date === scheduledLocal.date;
+    return entry.weekdays.includes(scheduledLocal.weekday);
   });
 }
 
