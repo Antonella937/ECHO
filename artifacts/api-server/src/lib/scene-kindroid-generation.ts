@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { acquireSceneGroupLease, markSceneGroupLeaseUncertain, releaseSceneGroupLease } from "./scene-kindroid-group-lease";
+import { parseKindroidSceneGroupReply } from "./scene-kindroid-reply";
 
 export type SceneGenerationClaim={
   ownerId:string;universeId:string;sceneId:string;sourceEventId:string;
@@ -102,4 +103,19 @@ export async function generateSceneKindroidOnce(
     else await releaseSceneGroupLease(lease).catch(()=>false);
     throw error;
   }
+}
+
+/** Adapter for the Kindroid group provider's JSON action envelope.
+ * Only group-specific provider output is accepted; never route through DM.
+ */
+export async function generateParsedSceneKindroidOnce(
+  input:SceneGenerationClaim,
+  completeGroup:()=>Promise<{text:string}>,
+):Promise<{status:"generated";text:string}|{status:"already_claimed"|"uncertain"}>{
+  return generateSceneKindroidOnce(input,async()=>{
+    const completion=await completeGroup();
+    const text=parseKindroidSceneGroupReply(completion.text);
+    if(!text)throw new Error("KINDROID_SCENE_GROUP_DRAFT_INVALID");
+    return text;
+  });
 }
