@@ -1,6 +1,14 @@
-import test from 'node:test';
+import test, { beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { sendKindroidSocialGroupContext, kindroidSocialGroupProvider } from '../src/ai-engine/kindroid-social-group';
+
+const previousSingleInstance = process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED;
+beforeEach(() => { process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED = 'true'; });
+afterEach(() => {
+  if (previousSingleInstance === undefined) delete process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED;
+  else process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED = previousSingleInstance;
+});
+
 
 test('social context is posted only to the group endpoint', async () => {
   const previous = process.env.ECHO_KINDROID_API_KEY;
@@ -210,4 +218,16 @@ test('overlong Kindroid comment is rejected instead of publishing truncated spee
     if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
+});
+
+test('social group refuses generation when single-instance safety is not verified', async () => {
+  delete process.env.ECHO_KINDROID_SOCIAL_SINGLE_INSTANCE_VERIFIED;
+  const request = (async () => { throw new Error('network must not be called'); }) as typeof fetch;
+  await assert.rejects(
+    kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post',
+      'Visible post', undefined, request).complete({
+        system: '', context: '', outputSchema: {},
+      }),
+    /KINDROID_SOCIAL_DISTRIBUTED_LOCK_REQUIRED/,
+  );
 });
