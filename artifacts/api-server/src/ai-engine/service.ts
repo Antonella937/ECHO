@@ -103,9 +103,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     ownerId === 'user_3LeoBfUicTthDVixNbkPlqXFkdZ' &&
     ['comment', 'post', 'story_reaction', 'like_post', 'like_comment'].includes(input.situation);
   const isolatedSocial = founderSocial && process.env.ECHO_ISOLATED_SOCIAL_PROVIDER_ENABLED === 'true';
-  if (founderSocial && !isolatedSocial &&
-      process.env.ECHO_KINDROID_SOCIAL_PRIVATE_HISTORY_OPT_IN !== 'true') {
+  // Never allow a private-history bypass: the founder requested isolation.
+  if (founderSocial && !isolatedSocial) {
     throw new EngineError('KINDROID_SOCIAL_ISOLATION_REQUIRED', 503);
+  }
+  if (isolatedSocial && dependencies.provider.name === 'kindroid') {
+    throw new EngineError('KINDROID_SOCIAL_ISOLATED_PROVIDER_REQUIRED', 503);
   }
   // Linked Kin IDs are stored server-side, never exposed to the client.
   // The founder's linked characters use Kindroid for live DMs and social decisions;
