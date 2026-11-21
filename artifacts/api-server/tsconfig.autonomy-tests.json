@@ -2,9 +2,17 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "incremental": false,
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": [
+      "es2022",
+      "dom",
+      "dom.iterable"
+    ],
     "noEmit": true,
     "rootDir": "../.."
   },
-  "include": ["tests/autonomy.test.ts", "tests/ai-usage.test.ts"]
+  "include": [
+    "tests/autonomy.test.ts",
+    "tests/ai-usage.test.ts",
+    "src/types/**/*.d.ts"
+  ]
 }
