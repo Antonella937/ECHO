@@ -330,6 +330,19 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
     if (!scene) { res.status(404).json({error:"SCENE_NOT_FOUND"}); return; }
     const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
     if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
+    // Legacy or manually migrated bindings may predate the uniqueness checks.
+    // Never preview a group shared with another scene or an ordinary ECHO group.
+    const collisions = await db.execute(sql`SELECT 1 FROM echo_group_conversations
+      WHERE owner_id=${req.userId!} AND kindroid_group_id=${groupId}
+      UNION ALL
+      SELECT 1 FROM echo_scenes other
+      WHERE other.owner_id=${req.userId!}
+        AND NOT (other.universe_id=${parsed.data.universeId} AND other.scene_id=${sceneId.data})
+        AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+      LIMIT 1`);
+    if (collisions.rows.length) {
+      res.status(409).json({error:"KINDROID_SCENE_GROUP_SHARED"}); return;
+    }
     const apiKey = process.env.ECHO_KINDROID_API_KEY;
     if (!apiKey) { res.status(503).json({error:"KINDROID_KEY_MISSING"}); return; }
     const members = new Set(Array.isArray(scene.participant_ids) ? scene.participant_ids.filter((x):x is string=>typeof x==="string") : []);
