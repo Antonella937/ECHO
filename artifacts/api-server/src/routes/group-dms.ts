@@ -158,6 +158,13 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         const date = new Date(timestamp < 1e11 ? timestamp * 1000 : timestamp);
         if (!Number.isFinite(date.getTime())) { rejected.badTimestamp++; continue; }
         const stableId = "kindroid_" + createHash("sha256").update(groupIdOnKindroid + ":" + sourceId).digest("hex").slice(0, 48);
+        // The live response may already exist under an ECHO UUID.
+        const existing = await db.execute(sql`SELECT id FROM echo_group_messages
+          WHERE owner_id=${ownerId} AND universe_id=${universeId} AND group_id=${groupId}
+          AND sender_id=${senderId} AND body=${body}
+          AND created_at BETWEEN (${date.toISOString()}::timestamptz - interval '2 minutes')
+          AND (${date.toISOString()}::timestamptz + interval '2 minutes') LIMIT 1`);
+        if (existing.rows.length) continue;
         await db.execute(sql`INSERT INTO echo_group_messages
           (owner_id, universe_id, id, group_id, sender_id, body, read_by, created_at)
           VALUES (${ownerId}, ${universeId}, ${stableId}, ${groupId}, ${senderId}, ${body}, '[]'::jsonb, ${date.toISOString()}::timestamptz)
