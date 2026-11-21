@@ -522,6 +522,16 @@ export async function runAutonomyLiveCycle(
         vision: (id, state, input) => visionService.ensureForDecision(id, state, input),
         liveDmReply: true, // All live text actions use linked Kindroid, not just DM replies.
       });
+    } catch (error) {
+      // Context-only diagnostics: no private text, images, or Kin prompts.
+      console.warn("AUTONOMY_PREVIEW_FAILED", {
+        characterId: character.id, universeId, lane: dependencies.lane ?? "social",
+        situation: opportunity.situation, recipientId: opportunity.recipientId ?? null,
+        storyTriggered: Boolean(opportunity.storyId),
+        incomingDmTriggered: Boolean(opportunity.messageId),
+        errorCode: error instanceof EngineError ? error.code : error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN",
+      });
+      throw error;
     } finally {
       activeDmTyping.delete(typingId);
     }
