@@ -1,3 +1,4 @@
+import { notifyNewGroupMessage } from "../lib/group-push-dispatch";
 import { privateConversationCandidates } from "../lib/canon-knowledge";
 import { runGroupAutonomyOnce } from "../autonomy/group-executor";
 import { randomUUID, createHash } from "node:crypto";
@@ -165,11 +166,14 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
           AND created_at BETWEEN (${date.toISOString()}::timestamptz - interval '2 minutes')
           AND (${date.toISOString()}::timestamptz + interval '2 minutes') LIMIT 1`);
         if (existing.rows.length) continue;
-        await db.execute(sql`INSERT INTO echo_group_messages
+        const imported = await db.execute(sql`INSERT INTO echo_group_messages
           (owner_id, universe_id, id, group_id, sender_id, body, read_by, created_at)
           VALUES (${ownerId}, ${universeId}, ${stableId}, ${groupId}, ${senderId}, ${body}, '[]'::jsonb, ${date.toISOString()}::timestamptz)
-          ON CONFLICT DO NOTHING`);
-        accepted++;
+          ON CONFLICT DO NOTHING RETURNING id`);
+        if (imported.rows.length) {
+          accepted++;
+          if (Math.abs(Date.now()-date.getTime()) < 120_000) void notifyNewGroupMessage({ownerId,universeId,groupId,senderId,messageId:stableId,createdAt:date}).catch(()=>{});
+        }
       }
       console.info("[kindroid-group] history counts " + JSON.stringify({ group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", page, total: data.messages.length, accepted, rejected }));
       if (!data.pagination?.hasMore || !Number.isFinite(data.pagination.lastTimestamp) || data.pagination.lastTimestamp === cursor) break;
