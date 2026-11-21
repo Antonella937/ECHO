@@ -1320,6 +1320,28 @@ test("opt-in target query returns only enabled characters whose owner kill switc
   assert.deepEqual(ownTargets, [{ ownerId: eligibleOwner, universeId: "primary", characterId: "mar" }]);
 });
 
+test("DM worker evaluates social-only and peer-only targets without spontaneous owner DMs", async () => {
+  const seen: string[] = [];
+  const targets = [
+    { ownerId: "synthetic", universeId: "primary", characterId: "story-replier", socialEnabled: true, dmEnabled: false },
+    { ownerId: "synthetic", universeId: "primary", characterId: "peer-only", socialEnabled: false, dmEnabled: false },
+  ];
+  const repository = {
+    listLiveOptInTargets: async () => targets,
+    claimWorkerLease: async () => true,
+    releaseWorkerLease: async () => undefined,
+  };
+  const result = await runAutonomyWorkerTick({
+    enabled: true, repository, now: NOW, socialTickDue: false,
+    processCharacter: async (_ownerId, input) => {
+      seen.push(`${input.characterId}:${input.lane}`);
+      return { status: "no_action" as const };
+    },
+  });
+  assert.equal(result.status, "completed");
+  assert.deepEqual(seen, ["story-replier:dm", "peer-only:dm"]);
+});
+
 test("worker tick gates disabled and busy states before target selection", async () => {
   let listed = 0;
   let processed = 0;
