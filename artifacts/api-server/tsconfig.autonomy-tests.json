@@ -16,6 +16,7 @@
     "tests/kindroid-social-isolation.test.ts",
     "tests/kindroid-social-group.test.ts",
     "tests/social-event-context.test.ts",
+    "tests/social-action-idempotency.test.ts",
     "tests/story-social-policy.test.ts",
     "src/types/**/*.d.ts"
   ]
