@@ -170,11 +170,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       : [];
     const context = [
       `Actor: ${actor?.name ?? input.characterId} (${input.characterId})`,
+      analyzedGallery.length ? `Your own analyzed gallery photos (do not claim to post a photo until a gallery ID is selected): ${analyzedGallery.map(item => `${item.id}: ${item.scene}`).join(' | ').slice(0, 550)}` : '',
       (post ?? commentParentPost) ? `Visible post by ${parsed.data.state.characters.find(c => c.id === (post ?? commentParentPost)!.authorId)?.name ?? (post ?? commentParentPost)!.authorId}: ${((post ?? commentParentPost)!.caption ?? '[image or post without caption; visual content not analyzed]').slice(0,500)}` : '',
       comment ? `Visible comment by ${parsed.data.state.characters.find(c => c.id === comment.authorId)?.name ?? comment.authorId}: ${comment.text.slice(0,300)}` : '',
       story ? `Visible story by ${parsed.data.state.characters.find(c => c.id === story.authorId)?.name ?? story.authorId}: ${(story.caption ?? '[story without caption; visual content not analyzed]').slice(0,400)}` : '',
       visibleThread ? `Recent visible comments in this ECHO thread (across all Kindroid groups):\n${visibleThread}` : '',
-      analyzedGallery.length ? `Your own analyzed gallery photos (do not claim to post a photo until a gallery ID is selected): ${analyzedGallery.map(item => `${item.id}: ${item.scene}`).join(' | ').slice(0, 550)}` : '',
+
       'Use only this visible ECHO event; do not infer unseen image content or private messages.',
     ].filter(Boolean).join(String.fromCharCode(10));
     selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId);
