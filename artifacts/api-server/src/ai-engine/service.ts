@@ -236,7 +236,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         let outgoingPrompt = peerContext + (storyForReply
           ? `[ECHO story reply: You (${actorName}) are viewing ${recipientName}'s story, not appearing in it. ${storyMetadata} Caption: ${(storyForReply.caption ?? '').slice(0,250)}. ${visualContext.slice(0,650)} Tags do not verify faces. Do not claim the photo is yours or invent details. Reply as yourself to ${recipientName}, naturally, with your usual narration and dialogue when appropriate; do not shorten your style.]`
           : isDirectReply
-            ? `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`
+            ? (recipientId === parsed.data.state.primaryCharacterId
+                ? latestIncomingText // Send the owner's actual message, not a fabricated ECHO instruction.
+                : `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`)
             : `[ECHO autonomous DM: You have decided to reach out to ${recipientName} on your own. Write one natural message. Do not claim they messaged you or invent a reply from them.]`);
         // A profile card shared in this exact private thread grants a one-time
         // read of that profile's public posts; it does not create a follow.
@@ -380,7 +382,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
           socialContext = journalFacts.map(e => `Known world journal (${e.truthStatus}; ${e.title}): ${e.content}`).join('\n').slice(0,500);
         }
-        selectedProvider = kindroidDmProvider(outgoingPrompt, kinId, storyForReply ? socialContext : '', undefined, 'dm', input.characterId);
+        selectedProvider = kindroidDmProvider(outgoingPrompt, kinId,
+          storyForReply ? socialContext : '', undefined, 'dm', input.characterId);
       }
     }
   }
