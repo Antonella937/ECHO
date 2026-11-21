@@ -50,7 +50,7 @@ export default function ScenesPage() {
     try {
       const importResult = await customFetch<{sceneId:string;imported:number;matchedEvents:number}>(`/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-import`, {
         method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({universeId}),
+        body:JSON.stringify({universeId,expectedKindroidGroupId:kindroidPreview.kindroidGroupId}),
       });
       const result = await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(sceneId)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,
         {method:'GET',responseType:'json',cache:'no-store'});
@@ -62,7 +62,7 @@ export default function ScenesPage() {
     } finally {setKindroidImporting(false);}
   };
 
-  const [kindroidPreview,setKindroidPreview] = useState<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}|null>(null);
+  const [kindroidPreview,setKindroidPreview] = useState<{sceneId:string;kindroidGroupId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}|null>(null);
   useEffect(()=>{setKindroidPreview(null);},[selected]);
   const previewKindroidGroup = async (sceneId:string) => {
     if (kindroidPreviewLoading) return;
@@ -74,7 +74,10 @@ export default function ScenesPage() {
       const result = await customFetch<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}>(
         `/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-preview?${new URLSearchParams({universeId})}`,
         {method:'GET',responseType:'json'});
-      if (result.sceneId===sceneId) setKindroidPreview(result);
+      if (result.sceneId===sceneId) {
+        const groupId=scenes.find(item=>item.sceneId===sceneId)?.turnSettings?.kindroidGroupId;
+        if (groupId) setKindroidPreview({...result,kindroidGroupId:groupId});
+      }
     } catch (error) {
       setError((es?'No se pudo leer el historial del grupo. ':'Could not read group history. ') +
         (error instanceof Error?error.message.slice(0,160):''));
