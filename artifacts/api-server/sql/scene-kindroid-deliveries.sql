@@ -29,3 +29,26 @@ CREATE INDEX IF NOT EXISTS echo_scene_kindroid_deliveries_pending_idx
 CREATE UNIQUE INDEX IF NOT EXISTS echo_scene_kindroid_one_sending_per_group
   ON echo_scene_kindroid_deliveries (owner_id, kindroid_group_id)
   WHERE status = 'sending';
+
+-- Kin replies are remote writes too: reserve before generating, and do not
+-- retry a timeout without reconciling the Kindroid group history.
+CREATE TABLE IF NOT EXISTS echo_scene_kindroid_generations (
+  owner_id text NOT NULL,
+  universe_id text NOT NULL,
+  scene_id text NOT NULL,
+  source_event_id text NOT NULL,
+  character_id text NOT NULL,
+  kin_id text NOT NULL,
+  kindroid_group_id text NOT NULL,
+  status text NOT NULL DEFAULT 'reserved',
+  reserved_at timestamptz NOT NULL DEFAULT now(),
+  attempted_at timestamptz,
+  completed_at timestamptz,
+  CONSTRAINT echo_scene_kindroid_generations_pk PRIMARY KEY
+    (owner_id,universe_id,scene_id,source_event_id,character_id),
+  CONSTRAINT echo_scene_kindroid_generations_status_check
+    CHECK (status IN ('reserved','generating','generated','uncertain'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS echo_scene_kindroid_one_generation_per_group
+  ON echo_scene_kindroid_generations (owner_id,kindroid_group_id)
+  WHERE status = 'generating';
