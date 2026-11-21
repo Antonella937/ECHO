@@ -449,13 +449,27 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const kinId = typeof links.rows[0]?.kin_id === "string" ? links.rows[0].kin_id : null;
     let replyText: string;
     if (kinId) {
-      const scenePrompt = [
+      const sceneInstructions = [
         "[ECHO fictional group scene; respond as yourself, not as any other participant.]",
         "Write only your own next in-character dialogue and actions. Do not narrate anyone else's response.",
         "This is a separate scene, not a private DM. Only use the scene context below.",
-        context,
-        "[End scene context. Continue naturally as your character.]",
-      ].join("\n").slice(0,6000);
+      ].join("\n");
+      const sceneEnding = "\n[End scene context. Continue naturally as your character.]";
+      // The shared Kindroid DM transport rejects messages over 2,800 chars.
+      // Keep the latest visible events rather than truncating the entire prompt
+      // (which previously could discard the trigger and fail before dispatch).
+      const maxScenePromptChars = 2800;
+      const promptBudget = maxScenePromptChars - sceneInstructions.length - sceneEnding.length - 2;
+      const baseContext = { scene: { sceneId: sceneId.data, title: scene.title, premise: scene.premise, canon: scene.canon },
+        character: { id: character.id, name: character.name }, participants: people, sceneMemory: previousSummary };
+      const recentEvents = visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text }));
+      let sceneContext = JSON.stringify({ ...baseContext, visibleEvents: recentEvents });
+      while (sceneContext.length > promptBudget && recentEvents.length > 1) {
+        recentEvents.shift();
+        sceneContext = JSON.stringify({ ...baseContext, visibleEvents: recentEvents });
+      }
+      if (sceneContext.length > promptBudget) throw new EngineError("KINDROID_SCENE_CONTEXT_TOO_LONG", 400);
+      const scenePrompt = [sceneInstructions, sceneContext, sceneEnding].join("\n");
       const completion = await kindroidDmProvider(scenePrompt,kinId,"",fetch,"dm").complete({system:"",context:"",outputSchema:sceneOutputSchema});
       const draft = z.object({action:z.literal("draft"),text:z.string().trim().min(1).max(2000)}).passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
