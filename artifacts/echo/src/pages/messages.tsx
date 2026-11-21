@@ -138,7 +138,7 @@ export default function MessagesPage() {
             </li>; })}</ul>
           )}
         </section>
-      ) : (view === 'requests' ? requests.length === 0 : view === 'archived' ? inboxGroups.filter(g => g.archived).length === 0 : orderedThreads.length === 0 && inboxGroups.filter(g => !g.archived).length === 0) ? (
+      ) : (view === 'requests' ? requests.length === 0 : view === 'archived' ? inboxGroups.filter(g => g.archived).length === 0 : view === 'inbox' ? orderedThreads.length === 0 && inboxGroups.filter(g => !g.archived).length === 0 : true) ? (
         <div className="flex flex-col items-center px-8 py-20 text-center" data-testid="empty-messages">
           <div className="mb-5 grid h-16 w-16 place-items-center rounded-full border border-dashed border-primary/40 text-primary">
             <PenSquare className="h-6 w-6" strokeWidth={1.5} />
@@ -158,7 +158,7 @@ export default function MessagesPage() {
       ) : (
         <ul className="px-1 pt-3" data-testid="list-threads">
           {view !== 'requests' && (view === 'archived' ? inboxGroups.filter(group => group.archived) : view === 'inbox' ? inboxGroups.filter(group => !group.archived) : []).map(group => <li key={group.id}><Link href={`/messages/group/${group.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60"><div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-secondary"><Users className="h-6 w-6" /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{group.name}</p><p className="truncate text-xs text-muted-foreground">{group.participantIds.map(id => character(id)?.name ?? id).join(", ")}</p></div>{group.muted && <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Silenciado" />}</Link></li>)}
-          {(view === 'requests' ? requests : view === 'archived' ? [] : orderedThreads).map(({ other, last, unread }) => (
+          {(view === 'requests' ? requests : view === 'inbox' ? orderedThreads : []).map(({ other, last, unread }) => (
             <li key={other.id}>
               <Link href={`/messages/${other.id}`} className="flex min-h-[72px] items-center gap-3.5 rounded-2xl px-3 py-3 hover:bg-secondary/60" data-testid={`link-thread-${other.id}`}>
                 <span className="relative shrink-0"><CharacterAvatar character={other} size={52} />{recentlyActive(state, other.id) && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-[3px] border-background bg-emerald-500" aria-label="Recently active" data-testid={`activity-thread-${other.id}`} />}</span>
