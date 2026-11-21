@@ -128,7 +128,7 @@ export default function GroupConversationPage() {
           const found = groupResult.value.groups.find(g => g.id === id);
           if (found) { setGroup(found); if (found.wallpaperUrl) setWallpaper(found.wallpaperUrl); }
         }
-        if (threadResult.status === 'fulfilled') setMessages(threadResult.value.messages);
+        if (threadResult.status === 'fulfilled') { setMessages(threadResult.value.messages); if (groupResult.status === "fulfilled" && groupResult.value.groups.find(g => g.id === id)?.participantIds.includes(me.id)) void customFetch(`/api/group-dms/${encodeURIComponent(id)}/read`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({universeId:getActiveUniverseId(user.id),actorId:me.id}),responseType:"json"}).catch(()=>{}); }
         setError(groupResult.status === 'rejected' && threadResult.status === 'rejected'
           ? 'No se pudo conectar con el grupo. Reintentando automáticamente…'
           : threadResult.status === 'rejected' ? 'No se pudieron actualizar los mensajes. Reintentando…'
