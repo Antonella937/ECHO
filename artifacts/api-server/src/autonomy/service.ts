@@ -395,6 +395,8 @@ export async function runAutonomyLiveCycle(
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
       allowOwnerStoryReplies: control.enabled,
+      allowOwnerIncomingReplies: linkedInboundReply || control.dmEnabled,
+      allowOwnerSpontaneousDm: control.dmEnabled,
       targetIncomingMessageId: dependencies.targetIncomingMessageId,
     });
     if (dependencies.targetIncomingMessageId) {
@@ -471,8 +473,13 @@ export async function runAutonomyLiveCycle(
         // The owner's manually controlled identity is not an autonomous peer.
         // DM opt-in authorizes replies to the owner without a separate AI-to-AI
         // allowlist entry. AI-to-AI conversations still require mutual opt-in.
-        permitted = sender?.enabled === true &&
-          ((recipientIsOwnerIdentity && (control.dmEnabled || (control.enabled && Boolean(opportunity.storyId)))) || (
+        const incomingOwnerReply = recipientIsOwnerIdentity &&
+          opportunity.reason === "A recent incoming direct message is awaiting a reply." &&
+          (linkedInboundReply || control.dmEnabled);
+        const ownerStoryReply = recipientIsOwnerIdentity && control.enabled && Boolean(opportunity.storyId);
+        permitted = (recipientIsOwnerIdentity &&
+          (incomingOwnerReply || ownerStoryReply || (control.dmEnabled && sender?.enabled === true))) ||
+          (sender?.enabled === true && !recipientIsOwnerIdentity && (
             Array.isArray(sender.allowed_peer_ids) && sender.allowed_peer_ids.includes(opportunity.recipientId) &&
             receiver?.enabled === true &&
             Array.isArray(receiver.allowed_peer_ids) && receiver.allowed_peer_ids.includes(character.id)
