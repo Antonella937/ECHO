@@ -66,6 +66,7 @@ export async function finishSceneKindroidGeneration(
 export async function generateSceneKindroidOnce(
   input:SceneGenerationClaim,
   generateGroupReply:()=>Promise<string>,
+  persistSceneReply:(text:string)=>Promise<void>,
 ):Promise<{status:"generated";text:string}|{status:"already_claimed"|"uncertain"}>{
   const lease={ownerId:input.ownerId,groupId:input.groupId,sceneId:input.sceneId,
     operationId:input.sourceEventId+":"+input.characterId,kind:"generate" as const};
@@ -92,6 +93,16 @@ export async function generateSceneKindroidOnce(
       if(!recorded)throw new Error("SCENE_GENERATION_STATE_LOST");
       return {status:"uncertain"};
     }
+    // The group response may already be durable in Kindroid. Persist the
+    // matching ECHO scene event before declaring this generation complete.
+    // A DB failure must remain uncertain, never cause another remote call.
+    try{
+      await persistSceneReply(text);
+    }catch{
+      await finishSceneKindroidGeneration(input,"uncertain");
+      await markSceneGroupLeaseUncertain(lease);
+      return {status:"uncertain"};
+    }
     if(!await finishSceneKindroidGeneration(input,"generated")){
       await markSceneGroupLeaseUncertain(lease);
       throw new Error("SCENE_GENERATION_STATE_LOST");
@@ -111,11 +122,12 @@ export async function generateSceneKindroidOnce(
 export async function generateParsedSceneKindroidOnce(
   input:SceneGenerationClaim,
   completeGroup:()=>Promise<{text:string}>,
+  persistSceneReply:(text:string)=>Promise<void>,
 ):Promise<{status:"generated";text:string}|{status:"already_claimed"|"uncertain"}>{
   return generateSceneKindroidOnce(input,async()=>{
     const completion=await completeGroup();
     const text=parseKindroidSceneGroupReply(completion.text);
     if(!text)throw new Error("KINDROID_SCENE_GROUP_DRAFT_INVALID");
     return text;
-  });
+  },persistSceneReply);
 }
