@@ -41,6 +41,25 @@ export default function ScenesPage() {
   const [kindroidGroupLink,setKindroidGroupLink] = useState('');
   const [kindroidGroupSaving,setKindroidGroupSaving] = useState(false);
   const [kindroidPreviewLoading,setKindroidPreviewLoading] = useState(false);
+  const [kindroidImporting,setKindroidImporting] = useState(false);
+  const importKindroidHistory = async (sceneId:string) => {
+    if (kindroidImporting || !kindroidPreview || kindroidPreview.sceneId!==sceneId) return;
+    setKindroidImporting(true);
+    setError('');
+    try {
+      await customFetch(`/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-import`, {
+        method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({universeId}),
+      });
+      const result = await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(sceneId)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,
+        {method:'GET',responseType:'json',cache:'no-store'});
+      if (selected===sceneId) setEvents(result.events);
+      setKindroidPreview(null);
+    } catch (error) {
+      setError((es?'No se pudo importar el historial. ':'Could not import history. ')+(error instanceof Error?error.message.slice(0,160):''));
+    } finally {setKindroidImporting(false);}
+  };
+
   const [kindroidPreview,setKindroidPreview] = useState<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}|null>(null);
   useEffect(()=>{setKindroidPreview(null);},[selected]);
   const previewKindroidGroup = async (sceneId:string) => {
@@ -334,7 +353,12 @@ export default function ScenesPage() {
               {kindroidPreview.events.slice(-5).map(item=><p key={item.eventId} className="break-words text-white/80">
                 <strong>{state.characters.find(c=>c.id===item.actorId)?.name??(es?'Personaje':'Character')}</strong>: {item.text.slice(0,220)}
               </p>)}
-              <p className="text-white/60">{es?'Vista previa: no importa mensajes ni genera respuestas.':'Preview only: no messages imported or generated.'}</p>
+              <p className="text-white/60">{es?'Vista previa: todavía no se importaron mensajes.':'Preview only: no messages imported yet.'}</p>
+              {kindroidPreview.matchedEvents>0&&<button type="button" disabled={kindroidImporting}
+                onClick={()=>void importKindroidHistory(active.sceneId)}
+                className="rounded-lg border border-white/30 px-3 py-2 text-xs disabled:opacity-50">
+                {kindroidImporting?(es?'Importando…':'Importing…'):(es?'Importar mensajes identificados':'Import matched messages')}
+              </button>}
             </div>}
           </div>}
         </div>
