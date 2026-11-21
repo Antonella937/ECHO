@@ -56,3 +56,25 @@ test("rejects an empty continuation page",async()=>{
   await assert.rejects(readKindroidScenePages(group,"test-key",request),
     (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_SCENE_HISTORY_CURSOR_INVALID");
 });
+
+test("uses authenticated read-only requests without leaking the API key into URLs",async()=>{
+  const seen:Array<{url:string;method:string;authorization:string|null}>=[];
+  const request=(async(input:string|URL|Request,init?:RequestInit)=>{
+    seen.push({url:String(input),method:init?.method??"GET",
+      authorization:new Headers(init?.headers).get("Authorization")});
+    return reply({messages:[],pagination:{hasMore:false}});
+  }) as typeof fetch;
+  assert.deepEqual(await readKindroidScenePages(group,"secret-test-key",request),[]);
+  assert.equal(seen.length,1);
+  assert.equal(seen[0].method,"GET");
+  assert.equal(seen[0].authorization,"Bearer secret-test-key");
+  assert.equal(seen[0].url.includes("secret-test-key"),false);
+  assert.equal(new URL(seen[0].url).hostname,"api.kindroid.ai");
+});
+test("rejects malformed group identifiers before sending requests",async()=>{
+  let calls=0;
+  const request=(async()=>{calls++;return reply({messages:[],pagination:{hasMore:false}});}) as typeof fetch;
+  await assert.rejects(readKindroidScenePages("../private","test-key",request),
+    (error:unknown)=>error instanceof KindroidSceneHistoryError && error.code==="KINDROID_GROUP_ID_INVALID");
+  assert.equal(calls,0);
+});
