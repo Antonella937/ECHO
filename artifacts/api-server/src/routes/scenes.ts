@@ -786,7 +786,29 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const kinId = typeof linkedKin.rows[0]?.kin_id === "string" ? linkedKin.rows[0].kin_id : null;
     if (kinId) {
       const boundGroup = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
-      res.status(409).json({error:boundGroup ? "KINDROID_SCENE_GROUP_SYNC_REQUIRED" : "KINDROID_SCENE_GROUP_REQUIRED"});
+      if (!boundGroup) {
+        res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return;
+      }
+      // A Kin may only generate from the isolated group after every eligible
+      // human scene event has a confirmed delivery. Otherwise the Kin would
+      // answer from an incomplete history or inadvertently use its private DM.
+      const identity=(state as {currentCharacterId?:string}|null)?.currentCharacterId;
+      if (!identity || !participants.includes(identity)) {
+        res.status(409).json({error:"KINDROID_SCENE_IDENTITY_REQUIRED"}); return;
+      }
+      const pending=await db.execute(sql`SELECT 1 FROM echo_scene_events e
+        LEFT JOIN echo_scene_kindroid_deliveries d
+          ON d.owner_id=e.owner_id AND d.universe_id=e.universe_id
+          AND d.scene_id=e.scene_id AND d.event_id=e.event_id
+          AND d.kindroid_group_id=${boundGroup}
+        WHERE e.owner_id=${ownerId} AND e.universe_id=${universeId}
+          AND e.scene_id=${sceneId.data} AND e.actor_id=${identity}
+          AND e.visibility IN ('public','participants')
+          AND e.audience_ids='[]'::jsonb AND e.text <> ''
+          AND (d.status IS DISTINCT FROM 'sent') LIMIT 1`);
+      res.status(409).json({error:pending.rows.length
+        ? "KINDROID_SCENE_GROUP_SYNC_REQUIRED"
+        : "KINDROID_SCENE_GROUP_GENERATION_NOT_ENABLED"});
       return;
     }
     const eventId = randomUUID();
