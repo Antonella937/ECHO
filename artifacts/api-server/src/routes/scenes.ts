@@ -381,18 +381,19 @@ scenesRouter.get("/scenes/:sceneId/kindroid-history-preview", async (req, res) =
 
 // Explicit owner-triggered import; never generates Kindroid replies or uses private DMs.
 scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) => {
-  const parsed = scope.safeParse(req.query);
+  const parsed = scope.safeParse(req.body);
   const sceneId = id.safeParse(req.params.sceneId);
   if (!parsed.success || !sceneId.success) { res.status(400).json({error:"INVALID_SCENE"}); return; }
   try {
     const [universe] = await db.select({state:echoUniversesTable.state}).from(echoUniversesTable)
       .where(and(eq(echoUniversesTable.ownerId,req.userId!),eq(echoUniversesTable.universeId,parsed.data.universeId))).limit(1);
     if (!universe) { res.status(403).json({error:"UNIVERSE_NOT_ACCESSIBLE"}); return; }
-    const sceneRows = await db.execute(sql`SELECT participant_ids, turn_settings FROM echo_scenes
+    const sceneRows = await db.execute(sql`SELECT participant_ids, turn_settings, status FROM echo_scenes
       WHERE owner_id=${req.userId!} AND universe_id=${parsed.data.universeId}
         AND scene_id=${sceneId.data} LIMIT 1`);
     const scene = sceneRows.rows[0];
     if (!scene) { res.status(404).json({error:"SCENE_NOT_FOUND"}); return; }
+    if (scene.status !== "active") { res.status(409).json({error:"SCENE_NOT_ACTIVE"}); return; }
     const groupId = parseKindroidGroupId(String((scene.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? ""));
     if (!groupId) { res.status(409).json({error:"KINDROID_SCENE_GROUP_REQUIRED"}); return; }
     // Legacy or manually migrated bindings may predate the uniqueness checks.
