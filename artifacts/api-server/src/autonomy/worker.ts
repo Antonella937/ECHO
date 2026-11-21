@@ -1,9 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 export const AUTONOMY_WORKER_INTERVAL_MS = 2 * 60_000;
-// A two-minute worker should not hold a stale lease for ten minutes after a deploy.
-// Keep enough time for a normal tick while limiting crash recovery delay.
-const WORKER_LEASE_MS = 3 * 60_000;
+const WORKER_LEASE_MS = 10 * 60_000;
 const SOCIAL_INTERVAL_MS = 30 * 60_000;
 const CHARACTER_TIMEOUT_MS = 45_000;
 const FAILED_CHARACTER_BACKOFF_MS = 15 * 60_000;
