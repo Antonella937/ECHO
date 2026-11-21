@@ -266,7 +266,7 @@ export async function runAutonomyDryRun(
       lane: dependencies.lane,
       code,
       errorName: error instanceof Error ? error.name : "UNKNOWN",
-      stackLocation: error instanceof Error ? error.stack?.split("\\n").slice(1, 3).map(line => line.trim()) : undefined,
+      stackLocation: error instanceof Error ? error.stack?.split("\n").slice(1, 3).map(line => line.trim()) : undefined,
     });
     if (isAutonomyBudgetProtected(error)) {
       await dependencies.repository.complete(ownerId, runId, {
