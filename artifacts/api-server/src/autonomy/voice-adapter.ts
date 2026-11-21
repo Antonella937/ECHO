@@ -135,7 +135,7 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
     const objectPath = `/objects/uploads/${randomUUID()}`;
     const uploaded = await fetch(`${base}/storage/v1/object/echo-media/${objectPath.slice("/objects/".length)}`, {
       method: "POST", headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": mimeType, "x-upsert": "false" },
-      body: audioBytes, signal: AbortSignal.timeout(20000),
+      body: new Uint8Array(audioBytes), signal: AbortSignal.timeout(20000),
     });
     if (!uploaded.ok) throw Error("VOICE_UPLOAD_FAILED");
     await db.transaction(async tx => {
