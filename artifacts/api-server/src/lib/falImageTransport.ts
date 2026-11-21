@@ -92,11 +92,18 @@ export async function resolveFalImagePayload(payload: unknown, fetchImpl: typeof
   if (mime !== 'image/jpeg') throw Error('FAL_IMAGE_UNEXPECTED_MIME');
   const chunks: Buffer[] = [];
   let size = 0;
-  for await (const chunk of response.body.values()) {
-    const bytes = Buffer.from(chunk);
-    size += bytes.length;
-    if (size > MAX_BYTES) throw Error('FAL_IMAGE_TOO_LARGE');
-    chunks.push(bytes);
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const bytes = Buffer.from(value);
+      size += bytes.length;
+      if (size > MAX_BYTES) throw Error('FAL_IMAGE_TOO_LARGE');
+      chunks.push(bytes);
+    }
+  } finally {
+    reader.releaseLock();
   }
   const bytes = Buffer.concat(chunks);
   validateJpeg(bytes);
