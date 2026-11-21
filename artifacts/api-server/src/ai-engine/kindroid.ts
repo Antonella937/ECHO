@@ -307,7 +307,23 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
       } catch {
         throw new EngineError('KINDROID_GROUP_TURN_CONNECTION_FAILED', 502);
       }
-      if (!turnResponse.ok) throw new EngineError('KINDROID_GROUP_TURN_FAILED', turnResponse.status === 429 ? 429 : 502);
+      if (!turnResponse.ok) {
+        // Never log response bodies, credentials, Kin IDs, or group IDs.
+        // Classify upstream failures so a broken group mapping can be
+        // distinguished from a rejected payload or a temporary outage.
+        const failure = await classifyKindroidFailure(turnResponse);
+        console.warn('[kindroid-group] get-turn rejected ' + JSON.stringify({
+          status: turnResponse.status,
+          category: failure.category,
+          providerCode: failure.providerCode,
+          errorFormat: failure.errorFormat,
+          errorFingerprint: failure.errorFingerprint,
+        }));
+        throw new EngineError(
+          turnResponse.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_GROUP_TURN_FAILED',
+          turnResponse.status === 429 ? 429 : 502,
+        );
+      }
       const nextKinId = (await turnResponse.text()).trim();
       if (!nextKinId) throw new EngineError('KINDROID_GROUP_USER_TURN', 409);
       if (nextKinId !== kinId) throw new EngineError('KINDROID_GROUP_SPEAKER_MISMATCH', 409);
