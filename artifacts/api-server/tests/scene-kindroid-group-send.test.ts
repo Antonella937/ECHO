@@ -29,3 +29,20 @@ test("does not retry a potentially delivered message after network failure",asyn
     (error:unknown)=>error instanceof KindroidSceneSendError&&error.code==="KINDROID_SCENE_GROUP_SEND_UNCERTAIN");
   assert.equal(calls,1);
 });
+
+test("does not retry a rejected upstream write, including rate limits",async()=>{
+  let calls=0;
+  const request=(async()=>{calls++;return new Response("rate limit",{status:429});}) as typeof fetch;
+  await assert.rejects(sendKindroidSceneGroupMessage(group,"hello","test-key",request),
+    (error:unknown)=>error instanceof KindroidSceneSendError&&error.code==="KINDROID_RATE_LIMITED"&&error.status===429);
+  assert.equal(calls,1);
+});
+test("does not send a message without credentials or with an oversized body",async()=>{
+  let calls=0;
+  const request=(async()=>{calls++;return new Response("",{status:200});}) as typeof fetch;
+  await assert.rejects(sendKindroidSceneGroupMessage(group,"hello","",request),
+    (error:unknown)=>error instanceof KindroidSceneSendError&&error.code==="KINDROID_KEY_MISSING");
+  await assert.rejects(sendKindroidSceneGroupMessage(group,"x".repeat(5001),"test-key",request),
+    (error:unknown)=>error instanceof KindroidSceneSendError&&error.code==="KINDROID_SCENE_MESSAGE_INVALID");
+  assert.equal(calls,0);
+});
