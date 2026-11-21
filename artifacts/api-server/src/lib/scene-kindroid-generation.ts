@@ -99,8 +99,9 @@ export async function generateSceneKindroidOnce(
     try{
       await persistSceneReply(text);
     }catch{
-      await finishSceneKindroidGeneration(input,"uncertain");
-      await markSceneGroupLeaseUncertain(lease);
+      const recorded=await finishSceneKindroidGeneration(input,"uncertain");
+      const blocked=await markSceneGroupLeaseUncertain(lease);
+      if(!recorded || !blocked)throw new Error("SCENE_GENERATION_RECONCILIATION_REQUIRED");
       return {status:"uncertain"};
     }
     if(!await finishSceneKindroidGeneration(input,"generated")){
