@@ -1,3 +1,4 @@
+import { notifyNewGroupMessage } from "../lib/group-push-dispatch";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { db, echoUniversesTable } from "@workspace/db";
@@ -165,6 +166,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         GROUP BY group_id HAVING max(created_at) <= ${now.toISOString()}::timestamptz))
       RETURNING id`);
     if (!inserted.rows.length) return { status: "skipped", reason: "STALE_CONVERSATION" };
+    void notifyNewGroupMessage({ownerId,universeId,groupId,senderId:speakerId,messageId:String(inserted.rows[0].id)}).catch(()=>{});
     await db.execute(sql`UPDATE echo_group_conversations SET last_autonomy_at = now(), updated_at = now()
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId} AND autonomy_claim_id = ${claimId}`);
     return { status: "sent", speakerId };
