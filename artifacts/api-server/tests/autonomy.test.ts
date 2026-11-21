@@ -240,6 +240,32 @@ test("owner incoming reply is blocked without reply authorization", () => {
   assert.notEqual(result.recipientId, ownerId);
 });
 
+test("owner story reply is eligible with spontaneous owner DMs disabled", () => {
+  const { state, mar } = fixture();
+  const ownerId = state.primaryCharacterId;
+  assert.ok(ownerId);
+  addNoahRelationship(mar, ownerId);
+  state.follows[mar.id] = [...new Set([...(state.follows[mar.id] ?? []), ownerId])];
+  state.stories.push({
+    id: "owner-story", authorId: ownerId, image: "asset:test", caption: "Studio night",
+    createdAt: new Date(NOW.getTime() - 30 * 60_000), seenBy: [], reactions: [], origin: "user",
+  });
+  const allowed = chooseAutonomyOpportunity({
+    state, character: mar, history: [], now: NOW, random: () => 0,
+    lane: "dm", allowedDmRecipientIds: new Set<string>(),
+    allowOwnerStoryReplies: true, allowOwnerSpontaneousDm: false,
+  });
+  assert.equal(allowed.situation, "dm");
+  assert.equal(allowed.recipientId, ownerId);
+  assert.equal(allowed.storyId, "owner-story");
+  const blocked = chooseAutonomyOpportunity({
+    state, character: mar, history: [], now: NOW, random: () => 0,
+    lane: "dm", allowedDmRecipientIds: new Set<string>(),
+    allowOwnerStoryReplies: false, allowOwnerSpontaneousDm: false,
+  });
+  assert.notEqual(blocked.storyId, "owner-story");
+});
+
 test("planner chooses silence before spending a model call", () => {
   const { state, mar } = fixture();
   const result = chooseAutonomyOpportunity({ state, character: mar, history: [], now: NOW, random: () => 0.99 });
