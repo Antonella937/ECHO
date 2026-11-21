@@ -28,7 +28,8 @@ export function mapKindroidSceneHistory(
   for (const raw of messages) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
     const item = raw as Record<string, unknown>;
-    if (typeof item.id !== "string" || !item.id || typeof item.sender !== "string") continue;
+    if (typeof item.id !== "string" || !item.id.trim() || item.id.length > 256 ||
+        typeof item.sender !== "string" || !item.sender.trim()) continue;
     const actorId = kinToCharacter.get(item.sender);
     if (!actorId || !allowedCharacterIds.has(actorId)) continue;
     if (typeof item.message !== "string" || !item.message.trim() || item.message.length > 5000) continue;
