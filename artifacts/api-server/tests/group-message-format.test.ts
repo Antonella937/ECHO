@@ -12,3 +12,11 @@ test("does not remove another character's name or mid-sentence mentions", () => 
   assert.equal(cleanGroupSpeakerPrefix("[Mar Mulligan] Hello\nTheo Brooks: Hi\nI saw Theo Brooks today", "Theo Brooks"),
     "[Mar Mulligan] Hello\nHi\nI saw Theo Brooks today");
 });
+
+test("removes Kindroid message boundary markers but preserves the actual message", () => {
+  const message = "START MESSAGE\n[Theo Brooks] Going out tonight.\nEND MESSAGE";
+  assert.equal(cleanGroupSpeakerPrefix(message, "Theo Brooks"), "Going out tonight.");
+  assert.equal(cleanGroupSpeakerPrefix("<<START MESSAGE>>\nHello\n<<END MESSAGE>>", "Theo Brooks"), "Hello");
+  assert.equal(cleanGroupSpeakerPrefix("I wrote START MESSAGE in my notebook.", "Theo Brooks"),
+    "I wrote START MESSAGE in my notebook.");
+});
