@@ -103,6 +103,17 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
     const links = await db.execute(sql`SELECT character_id, kin_id FROM echo_kindroid_character_links
       WHERE owner_id=${ownerId} AND universe_id=${universeId} AND enabled=true`);
     const byKin = new Map<string, string>();
+    const characterNames = await db.execute(sql`SELECT character->>'id' AS id, character->>'name' AS name FROM echo_universes u, jsonb_array_elements(u.state->'characters') character WHERE u.owner_id=${ownerId} AND u.universe_id=${universeId}`);
+    const byName = new Map<string, string>();
+    const duplicateNames = new Set<string>();
+    for (const character of characterNames.rows) {
+      const characterId = String(character.id ?? "");
+      const name = String(character.name ?? "").trim().toLowerCase();
+      if (!members.includes(characterId) || !name) continue;
+      if (byName.has(name)) duplicateNames.add(name);
+      else byName.set(name, characterId);
+    }
+    for (const name of duplicateNames) byName.delete(name);
     for (const link of links.rows) {
       const characterId = String(link.character_id ?? "");
       const kinId = String(link.kin_id ?? "");
@@ -135,7 +146,8 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         const item = raw as Record<string, unknown>;
         const sourceId = typeof item.id === "string" ? item.id : "";
         const sender = typeof item.sender === "string" ? item.sender : "";
-        const senderId = byKin.get(sender);
+        const displayName = typeof item.display_name === "string" ? item.display_name.trim().toLowerCase() : "";
+        const senderId = byKin.get(sender) ?? (displayName ? byName.get(displayName) : undefined);
         const body = typeof item.message === "string" ? item.message.trim() : "";
         const timestamp = Number(item.timestamp);
         if (!sourceId) { rejected.missingId++; continue; }
