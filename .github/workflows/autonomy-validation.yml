@@ -10,6 +10,7 @@ on:
       - 'artifacts/api-server/tests/kindroid-groups.test.ts'
       - 'artifacts/api-server/tests/group-message-format.test.ts'
       - 'artifacts/api-server/tests/kindroid-dm.test.ts'
+      - 'artifacts/api-server/tests/kindroid-social.test.ts'
       - 'artifacts/api-server/package.json'
       - 'artifacts/api-server/tsconfig.autonomy-tests.json'
       - '.github/workflows/autonomy-validation.yml'
@@ -39,5 +40,7 @@ jobs:
         run: pnpm --filter @workspace/api-server test:kindroid-groups
       - name: Test private Kindroid DM payloads
         run: pnpm --filter @workspace/api-server exec tsx --test tests/kindroid-dm.test.ts
+      - name: Test Kindroid social interactions
+        run: pnpm --filter @workspace/api-server exec tsx --test tests/kindroid-social.test.ts
       - name: Test group message formatting
         run: pnpm --filter @workspace/api-server exec tsx --test tests/group-message-format.test.ts
