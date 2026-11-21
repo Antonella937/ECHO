@@ -255,7 +255,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
       // fabricate an incoming human message just to make Kindroid respond.
-      const isDirectReply = newest?.senderId === recipientId && !!(newest.text?.trim() || newest.musicTrackId || (Array.isArray((newest as unknown as Record<string, unknown>).attachments) && ((newest as unknown as Record<string, unknown>).attachments as unknown[]).length > 0));
+      const isDirectReply = Boolean(input.messageId && newest?.id === input.messageId && newest.senderId === recipientId && (newest.text?.trim() || newest.musicTrackId || (Array.isArray((newest as unknown as Record<string, unknown>).attachments) && ((newest as unknown as Record<string, unknown>).attachments as unknown[]).length > 0)));
+      // A spontaneous outreach must never be mistaken for a reply to an older
+      // human message still at the top of the existing conversation.
       if (isDirectReply || dependencies.liveDmReply) {
         const storyForReply = input.storyId ? parsed.data.state.stories.find(story =>
           story.id === input.storyId && story.authorId === recipientId && canCharacterViewCloseFriendsStory(parsed.data.state, story, input.characterId)) : undefined;
