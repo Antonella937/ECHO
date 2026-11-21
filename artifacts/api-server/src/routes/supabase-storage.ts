@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { logger } from "../lib/logger";
 import { configuredR2, signR2Request } from "../lib/cloudflareR2";
 import { Router, type IRouter } from "express";
 import { db, echoMediaTable, pool } from "@workspace/db";
@@ -62,7 +63,7 @@ export function createSupabaseStorageRouter(): IRouter {
       });
       if (!signed.ok) {
         const detail = (await signed.text()).slice(0, 500);
-        req.log.error({ status: signed.status, detail }, "Supabase upload signing failed");
+        logger.error({ status: signed.status, detail }, "Supabase upload signing failed");
         res.status(502).json({ error: "STORAGE_SIGN_FAILED", upstreamStatus: signed.status });
         return;
       }
@@ -85,7 +86,7 @@ export function createSupabaseStorageRouter(): IRouter {
         uploadURL = `${base}/storage/v1/object/upload/sign/${bucket}/${path}?token=${encodeURIComponent(payload.token)}`;
       }
       if (!uploadURL) {
-        req.log.error({ hasUrl: Boolean(relative), hasToken: Boolean(payload.token) }, "Supabase returned invalid signed upload URL");
+        logger.error({ hasUrl: Boolean(relative), hasToken: Boolean(payload.token) }, "Supabase returned invalid signed upload URL");
         res.status(502).json({ error: "STORAGE_SIGN_INVALID" });
         return;
       }
@@ -93,11 +94,11 @@ export function createSupabaseStorageRouter(): IRouter {
       try {
         await db.insert(echoMediaTable).values({ ownerId: req.userId!, objectPath });
       } catch (error) {
-        req.log.error({ err: error }, "Supabase media registration database failed");
+        logger.error({ err: error }, "Supabase media registration database failed");
         res.status(503).json({ error: "MEDIA_DATABASE_UNAVAILABLE" }); return;
       }
       res.json(RequestUploadUrlResponse.parse({ uploadURL, objectPath }));
-    } catch (error) { req.log.error({ err: error }, "Supabase upload URL creation failed"); res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); }
+    } catch (error) { logger.error({ err: error }, "Supabase upload URL creation failed"); res.status(503).json({ error: "STORAGE_UNAVAILABLE" }); }
   });
 
   router.post("/storage/uploads/claim", requireAuth, async (req, res) => {
@@ -156,7 +157,7 @@ export function createSupabaseStorageRouter(): IRouter {
         signal: AbortSignal.timeout(60000),
       });
       if (!result.ok) {
-        req.log.warn({ upstreamStatus: result.status }, "Audio transcription failed");
+        logger.warn({ upstreamStatus: result.status }, "Audio transcription failed");
         res.status(result.status === 429 ? 429 : 502).json({ error: "TRANSCRIPTION_PROVIDER_FAILED" }); return;
       }
       const data = await result.json() as { text?: unknown };
@@ -164,7 +165,7 @@ export function createSupabaseStorageRouter(): IRouter {
       if (!transcript) { res.status(422).json({ error: "AUDIO_NOT_UNDERSTOOD" }); return; }
       res.json({ transcript });
     } catch (error) {
-      req.log.warn({ err: error }, "Audio transcription unavailable");
+      logger.warn({ err: error }, "Audio transcription unavailable");
       res.status(503).json({ error: "TRANSCRIPTION_UNAVAILABLE" });
     }
   });
@@ -243,7 +244,7 @@ export function createSupabaseStorageRouter(): IRouter {
       // This is upstream Content-Length (when available), not verified bytes sent.
       const declaredBytes = Number(response.headers.get("content-length"));
       if (Number.isFinite(declaredBytes) && declaredBytes >= 1_000_000) {
-        req.log.info({
+        logger.info({
           mediaBackend: isR2Path(objectPath) ? "r2" : "supabase",
           mediaBytesDeclared: declaredBytes,
           partialContent: response.status === 206,
@@ -256,7 +257,7 @@ export function createSupabaseStorageRouter(): IRouter {
       // emits an unhandled Readable error and crashes the entire Node process.
       const { pipeMedia } = await import("../lib/pipeMedia");
       pipeMedia(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), res,
-        error => req.log.warn({ err: error }, "Private media stream interrupted"));
+        error => logger.warn({ err: error }, "Private media stream interrupted"));
     } catch { if (!res.headersSent) res.status(503).end(); }
   });
   return router;
