@@ -110,6 +110,8 @@ async function reconcileKindroidGroupHistory(ownerId: string, universeId: string
       if (!payload || typeof payload !== "object") return;
       const data = payload as { messages?: unknown; pagination?: { hasMore?: boolean; lastTimestamp?: number } };
       if (!Array.isArray(data.messages)) return;
+      let accepted = 0;
+      const rejected = { missingId: 0, unmatchedSender: 0, missingBody: 0, badTimestamp: 0 };
       for (const raw of data.messages) {
         if (!raw || typeof raw !== "object") continue;
         const item = raw as Record<string, unknown>;
@@ -118,15 +120,20 @@ async function reconcileKindroidGroupHistory(ownerId: string, universeId: string
         const senderId = byKin.get(sender);
         const body = typeof item.message === "string" ? item.message.trim() : "";
         const timestamp = Number(item.timestamp);
-        if (!sourceId || !senderId || !body || body.length > 10000 || !Number.isFinite(timestamp)) continue;
+        if (!sourceId) { rejected.missingId++; continue; }
+        if (!senderId) { rejected.unmatchedSender++; continue; }
+        if (!body || body.length > 10000) { rejected.missingBody++; continue; }
+        if (!Number.isFinite(timestamp)) { rejected.badTimestamp++; continue; }
         const date = new Date(timestamp < 1e11 ? timestamp * 1000 : timestamp);
-        if (!Number.isFinite(date.getTime())) continue;
+        if (!Number.isFinite(date.getTime())) { rejected.badTimestamp++; continue; }
         const stableId = "kindroid_" + createHash("sha256").update(groupIdOnKindroid + ":" + sourceId).digest("hex").slice(0, 48);
         await db.execute(sql`INSERT INTO echo_group_messages
           (owner_id, universe_id, id, group_id, sender_id, body, read_by, created_at)
           VALUES (${ownerId}, ${universeId}, ${stableId}, ${groupId}, ${senderId}, ${body}, '[]'::jsonb, ${date.toISOString()}::timestamptz)
           ON CONFLICT DO NOTHING`);
+        accepted++;
       }
+      console.info("[kindroid-group] history page", { group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", page, total: data.messages.length, accepted, rejected });
       if (!data.pagination?.hasMore || !Number.isFinite(data.pagination.lastTimestamp) || data.pagination.lastTimestamp === cursor) break;
       cursor = data.pagination.lastTimestamp;
     }
