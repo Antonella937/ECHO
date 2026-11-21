@@ -42,18 +42,20 @@ export default function ScenesPage() {
   const [kindroidGroupSaving,setKindroidGroupSaving] = useState(false);
   const [kindroidPreviewLoading,setKindroidPreviewLoading] = useState(false);
   const [kindroidImporting,setKindroidImporting] = useState(false);
+  const [kindroidImportResult,setKindroidImportResult] = useState<{sceneId:string;imported:number;matchedEvents:number}|null>(null);
   const importKindroidHistory = async (sceneId:string) => {
     if (kindroidImporting || !kindroidPreview || kindroidPreview.sceneId!==sceneId) return;
     setKindroidImporting(true);
     setError('');
     try {
-      await customFetch(`/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-import`, {
+      const importResult = await customFetch<{sceneId:string;imported:number;matchedEvents:number}>(`/api/scenes/${encodeURIComponent(sceneId)}/kindroid-history-import`, {
         method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({universeId}),
       });
       const result = await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(sceneId)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,
         {method:'GET',responseType:'json',cache:'no-store'});
       if (selected===sceneId) setEvents(result.events);
+      setKindroidImportResult(importResult);
       setKindroidPreview(null);
     } catch (error) {
       setError((es?'No se pudo importar el historial. ':'Could not import history. ')+(error instanceof Error?error.message.slice(0,160):''));
@@ -66,6 +68,7 @@ export default function ScenesPage() {
     if (kindroidPreviewLoading) return;
     setKindroidPreviewLoading(true);
     setKindroidPreview(null);
+    setKindroidImportResult(null);
     setError('');
     try {
       const result = await customFetch<{sceneId:string;matchedEvents:number;totalMessages:number;events:Array<{eventId:string;actorId:string;text:string}>}>(
@@ -86,6 +89,7 @@ export default function ScenesPage() {
     if (kindroidGroupSaving) return;
     setKindroidGroupSaving(true);
     setKindroidPreview(null);
+    setKindroidImportResult(null);
     setError('');
     try {
       await customFetch(`/api/scenes/${encodeURIComponent(sceneId)}/kindroid-group`, {
@@ -361,6 +365,9 @@ export default function ScenesPage() {
               </button>}
             </div>}
           </div>}
+          {kindroidImportResult?.sceneId===active.sceneId&&<p className="text-xs text-white/70" role="status">
+            {es?`Importados: ${kindroidImportResult.imported} de ${kindroidImportResult.matchedEvents} mensajes identificados.`:`Imported: ${kindroidImportResult.imported} of ${kindroidImportResult.matchedEvents} matched messages.`}
+          </p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={effectiveGroupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="none">{es?"Sin fondo de grupo":"No group background"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
             {wallpaperUploading?(es?'Subiendo fondo…':'Uploading wallpaper…'):(es?'Cambiar fondo':'Change wallpaper')}
