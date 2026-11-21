@@ -130,6 +130,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     if (input.situation === 'comment' && !post) throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
     if (input.situation === 'like_post' && !post) throw new EngineError('SOCIAL_TARGET_POST_NOT_FOUND', 404);
     if (input.situation === 'like_comment' && !comment) throw new EngineError('SOCIAL_TARGET_COMMENT_NOT_FOUND', 404);
+    // A comment-only target must resolve its parent post before any group
+    // prompt. Otherwise a private or deleted post could be referenced.
+    const commentParentPost = comment
+      ? parsed.data.state.posts.find(p => p.id === comment.postId)
+      : undefined;
+    if (comment && !commentParentPost) throw new EngineError('SOCIAL_COMMENT_PARENT_NOT_FOUND', 404);
+    if (commentParentPost && commentParentPost.authorId !== input.characterId &&
+        !parsed.data.state.follows[input.characterId]?.includes(commentParentPost.authorId)) {
+      throw new EngineError('SOCIAL_COMMENT_PARENT_NOT_VISIBLE', 403);
+    }
     if (input.situation === 'story_reaction' && !story) throw new EngineError('STORY_NOT_VISIBLE', 403);
     if (comment && post && comment.postId !== post.id) throw new EngineError('SOCIAL_COMMENT_POST_MISMATCH', 409);
     if (post && input.situation !== 'post' &&
