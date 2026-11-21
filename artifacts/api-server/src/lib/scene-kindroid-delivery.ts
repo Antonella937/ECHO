@@ -53,6 +53,12 @@ export async function deliverSceneKindroidEventOnce(
   if(!message.trim() || message.length>5000 || !apiKey) {
     throw new Error("SCENE_DELIVERY_INVALID_INPUT");
   }
+  // Check for another in-flight group write before reserving this event.
+  // The partial unique index remains the final concurrency safeguard.
+  const busy=await db.execute(sql`SELECT 1 FROM echo_scene_kindroid_deliveries
+    WHERE owner_id=${input.ownerId} AND kindroid_group_id=${input.groupId}
+      AND status='sending' LIMIT 1`);
+  if(busy.rows.length) return "already_claimed";
   if(!await reserveSceneKindroidDelivery(input)) return "already_claimed";
   if(!await beginSceneKindroidDelivery(input)) return "already_claimed";
   try {
