@@ -95,14 +95,18 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) throw new EngineError('KINDROID_ID_INVALID', 400);
       // The caller supplies social context only for an explicitly resolved story.
       // Do not infer a reference from incidental words in a DM.
-      const relevantSocialContext = socialContext;
-      // Keep the newest user turn intact: older ECHO history can grow beyond
-      // Kindroid's accepted request size and cause repeated HTTP 400 failures.
+      const relevantSocialContext = socialContext.trim();
+      // Keep the newest user turn intact. Optional visual/story context must
+      // never push any part of the actual DM out of the request.
       const maxChars = 2800;
       const userTurn = message.length > maxChars ? message.slice(-maxChars) : message;
-      const contextPrefix = relevantSocialContext
-        ? `[ECHO observed context]\n${relevantSocialContext.slice(0, 500)}\n[End context]\n\n` : '';
-      const requestMessage = (contextPrefix + userTurn).slice(-maxChars);
+      const contextHead = '[ECHO observed context]\\n';
+      const contextTail = '\\n[End context]\\n\\n';
+      const availableContextChars = Math.max(0, maxChars - userTurn.length - contextHead.length - contextTail.length);
+      const contextPrefix = relevantSocialContext && availableContextChars > 0
+        ? contextHead + relevantSocialContext.slice(0, Math.min(500, availableContextChars)) + contextTail
+        : '';
+      const requestMessage = contextPrefix + userTurn;
       const traceId = randomUUID();
       const startedAt = Date.now();
       console.info('[kindroid] generation dispatch', { traceId, situation, payloadChars: requestMessage.length });
