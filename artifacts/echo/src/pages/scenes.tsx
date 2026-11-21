@@ -289,7 +289,7 @@ export default function ScenesPage() {
       </div>{showSceneSettings&&<div className="relative z-20 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl border border-white/15 bg-black/35 p-2 backdrop-blur-lg">
         <div className="space-y-2 rounded-xl border border-white/15 p-3">
           <label htmlFor="scene-kindroid-group" className="block text-xs font-semibold">{es?'Grupo Kindroid de esta escena':'Kindroid group for this scene'}</label>
-          <input id="scene-kindroid-group" type="url" value={kindroidGroupLink}
+          <input id="scene-kindroid-group" type="text" inputMode="url" value={kindroidGroupLink}
             onChange={e=>setKindroidGroupLink(e.target.value)}
             placeholder="https://kindroid.ai/v2/chat/group/..."
             disabled={kindroidGroupSaving || active.status==='finished'}
