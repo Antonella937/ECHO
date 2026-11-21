@@ -178,9 +178,9 @@ export function kindroidDmProvider(message: string, kinId: string, socialContext
 
 /** Normalize a short Kindroid social choice without accepting explanatory prose. */
 function parseKindroidSocialChoice(raw: string, allowed: readonly string[]): string {
-  const cleaned = raw.split('\\n')
-    .filter(line => !/^\\s*(?:(?:<<|\\[|<)\\s*)?(?:start|end)[ _-]*message\\s*(?:(?:>>|\\]|>))?\\s*:?\\s*$/i.test(line))
-    .join('\\n').trim().replace(/^[\\s"'.,!]+|[\\s"'.,!]+$/g, '').toUpperCase();
+  const cleaned = raw.split('\n')
+    .filter(line => !/^\s*(?:(?:<<|\[|<)\s*)?(?:start|end)[ _-]*message\s*(?:(?:>>|\]|>))?\s*:?\s*$/i.test(line))
+    .join('\n').trim().replace(/^[\s"'.,!]+|[\s"'.,!]+$/g, '').toUpperCase();
   if (!allowed.includes(cleaned)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
   return cleaned;
 }
