@@ -7,6 +7,7 @@ import { kindroidPeerGroupProvider } from "../ai-engine/kindroid";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { evaluateGroupAutonomy } from "./group-evaluator";
 import { buildGroupConversationContext } from "./group-context";
+import { cleanGroupSpeakerPrefix } from "./group-message-format";
 
 class MeteredTextProviderFactory {
   private readonly free = new FreeModelProvider();
@@ -142,7 +143,8 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     }
     const parsedCompletion = JSON.parse(completion.text) as { text?: unknown };
     if (typeof parsedCompletion.text !== "string" || !parsedCompletion.text.trim()) throw new Error("INVALID_GROUP_REPLY");
-    const text = parsedCompletion.text.trim().slice(0, 800);
+    const text = cleanGroupSpeakerPrefix(parsedCompletion.text, speaker.name ?? "").slice(0, 800);
+    if (!text) return { status: "skipped", reason: "EMPTY_GROUP_REPLY" };
     const inserted = await db.execute(sql`INSERT INTO echo_group_messages
       (owner_id, universe_id, id, group_id, sender_id, body, read_by)
       SELECT ${ownerId}, ${universeId}, ${randomUUID()}, id, ${speakerId}, ${text}, ${JSON.stringify([speakerId])}::jsonb
