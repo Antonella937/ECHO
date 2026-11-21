@@ -109,7 +109,8 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
       const payload: unknown = await response.json();
       if (!payload || typeof payload !== "object") return;
       const data = payload as { messages?: unknown; pagination?: { hasMore?: boolean; lastTimestamp?: number } };
-      if (!Array.isArray(data.messages)) return;
+      if (!Array.isArray(data.messages)) { console.warn("[kindroid-group] unsupported history payload", { group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", topLevel: Object.keys(data).slice(0,12) }); return; }
+      console.info("[kindroid-group] history schema", { group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", count: data.messages.length, fields: data.messages.length && data.messages[0] && typeof data.messages[0] === "object" ? Object.keys(data.messages[0]).slice(0,20) : [] });
       let accepted = 0;
       const rejected = { missingId: 0, unmatchedSender: 0, missingBody: 0, badTimestamp: 0 };
       for (const raw of data.messages) {
@@ -133,7 +134,7 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
           ON CONFLICT DO NOTHING`);
         accepted++;
       }
-      console.info("[kindroid-group] history page", { group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", page, total: data.messages.length, accepted, rejected });
+      console.info("[kindroid-group] history counts " + JSON.stringify({ group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", page, total: data.messages.length, accepted, rejected }));
       if (!data.pagination?.hasMore || !Number.isFinite(data.pagination.lastTimestamp) || data.pagination.lastTimestamp === cursor) break;
       cursor = data.pagination.lastTimestamp;
     }
