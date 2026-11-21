@@ -135,10 +135,13 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       },
     });
     } catch (error) {
-      console.warn('[group-autonomy] generation failed', {
+      // Emit one structured line so Render logs preserve the complete failure
+      // without recording message text, prompts, API keys or Kindroid IDs.
+      console.warn('[group-autonomy] generation failed ' + JSON.stringify({
         groupId, speakerId, provider: linkedKinId ? 'kindroid' : 'echo',
-        code: error instanceof Error ? error.message.slice(0, 100) : 'UNKNOWN',
-      });
+        code: error instanceof Error && /^[A-Z0-9_]{1,100}$/.test(error.message)
+          ? error.message : 'GROUP_GENERATION_FAILED',
+      }));
       throw error;
     }
     const parsedCompletion = JSON.parse(completion.text) as { text?: unknown };
