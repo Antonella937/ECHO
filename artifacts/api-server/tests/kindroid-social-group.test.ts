@@ -136,3 +136,53 @@ test('invalid Kindroid social choice fails closed without a private fallback', a
     else process.env.ECHO_KINDROID_API_KEY = previous;
   }
 });
+
+test('a VIEW story choice creates no reaction and never touches private history', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    return new Response(path.endsWith('get-turn') ? 'kin123456789'
+      : path.endsWith('ai-response') ? 'VIEW' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const result = await kindroidSocialGroupProvider('group12345678', 'kin123456789',
+      'story_reaction', 'Visible story', undefined, request).complete({
+        system: '', context: '', outputSchema: {},
+      });
+    const decision = JSON.parse(result.text);
+    assert.equal(decision.action, 'none');
+    assert.equal(decision.reaction, null);
+    assert.equal(calls.includes('/v1/send-message'), false);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
+
+test('SKIP suppresses a public comment without posting or using private history', async () => {
+  const previous = process.env.ECHO_KINDROID_API_KEY;
+  process.env.ECHO_KINDROID_API_KEY = 'test-key';
+  const calls: string[] = [];
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(path);
+    return new Response(path.endsWith('get-turn') ? 'kin123456789'
+      : path.endsWith('ai-response') ? 'SKIP' : '', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const result = await kindroidSocialGroupProvider('group12345678', 'kin123456789',
+      'comment', 'Visible post', undefined, request).complete({
+        system: '', context: '', outputSchema: {},
+      });
+    const decision = JSON.parse(result.text);
+    assert.equal(decision.action, 'none');
+    assert.equal(decision.text, null);
+    assert.equal(calls.includes('/v1/send-message'), false);
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
+    else process.env.ECHO_KINDROID_API_KEY = previous;
+  }
+});
