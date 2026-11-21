@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { requiresIsolatedKindroidSocial, isolatedKindroidSocialReady, verifiedSocialGroupId } from '../src/ai-engine/social-isolation';
+import { requiresIsolatedKindroidSocial, isolatedKindroidSocialReady, verifiedSocialGroupId, verifiedSocialGroupForActor } from '../src/ai-engine/social-isolation';
 
 const ownerId = 'user_3LeoBfUicTthDVixNbkPlqXFkdZ';
 
@@ -83,6 +83,27 @@ test('multiple actors may share one verified social group without admitting unli
   } finally {
     if (oldMapping === undefined) delete process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
     else process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON = oldMapping;
+    if (oldVerified === undefined) delete process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED;
+    else process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = oldVerified;
+  }
+});
+
+test('Hyunjin public account cannot be mapped into Nela private social group', () => {
+  const oldMap = process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
+  const oldVerified = process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED;
+  try {
+    process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = 'true';
+    process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON = JSON.stringify({
+      primary: {
+        account_mw7bvivjs2rpd: 'group12345678',
+        account_mw9egnuoszyi5: 'group12345678',
+      },
+    });
+    assert.equal(verifiedSocialGroupForActor('primary', 'account_mw7bvivjs2rpd'), 'group12345678');
+    assert.equal(verifiedSocialGroupForActor('primary', 'account_mw9egnuoszyi5'), null);
+  } finally {
+    if (oldMap === undefined) delete process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
+    else process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON = oldMap;
     if (oldVerified === undefined) delete process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED;
     else process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED = oldVerified;
   }
