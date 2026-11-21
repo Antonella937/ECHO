@@ -2,6 +2,13 @@ name: Autonomy validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'artifacts/api-server/src/**'
+      - 'artifacts/api-server/tests/autonomy.test.ts'
+      - 'artifacts/api-server/tsconfig.autonomy-tests.json'
+      - '.github/workflows/autonomy-validation.yml'
 
 jobs:
   autonomy-typecheck:
