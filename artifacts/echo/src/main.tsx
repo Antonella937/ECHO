@@ -11,6 +11,23 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`, {
         scope: import.meta.env.BASE_URL,
+        updateViaCache: 'none',
+      })
+      .then((registration) => {
+        // Home-screen shortcuts on iOS can stay open for days. Check for a
+        // newer worker when the user returns instead of relying on Safari's
+        // background update schedule. Do not clear local conversation data.
+        let lastCheck = 0;
+        const checkForUpdate = () => {
+          if (document.visibilityState === 'hidden' || !navigator.onLine) return;
+          const now = Date.now();
+          if (now - lastCheck < 60_000) return;
+          lastCheck = now;
+          void registration.update().catch(() => undefined);
+        };
+        checkForUpdate();
+        window.addEventListener('focus', checkForUpdate);
+        document.addEventListener('visibilitychange', checkForUpdate);
       })
       .catch((error: unknown) => {
         console.warn('ECHO no pudo activar el modo sin conexión.', error);
