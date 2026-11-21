@@ -92,7 +92,7 @@ export function kindroidSocialGroupProvider(
       // the user turn, which would reject every first social event.
       // The group provider verifies the Kin before requesting AI generation.
       await sendKindroidSocialGroupContext(groupId, `${instruction}\n${context.slice(0, 1050)}`, request);
-      const generated = await kindroidPeerGroupProvider(groupId, kinId, echoCharacterId, request).complete({
+      const generated = await kindroidPeerGroupProvider(groupId, kinId, echoCharacterId, request, true).complete({
         ...input, validate: undefined,
       });
       let envelope: unknown;
