@@ -1,3 +1,5 @@
+import { kindroidPeerGroupProvider } from './kindroid';
+import { EngineError, type TextProvider } from './contracts';
 import { EngineError } from './contracts';
 
 /**
@@ -23,4 +25,62 @@ export async function sendKindroidSocialGroupContext(
   if (!response.ok) {
     throw new EngineError(response.status === 429 ? 'KINDROID_RATE_LIMITED' : 'KINDROID_SOCIAL_GROUP_CONTEXT_FAILED', response.status === 429 ? 429 : 502);
   }
+}
+
+/**
+ * Prepared social-only group adapter. Must be used only after a dedicated
+ * group mapping and memory settings have been verified. Caller is responsible
+ * for serializing requests per group; concurrent social events must not
+ * interleave their prompts and responses.
+ */
+export function kindroidSocialGroupProvider(
+  groupId: string,
+  kinId: string,
+  situation: 'post' | 'comment' | 'like_post' | 'like_comment' | 'story_reaction',
+  context: string,
+  echoCharacterId?: string,
+  request: typeof fetch = fetch,
+): TextProvider {
+  return {
+    name: 'kindroid',
+    async complete(input) {
+      const choices = situation === 'story_reaction'
+        ? 'VIEW, LIKE, LAUGH, SURPRISE, FIRE'
+        : situation.startsWith('like_') ? 'LIKE, SKIP' : '';
+      const instruction = choices
+        ? `ECHO social event for ${situation}. Respond with exactly one of: ${choices}. No narration.`
+        : `ECHO social event for ${situation}. Write only a natural English ${situation === 'post' ? 'feed caption' : 'public comment'} in your voice, or SKIP if you would not engage. No narration.`;
+      await sendKindroidSocialGroupContext(groupId, `${instruction}\n${context.slice(0, 1050)}`, request);
+      const generated = await kindroidPeerGroupProvider(groupId, kinId, echoCharacterId, request).complete({
+        ...input, validate: undefined,
+      });
+      const envelope = JSON.parse(generated.text) as { text?: unknown };
+      const reply = typeof envelope.text === 'string' ? envelope.text.trim() : '';
+      const cleaned = reply.replace(/^START MESSAGE\s*\n/i, '').replace(/\n\s*END MESSAGE$/i, '').trim();
+      let action: string = 'draft';
+      let text: string | null = null;
+      let reaction: string | null = null;
+      if (choices) {
+        const token = cleaned.toUpperCase();
+        if (!choices.split(', ').includes(token)) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+        if (situation === 'story_reaction') {
+          reaction = ({ LIKE: '❤', LAUGH: '😂', SURPRISE: '😮', FIRE: '🔥' } as Record<string, string>)[token] ?? null;
+          action = reaction ? 'react' : 'none';
+        } else {
+          action = token === 'LIKE' ? 'like' : 'none';
+        }
+      } else if (cleaned.toUpperCase() === 'SKIP') {
+        action = 'none';
+      } else {
+        text = cleaned.slice(0, situation === 'post' ? 600 : 1000);
+        if (!text) throw new EngineError('KINDROID_SOCIAL_DECISION_INVALID', 502);
+      }
+      const decision = JSON.stringify({
+        action, situation, text, reaction, reason: 'Isolated Kindroid social group',
+        suggestedDelayMinutes: 0, galleryPhotoId: null, contextSections: [],
+      });
+      input.validate?.(decision);
+      return { ...generated, text: decision };
+    },
+  };
 }
