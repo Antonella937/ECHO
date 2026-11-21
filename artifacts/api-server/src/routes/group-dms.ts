@@ -69,7 +69,7 @@ const kindroidGroupMappings: Record<string, string> = {
 };
 const kindroidHistoryLastCheck = new Map<string, number>();
 const kindroidHistoryPending = new Map<string, Promise<void>>();
-async function reconcileKindroidGroupHistory(ownerId: string, universeId: string, groupId: string) {
+export async function reconcileKindroidGroupHistory(ownerId: string, universeId: string, groupId: string) {
   if (universeId !== "primary" || !kindroidGroupMappings[groupId]) return;
   const apiKey = process.env.ECHO_KINDROID_API_KEY;
   if (!apiKey) return;
@@ -142,6 +142,18 @@ async function reconcileKindroidGroupHistory(ownerId: string, universeId: string
   }).finally(() => { kindroidHistoryPending.delete(cacheKey); });
   kindroidHistoryPending.set(cacheKey, task);
   return task;
+}
+/** Poll only the founder's already-linked Kindroid groups. Never generates a turn. */
+export async function reconcileActiveKindroidGroups() {
+  const ownerId = "user_3LeoBfUicTthDVixNbkPlqXFkdZ";
+  const universeId = "primary";
+  const groups = await db.execute(sql`SELECT id FROM echo_group_conversations
+    WHERE owner_id=${ownerId} AND universe_id=${universeId}`);
+  for (const row of groups.rows) {
+    const groupId = String(row.id);
+    if (!kindroidGroupMappings[groupId]) continue;
+    await reconcileKindroidGroupHistory(ownerId, universeId, groupId);
+  }
 }
 router.get("/group-dms/:groupId/messages", async (req, res) => {
   const parsed = scope.safeParse(req.query);
