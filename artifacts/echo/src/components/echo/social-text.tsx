@@ -22,7 +22,7 @@ function formatInline(source: string, renderPlain: (text: string, key: string) =
       const inner = token.slice(1, -1);
       // Longer italic passages are Kindroid's narrative/action segments;
       // brief italic emphasis in dialogue keeps its normal text color.
-      const narrative = inner.trim().split(/\s+/).length >= 5;
+      const before = source.slice(0, at);\n      const after = source.slice(at + token.length);\n      const standalone = (!before.trim() || /\\n\\s*$/.test(before)) && (!after.trim() || /^\\s*\\n/.test(after));\n      const narrative = standalone || inner.trim().split(/\\s+/).length >= 5;
       output.push(<em key={key} className={narrative ? 'text-muted-foreground/75' : undefined}>{formatInline(inner, renderPlain, key)}</em>);
     }
     else if (token.startsWith('__')) output.push(<u key={key}>{formatInline(token.slice(2, -2), renderPlain, key)}</u>);
