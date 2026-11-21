@@ -439,6 +439,19 @@ scenesRouter.post("/scenes/:sceneId/kindroid-history-import", async (req, res) =
           parseKindroidGroupId(String((locked.turn_settings as {kindroidGroupId?:unknown}|null)?.kindroidGroupId ?? "")) !== groupId) {
         throw new KindroidSceneHistoryError("KINDROID_SCENE_CHANGED_DURING_IMPORT",409);
       }
+      // Recheck group ownership after the external history read: a different
+      // scene or ordinary group could have claimed the binding meanwhile.
+      const shared = await tx.execute(sql`SELECT 1 FROM echo_group_conversations
+        WHERE owner_id=${req.userId!} AND kindroid_group_id=${groupId}
+        UNION ALL
+        SELECT 1 FROM echo_scenes other
+        WHERE other.owner_id=${req.userId!}
+          AND NOT (other.universe_id=${parsed.data.universeId} AND other.scene_id=${sceneId.data})
+          AND other.turn_settings ->> 'kindroidGroupId' = ${groupId}
+        LIMIT 1`);
+      if (shared.rows.length) {
+        throw new KindroidSceneHistoryError("KINDROID_SCENE_GROUP_SHARED",409);
+      }
       let count = 0;
       for (const item of events) {
         const inserted = await tx.execute(sql`INSERT INTO echo_scene_events
