@@ -1,6 +1,6 @@
 import { useClerk, useUser } from '@clerk/react';
 import { useState } from 'react';
-import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film, Sparkles, Image as ImageIcon, Bell } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
@@ -21,11 +21,11 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 import { NelaEasterEgg } from '@/components/branding/echo-brand';
 
-function CollapsibleSettings({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+function CollapsibleSettings({ title, testId, icon: Icon, children }: { title: string; testId: string; icon: typeof Palette; children: React.ReactNode }) {
   return (
     <details className="group mb-4 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid={testId}>
       <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-        <span>{title}</span>
+        <span className="flex items-center gap-3"><Icon className="h-5 w-5 shrink-0 text-primary" strokeWidth={1.8} aria-hidden="true" />{title}</span>
         <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="border-t border-border px-3 pb-4 [&>section]:mt-4 [&>section>h2]:hidden [&>section>div]:mt-0">
@@ -49,16 +49,6 @@ export default function SettingsPage() {
     <div>
       <TopBar title={t("settings")} onBack={back} />
       <div className="px-4 pb-12 pt-5">
-        <details className="group mb-6 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid="settings-ai-controls">
-          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-            <span className="flex items-center gap-2.5"><Sparkles className="h-5 w-5 text-primary" strokeWidth={1.8} aria-hidden="true" />{language === 'es' ? 'IA y autonomía' : 'AI & autonomy'}</span>
-            <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="space-y-2 border-t border-border px-3 pb-4">
-            <AutonomySettingsSection />
-          </div>
-        </details>
-
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{st("Tu cuenta")}</h2>
           <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4">
@@ -73,6 +63,18 @@ export default function SettingsPage() {
               <LogOut className="h-4 w-4" /> {st("Cerrar sesión")}
             </button>
           </div>
+        </section>
+
+        <details className="group mb-6 overflow-hidden rounded-2xl border border-border bg-card/60" data-testid="settings-ai-controls">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2.5"><Sparkles className="h-5 w-5 text-primary" strokeWidth={1.8} aria-hidden="true" />{language === 'es' ? 'IA y autonomía' : 'AI & autonomy'}</span>
+            <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-2 border-t border-border px-3 pb-4">
+            <AutonomySettingsSection />
+          </div>
+        </details>
+
         <Link href="/creator-hub" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold lg:hidden" data-testid="link-creator-hub-mobile"><span className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /> Creator Hub</span><span className="text-xs text-muted-foreground">{st("Tu perfil de creador ›")}</span></Link>
 
           <Link href="/music" className="mt-3 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-echo-music-studio">
@@ -89,7 +91,6 @@ export default function SettingsPage() {
           <Link href="/search" className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-card/60 p-4 text-sm font-semibold">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" /> {st("Buscar en este universo")}
           </Link>
-        </section>
 
         <Link href="/settings/subscriptions" className="mt-4 flex min-h-14 items-center justify-between rounded-2xl border border-border bg-card/60 px-4 text-sm font-semibold" data-testid="link-my-subscriptions">{st("Mi plan y suscripciones")} <span className="text-xs text-muted-foreground">{st("Ver planes y complementos ›")}</span></Link>
 
@@ -109,7 +110,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="mt-9" aria-labelledby="close-friends-h" data-testid="section-close-friends">
+        <section className="mt-9 mb-6" aria-labelledby="close-friends-h" data-testid="section-close-friends">
           <h2 id="close-friends-h" className="flex items-center gap-2 px-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground"><Star className="h-4 w-4 text-primary" /> {st('Mejores amigos · ')}{me.name}</h2>
           <details className="group mt-3 rounded-2xl border border-border bg-card/40" data-testid="details-close-friends"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{st('Mejores amigos · ')}{closeFriendContacts.filter(c => (state.closeFriends?.[me.id] ?? []).includes(c.id)).length}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border px-3 pb-3">
           <p className="mt-2 px-1 text-xs text-muted-foreground">{st("Solo los personajes seleccionados verán tus próximas historias para mejores amigos. Cada identidad tiene su propia lista.")}</p>
@@ -126,23 +127,23 @@ export default function SettingsPage() {
           </div></details>
         </section>
 
-        <CollapsibleSettings title={st("Apariencia")} testId="settings-appearance">
+        <CollapsibleSettings title={st("Apariencia")} testId="settings-appearance" icon={Palette}>
           <AppearanceSection />
         </CollapsibleSettings>
 
         <div id="echo-ai-style" className="scroll-mt-20">
-          <CollapsibleSettings title={st("Generación de imágenes IA")} testId="settings-image-style">
+          <CollapsibleSettings title={st("Generación de imágenes IA")} testId="settings-image-style" icon={ImageIcon}>
             <ImageGenerationStyleSection />
           </CollapsibleSettings>
         </div>
 
-        <CollapsibleSettings title={st("Sonidos de mensajes")} testId="settings-message-sounds">
+        <CollapsibleSettings title={st("Sonidos de mensajes")} testId="settings-message-sounds" icon={Music2}>
           <MessageSoundSettings />
         </CollapsibleSettings>
 
         <MusicConnectionsSection />
 
-        <CollapsibleSettings title={st("Notificaciones del celular")} testId="settings-push-notifications">
+        <CollapsibleSettings title={st("Notificaciones del celular")} testId="settings-push-notifications" icon={Bell}>
           <PushNotificationSettings />
         </CollapsibleSettings>
 
