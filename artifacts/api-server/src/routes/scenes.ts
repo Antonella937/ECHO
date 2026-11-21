@@ -350,7 +350,7 @@ scenesRouter.put("/scenes/:sceneId/turns", async (req, res) => {
     const current = scene.turn_settings as { cursor?: number; style?: string; kindroidGroupId?: string; autoReply?: boolean } | null;
     const settings = { mode, participantIds: participants, order: completeOrder, nextCharacterId,
       cursor: Math.min(Math.max(0, current?.cursor ?? 0), Math.max(0, completeOrder.length - 1)),
-      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false };
+      style: style ?? current?.style ?? "natural", autoReply: autoReply ?? current?.autoReply ?? false,\n      kindroidGroupId: current?.kindroidGroupId ?? null };
     const payload = JSON.stringify(settings);
     await db.execute(sql`UPDATE echo_scenes SET turn_settings = ${payload}::jsonb, updated_at = now()
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId.data}`);
