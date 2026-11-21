@@ -63,18 +63,10 @@ export function kindroidSocialGroupProvider(
       const instruction = choices
         ? `ECHO social event for ${situation}. Respond with exactly one of: ${choices}. No narration.`
         : `ECHO social event for ${situation}. Write only a natural English ${situation === 'post' ? 'feed caption' : 'public comment'} in your voice, or SKIP if you would not engage. No narration.`;
-      // Do not send a technical prompt to a group whose turn belongs to another Kin.
-      // This preflight is advisory: Kindroid may change turns after the message,
-      // so kindroidPeerGroupProvider verifies speaker identity again.
-      const key = process.env.ECHO_KINDROID_API_KEY;
-      if (!key) throw new EngineError('KINDROID_KEY_MISSING', 503);
-      const preflight = await request('https://api.kindroid.ai/v1/groupchats-get-turn', {
-        method: 'POST', signal: AbortSignal.timeout(90000),
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: groupId, allow_user: true }),
-      });
-      if (!preflight.ok) throw new EngineError('KINDROID_GROUP_TURN_FAILED', preflight.status === 429 ? 429 : 502);
-      if ((await preflight.text()).trim() !== kinId) throw new EngineError('KINDROID_GROUP_SPEAKER_MISMATCH', 409);
+      // Kindroid determines the next Kin after receiving the group user message.
+      // Do not preflight get-turn here: an idle group may legitimately have
+      // the user turn, which would reject every first social event.
+      // The group provider verifies the Kin before requesting AI generation.
       await sendKindroidSocialGroupContext(groupId, `${instruction}\n${context.slice(0, 1050)}`, request);
       const generated = await kindroidPeerGroupProvider(groupId, kinId, echoCharacterId, request).complete({
         ...input, validate: undefined,
