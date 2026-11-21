@@ -34,6 +34,12 @@ export async function beginSceneKindroidDelivery(input:SceneDelivery):Promise<bo
             AND other.kindroid_group_id=${input.groupId}
             AND other.status='sending'
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM echo_scene_kindroid_generations generation
+          WHERE generation.owner_id=${input.ownerId}
+            AND generation.kindroid_group_id=${input.groupId}
+            AND generation.status IN ('generating','uncertain')
+        )
       RETURNING delivery_key`);
     return result.rows.length===1;
   } catch (error) {
