@@ -78,7 +78,8 @@ export async function runAutonomyWorkerTick(input: {
     const slot = Math.floor(now.getTime() / AUTONOMY_WORKER_INTERVAL_MS);
     const socialSlot = Math.floor(now.getTime() / SOCIAL_INTERVAL_MS);
     for (const target of targets) {
-      if (target.dmEnabled === false) continue;
+      // DM ticks also handle social-enabled story replies and independently
+      // authorized peer DMs; dmEnabled only gates unsolicited owner outreach.
       const characterHash = createHash("sha256").update(`${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex").slice(0, 24);
       const lane: "dm" | "social" = "dm";
       const digest = createHash("sha256").update(`dm:${slot}:${characterHash}`).digest("hex");
