@@ -104,9 +104,11 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       }
       if (!kindroidGroupId) return { status: "skipped", reason: "KINDROID_GROUP_MAPPING_MISSING" };
     }
-    // Kindroid already holds the character personality and memory. Send only the
-    // participants, recent group turns and a short scene cue; leave the richer
-    // context untouched for the native ECHO provider.
+    // NOTE: The current Kindroid group adapter only calls get-turn and
+    // ai-response with group_id/ai_id; it does NOT transmit the prompt below.
+    // This context is currently consumed only by the native ECHO provider.
+    // Do not reuse this adapter for social decisions until a verified group
+    // context-ingestion mechanism exists; doing so would generate blind choices.
     const recentGroupTurns = [...messages.rows].reverse().slice(-8)
       .map(row => `${characters.find(c => c.id === String(row.sender_id))?.name ?? "Participant"}: ${String(row.body ?? "").trim().slice(0, 350)}`)
       .filter(line => !line.endsWith(": ")).join("\n");
