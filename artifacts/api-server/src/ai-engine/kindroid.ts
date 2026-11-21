@@ -285,7 +285,7 @@ export function kindroidLikeDecisionProvider(
  * Kin's private /send-message history. The group owns its own context.
  * Streaming is essential: the non-streaming endpoint returns an empty body.
  */
-export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCharacterId?: string, request: typeof fetch = fetch): TextProvider {
+export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCharacterId?: string, request: typeof fetch = fetch, explicitSpeaker = false): TextProvider {
   return {
     name: 'kindroid',
     async complete(input) {
@@ -294,6 +294,10 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(groupId) || !/^[A-Za-z0-9_-]{8,160}$/.test(kinId)) {
         throw new EngineError('KINDROID_GROUP_ID_INVALID', 400);
       }
+      // ECHO spectator groups explicitly choose the speaker. Asking Kindroid to
+      // auto-select a turn first can reject otherwise valid manually chosen turns.
+      // Peer-to-peer DMs retain the provider turn check for attribution safety.
+      if (!explicitSpeaker) {
       // Ask Kindroid which Kin owns the next turn before generating. A group
       // response must never be attributed to a different ECHO character.
       let turnResponse: Response;
@@ -327,6 +331,7 @@ export function kindroidPeerGroupProvider(groupId: string, kinId: string, echoCh
       const nextKinId = (await turnResponse.text()).trim();
       if (!nextKinId) throw new EngineError('KINDROID_GROUP_USER_TURN', 409);
       if (nextKinId !== kinId) throw new EngineError('KINDROID_GROUP_SPEAKER_MISMATCH', 409);
+      }
       let response: Response;
       try {
         response = await queuedKindroidRequest(kinId, 30, () => request('https://api.kindroid.ai/v1/groupchats-ai-response', {
