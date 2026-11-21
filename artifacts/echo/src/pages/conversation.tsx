@@ -12,7 +12,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Clapperboard, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { Clapperboard, Copy, Check, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -723,7 +723,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
   const mineReaction = reactions.find(r => r.actorId === meId)?.value;
   const { visibleText, transcript } = splitVoiceTranscript(m.text, !!m.attachments?.some(a => a.type === 'audio'));
   const sharedProfileIds = [...visibleText.matchAll(SHARED_PROFILE)].map(match=>match[1]);
-  const cleanVisibleText = visibleText.replace(SHARED_PROFILE, '').trim();
+  const [copied, setCopied] = useState(false);\n  const cleanVisibleText = visibleText.replace(SHARED_PROFILE, '').trim();
   return (
     <li onContextMenu={(e) => { e.preventDefault(); if (window.matchMedia('(min-width: 640px)').matches) { clearPress(); setMenuOpen(true); } }} onTouchStart={(e) => { const touch = e.touches[0]; if (touch) { clearPress(); gesture.current = { x: touch.clientX, y: touch.clientY, opened: false, swiped: false }; } }} onTouchEnd={(e) => { const touch = e.changedTouches[0]; if (touch) endGesture(touch.clientX, touch.clientY); else clearPress(); }} onTouchCancel={() => { clearPress(); gesture.current = null; }} onTouchMove={(e) => { const touch = e.touches[0]; if (touch) moveGesture(touch.clientX, touch.clientY); }} className={cn('fade-up group flex min-w-0 max-w-full flex-col transition-shadow', mine ? 'items-end' : 'items-start')} data-testid={`message-${m.id}`} data-message-id={m.id}>
       {showTime && <span className="my-3 self-center text-[11px] text-muted-foreground">{timeAgo(m.createdAt)}</span>}
@@ -789,7 +789,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
         )}
         <span className="flex max-w-full shrink-0 flex-wrap gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
           {canListen && <button type="button" disabled={listening} onClick={onListen} aria-label={t(listening ? "Generando voz" : "Escuchar mensaje")} title={t("Escuchar con la voz elegida")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary disabled:opacity-50" data-testid={`button-listen-${m.id}`}><Headphones className="h-4 w-4" /></button>}
-          <button type="button" onClick={onCreateScene} aria-label={t("Crear escena desde aquí")} title={t("Crear escena desde aquí")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-scene-${m.id}`}><Clapperboard className="h-4 w-4" /></button>
+          {!mine && !!cleanVisibleText && <button type="button" onClick={() => { void navigator.clipboard.writeText(cleanVisibleText).then(() => setCopied(true)).catch(() => setCopied(false)); }} aria-label={copied ? 'Copiado' : 'Copiar respuesta'} title={copied ? 'Copiado' : 'Copiar respuesta'} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-copy-${m.id}`}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}</button>}\n          <button type="button" onClick={onCreateScene} aria-label={t("Crear escena desde aquí")} title={t("Crear escena desde aquí")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-scene-${m.id}`}><Clapperboard className="h-4 w-4" /></button>
           <button type="button" onClick={onReply} aria-label={t("Responder")} title={t("Responder")} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-reply-${m.id}`}><CornerUpLeft className="h-4 w-4" /></button>
           <button type="button" onClick={onToggleReacting} aria-label={t("Reaccionar")} title={t("Reaccionar")} aria-expanded={reacting} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-react-${m.id}`}><Smile className="h-4 w-4" /></button>
           <button type="button" onClick={onSave} aria-label={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} title={t(m.savedByIds?.includes(meId) ? 'Quitar de favoritos' : 'Guardar en favoritos')} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-save-${m.id}`}><Bookmark className={cn('h-4 w-4', m.savedByIds?.includes(meId) && 'fill-primary text-primary')} /></button>
