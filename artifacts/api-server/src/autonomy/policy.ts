@@ -389,6 +389,15 @@ export function chooseAutonomyOpportunity(input: {
         relevantAuthor(parent.authorId) &&
         !item.likes.includes(character.id) && !recentTargetUsed("like_comment", item.id);
     });
+  // A prior VIEW is not a permanent refusal to like a story. Allow at most
+  // one reconsideration after two hours, while keeping reactions final.
+  const storyOpportunityAllowed = (storyId: string) => {
+    const attempts = history.filter(event => event.situation === "story_reaction" && event.targetId === storyId);
+    if (attempts.some(event => event.action === "react") || attempts.length >= 2) return false;
+    if (!attempts.length) return true;
+    const last = attempts.reduce((latest, event) => Math.max(latest, asTime(event.createdAt) ?? 0), 0);
+    return last > 0 && now.getTime() - last >= 2 * 60 * 60_000;
+  };
   // The zero-cost story policy records a view, not a generated reaction.
   // Already-seen stories may still be liked later; the recent-target guard
   // prevents repeatedly selecting the same story within the action history.
@@ -397,7 +406,7 @@ export function chooseAutonomyOpportunity(input: {
       following.has(item.authorId) &&
       canCharacterViewCloseFriendsStory(state, item, character.id) &&
       !(item.likes ?? []).includes(character.id) &&
-      !item.reactions?.some(reaction => reaction.actorId === character.id) && !recentTargetUsed("story_reaction", item.id));
+      !item.reactions?.some(reaction => reaction.actorId === character.id) && storyOpportunityAllowed(item.id));
   const targetMessage = [...state.messages].sort((a, b) => (asTime(b.createdAt) ?? 0) - (asTime(a.createdAt) ?? 0))
     .find(item => item.recipientId === character.id && item.senderId !== character.id &&
       !item.hiddenForIds?.includes(character.id) && !!item.text?.trim() && recent30d(item.createdAt) &&
