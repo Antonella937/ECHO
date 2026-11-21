@@ -78,6 +78,15 @@ router.put("/group-dms/:groupId/wallpaper", async (req, res) => {
   if (!updated.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   res.json({ wallpaperUrl: updated.rows[0].wallpaper_url });
 });
+router.put("/group-dms/push-preference", async (req, res) => {
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({error:"INVALID_PREFERENCE"});return; }
+  const { clerkClient } = await import("@clerk/express");
+  await clerkClient.users.updateUserMetadata(req.userId!, {
+    privateMetadata: { echoGroupPushEnabled: parsed.data.enabled },
+  });
+  res.json({ enabled: parsed.data.enabled });
+});
 // Read-only Kindroid history reconciliation. Never requests AI generation.
 const kindroidGroupMappings: Record<string, string> = {
   group_kindroid_dead_static: "uzlDUKZ5MQMnR9sBHh6p",
