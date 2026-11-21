@@ -195,16 +195,6 @@ export async function runAutonomyDryRun(
     });
     const eligible = AUTONOMY_LIVE_EXECUTION_ENABLED && policyAllowsLive;
 
-    // A social worker tick must never fall through into a private DM.
-    // Social group traffic and private conversation traffic have distinct
-    // reservation namespaces, permissions and memory boundaries.
-    if (dependencies.lane === "social" && opportunity.situation === "dm") {
-      await dependencies.repository.complete(ownerId, runId, {
-        status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: "SOCIAL_LANE_DM_BLOCKED",
-      }, universeId);
-      return { status: "no_action", reasonCode: "SOCIAL_LANE_DM_BLOCKED",
-        characterId: character.id, runId, model: null };
-    }
     if (!opportunity.situation) {
       const status = opportunity.reasonCode === "COOLDOWN"
         ? "cooldown"
@@ -263,8 +253,7 @@ export async function runAutonomyDryRun(
     console.warn("AUTONOMY_LIVE_CYCLE_FAILED", {
       characterId: character.id,
       universeId,
-      lane: dependencies.lane,
-      code,
+      lane: "dry_run",
       errorName: error instanceof Error ? error.name : "UNKNOWN",
       stackLocation: error instanceof Error ? error.stack?.split("\n").slice(1, 3).map(line => line.trim()) : undefined,
     });
