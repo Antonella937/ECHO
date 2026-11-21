@@ -319,6 +319,29 @@ scenesRouter.put("/scenes/:sceneId/kindroid-group", async (req, res) => {
   if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_GROUP_BINDING" }); return; }
   const { universeId, groupId } = parsed.data;
   try {
+    if (groupId !== null) {
+      const sceneRows = await db.execute(sql`SELECT participant_ids FROM echo_scenes
+        WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+          AND scene_id = ${sceneId.data} AND status <> 'finished' LIMIT 1`);
+      const participants = sceneRows.rows[0]?.participant_ids;
+      if (!Array.isArray(participants)) { res.status(404).json({ error: "SCENE_NOT_ACTIVE" }); return; }
+      const linked = await db.execute(sql`SELECT character_id FROM echo_kindroid_character_links
+        WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+          AND enabled = true AND kin_id IS NOT NULL`);
+      const linkedIds = new Set(linked.rows.map(row => row.character_id));
+      // The owner's playable identity does not require a Kin link; every AI
+      // participant must have an enabled Kin before a group can be bound.
+      const [universe] = await db.select({ state: echoUniversesTable.state })
+        .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, req.userId!),
+          eq(echoUniversesTable.universeId, universeId))).limit(1);
+      const ownerIdentity = (universe?.state as { currentCharacterId?: string } | null)?.currentCharacterId;
+      const missing = participants.filter((participant): participant is string =>
+        typeof participant === "string" && participant !== ownerIdentity && !linkedIds.has(participant));
+      if (missing.length) {
+        res.status(409).json({ error: "SCENE_PARTICIPANT_KINDROID_LINK_MISSING", characterIds: missing });
+        return;
+      }
+    }
     const rows = await db.execute(sql`UPDATE echo_scenes
       SET turn_settings = jsonb_set(COALESCE(turn_settings, '{}'::jsonb),
         '{kindroidGroupId}', ${JSON.stringify(groupId)}::jsonb, true),
