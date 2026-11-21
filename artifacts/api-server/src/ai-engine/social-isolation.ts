@@ -44,3 +44,25 @@ export function verifiedSocialGroupId(characterId: string): string | null {
     return null;
   }
 }
+
+/**
+ * Explicit universe-aware routing for technical social groups.
+ * Shape: { "primary": { "mar-character-id": "group-id" } }.
+ * A character is looked up by the ACTOR id, not the post author's id.
+ * Legacy flat mappings are intentionally not accepted here to prevent
+ * accidental cross-universe routing.
+ */
+export function verifiedSocialGroupForActor(universeId: string, actorId: string): string | null {
+  if (process.env.ECHO_KINDROID_SOCIAL_GROUP_MEMORY_VERIFIED !== 'true') return null;
+  if (!/^[A-Za-z0-9_-]{1,160}$/.test(universeId) || !/^[A-Za-z0-9_-]{1,160}$/.test(actorId)) return null;
+  const raw = process.env.ECHO_KINDROID_SOCIAL_GROUPS_BY_UNIVERSE_JSON;
+  if (!raw) return null;
+  try {
+    const data: unknown = JSON.parse(raw);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    const universe = (data as Record<string, unknown>)[universeId];
+    if (!universe || typeof universe !== 'object' || Array.isArray(universe)) return null;
+    const group = (universe as Record<string, unknown>)[actorId];
+    return typeof group === 'string' && /^[A-Za-z0-9_-]{8,160}$/.test(group) ? group : null;
+  } catch { return null; }
+}
