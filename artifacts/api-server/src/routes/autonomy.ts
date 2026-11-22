@@ -85,15 +85,23 @@ function requestedUniverseId(value: unknown): string {
 async function ownerSettings(ownerId: string, universeId = "primary") {
   const snapshot = await readUniverse(ownerId, universeId);
   if (!snapshot.state) throw new EngineError("UNIVERSE_NOT_FOUND", 404);
-  const parsed = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
-  if (!parsed.success) throw new EngineError("INVALID_STORED_UNIVERSE", 422);
+  // Settings only need the character roster. A legacy post, message or media
+  // field must not prevent the owner from editing existing autonomy controls.
+  const rawCharacters = (snapshot.state as { characters?: unknown }).characters;
+  if (!Array.isArray(rawCharacters)) throw new EngineError("INVALID_STORED_CHARACTERS", 422);
+  const characters = rawCharacters.filter((value): value is {
+    id: string; name: string; handle: string; archived?: boolean;
+  } => value !== null && typeof value === "object" &&
+    typeof value.id === "string" && value.id.length > 0 &&
+    typeof value.name === "string" && typeof value.handle === "string" &&
+    value.archived !== true);
   const controls = await readOwnerControls(ownerId, universeId);
   return GetAutonomySettingsResponse.parse({
     universeId,
     globalKillSwitchEngaged: controls.ownerKillSwitchEngaged,
     universeAutonomyPaused: (snapshot.state as { settings?: { autonomyPaused?: boolean } }).settings?.autonomyPaused === true,
     liveExecutionEnabled: isAutonomyLiveExecutionEnabled() && isAutonomyOwnerAuthorized(ownerId),
-    characters: parsed.data.state.characters.filter((character) => !character.archived).map((character) => {
+    characters: characters.map((character) => {
       const control = controls.characters.get(character.id) ?? DEFAULT_CHARACTER_CONTROL;
       return {
         characterId: character.id,
