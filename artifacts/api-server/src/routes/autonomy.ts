@@ -383,6 +383,12 @@ router.put("/autonomy/story-permissions", requireAuth, async (req, res): Promise
     if (!characters?.some(c => c.id === characterId && !c.archived)) {
       res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
     }
+    // A story-only character may have no existing autonomy row. Create a
+    // disabled-by-default row so the worker can discover it via its join.
+    // Existing social and DM permissions are never overwritten.
+    await db.execute(sql`INSERT INTO echo_ai_autonomy_characters (owner_id, universe_id, character_id)
+      VALUES (${req.userId!}, ${universeId}, ${characterId})
+      ON CONFLICT (owner_id, universe_id, character_id) DO NOTHING`);
     await db.execute(sql`UPDATE echo_universes SET state = jsonb_set(
       state::jsonb, '{settings}', COALESCE(state::jsonb->'settings', '{}'::jsonb)
       || jsonb_build_object('storyInteractionPermissions',
