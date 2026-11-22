@@ -107,7 +107,7 @@ export function AutonomySettingsSection() {
         {t("Autonomía de texto")}
       </h2>
       <p className="mt-1.5 px-1 text-[13px] leading-relaxed text-muted-foreground">
-        {settings?.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar con IA de texto. La generación manual de imágenes está disponible; las acciones autónomas con imágenes se controlan por separado.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
+        {!settings ? t("Consultando disponibilidad de autonomía…") : settings.liveExecutionEnabled ? t("Beta privada: los personajes habilitados pueden actuar con IA de texto. La generación manual de imágenes está disponible; las acciones autónomas con imágenes se controlan por separado.") : t("La autonomía en vivo todavía no está habilitada para esta cuenta; las simulaciones son manuales.")}
       </p>
       <div className="mt-3 divide-y divide-border rounded-2xl border border-border bg-card/60">
         <div className="flex items-center gap-3 p-4">
@@ -143,8 +143,9 @@ export function AutonomySettingsSection() {
 
         {query.isLoading && <div className="p-4 text-xs text-muted-foreground">{t("Cargando controles privados…")}</div>}
         {query.isError && (
-          <div role="alert" className="p-4 text-xs text-destructive">
-            {t("No se pudieron cargar los controles de autonomía. No se habilitó ninguna cuenta.")}
+          <div role="alert" className="space-y-2 p-4 text-xs text-destructive">
+            <p>{t("No se pudieron cargar los controles de autonomía. No se modificaron los permisos guardados.")}</p>
+            <button type="button" onClick={() => void query.refetch()} className="rounded-lg border border-border px-3 py-2 font-semibold text-foreground">{t("Reintentar carga")}</button>
           </div>
         )}
         <details className="group" data-testid="details-social-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Autonomía social")} · {settings ? `${settings.characters.filter(c=>c.enabled).length}/${settings.characters.length}` : "—"}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
