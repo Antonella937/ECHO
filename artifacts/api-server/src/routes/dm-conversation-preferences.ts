@@ -152,9 +152,9 @@ dmConversationPreferencesRouter.put("/dm/appearance",async(req,res)=>{
   }
   const payload=JSON.stringify(parsed.data.appearance);
   await db.execute(sql`INSERT INTO echo_dm_conversation_preferences(owner_id,universe_id,character_id,preferences)
-   VALUES(${req.userId!},${universeId},${characterId},jsonb_build_object('appearanceByIdentity',jsonb_build_object(${identityId},${payload}::jsonb)))
+   VALUES(${req.userId!},${universeId},${characterId},jsonb_build_object('appearanceByIdentity',jsonb_build_object(${identityId}::text,${payload}::jsonb)))
    ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET
-   preferences=jsonb_set(COALESCE(echo_dm_conversation_preferences.preferences,'{}'::jsonb),'{appearanceByIdentity}',COALESCE(echo_dm_conversation_preferences.preferences->'appearanceByIdentity','{}'::jsonb) || jsonb_build_object(${identityId},${payload}::jsonb),true),updated_at=now()`);
+   preferences=jsonb_set(COALESCE(echo_dm_conversation_preferences.preferences,'{}'::jsonb),'{appearanceByIdentity}',COALESCE(echo_dm_conversation_preferences.preferences->'appearanceByIdentity','{}'::jsonb) || jsonb_build_object(${identityId}::text,${payload}::jsonb),true),updated_at=now()`);
   res.json({appearance:parsed.data.appearance});
  }catch(error){console.error("[dm-appearance] save failed",error);res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
 });
