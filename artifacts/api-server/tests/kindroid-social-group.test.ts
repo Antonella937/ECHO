@@ -56,7 +56,7 @@ test('social group converts the selected Kin response to an ECHO like without pr
     const result = await kindroidSocialGroupProvider('group12345678', 'kin123456789', 'like_post', 'Noah posted a guitar photo', undefined, request).complete({
       system: '', context: '', outputSchema: {},
     });
-    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-get-turn', '/v1/groupchats-ai-response']);
+    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-ai-response']);
     assert.equal(JSON.parse(result.text).action, 'like');
   } finally {
     if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
@@ -64,24 +64,25 @@ test('social group converts the selected Kin response to an ECHO like without pr
   }
 });
 
-test('a different Kin cannot impersonate the intended character', async () => {
+test('explicit social speaker is sent as the requested Kin, never a private DM', async () => {
   const previous = process.env.ECHO_KINDROID_API_KEY;
   process.env.ECHO_KINDROID_API_KEY = 'test-key';
-  const calls: string[] = [];
-  const request = (async (url: string | URL | Request) => {
+  const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
-    calls.push(path);
-    return new Response(path.endsWith('get-turn') ? 'otherKin1234' : '', { status: 200 });
+    calls.push({ path, body: JSON.parse(String(init?.body)) });
+    return new Response(path.endsWith('ai-response') ? 'SKIP' : '', { status: 200 });
   }) as typeof fetch;
   try {
-    await assert.rejects(
-      kindroidSocialGroupProvider('group12345678', 'kin123456789', 'comment',
-        'Mar commented on Noah post', undefined, request).complete({
-          system: '', context: '', outputSchema: {},
-        }),
-      /KINDROID_GROUP_SPEAKER_MISMATCH/,
-    );
-    assert.deepEqual(calls, ['/v1/groupchats-user-message', '/v1/groupchats-get-turn']);
+    await kindroidSocialGroupProvider('group12345678', 'kin123456789', 'comment',
+      'Mar commented on Noah post', undefined, request).complete({
+        system: '', context: '', outputSchema: {},
+      });
+    assert.deepEqual(calls.map(call => call.path), [
+      '/v1/groupchats-user-message', '/v1/groupchats-ai-response',
+    ]);
+    assert.equal(calls[1].body.ai_id, 'kin123456789');
+    assert.equal(calls.some(call => call.path === '/v1/send-message'), false);
   } finally {
     if (previous === undefined) delete process.env.ECHO_KINDROID_API_KEY;
     else process.env.ECHO_KINDROID_API_KEY = previous;
@@ -106,7 +107,7 @@ test('two requests to the same social group never interleave context and respons
       first.complete({ system: '', context: '', outputSchema: {} }),
       second.complete({ system: '', context: '', outputSchema: {} }),
     ]);
-    const one = ['/v1/groupchats-user-message', '/v1/groupchats-get-turn', '/v1/groupchats-ai-response'];
+    const one = ['/v1/groupchats-user-message', '/v1/groupchats-ai-response'];
     assert.deepEqual(calls, [...one, ...one]);
     assert.equal(calls.filter(path => path === '/v1/send-message').length, 0);
   } finally {
@@ -135,7 +136,6 @@ test('invalid Kindroid social choice fails closed without a private fallback', a
     );
     assert.deepEqual(calls, [
       '/v1/groupchats-user-message',
-      '/v1/groupchats-get-turn',
       '/v1/groupchats-ai-response',
     ]);
     assert.equal(calls.some(path => path === '/v1/send-message'), false);
