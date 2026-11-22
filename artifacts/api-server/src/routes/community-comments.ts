@@ -4,6 +4,9 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { GeminiDmProvider } from "../ai-engine/gemini";
+import { VisionService } from "../vision/service";
+import { VisionError } from "../vision/contracts";
+import type { SocialState } from "@workspace/api-zod";
 
 function parseCommunityDraft(text: string): { comments?: Array<{ handle?: unknown; text?: unknown }> } {
   const trimmed = text.trim();
@@ -56,11 +59,24 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
     if (!post || !account || post.authorId !== universe?.currentCharacterId || !communityEligible || post.commentsEnabled === false) {
       res.status(403).json({ error: "COMMUNITY_COMMENTS_NOT_ENABLED_OR_NOT_OWNER" }); return;
     }
+    let visualContext: string | null = null;
+    const hasImages = Boolean((post as { image?: string; media?: Array<{ type: string }> }).image || (post as { media?: Array<{ type: string }> }).media?.some(m => m.type === "image"));
+    if (hasImages) {
+      try {
+        const vision = await new VisionService().analyzePost(ownerId, state as SocialState, post.id, parsed.data.universeId);
+        visualContext = vision.summary.overallDescription.slice(0, 5000);
+      } catch (error) {
+        // Older/external images cannot always be analyzed securely. Never fabricate
+        // visual details; fall back to caption-only comments for those posts.
+        if (!(error instanceof VisionError)) throw error;
+        console.warn("[community-comments] image analysis unavailable", { code: error.code });
+      }
+    }
     const existing = (universe?.comments ?? []).filter(c => c.postId === post.id).slice(-20).map(c => ({ handle: c.guestHandle ?? "character", text: c.text.slice(0, 180) }));
     const provider = new MeteredTextProvider(ownerId, "brain_text", new GeminiDmProvider(undefined, fetch, ownerId));
     const generated = await provider.complete({
-      system: "Generate fictional social-network fan comments for an explicitly fictional roleplay world. Output ONLY a JSON object with key comments, an array of objects {handle,text}. Never impersonate real users or celebrities. Handles must be fictional and not match existing real accounts. Keep comments short, varied, natural and contextual. Do not write hateful, sexual, violent, or personally identifying material. Do not create replies or conversations. Do not mention AI. Respect language and vibe of the account. No markdown.",
-      context: JSON.stringify({ account: { name: account.name, handle: account.handle, type: account.accountType }, postCaption: (post.caption ?? "").slice(0, 600), existing, count: parsed.data.count }),
+      system: "Generate fictional social-network fan comments for an explicitly fictional roleplay world. Output ONLY a JSON object with key comments, an array of objects {handle,text}. Never impersonate real users or celebrities. Handles must be fictional and not match existing real accounts. Keep comments short, varied, natural and contextual. When visualContext is provided, comment on specific visible clothing, styling, instruments, colors or other observable details, not just the caption. Do not invent unseen details. Do not write hateful, sexual, violent, or personally identifying material. Do not create replies or conversations. Do not mention AI. Respect language and vibe of the account. No markdown.",
+      context: JSON.stringify({ account: { name: account.name, handle: account.handle, type: account.accountType }, postCaption: (post.caption ?? "").slice(0, 600), visualContext, existing, count: parsed.data.count }),
       outputSchema: { type: "object", properties: { comments: { type: "array", items: { type: "object", properties: { handle: { type: "string" }, text: { type: "string" } }, required: ["handle", "text"] } } }, required: ["comments"] },
     });
     const raw = parseCommunityDraft(generated.text);
