@@ -14,6 +14,52 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { getActiveUniverseId } from "@/store/persistence";
 
+function StoryInteractionPermissions({ universeId, characters }: {
+  universeId: string;
+  characters: Array<{ characterId: string; displayName: string; enabled: boolean }>;
+}) {
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    customFetch<{ characters: Array<{ characterId: string; enabled: boolean }> }>(
+      `/api/autonomy/story-permissions?${new URLSearchParams({ universeId })}`,
+      { method: "GET", responseType: "json", cache: "no-store" },
+    ).then(data => {
+      if (active) setPermissions(Object.fromEntries(data.characters.map(c => [c.characterId, c.enabled])));
+    }).catch(() => { if (active) setError("No se pudieron cargar los permisos de historias."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [universeId]);
+  const change = async (characterId: string, enabled: boolean) => {
+    setSaving(characterId);
+    setError("");
+    try {
+      await customFetch("/api/autonomy/story-permissions", {
+        method: "PUT", responseType: "json",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ universeId, characterId, enabled }),
+      });
+      setPermissions(old => ({ ...old, [characterId]: enabled }));
+    } catch {
+      setError("No se pudo guardar el permiso de historias.");
+    } finally { setSaving(null); }
+  };
+  if (loading) return <p className="p-4 text-xs text-muted-foreground">Cargando permisos de historias…</p>;
+  return <div className="divide-y divide-border border-t border-border">
+    <p className="p-4 text-xs text-muted-foreground">Permití que cada personaje responda o reaccione automáticamente a historias. Independiente de publicar en el feed y de iniciar DMs.</p>
+    {error && <p role="alert" className="p-4 text-xs text-destructive">{error}</p>}
+    {characters.map(character => <div key={character.characterId} className="flex items-center gap-3 p-4">
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{character.displayName}</span>
+      <Switch checked={permissions[character.characterId] ?? false} disabled={!!saving || !!error} onCheckedChange={enabled => void change(character.characterId, enabled)} aria-label={`Historias para ${character.displayName}`} />
+    </div>)}
+  </div>;
+}
+
 function PeerDmPermissions({ universeId, characterId, characters }: { universeId: string; characterId: string; characters: Array<{ characterId: string; displayName: string }> }) {
   const [enabled, setEnabled] = useState(false);
   const [allowed, setAllowed] = useState<string[]>([]);
@@ -169,6 +215,13 @@ export function AutonomySettingsSection() {
           </div>
         ))}
         </div></details>
+        <details className="group" data-testid="details-story-interaction-autonomy">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <span>Respuestas y reacciones a historias</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          {settings && <StoryInteractionPermissions universeId={universeId} characters={settings.characters} />}
+        </details>
         <details className="group" data-testid="details-peer-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>DMs entre personajes</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border p-4"><p className="mb-3 text-xs text-muted-foreground">Elegí con quién puede hablar cada personaje. Estos permisos son independientes de los mensajes espontáneos hacia tu cuenta.</p>{settings?.characters.map(character => <details key={character.characterId} className="mb-2 rounded-xl border border-border"><summary className="cursor-pointer p-3 text-sm font-medium">{character.displayName}</summary><PeerDmPermissions universeId={universeId} characterId={character.characterId} characters={settings.characters} /></details>)}</div></details>
         <details className="group" data-testid="details-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Mensajes autónomos")} · {settings ? `${settings.characters.filter(c=>c.dmEnabled).length}/${settings.characters.length}` : "—"}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Mensajes autónomos")}</h3>
