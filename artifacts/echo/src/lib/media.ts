@@ -156,7 +156,15 @@ function fetchPrivateMedia(url: string) {
     });
 }
 function loadPrivateMedia(url: string, priority = false) {
-  if (privateMediaCache.has(url) || privateMediaPending.has(url) || privateMediaQueued.has(url)) return;
+  if (privateMediaQueued.has(url)) {
+    // Promote avatars/stories even if a long feed already queued their image.
+    if (priority) {
+      const index = privateMediaQueue.indexOf(url);
+      if (index > 0) { privateMediaQueue.splice(index, 1); privateMediaQueue.unshift(url); }
+    }
+    return;
+  }
+  if (privateMediaCache.has(url) || privateMediaPending.has(url)) return;
   if (Date.now() - (privateMediaFailures.get(url) ?? -Infinity) < PRIVATE_MEDIA_RETRY_MS) return;
   privateMediaQueued.add(url);
   if (priority) privateMediaQueue.unshift(url);
@@ -185,7 +193,7 @@ export function useMediaResolver() {
       privateMediaCache.set(url, locallyPrimed);
     }
     if (!privateMediaCache.has(url) && !privateMediaPending.has(url)) {
-      queueMicrotask(() => loadPrivateMedia(url, hint?.sourceType === "story"));
+      queueMicrotask(() => loadPrivateMedia(url, hint?.sourceType === 'story' || hint?.sourceType === 'avatar'));
     }
     return privateMediaCache.get(url) ?? '';
   };
