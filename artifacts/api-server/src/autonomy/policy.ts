@@ -208,6 +208,8 @@ export function chooseAutonomyOpportunity(input: {
   allowStoryInteractions?: boolean;
   /** Feed posting, comments and likes require social autonomy opt-in. */
   allowSocialActions?: boolean;
+  /** Story-only opt-in must not authorize unrelated cold DMs. */
+  allowSpontaneousOutreach?: boolean;
   /** Story replies may reach the owner without spontaneous outreach permission. */
   allowOwnerStoryReplies?: boolean;
   /** Owner-initiated DM replies remain available without unsolicited DM opt-in. */
@@ -340,7 +342,7 @@ export function chooseAutonomyOpportunity(input: {
   // characters silent whenever nobody posted a story. Keep this inexpensive:
   // select locally before calling a model, honor relationships, daily caps and
   // cooldowns, and avoid outreach during sleeping hours.
-  if (input.lane === "dm" && !unanswered &&
+  if (input.lane === "dm" && input.allowSpontaneousOutreach !== false && !unanswered &&
       history.length < 30 &&
       (latestActivity === 0 || now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000) &&
       spontaneousHourAllowed) {
