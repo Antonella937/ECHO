@@ -370,13 +370,12 @@ export default function EchoMusicPage() {
       setImportTrackError(interfaceLanguage === 'es' ? 'Elegí un WAV o MP3 de hasta 50 MB. Para WAV más grandes necesitamos ampliar el límite del servidor.' : 'Choose a WAV or MP3 up to 50 MB. Larger WAV files require a server limit update.');
       return;
     }
-    const mime = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
-    const normalized = new File([file], file.name, { type: mime });
-    setImportTrackFile(normalized);
+    // Keep the original File: copying large WAV blobs can fail on mobile Safari.
+    setImportTrackFile(file);
     setImportTrackTitle(file.name.replace(/\.(wav|mp3)$/i, '').replace(/[_-]+/g, ' ').trim());
     setImportTrackDuration(0);
     setImportTrackError('');
-    const url = URL.createObjectURL(normalized);
+    const url = URL.createObjectURL(file);
     const probe = new Audio();
     probe.preload = 'metadata';
     probe.onloadedmetadata = () => {
@@ -986,7 +985,7 @@ export default function EchoMusicPage() {
       {importTrackOpen && <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/75" onClick={() => !importTrackBusy && setImportTrackOpen(false)}>
         <section role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Subir canción' : 'Upload track'} onClick={event => event.stopPropagation()} className="w-full max-w-xl space-y-4 rounded-t-3xl border border-border bg-[#252327] px-5 pb-[calc(env(safe-area-inset-bottom,0px)+24px)] pt-5">
           <div className="flex items-center justify-between"><h2 className="font-semibold">{interfaceLanguage === 'es' ? 'Subir canción a mi biblioteca' : 'Upload to my library'}</h2><button type="button" disabled={importTrackBusy} onClick={() => setImportTrackOpen(false)} aria-label="Cerrar"><X className="h-5 w-5" /></button></div>
-          <input ref={importTrackFileRef} type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" className="sr-only" onChange={event => { selectLibraryAudio(event.target.files?.[0]); event.target.value = ''; }} />
+          <input ref={importTrackFileRef} type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav,audio/vnd.wave" className="sr-only" onChange={event => { selectLibraryAudio(event.target.files?.[0]); event.target.value = ''; }} />
           <button type="button" disabled={importTrackBusy} onClick={() => importTrackFileRef.current?.click()} className="w-full rounded-xl border border-dashed border-border p-4 text-sm">{importTrackFile ? importTrackFile.name : (interfaceLanguage === 'es' ? 'Elegir WAV o MP3 desde Archivos' : 'Choose WAV or MP3 from Files')}</button>
           <p className="text-xs text-muted-foreground">{interfaceLanguage === 'es' ? 'Máximo 50 MB por archivo. Privada por defecto. No consume créditos de generación.' : 'Maximum 50 MB per file. Private by default. No generation credits used.'}</p>
           <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Título' : 'Title'}</span><input value={importTrackTitle} maxLength={120} onChange={event => setImportTrackTitle(event.target.value)} className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
