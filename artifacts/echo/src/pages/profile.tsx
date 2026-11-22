@@ -131,6 +131,7 @@ export default function ProfilePage() {
         {isMe && pendingRequests.length > 0 && <div className="mt-4 space-y-2">{pendingRequests.map(requesterId => { const requester = character(requesterId); return requester && <div key={requesterId} className="flex items-center gap-2 rounded-xl border border-border p-2 text-sm"><CharacterAvatar character={requester} size={32} /><span className="min-w-0 flex-1 truncate">@{requester.handle}</span><button className="rounded-lg bg-primary px-2 py-2 text-primary-foreground" onClick={() => actions.respondFollowRequest(requesterId, true)}>{t('Aceptar')}</button><button className="rounded-lg bg-secondary px-2 py-2" onClick={() => actions.respondFollowRequest(requesterId, false)}>{t('Rechazar')}</button></div>; })}</div>}
         {isMe ? (
           <div className="mt-5 grid grid-cols-2 gap-2">
+            <Link href="/messages?view=observer-dms" className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80" data-testid="link-profile-observer-dms"><MessageCircle className="h-4 w-4 shrink-0" /> DMs de espectadora</Link>
             <Link href="/create" className="tap col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground" data-testid="link-profile-create">
               <PlusSquare className="h-4 w-4" strokeWidth={2} /> {t("Nueva publicación")}
             </Link>
