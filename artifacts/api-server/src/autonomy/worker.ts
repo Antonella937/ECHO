@@ -108,7 +108,7 @@ export async function runAutonomyWorkerTick(input: {
     // Spontaneous activity retains its slower cadence and separate idempotency namespace.
     if (input.socialTickDue ?? (slot % (SOCIAL_INTERVAL_MS / AUTONOMY_WORKER_INTERVAL_MS) === 0)) {
       for (const target of targets) {
-        if (target.socialEnabled === false) continue;
+        if (target.socialEnabled === false && target.storyEnabled === false) continue;
         const hash = createHash("sha256").update(`social:${socialSlot}:${target.ownerId}:${target.universeId}:${target.characterId}`).digest("hex");
         const idempotencyKey = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
         const failureKey = `${target.ownerId}:${target.universeId}:${target.characterId}:social`;
