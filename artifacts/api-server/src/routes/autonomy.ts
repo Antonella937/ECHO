@@ -112,8 +112,10 @@ async function ownerSettings(ownerId: string, universeId = "primary") {
         dmFrequency: control.dmFrequency ?? "sometimes",
         dmMediaPreference: control.dmMediaPreference ?? "text",
         dmInstructions: control.dmInstructions ?? "",
-        maxActionsPerDay: control.maxActionsPerDay,
-        minCooldownMinutes: control.minCooldownMinutes,
+        // Legacy values can exceed current response-schema limits. Normalize
+        // only the read projection; never overwrite stored owner preferences.
+        maxActionsPerDay: Math.max(1, Math.min(4, control.maxActionsPerDay)),
+        minCooldownMinutes: Math.max(60, Math.min(1440, control.minCooldownMinutes)),
       };
     }),
   });
