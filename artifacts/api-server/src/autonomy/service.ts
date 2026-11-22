@@ -411,18 +411,20 @@ export async function runAutonomyLiveCycle(
           (permissionFor(peer.id)?.allowed_peer_ids as string[]).includes(character.id)
         )))).map(peer => peer.id));
     }
+    // Read the permission from persisted JSON: legacy Zod universe parsing may
+    // strip settings extensions from the in-memory state projection.
+    const storyPermissionRows = await db.execute(sql`SELECT
+      state::jsonb #>> ARRAY['settings', 'storyInteractionPermissions', ${character.id}] AS enabled
+      FROM echo_universes WHERE owner_id = ${ownerId} AND universe_id = ${universeId} LIMIT 1`);
+    const storyPermissionValue = storyPermissionRows.rows[0]?.enabled;
+    const allowStoryInteractions = storyPermissionValue === "true" ? true
+      : storyPermissionValue === "false" ? false : control.enabled;
     const opportunity = chooseAutonomyOpportunity({
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
-      allowStoryInteractions: (() => {
-        const overrides = (state.settings as typeof state.settings & { storyInteractionPermissions?: Record<string, boolean> } | undefined)?.storyInteractionPermissions;
-        return typeof overrides?.[character.id] === "boolean" ? overrides[character.id] : control.enabled;
-      })(),
-      allowOwnerStoryReplies: (() => {
-        const overrides = (state.settings as typeof state.settings & { storyInteractionPermissions?: Record<string, boolean> } | undefined)?.storyInteractionPermissions;
-        return typeof overrides?.[character.id] === "boolean" ? overrides[character.id] : control.enabled;
-      })(),
+      allowStoryInteractions,
+      allowOwnerStoryReplies: allowStoryInteractions,
       allowOwnerIncomingReplies: linkedInboundReply || control.dmEnabled,
       allowOwnerSpontaneousDm: control.dmEnabled,
       targetIncomingMessageId: dependencies.targetIncomingMessageId,
