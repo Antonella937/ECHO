@@ -37,6 +37,8 @@ function CollapsibleSettings({ title, testId, icon: Icon, children }: { title: s
 
 export default function SettingsPage() {
   const { state, me, actions, storageError, lastSavedAt } = useSocial();
+  const [recoveryFiles, setRecoveryFiles] = useState<File[]>([]);
+  const [showRecovery, setShowRecovery] = useState(false);
   const { user } = useUser();
   const { signOut } = useClerk();
   const back = useBack();
@@ -180,6 +182,29 @@ export default function SettingsPage() {
               </button>
             )}
           </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-border bg-card/60 p-4" aria-label="Recuperar imágenes">
+          <button type="button" onClick={() => setShowRecovery(value => !value)} className="flex w-full items-center justify-between text-left text-sm font-semibold" aria-expanded={showRecovery}>
+            <span className="flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Recuperar imágenes</span>
+            <ChevronDown className={cn("h-4 w-4 transition-transform", showRecovery && "rotate-180")} />
+          </button>
+          {showRecovery && <div className="mt-4 space-y-3 text-sm">
+            <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone. Esta etapa prepara la recuperación: no reemplaza ni borra imágenes sin que confirmes la correspondencia.</p>
+            <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/*" multiple
+              onChange={event => setRecoveryFiles(Array.from(event.currentTarget.files ?? []))}
+              className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
+            {recoveryFiles.length > 0 && <p role="status" className="text-xs">{recoveryFiles.length} foto(s) seleccionada(s). Todavía no se subieron.</p>}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold">Avatares que necesitan recuperación</p>
+              {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character => (
+                <div key={character.id} className="flex items-center justify-between gap-2 rounded-lg bg-secondary/40 px-3 py-2 text-xs">
+                  <span className="truncate">{character.name}</span><span className="shrink-0 text-muted-foreground">Copia antigua</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">La asignación y subida segura a Cloudflare R2 se habilitarán después de incorporar la verificación de coincidencias. Las fotos seleccionadas permanecen en este dispositivo.</p>
+          </div>}
         </section>
 
         <NelaEasterEgg />
