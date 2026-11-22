@@ -78,8 +78,8 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
         }}
         tabIndex={0}
         aria-label="Doble toque para indicar que te gusta. Flechas para cambiar de foto."
-        className="no-scrollbar flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain aspect-[4/5]"
-        style={{ touchAction: 'pan-x pan-y' }}
+        className="no-scrollbar flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain aspect-[4/5] transition-[aspect-ratio] duration-200"
+        style={{ touchAction: 'pan-x pan-y', ...(fit && imageRatios[media[index]?.id ?? ''] ? { aspectRatio: String(imageRatios[media[index].id]) } : {}) }}
         data-testid={`button-image-${postId}`}
       >
         {media.map((m, i) => (
@@ -96,7 +96,7 @@ export function PostMediaView({ postId, media, alt, eager, onTap, overlay }: Pro
                 data-testid={`video-post-${postId}-${i}`}
               />
             ) : (
-              <GracefulImage key={resolveMedia(m.url)} src={resolveMedia(m.url)} alt={`${alt} · foto ${i + 1} de ${count}`} loading={eager && i === 0 ? 'eager' : 'lazy'} draggable={false} containerClassName="relative h-full w-full" onLoad={event => rememberRatio(m.id, event.currentTarget)} className={`absolute inset-0 h-full w-full transition-[object-fit,transform] duration-200 ${fit ? 'object-contain scale-[0.86]' : 'object-cover scale-100'}`} fallback={imageFallback} data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`} />
+              <GracefulImage key={resolveMedia(m.url)} src={resolveMedia(m.url)} alt={`${alt} · foto ${i + 1} de ${count}`} loading={eager && i === 0 ? 'eager' : 'lazy'} draggable={false} containerClassName="relative h-full w-full" onLoad={event => rememberRatio(m.id, event.currentTarget)} className={`absolute inset-0 h-full w-full ${fit ? 'object-contain' : 'object-cover'}`} fallback={imageFallback} data-testid={i === 0 ? `img-post-${postId}` : `img-post-${postId}-${i}`} />
             )}
           </div>
         ))}
