@@ -9,7 +9,7 @@ import { useSocial } from '@/store/social-store';
 import { Sheet } from './sheet';
 import { CharacterAvatar } from './avatar';
 import { CommentComposer, CommentList } from './comments-panel';
-import { postUrl } from '@/lib/media';
+import { postUrl, resolveMedia } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import type { Comment, Post } from '@/domain/types';
 import { getOrderedPinnedPosts } from '@/domain/social-features';
@@ -65,6 +65,8 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
   const { state, me, actions, character } = useSocial();
   const [copied, setCopied] = useState(false);
   const [sentTo, setSentTo] = useState<string[]>([]);
+  const [storyComposerOpen, setStoryComposerOpen] = useState(false);
+  const [storyText, setStoryText] = useState('');
   const url = postUrl(post.id);
   const author = character(post.authorId);
   const canNativeShare = typeof navigator !== 'undefined' && 'share' in navigator;
@@ -93,8 +95,10 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
   const addToStory = () => {
     try {
       if (!post.image) throw new Error('Esta publicación no tiene una imagen para compartir.');
-      actions.createStory({ image: post.image, caption: '', repostOfPostId: post.id });
+      actions.createStory({ image: post.image, caption: storyText.trim(), repostOfPostId: post.id });
       toast({ title: 'Publicación compartida en tu historia' });
+      setStoryComposerOpen(false);
+      setStoryText('');
       onClose();
     } catch (error) {
       toast({ title: 'No se pudo compartir', description: (error as Error).message });
@@ -108,7 +112,25 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
 
   return (
     <Sheet open={open} onClose={onClose} title={t("Compartir")} testId="sheet-share">
-      <button type="button" onClick={addToStory} className="mb-5 flex h-12 w-full items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-share-to-story"><BookImage className="h-5 w-5" /> Agregar a mi historia</button>
+      <button type="button" onClick={() => setStoryComposerOpen(true)} className="mb-5 flex h-12 w-full items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-share-to-story"><BookImage className="h-5 w-5" /> Agregar a mi historia</button>
+      {storyComposerOpen && (
+        <div className="mb-5 space-y-3 rounded-2xl border border-border bg-background p-3" data-testid="composer-repost-story">
+          <div className="text-sm font-semibold">Vista previa de tu historia</div>
+          <div className="relative mx-auto flex aspect-[9/13] max-h-[48dvh] w-full max-w-[300px] flex-col items-center justify-center overflow-hidden rounded-xl bg-[#19171d] p-5 text-white">
+            <div className="w-full overflow-hidden rounded-xl bg-[#090909] shadow-xl">
+              <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold">@{author?.handle ?? 'publicacion'}</div>
+              <img src={resolveMedia(post.image)} alt="Vista previa de la publicación" className="max-h-[28dvh] w-full object-contain" />
+              <div className="px-3 py-2 text-[10px] text-white/70">Ver publicación original</div>
+            </div>
+            {storyText.trim() && <p className="mt-4 max-w-full break-words text-center text-sm font-medium">{storyText}</p>}
+          </div>
+          <textarea value={storyText} onChange={e => setStoryText(e.target.value.slice(0, 500))} placeholder="Escribí algo sobre esta publicación..." aria-label="Texto de tu historia" maxLength={500} rows={3} className="w-full resize-none rounded-xl border border-border bg-secondary p-3 text-sm outline-none" data-testid="input-repost-story-text" />
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setStoryComposerOpen(false)} className="h-11 flex-1 rounded-xl border border-border text-sm">Cancelar</button>
+            <button type="button" onClick={addToStory} className="h-11 flex-1 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground" data-testid="button-publish-repost-story">Publicar historia</button>
+          </div>
+        </div>
+      )}
       <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Enviar por mensaje")}</div>
       <div className="mt-3 flex gap-5">
         {friends.map((f) => {
