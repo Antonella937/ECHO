@@ -248,13 +248,18 @@ export async function uploadPrivateImage(dataUrl: string): Promise<string> {
     if (upload) {
       try {
         const body = await upload.text();
-        const parsed: unknown = JSON.parse(body);
-        if (parsed && typeof parsed === 'object') {
-          const detail = parsed as Record<string, unknown>;
-          reason = [detail.error, detail.message]
-            .filter((value): value is string => typeof value === 'string').join(': ').slice(0, 180);
+        try {
+          const parsed: unknown = JSON.parse(body);
+          if (parsed && typeof parsed === 'object') {
+            const detail = parsed as Record<string, unknown>;
+            reason = [detail.error, detail.message]
+              .filter((value): value is string => typeof value === 'string').join(': ').slice(0, 180);
+          }
+        } catch {
+          // S3-compatible R2 errors are XML. Only expose the safe error code.
+          reason = body.match(/<Code>([A-Za-z0-9_-]{1,80})<\\/Code>/)?.[1] ?? '';
         }
-      } catch { /* Upstream errors may not contain JSON. */ }
+      } catch { /* An empty upstream response may not contain details. */ }
     }
     throw new Error(`No se pudo subir la imagen (HTTP ${upload?.status ?? 'sin respuesta'})${reason ? ` — ${reason}` : ''}.`);
   }
