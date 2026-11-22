@@ -486,7 +486,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
         "Continue as " + character.name + ". Write only your own dialogue and actions; do not speak for others.",
         "Recent shared scene events:",
         ...sharedEvents.slice(-5).map(e => String(e.actor_id) + ": " + String(e.text).slice(-250)),
-      ].join("\n").slice(0, 1700);
+      ].join("\n").slice(0, 1450);
       await sendKindroidSocialGroupContext(groupId, scenePrompt);
       const completion = await kindroidPeerGroupProvider(groupId, kinId, characterId, fetch, true)
         .complete({ system: "", context: "", outputSchema: sceneOutputSchema });
