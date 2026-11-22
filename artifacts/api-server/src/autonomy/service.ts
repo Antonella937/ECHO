@@ -350,7 +350,12 @@ export async function runAutonomyLiveCycle(
   // Peer DM autonomy is authorized by the separate bilateral permissions table.
   // The dmEnabled switch only controls spontaneous outreach to the human owner.
   let peerDmEnabled = false;
-  const storyReplyEligible = dependencies.lane === "dm" && control.enabled;
+  const storyOptInRows = await db.execute(sql`SELECT
+    state::jsonb #>> ARRAY['settings', 'storyInteractionPermissions', ${character.id}] AS enabled
+    FROM echo_universes WHERE owner_id = ${ownerId} AND universe_id = ${universeId} LIMIT 1`);
+  const storyOptIn = storyOptInRows.rows[0]?.enabled;
+  const storyInteractionsEnabled = storyOptIn === "true" ? true : storyOptIn === "false" ? false : control.enabled;
+  const storyReplyEligible = dependencies.lane === "dm" && storyInteractionsEnabled;
   if (dependencies.lane === "dm" && !control.dmEnabled) {
     const permissions = await db.execute(sql`SELECT character_id, enabled, allowed_peer_ids
       FROM echo_character_dm_permissions
@@ -413,12 +418,7 @@ export async function runAutonomyLiveCycle(
     }
     // Read the permission from persisted JSON: legacy Zod universe parsing may
     // strip settings extensions from the in-memory state projection.
-    const storyPermissionRows = await db.execute(sql`SELECT
-      state::jsonb #>> ARRAY['settings', 'storyInteractionPermissions', ${character.id}] AS enabled
-      FROM echo_universes WHERE owner_id = ${ownerId} AND universe_id = ${universeId} LIMIT 1`);
-    const storyPermissionValue = storyPermissionRows.rows[0]?.enabled;
-    const allowStoryInteractions = storyPermissionValue === "true" ? true
-      : storyPermissionValue === "false" ? false : control.enabled;
+    const allowStoryInteractions = storyInteractionsEnabled;
     const opportunity = chooseAutonomyOpportunity({
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
