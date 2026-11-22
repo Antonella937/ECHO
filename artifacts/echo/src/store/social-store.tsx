@@ -52,7 +52,7 @@ export interface SocialActions {
   respondCollaboration(postId: string, accept: boolean): void;
   votePoll(postId: string, optionId: string): void;
   createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; collaborationInvites?: string[]; poll?: import('@/domain/types').Post['poll']; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
-  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
+  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip; repostOfPostId?: string }): string;
   repostMentionedStory(storyId: string): string;
   deletePost(postId: string): void;
   deleteStory(storyId: string): void;
@@ -447,7 +447,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { postId: id }, taggedAccountIds));
         return id;
       },
-      createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly, musicClip }) {
+      createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly, musicClip, repostOfPostId }) {
         const allowedViewerIds = closeFriendsOnly ? (cur().closeFriends?.[myId()] ?? []) : [];
         if (closeFriendsOnly && !allowedViewerIds.length) throw new Error('Agregá al menos un mejor amigo antes de publicar.');
         const id = uid('s');
@@ -455,7 +455,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           type: 'story.created',
           story: { id, authorId: myId(), image, caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
             ...(mentionedAccountIds ? { mentionedAccountIds: mentionedAccountIds.filter(id => !closeFriendsOnly || allowedViewerIds.includes(id)) } : {}),
-            ...(closeFriendsOnly ? { closeFriendsOnly: true, allowedViewerIds } : {}), ...(music ? { music } : {}), ...(musicClip ? { musicClip } : {}) },
+            ...(closeFriendsOnly ? { closeFriendsOnly: true, allowedViewerIds } : {}), ...(music ? { music } : {}), ...(musicClip ? { musicClip } : {}), ...(repostOfPostId ? { repostOfPostId } : {}) },
         });
         coordinator.current?.edit(s => {
           const next = mentionNotifications(s, caption, myId(), { storyId: id }, mentionedAccountIds);
