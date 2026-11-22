@@ -3,7 +3,7 @@ import { useLanguage } from '@/lib/i18n';
 import { dmSharePrompt } from '@/lib/dm-share-translations';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ArrowDown, ArrowUp, Check, Copy, Link2, MessageCircleOff, MessageCircle, Pencil, Pin, PinOff, Share, Trash2, User } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Copy, Link2, MessageCircleOff, MessageCircle, Pencil, Pin, PinOff, Share, Trash2, User, BookImage } from 'lucide-react';
 import { EditPostSheet } from './edit-post-sheet';
 import { useSocial } from '@/store/social-store';
 import { Sheet } from './sheet';
@@ -90,6 +90,17 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
     }
   };
 
+  const addToStory = () => {
+    try {
+      if (!post.image) throw new Error('Esta publicación no tiene una imagen para compartir.');
+      actions.createStory({ image: post.image, caption: '', repostOfPostId: post.id });
+      toast({ title: 'Publicación compartida en tu historia' });
+      onClose();
+    } catch (error) {
+      toast({ title: 'No se pudo compartir', description: (error as Error).message });
+    }
+  };
+
   const sendTo = (id: string) => {
     actions.sendMessage(id, dmSharePrompt(language), { postId: post.id });
     setSentTo((s) => [...s, id]);
@@ -97,6 +108,7 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
 
   return (
     <Sheet open={open} onClose={onClose} title={t("Compartir")} testId="sheet-share">
+      <button type="button" onClick={addToStory} className="mb-5 flex h-12 w-full items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-share-to-story"><BookImage className="h-5 w-5" /> Agregar a mi historia</button>
       <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("Enviar por mensaje")}</div>
       <div className="mt-3 flex gap-5">
         {friends.map((f) => {
