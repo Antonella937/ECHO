@@ -1,7 +1,7 @@
 export const mediaLimits: Record<string, number> = {
   'image/jpeg': 15, 'image/png': 15, 'image/webp': 15, 'image/gif': 15,
   'video/mp4': 50, 'video/webm': 50,
-  'audio/webm': 15, 'audio/ogg': 15, 'audio/mp4': 15, 'audio/mpeg': 15, 'audio/wav': 15,
+  'audio/webm': 15, 'audio/ogg': 15, 'audio/mp4': 15, 'audio/mpeg': 50, 'audio/wav': 50,
 };
 export function validMediaHeader(bytes: Buffer, mime: string): boolean {
   if (mime === 'image/jpeg') return bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
