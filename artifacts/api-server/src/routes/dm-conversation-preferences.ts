@@ -136,7 +136,7 @@ dmConversationPreferencesRouter.get("/dm/appearance",async(req,res)=>{
    if(previous.success){res.json({appearance:previous.data,inherited:true});return;}
   }
   res.json({appearance:defaultAppearance});
- }catch{res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
+ }catch(error){console.error("[dm-appearance] read failed",error);res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
 });
 dmConversationPreferencesRouter.put("/dm/appearance",async(req,res)=>{
  res.setHeader("Cache-Control","private, no-store");
@@ -156,5 +156,5 @@ dmConversationPreferencesRouter.put("/dm/appearance",async(req,res)=>{
    ON CONFLICT(owner_id,universe_id,character_id) DO UPDATE SET
    preferences=jsonb_set(COALESCE(echo_dm_conversation_preferences.preferences,'{}'::jsonb),ARRAY['appearanceByIdentity',${identityId}],${payload}::jsonb,true),updated_at=now()`);
   res.json({appearance:parsed.data.appearance});
- }catch{res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
+ }catch(error){console.error("[dm-appearance] save failed",error);res.status(503).json({error:"DM_APPEARANCE_UNAVAILABLE"});}
 });
