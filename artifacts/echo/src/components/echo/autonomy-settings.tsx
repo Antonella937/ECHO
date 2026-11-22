@@ -145,6 +145,7 @@ export function AutonomySettingsSection() {
         {query.isError && (
           <div role="alert" className="space-y-2 p-4 text-xs text-destructive">
             <p>{t("No se pudieron cargar los controles de autonomía. No se modificaron los permisos guardados.")}</p>
+            <p className="break-all text-muted-foreground">Universo consultado: {universeId}</p>
             <button type="button" onClick={() => void query.refetch()} className="rounded-lg border border-border px-3 py-2 font-semibold text-foreground">{t("Reintentar carga")}</button>
           </div>
         )}
