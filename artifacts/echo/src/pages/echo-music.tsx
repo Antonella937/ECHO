@@ -247,6 +247,15 @@ export default function EchoMusicPage() {
   const [studioTab, setStudioTab] = useState<'create' | 'library'>('create');
   const [libraryFilter, setLibraryFilter] = useState<'saved_audio' | 'draft'>('saved_audio');
   const [librarySearch, setLibrarySearch] = useState('');
+  const [importTrackFile, setImportTrackFile] = useState<File | null>(null);
+  const [importTrackTitle, setImportTrackTitle] = useState('');
+  const [importTrackArtist, setImportTrackArtist] = useState('Pretty Violence');
+  const [importTrackBusy, setImportTrackBusy] = useState(false);
+  const [importTrackDuration, setImportTrackDuration] = useState(0);
+  const [importTrackOpen, setImportTrackOpen] = useState(false);
+  const [importTrackError, setImportTrackError] = useState('');
+  const importTrackFileRef = useRef<HTMLInputElement>(null);
+
   const [trackMenuId, setTrackMenuId] = useState<string | null>(null);
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
   const [editTrackTitle, setEditTrackTitle] = useState('');
@@ -352,6 +361,63 @@ export default function EchoMusicPage() {
     } catch (error) {
       setLocalAudioError(error instanceof Error ? error.message : t("No se pudo guardar el audio."));
     } finally { setSavingAudio(false); }
+  }
+
+  function selectLibraryAudio(file?: File) {
+    if (!file) return;
+    const ext = file.name.toLowerCase().split('.').pop();
+    if (!['wav', 'mp3'].includes(ext ?? '') || file.size < 1 || file.size > 15 * 1024 * 1024) {
+      setImportTrackError(interfaceLanguage === 'es' ? 'Elegí un WAV o MP3 de hasta 15 MB. Para WAV más grandes necesitamos ampliar el límite del servidor.' : 'Choose a WAV or MP3 up to 15 MB. Larger WAV files require a server limit update.');
+      return;
+    }
+    const mime = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
+    const normalized = new File([file], file.name, { type: mime });
+    setImportTrackFile(normalized);
+    setImportTrackTitle(file.name.replace(/\\.(wav|mp3)$/i, '').replace(/[_-]+/g, ' ').trim());
+    setImportTrackDuration(0);
+    setImportTrackError('');
+    const url = URL.createObjectURL(normalized);
+    const probe = new Audio();
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => {
+      if (Number.isFinite(probe.duration)) setImportTrackDuration(Math.round(probe.duration));
+      URL.revokeObjectURL(url);
+    };
+    probe.onerror = () => URL.revokeObjectURL(url);
+    probe.src = url;
+  }
+  async function saveImportedLibraryAudio() {
+    if (!me?.id || !importTrackFile || !importTrackTitle.trim() || importTrackBusy) return;
+    setImportTrackBusy(true);
+    setImportTrackError('');
+    try {
+      const attachment = await uploadPrivateFile(importTrackFile);
+      if (attachment.type !== 'audio') throw new Error('INVALID_AUDIO_UPLOAD');
+      const record: MusicDraftRecord = {
+        id: crypto.randomUUID(), title: importTrackTitle.trim(),
+        prompt: '', characterId: me.id, createdAt: new Date().toISOString(),
+        durationSeconds: importTrackDuration, status: 'saved_audio',
+        audioPath: attachment.url, artistName: importTrackArtist.trim() || 'Pretty Violence',
+      };
+      await customFetch('/api/music/library', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: record.id, characterId: record.characterId, title: record.title,
+          prompt: record.prompt, durationSeconds: record.durationSeconds, status: record.status,
+          audioPath: record.audioPath }), responseType: 'json',
+      });
+      if (record.artistName) await customFetch('/api/music/library/' + encodeURIComponent(record.id) + '/metadata', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: record.title, artistName: record.artistName }), responseType: 'json',
+      });
+      setLibrary(current => [record, ...current.filter(item => item.id !== record.id)]);
+      setCloudLibraryAvailable(true);
+      setLibraryFilter('saved_audio');
+      setImportTrackOpen(false);
+      setImportTrackFile(null);
+      setImportTrackTitle('');
+    } catch (error) {
+      setImportTrackError(error instanceof Error ? error.message : 'No se pudo importar la canción.');
+    } finally { setImportTrackBusy(false); }
   }
   function deleteDraft(id: string) {
     try {
@@ -900,12 +966,25 @@ export default function EchoMusicPage() {
     {studioTab === 'library' ? <section className="space-y-5">
       <header className="space-y-4 pt-2">
         <div className="flex items-center gap-3"><Disc3 className="h-8 w-8 text-primary" /><div><h1 className="text-3xl font-bold tracking-tight">{t("Mi biblioteca")}</h1><p className="mt-1 text-sm text-muted-foreground">{library.filter(item => item.status === 'saved_audio').length} {t("canciones guardadas")} · {library.filter(item => item.status === 'draft').length} {t("borradores")}</p></div></div>
+        <button type="button" onClick={() => { setImportTrackOpen(true); setImportTrackError(''); }} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"><Upload className="h-4 w-4" />{interfaceLanguage === 'es' ? '+ Subir canción' : '+ Upload track'}</button>
         <input type="search" value={librarySearch} onChange={event => setLibrarySearch(event.target.value)} placeholder={interfaceLanguage === 'es' ? 'Buscar en mi biblioteca' : 'Search my library'} aria-label={interfaceLanguage === 'es' ? 'Buscar en mi biblioteca' : 'Search my library'} className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary" />
       </header>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={() => setLibraryFilter('saved_audio')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'saved_audio' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Canciones guardadas")}</button>
         <button type="button" onClick={() => setLibraryFilter('draft')} className={`rounded-xl px-3 py-3 text-sm font-semibold ${libraryFilter === 'draft' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{t("Borradores")}</button>
       </div>
+      {importTrackOpen && <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/75" onClick={() => !importTrackBusy && setImportTrackOpen(false)}>
+        <section role="dialog" aria-modal="true" aria-label={interfaceLanguage === 'es' ? 'Subir canción' : 'Upload track'} onClick={event => event.stopPropagation()} className="w-full max-w-xl space-y-4 rounded-t-3xl border border-border bg-[#252327] px-5 pb-[calc(env(safe-area-inset-bottom,0px)+24px)] pt-5">
+          <div className="flex items-center justify-between"><h2 className="font-semibold">{interfaceLanguage === 'es' ? 'Subir canción a mi biblioteca' : 'Upload to my library'}</h2><button type="button" disabled={importTrackBusy} onClick={() => setImportTrackOpen(false)} aria-label="Cerrar"><X className="h-5 w-5" /></button></div>
+          <input ref={importTrackFileRef} type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" className="sr-only" onChange={event => { selectLibraryAudio(event.target.files?.[0]); event.target.value = ''; }} />
+          <button type="button" disabled={importTrackBusy} onClick={() => importTrackFileRef.current?.click()} className="w-full rounded-xl border border-dashed border-border p-4 text-sm">{importTrackFile ? importTrackFile.name : (interfaceLanguage === 'es' ? 'Elegir WAV o MP3 desde Archivos' : 'Choose WAV or MP3 from Files')}</button>
+          <p className="text-xs text-muted-foreground">{interfaceLanguage === 'es' ? 'Máximo 15 MB por archivo. Privada por defecto. No consume créditos de generación.' : 'Maximum 15 MB per file. Private by default. No generation credits used.'}</p>
+          <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Título' : 'Title'}</span><input value={importTrackTitle} maxLength={120} onChange={event => setImportTrackTitle(event.target.value)} className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
+          <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Artista' : 'Artist'}</span><input value={importTrackArtist} maxLength={120} onChange={event => setImportTrackArtist(event.target.value)} className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
+          {importTrackError && <p role="alert" className="text-sm text-destructive">{importTrackError}</p>}
+          <button type="button" disabled={!importTrackFile || !importTrackTitle.trim() || importTrackBusy} onClick={() => void saveImportedLibraryAudio()} className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">{importTrackBusy ? (interfaceLanguage === 'es' ? 'Subiendo…' : 'Uploading…') : (interfaceLanguage === 'es' ? 'Guardar canción privada' : 'Save private track')}</button>
+        </section>
+      </div>}
       {libraryError && <p role="alert" className="text-sm text-destructive">{libraryError}</p>}
       {filteredLibrary.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-8 text-center"><Music2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-3 font-semibold">{libraryFilter === 'saved_audio' ? t("Todavía no guardaste canciones") : t("Todavía no tenés borradores")}</p><p className="mt-2 text-sm text-muted-foreground">{libraryFilter === 'saved_audio' ? t("Probá con un audio propio y guardalo en ECHO.") : t("Prepará una canción con un prompt para verla acá.")}</p><button type="button" onClick={() => setStudioTab('create')} className="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{t("Ir al estudio")}</button></div> : <div className="space-y-3">{filteredLibrary.map(item => <article key={item.id} className="flex items-center gap-3 border-b border-border/60 py-3">
         <button type="button" onClick={() => void openLibraryItem(item)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
