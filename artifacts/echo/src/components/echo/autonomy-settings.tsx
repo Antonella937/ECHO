@@ -129,11 +129,11 @@ export function AutonomySettingsSection() {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">{t("Bloqueo global")}</div>
             <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {settings?.globalKillSwitchEngaged === false ? settings.liveExecutionEnabled ? t("Pausa general desactivada; los personajes habilitados pueden actuar.") : t("Pausa general desactivada; el motor en vivo sigue apagado.") : t("Pausa general activa para todas las cuentas.")}
+              {!settings ? t("Consultando estado del bloqueo global…") : settings.globalKillSwitchEngaged ? t("Pausa general activa para todas las cuentas.") : settings.liveExecutionEnabled ? t("Pausa general desactivada; los personajes habilitados pueden actuar.") : t("Pausa general desactivada; el motor en vivo sigue apagado.")}
             </div>
           </div>
           <Switch
-            checked={settings?.globalKillSwitchEngaged ?? true}
+            checked={settings?.globalKillSwitchEngaged ?? false}
             disabled={!settings || update.isPending}
             onCheckedChange={setKillSwitch}
             aria-label={t("Bloqueo global de autonomía")}
@@ -147,7 +147,7 @@ export function AutonomySettingsSection() {
             {t("No se pudieron cargar los controles de autonomía. No se habilitó ninguna cuenta.")}
           </div>
         )}
-        <details className="group" data-testid="details-social-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Autonomía social")} · {settings?.characters.filter(c=>c.enabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
+        <details className="group" data-testid="details-social-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Autonomía social")} · {settings ? `${settings.characters.filter(c=>c.enabled).length}/${settings.characters.length}` : "—"}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Autonomía social")}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t("Elegí quién puede publicar en el feed, subir historias, comentar, dar likes y reaccionar o responder historias por su cuenta.")}</p>
         </div>
@@ -168,7 +168,7 @@ export function AutonomySettingsSection() {
         ))}
         </div></details>
         <details className="group" data-testid="details-peer-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>DMs entre personajes</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border p-4"><p className="mb-3 text-xs text-muted-foreground">Elegí con quién puede hablar cada personaje. Estos permisos son independientes de los mensajes espontáneos hacia tu cuenta.</p>{settings?.characters.map(character => <details key={character.characterId} className="mb-2 rounded-xl border border-border"><summary className="cursor-pointer p-3 text-sm font-medium">{character.displayName}</summary><PeerDmPermissions universeId={universeId} characterId={character.characterId} characters={settings.characters} /></details>)}</div></details>
-        <details className="group" data-testid="details-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Mensajes autónomos")} · {settings?.characters.filter(c=>c.dmEnabled).length ?? 0}/{settings?.characters.length ?? 0}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
+        <details className="group" data-testid="details-dm-autonomy"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold [&::-webkit-details-marker]:hidden"><span>{t("Mensajes autónomos")} · {settings ? `${settings.characters.filter(c=>c.dmEnabled).length}/${settings.characters.length}` : "—"}</span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"/></summary><div className="divide-y divide-border border-t border-border"><div className="p-4">
           <h3 className="text-sm font-semibold">{t("Mensajes autónomos")}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t("Elegí qué personajes pueden iniciar mensajes privados espontáneos, incluso cuando no estás usando ECHO. Las respuestas a mensajes que vos iniciás se controlan por separado.")}</p>
         </div>
