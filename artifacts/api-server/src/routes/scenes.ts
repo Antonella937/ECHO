@@ -431,12 +431,16 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     // Keep a generous recent window; summarize only events the character could see.
     const oldEvents = unsummarized.length > 30 ? unsummarized.slice(0, -20) : [];
     const trigger = visible.at(-1);
-    if (!trigger || trigger.actor_id === characterId) { res.status(409).json({ error: "NO_NEW_SCENE_TURN" }); return; }
+    // An empty scene may be started by tapping a character avatar in manual mode.
+    // Keep the no-repeat guard once the scene has actual events.
+    if ((!trigger && turn?.mode !== "manual") || (trigger && trigger.actor_id === characterId)) {
+      res.status(409).json({ error: "NO_NEW_SCENE_TURN" }); return;
+    }
     const eventId = randomUUID();
     // Reserve the (character, triggering event) pair before calling a paid model.
     const reservation = await db.execute(sql`INSERT INTO echo_scene_events
       (owner_id, universe_id, scene_id, event_id, actor_id, visibility, audience_ids, text, source_event_id)
-      VALUES (${ownerId}, ${universeId}, ${sceneId.data}, ${eventId}, ${characterId}, 'participants', '[]'::jsonb, '', ${trigger.event_id})
+      VALUES (${ownerId}, ${universeId}, ${sceneId.data}, ${eventId}, ${characterId}, 'participants', '[]'::jsonb, '', ${trigger?.event_id ?? null})
       ON CONFLICT DO NOTHING RETURNING event_id`);
     if (!reservation.rows.length) { res.status(409).json({ error: "SCENE_REPLY_ALREADY_REQUESTED" }); return; }
     reservedId = eventId;
