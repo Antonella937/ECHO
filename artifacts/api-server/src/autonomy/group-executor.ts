@@ -5,6 +5,7 @@ import { db, echoUniversesTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { kindroidPeerGroupProvider } from "../ai-engine/kindroid";
+import { sendKindroidSocialGroupContext } from "../ai-engine/kindroid-social-group";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { evaluateGroupAutonomy } from "./group-evaluator";
 import { buildGroupConversationContext } from "./group-context";
@@ -129,6 +130,11 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     ].filter(Boolean).join("\n");
     let completion;
     try {
+      // Kindroid's group response endpoint ignores the provider context fields.
+      // Inject the actual recent conversation before asking the selected Kin to reply.
+      if (linkedKinId && kindroidGroupId) {
+        await sendKindroidSocialGroupContext(kindroidGroupId, kinPrompt.slice(0, 1450));
+      }
       completion = await (linkedKinId
         ? kindroidPeerGroupProvider(kindroidGroupId!, linkedKinId, speakerId, fetch, true)
         : provider.forOwner(ownerId)).complete({
