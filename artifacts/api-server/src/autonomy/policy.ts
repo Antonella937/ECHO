@@ -206,6 +206,8 @@ export function chooseAutonomyOpportunity(input: {
   allowedDmRecipientIds?: ReadonlySet<string>;
   /** Explicit permission for automatic story reactions and replies. */
   allowStoryInteractions?: boolean;
+  /** Feed posting, comments and likes require social autonomy opt-in. */
+  allowSocialActions?: boolean;
   /** Story replies may reach the owner without spontaneous outreach permission. */
   allowOwnerStoryReplies?: boolean;
   /** Owner-initiated DM replies remain available without unsolicited DM opt-in. */
@@ -456,16 +458,16 @@ export function chooseAutonomyOpportunity(input: {
   const commentCount = state.comments.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
-    ...(postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency), publishStory: false }] : []),
-    ...(storyCount < 1 && !anyStoryToday ? [{ situation: "post" as const, weight: frequencyWeight(social?.storiesFrequency), publishStory: true }] : []),
-    ...(comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
-    ...(targetPost && actionCount("like_post") < 3
+    ...(input.allowSocialActions !== false && postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency), publishStory: false }] : []),
+    ...(input.allowSocialActions !== false && storyCount < 1 && !anyStoryToday ? [{ situation: "post" as const, weight: frequencyWeight(social?.storiesFrequency), publishStory: true }] : []),
+    ...(input.allowSocialActions !== false && comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
+    ...(input.allowSocialActions !== false && targetPost && actionCount("like_post") < 3
       ? [{ situation: "like_post" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
-    ...(targetComment && actionCount("like_comment") < 3
+    ...(input.allowSocialActions !== false && targetComment && actionCount("like_comment") < 3
       ? [{ situation: "like_comment" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
     ...(input.allowStoryInteractions !== false && targetStory && actionCount("story_reaction") < 2
       ? [{ situation: "story_reaction" as const, weight: frequencyWeight(social?.storiesFrequency) }] : []),
-    ...(targetMessage && actionCount("dm_reaction") < 2
+    ...(input.allowSocialActions !== false && targetMessage && actionCount("dm_reaction") < 2
       ? [{ situation: "dm_reaction" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
   ];
   if (weights.length === 0) {
