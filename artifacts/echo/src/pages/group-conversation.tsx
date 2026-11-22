@@ -426,7 +426,7 @@ export default function GroupConversationPage() {
       {messages.filter(m => m.pinnedAt).length > 0 && <div className="mb-3 rounded-xl bg-secondary/70 px-3 py-2 text-xs"><Pin className="mr-1 inline h-3 w-3" /> {messages.filter(m => m.pinnedAt).length} mensaje(s) fijado(s)</div>}
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>
         {m.senderId !== me.id && <div className="shrink-0"><CharacterAvatar character={character(m.senderId) ?? me} size={30} /></div>}
-        <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${m.senderId === me.id ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>
+        <div className={`max-w-[85%] rounded-2xl border border-white/15 bg-black/30 px-4 py-2 text-white shadow-sm backdrop-blur-md`}>
           {m.senderId !== me.id && <p className="mb-1 text-xs font-semibold">{character(m.senderId)?.name ?? 'Participante'}</p>}
           {m.text && <p className="whitespace-pre-wrap break-words text-sm"><SocialText text={m.text} /></p>}
           {!!m.attachments?.length && <div className="mt-2 flex flex-col gap-2">{m.attachments.map(a => a.type === 'music' ? <div key={a.id} className="rounded-xl border border-border bg-card p-3 text-foreground">
