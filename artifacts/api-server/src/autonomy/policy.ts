@@ -204,6 +204,8 @@ export function chooseAutonomyOpportunity(input: {
   dmFrequency?: "rarely" | "sometimes" | "frequently";
   /** Recipients allowed by server-side mutual DM permissions. */
   allowedDmRecipientIds?: ReadonlySet<string>;
+  /** Explicit permission for automatic story reactions and replies. */
+  allowStoryInteractions?: boolean;
   /** Story replies may reach the owner without spontaneous outreach permission. */
   allowOwnerStoryReplies?: boolean;
   /** Owner-initiated DM replies remain available without unsolicited DM opt-in. */
@@ -461,7 +463,7 @@ export function chooseAutonomyOpportunity(input: {
       ? [{ situation: "like_post" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
     ...(targetComment && actionCount("like_comment") < 3
       ? [{ situation: "like_comment" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
-    ...(targetStory && actionCount("story_reaction") < 2
+    ...(input.allowStoryInteractions !== false && targetStory && actionCount("story_reaction") < 2
       ? [{ situation: "story_reaction" as const, weight: frequencyWeight(social?.storiesFrequency) }] : []),
     ...(targetMessage && actionCount("dm_reaction") < 2
       ? [{ situation: "dm_reaction" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),
