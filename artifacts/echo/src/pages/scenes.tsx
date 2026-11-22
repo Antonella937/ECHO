@@ -241,6 +241,13 @@ export default function ScenesPage() {
     } catch { setError(es ? 'No se pudo eliminar la escena.' : 'Could not delete scene.'); }
     finally { setBusy(false); }
   };
+  const finishScene = async () => {
+    if (!active || active.status === 'finished' || busy) return;
+    if (!window.confirm(es
+      ? '¿Terminar esta escena? Se conservarán sus mensajes y recuerdos, y los personajes volverán a estar disponibles para sus DMs y autonomía.'
+      : 'Finish this scene? Messages and memories will be preserved, and characters will be available for DMs and autonomy again.')) return;
+    await updateStatus('finished');
+  };
   const updateStatus = async (status:'active'|'paused'|'finished')=>{
     if(!active)return;setBusy(true);setError('');
     try{await customFetch(`/api/scenes/${encodeURIComponent(active.sceneId)}/status`,{
@@ -278,7 +285,11 @@ export default function ScenesPage() {
           <h2 className="max-w-full truncate px-1 text-sm font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">{active.title}</h2>
         </div>
         <button type="button" aria-expanded={showSceneSettings} onClick={()=>setShowSceneSettings(v=>!v)} aria-label={es?"Opciones":"Options"} className="grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-black/25 text-xl backdrop-blur-md">···</button>
-      </div>{showSceneSettings&&<div className="relative z-20 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl border border-white/15 bg-black/35 p-2 backdrop-blur-lg"><div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={effectiveGroupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="none">{es?"Sin fondo de grupo":"No group background"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
+      </div>
+      {active.status === 'finished'
+        ? <div className="relative z-20 mx-2 rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-xs text-white/80" role="status">{es ? 'Escena terminada · Guardada para releer · Personajes liberados' : 'Scene finished · Saved for reading · Characters released'}</div>
+        : <div className="relative z-20 flex justify-end px-2 pb-1"><button type="button" disabled={busy} onClick={()=>void finishScene()} className="rounded-full border border-white/30 bg-black/50 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md disabled:opacity-50" data-testid="finish-scene-button">{es ? 'Terminar escena' : 'Finish scene'}</button></div>}
+      {showSceneSettings&&<div className="relative z-20 max-h-[38dvh] space-y-2 overflow-y-auto rounded-2xl border border-white/15 bg-black/35 p-2 backdrop-blur-lg"><div className="flex flex-wrap items-center gap-2">{matchingGroups.length>0&&<label className="flex items-center gap-2 text-xs">{es?"Fondo del grupo":"Group background"}<select className="max-w-40 rounded-xl border border-white/20 bg-black/60 p-2" value={effectiveGroupBackgroundId} onChange={e=>{const value=e.target.value;setGroupBackgroundId(value);try{localStorage.setItem(`echo:scene-source-group:${user!.id}:${universeId}:${me.id}:${selected}`,value);}catch{}}}><option value="none">{es?"Sin fondo de grupo":"No group background"}</option>{matchingGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}          {showSceneSettings&&<label className="cursor-pointer rounded-full border border-white/20 bg-background/40 px-3 py-2 text-xs backdrop-blur-xl">
             {wallpaperUploading?(es?'Subiendo fondo…':'Uploading wallpaper…'):(es?'Cambiar fondo':'Change wallpaper')}
             <input type="file" accept="image/jpeg,image/png,image/webp" disabled={wallpaperUploading} className="sr-only" onChange={e=>{changeSceneWallpaper(e.target.files?.[0]);e.target.value='';}} />
           </label>}
@@ -327,7 +338,7 @@ export default function ScenesPage() {
           <div className="flex gap-2">
             {active.status==='active'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('paused')} className="rounded-xl border border-border px-3 py-2 text-sm">{st("Pausar")}</button>}
             {active.status==='paused'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('active')} className="rounded-xl border border-border px-3 py-2 text-sm">{st("Reanudar")}</button>}
-            {active.status!=='finished'&&<button type="button" disabled={busy} onClick={()=>void updateStatus('finished')} className="rounded-xl border border-border px-3 py-2 text-sm">{st("Finalizar")}</button>}
+            {active.status!=='finished'&&<button type="button" disabled={busy} onClick={()=>void finishScene()} className="rounded-xl border border-border px-3 py-2 text-sm">{es ? 'Terminar escena' : 'Finish scene'}</button>}
             <button type="button" disabled={busy} onClick={()=>void deleteScene()} className="rounded-xl border border-destructive px-3 py-2 text-sm text-destructive disabled:opacity-50">{st("Eliminar escena definitivamente")}</button>
           </div>
         </div>
@@ -337,7 +348,7 @@ export default function ScenesPage() {
           <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/25 bg-black/20 text-lg shadow-md">{state.characters.find(c=>c.id===id)?.avatar?<img src={resolveMedia(state.characters.find(c=>c.id===id)!.avatar)} alt="" className="h-full w-full object-cover" loading="lazy" onError={e=>{e.currentTarget.style.display='none';e.currentTarget.parentElement?.append(document.createTextNode((state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)));}}/>:(state.characters.find(c=>c.id===id)?.name??'?').slice(0,1)}</span>
           {state.characters.find(c=>c.id===id)?.name??id}
         </button>)}
-      </div><form onSubmit={send} className="relative z-30 flex min-w-0 shrink-0 flex-wrap items-end gap-2 border-0 bg-transparent px-1 pb-1 pt-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><textarea ref={sceneMessageRef} rows={1} value={message} onChange={e=>{setMessage(e.target.value);e.currentTarget.style.height="auto";e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight,160)}px`;}} maxLength={5000} placeholder={st("Escribí en la escena…")} className="max-h-40 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-full border border-white/25 bg-black/25 px-4 py-3 text-white placeholder:text-white/55 backdrop-blur-md"/><button disabled={busy||active.status!=='active'||!message.trim()} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50" aria-label={st("Enviar")}><span aria-hidden="true" className="text-xl">➤</span></button></form></section>}
+      </div>{active.status !== 'finished' && <form onSubmit={send} className="relative z-30 flex min-w-0 shrink-0 flex-wrap items-end gap-2 border-0 bg-transparent px-1 pb-1 pt-2"><FormattingToolbar inputRef={sceneMessageRef} value={message} onChange={setMessage} maxLength={5000} className="w-full" /><textarea ref={sceneMessageRef} rows={1} value={message} onChange={e=>{setMessage(e.target.value);e.currentTarget.style.height="auto";e.currentTarget.style.height=`${Math.min(e.currentTarget.scrollHeight,160)}px`;}} maxLength={5000} placeholder={st("Escribí en la escena…")} className="max-h-40 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-full border border-white/25 bg-black/25 px-4 py-3 text-white placeholder:text-white/55 backdrop-blur-md"/><button disabled={busy||active.status!=='active'||!message.trim()} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50" aria-label={st("Enviar")}><span aria-hidden="true" className="text-xl">➤</span></button></form>}</section>}
     {error&&<p role="alert" className="relative z-20 px-3 text-sm text-destructive">{error}</p>}
   </main>;
 }
