@@ -9,7 +9,7 @@ import { useSocial } from '@/store/social-store';
 import { Sheet } from './sheet';
 import { CharacterAvatar } from './avatar';
 import { CommentComposer, CommentList } from './comments-panel';
-import { postUrl, resolveMedia } from '@/lib/media';
+import { postUrl, useMediaResolver } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import type { Comment, Post } from '@/domain/types';
 import { getOrderedPinnedPosts } from '@/domain/social-features';
@@ -63,6 +63,8 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
   const t = usePostInteractionsText();
   const language = useLanguage();
   const { state, me, actions, character } = useSocial();
+  const mediaUrl = useMediaResolver();
+  const previewImage = post.image ? mediaUrl(post.image, { sourceType: 'post', sourceId: post.id }) : '';
   const [copied, setCopied] = useState(false);
   const [sentTo, setSentTo] = useState<string[]>([]);
   const [storyComposerOpen, setStoryComposerOpen] = useState(false);
@@ -119,7 +121,7 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
           <div className="relative mx-auto flex aspect-[9/13] max-h-[48dvh] w-full max-w-[300px] flex-col items-center justify-center overflow-hidden rounded-xl bg-[#19171d] p-5 text-white">
             <div className="w-full overflow-hidden rounded-xl bg-[#090909] shadow-xl">
               <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold">@{author?.handle ?? 'publicacion'}</div>
-              <img src={resolveMedia(post.image)} alt="Vista previa de la publicación" className="max-h-[28dvh] w-full object-contain" />
+              {previewImage ? <img src={previewImage} alt="Vista previa de la publicación" className="max-h-[28dvh] w-full object-contain" /> : <div className="flex h-[25dvh] w-full items-center justify-center bg-gradient-to-br from-[#342b37] via-[#24212b] to-[#17161e]" role="status" aria-label="Cargando vista previa"><div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-white/80" /></div>}
               <div className="px-3 py-2 text-[10px] text-white/70">Ver publicación original</div>
             </div>
             {storyText.trim() && <p className="mt-4 max-w-full break-words text-center text-sm font-medium">{storyText}</p>}
