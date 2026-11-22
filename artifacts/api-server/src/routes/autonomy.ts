@@ -381,9 +381,12 @@ router.put("/autonomy/settings", requireAuth, async (req, res): Promise<void> =>
     } else if ("globalKillSwitchEngaged" in update) {
       await updateOwnerKillSwitch(ownerId, update.globalKillSwitchEngaged);
     } else if ("characterId" in update) {
-      const stored = SaveUniverseBody.safeParse({ state: snapshot.state, expectedRevision: snapshot.revision });
-      const account = stored.success
-        ? stored.data.state.characters.find((character) => character.id === update.characterId)
+      // Permission edits must not depend on unrelated legacy universe fields.
+      const rawCharacters = (snapshot.state as { characters?: unknown }).characters;
+      const account = Array.isArray(rawCharacters)
+        ? rawCharacters.find((value): value is { id: string; archived?: boolean } =>
+            value !== null && typeof value === "object" &&
+            typeof value.id === "string" && value.id === update.characterId)
         : undefined;
       if (!account || (account.archived && ("enabled" in update ? update.enabled : true))) {
         res.status(404).json({ error: "CHARACTER_NOT_FOUND_OR_ARCHIVED" }); return;
