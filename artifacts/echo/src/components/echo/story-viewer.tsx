@@ -116,8 +116,11 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const originalStory = liveStory.repostOfStoryId ? state.stories.find(s => s.id === liveStory.repostOfStoryId) : undefined;
   const originalAuthor = originalStory ? state.characters.find(c => c.id === originalStory.authorId) : undefined;
   // Media authorization must use the original object's owner and content id.
+  const sourcePost = liveStory.repostOfPostId ? state.posts.find(p => p.id === liveStory.repostOfPostId) : undefined;
   const mediaOwner = originalStory ?? liveStory;
-  const storyMediaSource = { sourceUniverseId: universeId, sourceCharacterId: mediaOwner.authorId, sourceType: 'story' as const, sourceContentId: mediaOwner.id };
+  const storyMediaSource = sourcePost
+    ? { sourceUniverseId: universeId, sourceCharacterId: sourcePost.authorId, sourceType: 'post' as const, sourceContentId: sourcePost.id }
+    : { sourceUniverseId: universeId, sourceCharacterId: mediaOwner.authorId, sourceType: 'story' as const, sourceContentId: mediaOwner.id };
   const storyImage = resolveMedia(mediaOwner.image, storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
   // A private image can take a few seconds to resolve on mobile. Loading is not an error.
@@ -402,6 +405,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
               <span className="shrink-0 rounded-full bg-foreground/15 px-1.5 text-[10px] uppercase tracking-wider">{t("sin audio")}</span>
             </span>
           )}
+          {sourcePost && <button type="button" onClick={() => { onClose(); navigate(`/p/${sourcePost.id}`); }} className="pointer-events-auto rounded-2xl border border-white/30 bg-black/65 px-5 py-3 text-sm font-medium text-white backdrop-blur" data-testid="button-story-open-post">Ver publicación original</button>}
           {story.caption && (
             <p className="max-w-full break-words font-display text-base font-light leading-relaxed text-foreground/95 sm:text-lg"><SocialText text={story.caption} onNavigate={onClose} /></p>
           )}
