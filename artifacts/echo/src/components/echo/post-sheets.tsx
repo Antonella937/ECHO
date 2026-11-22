@@ -64,7 +64,7 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
   const language = useLanguage();
   const { state, me, actions, character } = useSocial();
   const mediaUrl = useMediaResolver();
-  const previewImage = post.image ? mediaUrl(post.image, { sourceType: 'post', sourceId: post.id }) : '';
+  const previewImage = post.image ? mediaUrl(post.image, { sourceType: 'post', sourceContentId: post.id, sourceCharacterId: post.authorId }) : '';
   const [copied, setCopied] = useState(false);
   const [sentTo, setSentTo] = useState<string[]>([]);
   const [storyComposerOpen, setStoryComposerOpen] = useState(false);
