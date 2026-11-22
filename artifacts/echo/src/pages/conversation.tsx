@@ -782,7 +782,7 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
           <p
             className={cn(
               'min-w-0 max-w-[92%] sm:max-w-[calc(100%-7rem)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] px-4 py-2.5 text-[15px] leading-snug', layout==='narrative'?'rounded-lg border-l-2 border-primary/60 bg-card/90 italic leading-relaxed backdrop-blur-md':'rounded-[22px]',
-              mine ? 'rounded-br-md bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/40' : 'rounded-bl-md bg-card text-card-foreground shadow-lg ring-1 ring-border',
+              mine ? 'rounded-br-md border border-white/15 bg-black/30 text-white shadow-sm backdrop-blur-md' : 'rounded-bl-md border border-white/15 bg-black/30 text-white shadow-sm backdrop-blur-md',
             )}
           >
             <SocialText text={cleanVisibleText} />
