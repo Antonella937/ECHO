@@ -351,6 +351,52 @@ router.post("/autonomy/retry-dm-reply", requireAuth, async (req, res): Promise<v
   }
 });
 
+// Independent, owner-scoped story interaction permissions. Missing entries inherit
+// the existing social setting until explicitly changed by the owner.
+router.get("/autonomy/story-permissions", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const universeId = requestedUniverseId(req.query.universeId);
+    const snapshot = await readUniverse(req.userId!, universeId);
+    if (!snapshot.state) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
+    const settings = (snapshot.state as { settings?: { storyInteractionPermissions?: Record<string, boolean> } }).settings;
+    const overrides = settings?.storyInteractionPermissions ?? {};
+    const controls = await readOwnerControls(req.userId!, universeId);
+    const characters = (snapshot.state as { characters?: Array<{ id?: string; archived?: boolean }> }).characters ?? [];
+    res.json({ universeId, characters: characters.filter(c => typeof c.id === "string" && !c.archived).map(c => ({
+      characterId: c.id, enabled: typeof overrides[c.id!] === "boolean" ? overrides[c.id!] : (controls.characters.get(c.id!)?.enabled ?? false),
+    })) });
+  } catch (error) {
+    req.log.error({ cause: error instanceof Error ? error.message : String(error) }, "Story permissions GET failed");
+    res.status(500).json({ error: "STORY_PERMISSIONS_FAILED" });
+  }
+});
+
+router.put("/autonomy/story-permissions", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const { universeId: requestedId, characterId, enabled } = req.body ?? {};
+    const universeId = requestedUniverseId(requestedId);
+    if (typeof characterId !== "string" || !characterId || characterId.length > 120 || typeof enabled !== "boolean") {
+      res.status(400).json({ error: "INVALID_STORY_PERMISSION" }); return;
+    }
+    const snapshot = await readUniverse(req.userId!, universeId);
+    const characters = (snapshot.state as { characters?: Array<{ id?: string; archived?: boolean }> } | null)?.characters;
+    if (!characters?.some(c => c.id === characterId && !c.archived)) {
+      res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return;
+    }
+    await db.execute(sql`UPDATE echo_universes SET state = jsonb_set(
+      state::jsonb, '{settings}', COALESCE(state::jsonb->'settings', '{}'::jsonb)
+      || jsonb_build_object('storyInteractionPermissions',
+        COALESCE(state::jsonb->'settings'->'storyInteractionPermissions', '{}'::jsonb)
+        || jsonb_build_object(${characterId}, ${enabled})), true)
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId}
+        AND archived_at IS NULL AND deleted_at IS NULL`);
+    res.json({ universeId, characterId, enabled });
+  } catch (error) {
+    req.log.error({ cause: error instanceof Error ? error.message : String(error) }, "Story permissions PUT failed");
+    res.status(500).json({ error: "STORY_PERMISSION_UPDATE_FAILED" });
+  }
+});
+
 router.get("/autonomy/settings", requireAuth, async (req, res): Promise<void> => {
   try {
     const universeId = requestedUniverseId(req.query.universeId);
