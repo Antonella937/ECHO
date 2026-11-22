@@ -373,7 +373,7 @@ export default function EchoMusicPage() {
     const mime = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
     const normalized = new File([file], file.name, { type: mime });
     setImportTrackFile(normalized);
-    setImportTrackTitle(file.name.replace(/\\.(wav|mp3)$/i, '').replace(/[_-]+/g, ' ').trim());
+    setImportTrackTitle(file.name.replace(/\.(wav|mp3)$/i, '').replace(/[_-]+/g, ' ').trim());
     setImportTrackDuration(0);
     setImportTrackError('');
     const url = URL.createObjectURL(normalized);
