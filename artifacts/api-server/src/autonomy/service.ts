@@ -425,6 +425,7 @@ export async function runAutonomyLiveCycle(
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
       allowStoryInteractions,
       allowSocialActions: control.enabled,
+      allowSpontaneousOutreach: control.dmEnabled || peerDmEnabled,
       allowOwnerStoryReplies: allowStoryInteractions,
       allowOwnerIncomingReplies: linkedInboundReply || control.dmEnabled,
       allowOwnerSpontaneousDm: control.dmEnabled,
