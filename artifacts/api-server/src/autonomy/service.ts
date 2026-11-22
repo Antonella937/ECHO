@@ -367,7 +367,7 @@ export async function runAutonomyLiveCycle(
       Array.isArray(row.allowed_peer_ids) && row.allowed_peer_ids.includes(character.id));
   }
   if (!controls.liveExecutionEnabled || controls.globalKillSwitchEngaged ||
-      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply || peerDmEnabled || storyReplyEligible) : control.enabled)) {
+      !(dependencies.lane === "dm" ? (control.dmEnabled || linkedInboundReply || peerDmEnabled || storyReplyEligible) : (control.enabled || storyInteractionsEnabled))) {
     return { status: "disabled", reasonCode: "OPT_IN_OR_KILL_SWITCH", characterId: character.id, runId: null, model: null };
   }
 
@@ -424,6 +424,7 @@ export async function runAutonomyLiveCycle(
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
       allowStoryInteractions,
+      allowSocialActions: control.enabled,
       allowOwnerStoryReplies: allowStoryInteractions,
       allowOwnerIncomingReplies: linkedInboundReply || control.dmEnabled,
       allowOwnerSpontaneousDm: control.dmEnabled,
