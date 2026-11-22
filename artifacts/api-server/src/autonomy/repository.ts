@@ -88,6 +88,7 @@ export async function listLiveOptInTargets() {
     characterId: echoAutonomyCharactersTable.characterId,
     socialEnabled: echoAutonomyCharactersTable.enabled,
     dmEnabled: echoAutonomyCharactersTable.dmEnabled,
+    storyEnabled: sql<boolean>`COALESCE((${echoUniversesTable.state}::jsonb #>> ARRAY['settings','storyInteractionPermissions', ${echoAutonomyCharactersTable.characterId}])::boolean, ${echoAutonomyCharactersTable.enabled})`,
   }).from(echoAutonomyCharactersTable).innerJoin(
     echoAutonomyOwnersTable,
     eq(echoAutonomyOwnersTable.ownerId, echoAutonomyCharactersTable.ownerId),
@@ -99,6 +100,7 @@ export async function listLiveOptInTargets() {
     // Include peer-only DM characters even when social and unsolicited owner DMs are off.
     // Both sides must have enabled permission rows that allow each other.
     sql`(${echoAutonomyCharactersTable.enabled} = true OR ${echoAutonomyCharactersTable.dmEnabled} = true
+      OR COALESCE((${echoUniversesTable.state}::jsonb #>> ARRAY['settings','storyInteractionPermissions', ${echoAutonomyCharactersTable.characterId}])::boolean, false) = true
       OR EXISTS (
         SELECT 1 FROM echo_character_dm_permissions sender
         JOIN echo_character_dm_permissions peer
