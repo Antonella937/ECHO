@@ -46,9 +46,25 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   // Likes and story views/reactions do not require image interpretation.
   // Skip vision loading to avoid unnecessary provider work on non-text actions.
   const isNonTextSocial = ['like_post', 'like_comment', 'story_reaction'].includes(input.situation);
-  let vision: VisionContext = dependencies.vision && !isNonTextSocial
-    ? await dependencies.vision(ownerId, parsed.data.state, input)
-    : { analyses: {}, postSummaries: {} };
+  let vision: VisionContext = { analyses: {}, postSummaries: {} };
+  if (dependencies.vision && !isNonTextSocial) {
+    try {
+      vision = await dependencies.vision(ownerId, parsed.data.state, input);
+    } catch (error) {
+      // A metered image-analysis budget must never prevent a linked Kindroid
+      // from receiving an otherwise valid private DM. Do not invent visual
+      // observations or silently bypass the image spending limit.
+      const code = error instanceof Error && "code" in error
+        ? String((error as Error & { code?: unknown }).code)
+        : "";
+      const budgetBlocked = code === "AUTONOMY_BUDGET_PROTECTED" ||
+        code === "AI_MONTHLY_HARD_CEILING";
+      if (!(input.situation === "dm" && dependencies.liveDmReply === true && budgetBlocked)) {
+        throw error;
+      }
+      console.warn("ECHO_DM_VISION_BUDGET_SKIPPED", { situation: input.situation, code });
+    }
+  }
   // A story reply needs the image, not merely its caption. Analyze once through
   // the owner-scoped, content-hash cache and existing metered vision safeguards.
   // Never charge for story views, likes or reactions.
