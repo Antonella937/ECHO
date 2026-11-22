@@ -1180,8 +1180,19 @@ const musicGenerationRequest = musicDraft.extend({
   durationSeconds: z.number().int().min(3).max(300).default(120),
   requireConfiguredVoice: z.boolean().default(false),
 }).strict();
+// Stable, zero-cloning-cost vocal direction for Nela / Pretty Violence.
+// This is a stylistic anchor, NOT a provider vocal_id or an exact voice clone.
+// Keep it server-side so future songs share the same direction regardless of UI text.
+const NELA_PRETTY_VIOLENCE_VOCAL_STYLE =
+  "Lead singer identity: Nela of Pretty Violence. One consistent female lead vocalist, " +
+  "low-mid register, smoky slightly raspy timbre, natural grit, intimate restrained verses, " +
+  "strong melodic alternative-metal choruses, controlled harsh screams where requested, " +
+  "raw emotional delivery, minimal artificial vocal processing. No male lead vocalist, " +
+  "no bright pop-style vocal runs. Maintain the same vocal character throughout.";
 function composeMurekaRequest(draft: z.infer<typeof musicGenerationRequest>) {
-  const style = [draft.description, draft.genre && `Genre: ${draft.genre}`,
+  const stableVocalDirection = draft.vocalMode === "singing" && draft.characterId?.toLowerCase() === "nela"
+    ? NELA_PRETTY_VIOLENCE_VOCAL_STYLE : "";
+  const style = [stableVocalDirection, draft.description, draft.genre && `Genre: ${draft.genre}`,
     draft.mood && `Mood: ${draft.mood}`,
     draft.instruments.length && `Instruments: ${draft.instruments.join(", ")}`,
     draft.vocalMode === "instrumental" ? "Instrumental music, no vocals." : `Singing in ${draft.language}.`,
