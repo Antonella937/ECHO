@@ -295,7 +295,7 @@ export function chooseAutonomyOpportunity(input: {
   // the six-hour unsolicited-DM cooldown to a newly posted story.
   const unsolicitedDmCooldownPassed = latestActivity === 0 ||
     now.getTime() - latestActivity >= (input.minCooldownMinutes ?? 360) * 60_000;
-  if (input.lane === "dm" && !unanswered &&
+  if (input.lane === "dm" && input.allowStoryInteractions !== false && !unanswered &&
       history.length < (input.maxActionsPerDay ?? 2) &&
       random() < dmChance) {
     const following = new Set(state.follows[character.id] ?? []);
