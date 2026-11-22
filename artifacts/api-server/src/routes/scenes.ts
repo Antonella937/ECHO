@@ -363,11 +363,24 @@ scenesRouter.put("/scenes/:sceneId/status", async (req, res) => {
   const sceneId = id.safeParse(req.params.sceneId);
   if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE_STATUS" }); return; }
   try {
-    const result = await db.execute(sql`UPDATE echo_scenes SET status = ${parsed.data.status}, updated_at = now()
-      WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data}
-        AND status <> 'finished' RETURNING scene_id`);
-    if (!result.rows.length) { res.status(404).json({ error: "SCENE_NOT_EDITABLE" }); return; }
-    res.json({ status: parsed.data.status });
+    const result = await db.transaction(async tx => {
+      const rows = await tx.execute(sql`SELECT status FROM echo_scenes
+        WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}
+          AND scene_id = ${sceneId.data} FOR UPDATE`);
+      if (!rows.rows.length) return "missing";
+      if (rows.rows[0]?.status === "finished") return parsed.data.status === "finished" ? "finished" : "immutable";
+      await tx.execute(sql`UPDATE echo_scenes SET status = ${parsed.data.status}, updated_at = now()
+        WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data}`);
+      if (parsed.data.status === "finished") {
+        // Preserve scene, transcript and memories; only release live presence.
+        await tx.execute(sql`DELETE FROM echo_scene_presence
+          WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data}`);
+      }
+      return parsed.data.status;
+    });
+    if (result === "missing") { res.status(404).json({ error: "SCENE_NOT_FOUND" }); return; }
+    if (result === "immutable") { res.status(409).json({ error: "SCENE_ALREADY_FINISHED" }); return; }
+    res.json({ status: result });
   } catch { res.status(503).json({ error: "SCENE_STATUS_UNAVAILABLE" }); }
 });
 
