@@ -114,6 +114,7 @@ export async function runAutonomyDryRun(
     provider: TextProvider;
     now?: Date;
     random?: () => number;
+    lane?: "social" | "dm";
   },
 ): Promise<AutonomyDryRunResult> {
   if (!ownerId) throw new EngineError("AUTHENTICATION_REQUIRED", 401);
@@ -202,8 +203,8 @@ export async function runAutonomyDryRun(
       await dependencies.repository.complete(ownerId, runId, {
         status: "no_action", sourceRevision: snapshot.revision, lastErrorCode: "SOCIAL_LANE_DM_BLOCKED",
       }, universeId);
-      return { status: "no_action", reasonCode: "SOCIAL_LANE_DM_BLOCKED",
-        characterId: character.id, runId, model: null };
+      return result({ runId, characterId: character.id, status: "no_opportunity", liveEligible: false,
+        reason: "SOCIAL_LANE_DM_BLOCKED", preview: null, createdAt: now });
     }
     if (!opportunity.situation) {
       const status = opportunity.reasonCode === "COOLDOWN"
@@ -264,7 +265,7 @@ export async function runAutonomyDryRun(
       characterId: character.id,
       universeId,
       lane: dependencies.lane,
-      code,
+      code: error instanceof Error ? error.name : "UNKNOWN",
       errorName: error instanceof Error ? error.name : "UNKNOWN",
       stackLocation: error instanceof Error ? error.stack?.split("\n").slice(1, 3).map(line => line.trim()) : undefined,
     });
