@@ -99,6 +99,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [reposting, setReposting] = useState(false);
+  const [repostComposerOpen, setRepostComposerOpen] = useState(false);
+  const [repostCaption, setRepostCaption] = useState('');
   const [shareSearch, setShareSearch] = useState('');
   const [editingMetricsId, setEditingMetricsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -239,8 +241,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         body: JSON.stringify({ universeId, actorId: me.id, storyId: liveStory.id }),
       });
       if (!result.allowed) throw new Error('No autorizado');
-      actions.repostMentionedStory(liveStory.id);
+      actions.repostMentionedStory(liveStory.id, repostCaption);
       toast({ title: 'Historia agregada', description: 'Compartida con crédito a la historia original.' });
+      setRepostComposerOpen(false);
+      setRepostCaption('');
       onClose();
     } catch (error) {
       toast({ title: 'No se pudo repostear', description: (error as Error).message });
@@ -323,7 +327,26 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[hsl(240_8%_3%/0.75)] to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[hsl(240_8%_3%/0.85)] to-transparent" />
 
-        {originalAuthor && <div className="absolute left-4 top-20 z-20 rounded-lg bg-black/65 px-3 py-2 text-xs text-white backdrop-blur" data-testid="story-repost-credit">Repost de @{originalAuthor.handle}</div>}
+        {repostComposerOpen && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/90 px-5 py-10" data-testid="composer-mentioned-story-repost">
+            <div className="flex w-full max-w-[380px] flex-col gap-4 rounded-2xl bg-card p-4">
+              <div className="text-base font-semibold">Compartir en mi historia</div>
+              <div className="relative mx-auto flex max-h-[48dvh] w-full flex-col items-center overflow-hidden rounded-xl bg-black p-3">
+                <div className="w-full rounded-xl border border-white/20 bg-[#18161c] p-2">
+                  <div className="pb-2 text-xs font-semibold text-white">@{group.author.handle} · Historia original</div>
+                  {storyImage && <img src={storyImage} alt="Historia original" className="max-h-[31dvh] w-full object-contain" />}
+                </div>
+                {repostCaption.trim() && <p className="mt-3 break-words text-center text-sm text-white">{repostCaption}</p>}
+              </div>
+              <textarea value={repostCaption} onChange={e => setRepostCaption(e.target.value.slice(0, 500))} maxLength={500} rows={3} placeholder="Agregá tu propio texto..." aria-label="Texto para la historia compartida" className="w-full resize-none rounded-xl border border-border bg-secondary p-3 text-sm" data-testid="input-mentioned-story-repost-caption" />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setRepostComposerOpen(false)} className="h-11 flex-1 rounded-xl border border-border text-sm">Cancelar</button>
+                <button type="button" disabled={reposting} onClick={() => void repostToMyStory()} className="h-11 flex-1 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50" data-testid="button-publish-mentioned-story-repost">{reposting ? 'Publicando…' : 'Publicar historia'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {originalAuthor && <button type="button" onClick={() => { onClose(); navigate(`/profile/${originalAuthor.id}`); }} className="absolute left-4 top-20 z-20 rounded-lg bg-black/75 px-3 py-2 text-xs font-semibold text-white backdrop-blur" data-testid="story-repost-credit">Compartido de @{originalAuthor.handle} ↗</button>}
 
         {/* progress */}
         <div className="relative z-10 flex gap-1 px-3 pt-[max(env(safe-area-inset-top),12px)]">
@@ -367,7 +390,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           </button>
         </div>
 
-        {canRepost && <button type="button" disabled={reposting} onClick={() => void repostToMyStory()} className="absolute right-4 top-24 z-20 rounded-full border border-white/30 bg-black/65 px-4 py-2 text-xs font-semibold text-white backdrop-blur disabled:opacity-50" data-testid="button-story-repost">{reposting ? 'Compartiendo…' : 'Agregar a mi historia'}</button>}
+        {canRepost && <button type="button" disabled={reposting} onClick={() => setRepostComposerOpen(true)} className="absolute right-4 top-24 z-20 rounded-full border border-white/30 bg-black/65 px-4 py-2 text-xs font-semibold text-white backdrop-blur disabled:opacity-50" data-testid="button-story-repost">{reposting ? 'Compartiendo…' : 'Agregar a mi historia'}</button>}
         {showShare && <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={t('Compartir historia')}>
           <div className="flex max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-card p-4 text-foreground" data-testid="story-share-picker">
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">{t('Compartir historia')}</h2><button type="button" className="grid h-10 w-10 place-items-center rounded-full hover:bg-secondary" onClick={() => setShowShare(false)} aria-label={t('Cerrar')}><X size={20}/></button></div>
