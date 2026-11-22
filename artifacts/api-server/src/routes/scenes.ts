@@ -311,7 +311,7 @@ scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
   const sceneId = id.safeParse(req.params.sceneId);
   if (!parsed.success || !sceneId.success) { res.status(400).json({ error: "INVALID_SCENE" }); return; }
   try {
-    const rows = await db.execute(sql`SELECT s.participant_ids, p.character_id, p.presence
+    const rows = await db.execute(sql`SELECT s.participant_ids, s.status, p.character_id, p.presence
       FROM echo_scenes s LEFT JOIN echo_scene_presence p
         ON p.owner_id = s.owner_id AND p.universe_id = s.universe_id AND p.scene_id = s.scene_id
       WHERE s.owner_id = ${req.userId!} AND s.universe_id = ${parsed.data.universeId}
@@ -319,7 +319,7 @@ scenesRouter.get("/scenes/:sceneId/presence", async (req, res) => {
     if (!rows.rows.length) { res.status(404).json({ error: "SCENE_NOT_FOUND" }); return; }
     const participants = rows.rows[0].participant_ids as string[];
     res.json({ presence: participants.map(characterId => ({
-      characterId, presence: rows.rows.find(row => row.character_id === characterId)?.presence ?? "present",
+      characterId, presence: rows.rows[0].status === "finished" ? "left" : (rows.rows.find(row => row.character_id === characterId)?.presence ?? "present"),
     })) });
   } catch { res.status(503).json({ error: "SCENE_PRESENCE_UNAVAILABLE" }); }
 });
