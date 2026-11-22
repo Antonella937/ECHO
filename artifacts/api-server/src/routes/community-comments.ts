@@ -63,7 +63,7 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
     const hasImages = Boolean((post as { image?: string; media?: Array<{ type: string }> }).image || (post as { media?: Array<{ type: string }> }).media?.some(m => m.type === "image"));
     if (hasImages) {
       try {
-        const vision = await new VisionService().analyzePost(ownerId, state as SocialState, post.id, parsed.data.universeId);
+        const vision = await new VisionService().analyzePost(ownerId, state as unknown as SocialState, post.id, parsed.data.universeId);
         visualContext = vision.summary.overallDescription.slice(0, 5000);
       } catch (error) {
         // Older/external images cannot always be analyzed securely. Never fabricate
