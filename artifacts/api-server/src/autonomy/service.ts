@@ -415,7 +415,14 @@ export async function runAutonomyLiveCycle(
       state, character, history, now, random: dependencies.random,
       minCooldownMinutes: control.minCooldownMinutes, maxActionsPerDay: ownerId === "user_3LeoBfUicTthDVixNbkPlqXFkdZ" ? Number.POSITIVE_INFINITY : control.maxActionsPerDay, lane: dependencies.lane, dmFrequency: control.dmFrequency === 'frequently' || control.dmFrequency === 'rarely' ? control.dmFrequency : 'sometimes',
       allowedDmRecipientIds: liveAllowedDmRecipientIds,
-      allowOwnerStoryReplies: control.enabled,
+      allowStoryInteractions: (() => {
+        const overrides = (state.settings as typeof state.settings & { storyInteractionPermissions?: Record<string, boolean> } | undefined)?.storyInteractionPermissions;
+        return typeof overrides?.[character.id] === "boolean" ? overrides[character.id] : control.enabled;
+      })(),
+      allowOwnerStoryReplies: (() => {
+        const overrides = (state.settings as typeof state.settings & { storyInteractionPermissions?: Record<string, boolean> } | undefined)?.storyInteractionPermissions;
+        return typeof overrides?.[character.id] === "boolean" ? overrides[character.id] : control.enabled;
+      })(),
       allowOwnerIncomingReplies: linkedInboundReply || control.dmEnabled,
       allowOwnerSpontaneousDm: control.dmEnabled,
       targetIncomingMessageId: dependencies.targetIncomingMessageId,
