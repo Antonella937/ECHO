@@ -257,7 +257,7 @@ export async function uploadPrivateImage(dataUrl: string): Promise<string> {
           }
         } catch {
           // S3-compatible R2 errors are XML. Only expose the safe error code.
-          reason = body.match(/<Code>([A-Za-z0-9_-]{1,80})<\\/Code>/)?.[1] ?? '';
+          reason = body.match(new RegExp("<Code>([A-Za-z0-9_-]{1,80})</Code>"))?.[1] ?? '';
         }
       } catch { /* An empty upstream response may not contain details. */ }
     }
