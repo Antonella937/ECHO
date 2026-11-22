@@ -285,7 +285,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       </button>
 
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
-        {storyImage && (
+        {storyImage && !sourcePost && (
           <img
             key={story.id}
             src={storyImage}
@@ -296,6 +296,18 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             draggable={false}
             data-testid={`img-story-${story.id}`}
           />
+        )}
+        {sourcePost && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#19171d] px-7 py-24">
+            <button type="button" onClick={() => { onClose(); navigate(`/p/${sourcePost.id}`); }} className="pointer-events-auto w-full max-w-[350px] overflow-hidden rounded-2xl bg-[#0b0b0d] text-left text-white shadow-2xl" data-testid="button-story-repost-card" aria-label="Abrir publicación original">
+              <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold">
+                {state.characters.find(c => c.id === sourcePost.authorId)?.handle ? `@${state.characters.find(c => c.id === sourcePost.authorId)?.handle}` : 'Publicación original'}
+                <span className="ml-auto text-[11px] font-normal text-white/60">Publicación</span>
+              </div>
+              {storyImage && <img src={storyImage} onLoad={() => setFailedStoryImage(current => current === story.id ? null : current)} onError={() => setFailedStoryImage(story.id)} alt="Publicación compartida" className="max-h-[52dvh] w-full object-contain" />}
+              <div className="px-4 py-3 text-xs text-white/70">Ver publicación original ↗</div>
+            </button>
+          </div>
         )}
         {imageIsPrivate && imageUnavailable && !showImageError && (
           <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/40" role="status" aria-label="Cargando imagen">
@@ -405,7 +417,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
               <span className="shrink-0 rounded-full bg-foreground/15 px-1.5 text-[10px] uppercase tracking-wider">{t("sin audio")}</span>
             </span>
           )}
-          {sourcePost && <button type="button" onClick={() => { onClose(); navigate(`/p/${sourcePost.id}`); }} className="pointer-events-auto rounded-2xl border border-white/30 bg-black/65 px-5 py-3 text-sm font-medium text-white backdrop-blur" data-testid="button-story-open-post">Ver publicación original</button>}
+          
           {story.caption && (
             <p className="max-w-full break-words font-display text-base font-light leading-relaxed text-foreground/95 sm:text-lg"><SocialText text={story.caption} onNavigate={onClose} /></p>
           )}
