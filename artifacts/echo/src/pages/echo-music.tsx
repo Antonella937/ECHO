@@ -366,8 +366,8 @@ export default function EchoMusicPage() {
   function selectLibraryAudio(file?: File) {
     if (!file) return;
     const ext = file.name.toLowerCase().split('.').pop();
-    if (!['wav', 'mp3'].includes(ext ?? '') || file.size < 1 || file.size > 15 * 1024 * 1024) {
-      setImportTrackError(interfaceLanguage === 'es' ? 'Elegí un WAV o MP3 de hasta 15 MB. Para WAV más grandes necesitamos ampliar el límite del servidor.' : 'Choose a WAV or MP3 up to 15 MB. Larger WAV files require a server limit update.');
+    if (!['wav', 'mp3'].includes(ext ?? '') || file.size < 1 || file.size > 50 * 1024 * 1024) {
+      setImportTrackError(interfaceLanguage === 'es' ? 'Elegí un WAV o MP3 de hasta 50 MB. Para WAV más grandes necesitamos ampliar el límite del servidor.' : 'Choose a WAV or MP3 up to 50 MB. Larger WAV files require a server limit update.');
       return;
     }
     const mime = ext === 'wav' ? 'audio/wav' : 'audio/mpeg';
@@ -391,13 +391,23 @@ export default function EchoMusicPage() {
     setImportTrackBusy(true);
     setImportTrackError('');
     try {
-      const attachment = await uploadPrivateFile(importTrackFile);
-      if (attachment.type !== 'audio') throw new Error('INVALID_AUDIO_UPLOAD');
+      const mime = importTrackFile.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg';
+      const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+        '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'echo-music-import', size: importTrackFile.size, contentType: mime }), responseType: 'json' },
+      );
+      const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': mime }, body: importTrackFile });
+      if (!uploaded.ok) throw new Error('No se pudo subir el audio (HTTP ' + uploaded.status + ').');
+      const claimed = await customFetch<{ objectPath: string }>('/api/storage/uploads/claim', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectPath }), responseType: 'json',
+      });
+      const audioPath = claimed.objectPath;
       const record: MusicDraftRecord = {
         id: crypto.randomUUID(), title: importTrackTitle.trim(),
         prompt: '', characterId: me.id, createdAt: new Date().toISOString(),
         durationSeconds: importTrackDuration, status: 'saved_audio',
-        audioPath: attachment.url, artistName: importTrackArtist.trim() || 'Pretty Violence',
+        audioPath, artistName: importTrackArtist.trim() || 'Pretty Violence',
       };
       await customFetch('/api/music/library', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -978,7 +988,7 @@ export default function EchoMusicPage() {
           <div className="flex items-center justify-between"><h2 className="font-semibold">{interfaceLanguage === 'es' ? 'Subir canción a mi biblioteca' : 'Upload to my library'}</h2><button type="button" disabled={importTrackBusy} onClick={() => setImportTrackOpen(false)} aria-label="Cerrar"><X className="h-5 w-5" /></button></div>
           <input ref={importTrackFileRef} type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" className="sr-only" onChange={event => { selectLibraryAudio(event.target.files?.[0]); event.target.value = ''; }} />
           <button type="button" disabled={importTrackBusy} onClick={() => importTrackFileRef.current?.click()} className="w-full rounded-xl border border-dashed border-border p-4 text-sm">{importTrackFile ? importTrackFile.name : (interfaceLanguage === 'es' ? 'Elegir WAV o MP3 desde Archivos' : 'Choose WAV or MP3 from Files')}</button>
-          <p className="text-xs text-muted-foreground">{interfaceLanguage === 'es' ? 'Máximo 15 MB por archivo. Privada por defecto. No consume créditos de generación.' : 'Maximum 15 MB per file. Private by default. No generation credits used.'}</p>
+          <p className="text-xs text-muted-foreground">{interfaceLanguage === 'es' ? 'Máximo 50 MB por archivo. Privada por defecto. No consume créditos de generación.' : 'Maximum 50 MB per file. Private by default. No generation credits used.'}</p>
           <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Título' : 'Title'}</span><input value={importTrackTitle} maxLength={120} onChange={event => setImportTrackTitle(event.target.value)} className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
           <label className="block space-y-2 text-sm"><span>{interfaceLanguage === 'es' ? 'Artista' : 'Artist'}</span><input value={importTrackArtist} maxLength={120} onChange={event => setImportTrackArtist(event.target.value)} className="w-full rounded-xl border border-border bg-secondary px-4 py-3" /></label>
           {importTrackError && <p role="alert" className="text-sm text-destructive">{importTrackError}</p>}
