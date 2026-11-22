@@ -399,7 +399,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     if (presenceRows.rows[0]?.presence === "absent" || presenceRows.rows[0]?.presence === "left") {
       res.status(409).json({ error: "CHARACTER_NOT_PRESENT_IN_SCENE" }); return;
     }
-    const turn = scene.turn_settings as { mode?: string; nextCharacterId?: string | null; order?: string[]; cursor?: number; style?: string } | null;
+    const turn = scene.turn_settings as { mode?: string; nextCharacterId?: string | null; order?: string[]; cursor?: number; style?: string; kindroidGroupId?: string | null } | null;
     if (turn?.mode === "manual" && turn.nextCharacterId !== characterId) {
       res.status(409).json({ error: "MANUAL_TURN_NOT_SELECTED" }); return;
     }
