@@ -246,6 +246,38 @@ export default function SettingsPage() {
     return selected && !first.some(item => item.path === selected.path) ? [selected, ...first] : first;
   }, [filteredLegacyMedia, legacyMediaDetails, recoveryMediaPath]);
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
+  async function inspectRecoveryServerState() {
+    if (!recoveryMediaPath || recoveryBusy) return;
+    setRecoveryStatus('Consultando el estado real de la publicación en el servidor…');
+    try {
+      const remote = await loadUniverse(universeId);
+      if (!remote.state) throw new Error('El servidor no devolvió el estado del universo.');
+      const oldPath = recoveryMediaPath;
+      const localPosts = state.posts.filter(post =>
+        post.image === oldPath || post.media?.some(item => item.type === 'image' && item.url === oldPath));
+      const localStoryIds = new Set(state.stories.filter(story => story.image === oldPath).map(story => story.id));
+      const ids = new Set(localPosts.map(post => post.id));
+      const serverPosts = remote.state.posts.filter(post => ids.has(post.id));
+      const serverStories = remote.state.stories.filter(story => localStoryIds.has(story.id));
+      if (!ids.size && !localStoryIds.size) {
+        setRecoveryStatus('Esta referencia ya no figura en la sesión local. Actualizá ECHO y volvé a revisar el perfil.');
+        return;
+      }
+      const serverOld = serverPosts.some(post =>
+        post.image === oldPath || post.media?.some(item => item.type === 'image' && item.url === oldPath)) ||
+        serverStories.some(story => story.image === oldPath);
+      const serverNew = serverPosts.some(post =>
+        post.image?.startsWith('/objects/r2/') || post.media?.some(item => item.type === 'image' && item.url.startsWith('/objects/r2/'))) ||
+        serverStories.some(story => story.image?.startsWith('/objects/r2/'));
+      setRecoveryStatus(serverOld
+        ? 'El servidor todavía conserva la referencia antigua en la publicación o historia. La subida a R2 no completó la asociación. No vuelvas a subir la foto.'
+        : serverNew
+          ? 'El servidor ya tiene una referencia R2 para esta publicación o historia. Actualizá el perfil; si sigue sin verse, hay que revisar la carga visual.'
+          : 'La publicación o historia no conserva la referencia antigua, pero tampoco se detectó una nueva referencia R2. Revisá el estado antes de reintentar.');
+    } catch (error) {
+      setRecoveryStatus(`No se pudo consultar el estado del servidor: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   async function recoverContentPhoto(file: File | null, batchPath?: string): Promise<boolean> {
     const targetPath = batchPath ?? recoveryMediaPath;
     if (!batchPath && (recoveryBusy || !recoveryContentConfirmed || !targetPath || !legacyMedia.includes(targetPath))) {
@@ -715,6 +747,11 @@ export default function SettingsPage() {
                 onClick={() => { if (recoveryContentFile) void recoverContentPhoto(recoveryContentFile); }}
                 className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando foto…' : 'Recuperar foto seleccionada'}
+              </button>
+              <button type="button" disabled={!recoveryMediaPath || recoveryBusy}
+                onClick={() => void inspectRecoveryServerState()}
+                className="rounded-xl border border-border px-4 py-3 text-xs font-semibold disabled:opacity-50">
+                Comprobar publicación en servidor (sin subir foto)
               </button>
               {recoveryStatus && <p role="status" aria-live="polite" aria-atomic="true" className="rounded-lg bg-secondary/40 p-3 text-xs break-words">{recoveryStatus}</p>}
               <p className="text-muted-foreground">No se sube nada hasta que confirmes y toques el botón. No se eliminan originales.</p>
