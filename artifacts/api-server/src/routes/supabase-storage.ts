@@ -52,6 +52,29 @@ export function createSupabaseStorageRouter(): IRouter {
     }
   });
 
+  // Read-only usage counts for legacy media in this owner's universes.
+  // Avoid returning universe state or another owner's media.
+  router.get("/storage/recovery/usage", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT universe_id,
+          jsonb_array_length(COALESCE(state->'posts', '[]'::jsonb)) AS posts,
+          jsonb_array_length(COALESCE(state->'stories', '[]'::jsonb)) AS stories,
+          jsonb_array_length(COALESCE(state->'characters', '[]'::jsonb)) AS characters,
+          (state->'posts')::text LIKE '%/objects/uploads/%' AS legacy_posts,
+          (state->'stories')::text LIKE '%/objects/uploads/%' AS legacy_stories,
+          (state->'characters')::text LIKE '%/objects/uploads/%' AS legacy_characters
+         FROM echo_universes WHERE owner_id = $1`,
+        [req.userId!],
+      );
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ universes: result.rows });
+    } catch (error) {
+      logger.warn({ err: error }, "Legacy media usage inventory failed");
+      res.status(503).json({ error: "RECOVERY_USAGE_UNAVAILABLE" });
+    }
+  });
+
   // Read-only inventory: never expose private URLs or read another owner's media.
   router.post("/storage/recovery/check-legacy", requireAuth, async (req, res) => {
     const paths = req.body?.paths;
