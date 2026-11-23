@@ -263,17 +263,32 @@ export default function SettingsPage() {
         setRecoveryStatus('Esta referencia ya no figura en la sesión local. Actualizá ECHO y volvé a revisar el perfil.');
         return;
       }
-      const serverOld = serverPosts.some(post =>
-        post.image === oldPath || post.media?.some(item => item.type === 'image' && item.url === oldPath)) ||
-        serverStories.some(story => story.image === oldPath);
-      const serverNew = serverPosts.some(post =>
-        post.image?.startsWith('/objects/r2/') || post.media?.some(item => item.type === 'image' && item.url.startsWith('/objects/r2/'))) ||
-        serverStories.some(story => story.image?.startsWith('/objects/r2/'));
-      setRecoveryStatus(serverOld
-        ? 'El servidor todavía conserva la referencia antigua en la publicación o historia. La subida a R2 no completó la asociación. No vuelvas a subir la foto.'
-        : serverNew
-          ? 'El servidor ya tiene una referencia R2 para esta publicación o historia. Actualizá el perfil; si sigue sin verse, hay que revisar la carga visual.'
-          : 'La publicación o historia no conserva la referencia antigua, pero tampoco se detectó una nueva referencia R2. Revisá el estado antes de reintentar.');
+      // Compare only the original cover and carousel item IDs. Another image
+      // in the same post may already be in R2 and must not count as recovered.
+      const expected = localPosts.map(post => ({
+        id: post.id,
+        cover: post.image === oldPath,
+        mediaIds: (post.media ?? []).filter(item => item.type === 'image' && item.url === oldPath).map(item => item.id),
+      }));
+      const inspected = expected.flatMap(item => {
+        const post = serverPosts.find(candidate => candidate.id === item.id);
+        if (!post) return ['missing'];
+        return [
+          ...(item.cover ? [post.image] : []),
+          ...item.mediaIds.map(id => post.media?.find(media => media.id === id && media.type === 'image')?.url),
+        ];
+      });
+      for (const storyId of localStoryIds) {
+        inspected.push(serverStories.find(story => story.id === storyId)?.image ?? 'missing');
+      }
+      const oldCount = inspected.filter(path => path === oldPath).length;
+      const r2Count = inspected.filter(path => typeof path === 'string' && /^\\/objects\\/r2\\/[0-9a-f-]{36}$/i.test(path)).length;
+      const missingCount = inspected.length - oldCount - r2Count;
+      setRecoveryStatus(oldCount > 0
+        ? `El servidor conserva ${oldCount} referencia(s) antigua(s) de esta foto. ${r2Count} ya apunta(n) a R2 y ${missingCount} requieren revisión. No vuelvas a subir la foto.`
+        : r2Count > 0 && missingCount === 0
+          ? 'Todas las ubicaciones originales de esta foto apuntan ahora a R2. Si no aparece, revisaremos la carga de imágenes del perfil.'
+          : 'La referencia antigua ya no aparece, pero hay ubicaciones sin una referencia R2 verificable. No vuelvas a subirla hasta revisar el resultado.');
     } catch (error) {
       setRecoveryStatus(`No se pudo consultar el estado del servidor: ${error instanceof Error ? error.message : String(error)}`);
     }
