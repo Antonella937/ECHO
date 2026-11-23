@@ -30,6 +30,7 @@ export interface AutonomyWorkerTarget {
   universeId: string;
   characterId: string;
   socialEnabled?: boolean;
+  storyEnabled?: boolean;
   dmEnabled?: boolean;
 }
 
