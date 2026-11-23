@@ -114,6 +114,11 @@ export default function SettingsPage() {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024 || !file.size) {
           throw new Error('Solo JPG, PNG o WebP de hasta 15 MB. Convertí las fotos HEIC antes de recuperarlas.');
         }
+        // Check the server immediately before upload: another session may have restored this avatar.
+        const currentRemote = await loadUniverse(universeId);
+        const remoteCharacter = currentRemote.state?.characters.find(item => item.id === id);
+        if (!remoteCharacter || remoteCharacter.avatar !== character.avatar)
+          throw new Error(`El avatar de ${character.name} cambió en el servidor. Actualizá ECHO antes de volver a intentar.`);
         setRecoveryStatus(`Subiendo ${completed + 1} de ${assignments.length}: ${character.name}…`);
         const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
           '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
