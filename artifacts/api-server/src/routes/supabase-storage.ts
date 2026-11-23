@@ -43,7 +43,7 @@ export function createSupabaseStorageRouter(): IRouter {
     try {
       const rows = await db.select({ objectPath: echoMediaTable.objectPath, createdAt: echoMediaTable.createdAt })
         .from(echoMediaTable).where(eq(echoMediaTable.ownerId, req.userId!));
-      const legacy = rows.filter(row => /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(row.objectPath));
+      const legacy = rows.filter(row => row.objectPath.startsWith("/objects/uploads/") && validPath(row.objectPath));
       res.setHeader("Cache-Control", "no-store");
       res.json({ total: legacy.length, paths: legacy.map(row => ({ path: row.objectPath, createdAt: row.createdAt })) });
     } catch (error) {
