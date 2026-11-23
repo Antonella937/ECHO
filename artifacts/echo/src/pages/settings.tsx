@@ -60,6 +60,17 @@ export default function SettingsPage() {
   const [recoveryContentFile, setRecoveryContentFile] = useState<File | null>(null);
   const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
+  // Never carry file-to-account assignments across universe switches.
+  useEffect(() => {
+    setRecoveryFiles([]);
+    setRecoveryAssignments({});
+    setRecoveryConfirmed(false);
+    setRecoveryMediaPath('');
+    setRecoveryContentFile(null);
+    setRecoveryContentConfirmed(false);
+    setRecoverySearch('');
+    setRecoveryStatus('');
+  }, [universeId]);
   const { signOut } = useClerk();
   const back = useBack();
   const t = useTranslation();
