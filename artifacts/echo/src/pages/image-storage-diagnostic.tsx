@@ -33,7 +33,7 @@ export default function ImageStorageDiagnosticPage() {
     try {
       const token = await getToken();
       if (!token) throw new Error('Iniciá sesión nuevamente para comprobar las fotos.');
-      const origin = import.meta.env.VITE_ECHO_API_ORIGIN?.trim()?.replace(/\\/$/, '') || '';
+      const origin = import.meta.env.VITE_ECHO_API_ORIGIN?.trim()?.replace(/\/$/, '') || '';
       const headers = { Authorization: `Bearer ${token}` };
       const [inventoryResponse, usageResponse] = await Promise.all([
         fetch(`${origin}/api/storage/recovery/inventory`, { headers, cache: 'no-store' }),
