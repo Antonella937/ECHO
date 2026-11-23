@@ -54,6 +54,7 @@ export default function SettingsPage() {
   const [recoveryAssignments, setRecoveryAssignments] = useState<Record<number, string>>({});
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
+  const [recoveryMediaPath, setRecoveryMediaPath] = useState('');
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const { signOut } = useClerk();
   const back = useBack();
@@ -98,6 +99,36 @@ export default function SettingsPage() {
     } catch (error) {
       setRecoveryStatus(`${completed} avatar(es) procesado(s), pero no se pudo confirmar la sincronización completa. No vuelvas a subir las mismas fotos hasta comprobar los perfiles. ${error instanceof Error ? error.message : ''}`);
     } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
+  }
+  const legacyMedia = Array.from(new Set([
+    ...state.posts.flatMap(post => [post.image, ...(post.media ?? []).map(item => item.url)]),
+    ...state.stories.map(story => story.image),
+  ].filter((value): value is string => typeof value === 'string' && value.startsWith('/objects/uploads/'))));
+  async function recoverContentPhoto(file: File) {
+    if (!recoveryConfirmed || !recoveryMediaPath || recoveryBusy) return;
+    setRecoveryBusy(true);
+    try {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || !file.size || file.size > 15 * 1024 * 1024)
+        throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
+      setRecoveryStatus('Subiendo imagen original a R2…');
+      const { uploadURL, objectPath } = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ size: file.size, contentType: file.type }), responseType: 'json',
+      });
+      if (!objectPath.startsWith('/objects/r2/')) throw new Error('R2 no está habilitado. No se cambió el contenido.');
+      const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!upload.ok) throw new Error('No se pudo subir la foto.');
+      await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectPath }), responseType: 'json' });
+      actions.recoverLegacyMedia(recoveryMediaPath, objectPath);
+      setRecoveryStatus('Foto subida. Verificando sincronización de publicaciones e historias…');
+      await actions.retrySync();
+      setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
+      setRecoveryMediaPath('');
+      setRecoveryConfirmed(false);
+    } catch (error) {
+      setRecoveryStatus(error instanceof Error ? error.message : 'No se pudo confirmar la recuperación. Comprobá el contenido antes de reintentar.');
+    } finally { setRecoveryBusy(false); }
   }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
 
@@ -276,6 +307,20 @@ export default function SettingsPage() {
                   <span className="truncate">{character.name}</span><span className="shrink-0 text-muted-foreground">Copia antigua</span>
                 </div>
               ))}
+            </div>
+            <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
+              <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
+              <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
+              <select aria-label="Imagen antigua a recuperar" className="w-full rounded-lg bg-background p-2" value={recoveryMediaPath}
+                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryConfirmed(false); }}>
+                <option value="">Elegir referencia antigua</option>
+                {legacyMedia.map((path, index) => <option key={path} value={path}>Imagen {index + 1} · {path.slice(-8)}</option>)}
+              </select>
+              {recoveryMediaPath && <p className="break-all text-muted-foreground">{recoveryMediaPath}</p>}
+              <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || !recoveryConfirmed || recoveryBusy}
+                onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void recoverContentPhoto(file); }}
+                className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
+              <p className="text-muted-foreground">La foto se sube al seleccionarla, solo después de elegir la referencia y marcar la confirmación de arriba. No se eliminan originales.</p>
             </div>
             <div className="rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Inventario de imágenes antiguas</p>
