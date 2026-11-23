@@ -103,11 +103,11 @@ export function createSupabaseStorageRouter(): IRouter {
               signal: AbortSignal.timeout(8000),
             });
             if (fallback.body) await fallback.body.cancel();
-            results.push({ path, status: fallback.ok ? "available" : fallback.status === 404 ? "missing" : "unknown" });
+            results.push({ path, status: fallback.ok ? "available" : fallback.status === 404 ? "missing" : "unknown", reason: fallback.ok ? "ok" : fallback.status === 404 ? "not_found" : fallback.status === 401 || fallback.status === 403 ? "access_denied" : fallback.status >= 500 ? "storage_server_error" : "unexpected_storage_response" });
           } else {
-            results.push({ path, status: response.ok ? "available" : response.status === 404 ? "missing" : "unknown" });
+            results.push({ path, status: response.ok ? "available" : response.status === 404 ? "missing" : "unknown", reason: response.ok ? "ok" : response.status === 404 ? "not_found" : response.status === 401 || response.status === 403 ? "access_denied" : response.status >= 500 ? "storage_server_error" : "unexpected_storage_response" });
           }
-        } catch { results.push({ path, status: "unknown" }); }
+        } catch (error) { results.push({ path, status: "unknown", reason: error instanceof Error && error.name === "TimeoutError" ? "timeout" : "connection_error" }); }
       }
       res.setHeader("Cache-Control", "no-store");
       res.json({ results });
