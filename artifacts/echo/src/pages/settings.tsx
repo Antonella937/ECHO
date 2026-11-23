@@ -72,6 +72,8 @@ export default function SettingsPage() {
   const [recoveryContentFile, setRecoveryContentFile] = useState<File | null>(null);
   const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
+  const [recoveryBatchFiles, setRecoveryBatchFiles] = useState<File[]>([]);
+  const [recoveryBatchAssignments, setRecoveryBatchAssignments] = useState<Record<number, string>>({});
   // Never carry file-to-account assignments across universe switches.
   useEffect(() => {
     setRecoveryFiles([]);
@@ -81,6 +83,8 @@ export default function SettingsPage() {
     setRecoveryContentFile(null);
     setRecoveryContentConfirmed(false);
     setRecoverySearch('');
+    setRecoveryBatchFiles([]);
+    setRecoveryBatchAssignments({});
     setRecoveryStatus('');
   }, [universeId]);
   const { signOut } = useClerk();
@@ -486,6 +490,28 @@ export default function SettingsPage() {
                   <span className="truncate">{character.name}</span><span className="shrink-0 text-muted-foreground">Copia antigua</span>
                 </div>
               ))}
+            </div>
+            <div className="space-y-3 rounded-xl border border-border p-3 text-xs">
+              <p className="font-semibold">Preparar recuperación de publicaciones en lote</p>
+              <p className="text-muted-foreground">Elegí varias fotos juntas. Revisá la vista previa y asigná la referencia original a cada una. Esta preparación no sube ni modifica nada.</p>
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={recoveryBusy}
+                aria-label="Seleccionar fotos de publicaciones en lote"
+                onChange={event => { setRecoveryBatchFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryBatchAssignments({}); }}
+                className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
+              {recoveryBatchFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
+                <RecoveryPreview file={file} />
+                <div className="min-w-0 flex-1"><p className="truncate">{file.name}</p>
+                  <select className="mt-1 w-full rounded-lg bg-background p-2" aria-label={`Referencia para ${file.name}`}
+                    value={recoveryBatchAssignments[index] ?? ''} disabled={recoveryBusy}
+                    onChange={event => setRecoveryBatchAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
+                    <option value="">Sin asignar</option>
+                    {legacyMediaDetails.map(item => <option key={item.path} value={item.path}>
+                      {item.owners.join(', ')} · {item.posts[0]?.caption?.slice(0, 45) || item.stories[0]?.caption?.slice(0, 45) || item.posts[0]?.createdAt.toLocaleDateString('es-AR') || item.stories[0]?.createdAt.toLocaleDateString('es-AR') || 'Sin texto'} · {item.path.slice(-8)}
+                    </option>)}
+                  </select>
+                </div>
+              </div>)}
+              {recoveryBatchFiles.length > 0 && <p className="text-muted-foreground">Preparadas {Object.values(recoveryBatchAssignments).filter(Boolean).length} de {recoveryBatchFiles.length} fotos. No se aplicarán cambios hasta que se habilite una recuperación por lotes con verificación individual.</p>}
             </div>
             <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
