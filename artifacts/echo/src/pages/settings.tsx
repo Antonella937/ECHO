@@ -223,14 +223,15 @@ export default function SettingsPage() {
     return selected && !first.some(item => item.path === selected.path) ? [selected, ...first] : first;
   }, [filteredLegacyMedia, legacyMediaDetails, recoveryMediaPath]);
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
-  async function recoverContentPhoto(file: File) {
-    if (!recoveryContentConfirmed || !recoveryMediaPath || recoveryBusy || !legacyMedia.includes(recoveryMediaPath)) return;
+  async function recoverContentPhoto(file: File, batchPath?: string): Promise<boolean> {
+    const targetPath = batchPath ?? recoveryMediaPath;
+    if ((!batchPath && (!recoveryContentConfirmed || recoveryBusy)) || !targetPath || !legacyMedia.includes(targetPath)) return false;
     const recoveryUniverse = universeId;
-    setRecoveryBusy(true);
+    if (!batchPath) setRecoveryBusy(true);
     try {
       if (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024)
         throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
-      const oldPath = recoveryMediaPath;
+      const oldPath = targetPath;
       // Check the current server snapshot before uploading: the photo may already have
       // been recovered in another session or the selected post/story may have changed.
       assertRecoveryUniverse(recoveryUniverse);
@@ -305,11 +306,44 @@ export default function SettingsPage() {
           post.media?.some(item => item.type === 'image' && item.url === oldPath)) &&
         !remote.stories.some(story => story.image === oldPath));
       setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
-      setRecoveryMediaPath('');
-      setRecoveryContentFile(null);
-      setRecoveryContentConfirmed(false);
+      if (!batchPath) {
+        setRecoveryMediaPath('');
+        setRecoveryContentFile(null);
+        setRecoveryContentConfirmed(false);
+      }
+      return true;
     } catch (error) {
       setRecoveryStatus(`No se pudo confirmar la recuperación completa. Revisá primero la publicación o historia antes de reintentar para evitar duplicados. ${error instanceof Error ? error.message : ''}`);
+      return false;
+    } finally { if (!batchPath) setRecoveryBusy(false); }
+  }
+  async function recoverContentBatch() {
+    if (recoveryBusy || recoveryBatchFiles.length === 0) return;
+    const assignments = recoveryBatchFiles.map((file, index) => ({ file, path: recoveryBatchAssignments[index] ?? '' }));
+    if (assignments.some(item => !item.path || !legacyMedia.includes(item.path) || !recoveryImageType(item.file) || !item.file.size || item.file.size > 15 * 1024 * 1024) ||
+        new Set(assignments.map(item => item.path)).size !== assignments.length) {
+      setRecoveryStatus('Asigná una referencia distinta y válida a cada imagen JPG, PNG o WebP de hasta 15 MB.');
+      return;
+    }
+    const expectedUniverse = universeId;
+    setRecoveryBusy(true);
+    let completed = 0;
+    try {
+      for (const item of assignments) {
+        assertRecoveryUniverse(expectedUniverse);
+        setRecoveryStatus(`Recuperando foto ${completed + 1} de ${assignments.length}…`);
+        const ok = await recoverContentPhoto(item.file, item.path);
+        if (!ok) {
+          setRecoveryStatus(previous => `${completed} de ${assignments.length} fotos verificadas. Proceso detenido para evitar duplicados. ${previous}`);
+          return;
+        }
+        completed++;
+      }
+      setRecoveryBatchFiles([]);
+      setRecoveryBatchAssignments({});
+      setRecoveryStatus(`${completed} fotos recuperadas y verificadas en R2. No se borraron originales.`);
+    } catch (error) {
+      setRecoveryStatus(`${completed} fotos verificadas. Se detuvo el lote: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally { setRecoveryBusy(false); }
   }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
@@ -512,6 +546,11 @@ export default function SettingsPage() {
                 </div>
               </div>)}
               {recoveryBatchFiles.length > 0 && <p className="text-muted-foreground">Preparadas {Object.values(recoveryBatchAssignments).filter(Boolean).length} de {recoveryBatchFiles.length} fotos. No se aplicarán cambios hasta que se habilite una recuperación por lotes con verificación individual.</p>}
+              <button type="button" disabled={recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
+                onClick={() => void recoverContentBatch()} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
+                {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar lote en R2'}
+              </button>
+              <p className="text-muted-foreground">Cada imagen se verifica en el servidor antes de continuar. Si falla una, el lote se detiene; revisá las fotos ya recuperadas antes de reintentar.</p>
             </div>
             <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
