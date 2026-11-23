@@ -234,9 +234,19 @@ export default function SettingsPage() {
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function recoverContentPhoto(file: File | null, batchPath?: string): Promise<boolean> {
     const targetPath = batchPath ?? recoveryMediaPath;
-    if ((!batchPath && (!recoveryContentConfirmed || recoveryBusy)) || !targetPath || !legacyMedia.includes(targetPath)) return false;
+    if (!batchPath && (recoveryBusy || !recoveryContentConfirmed || !targetPath || !legacyMedia.includes(targetPath))) {
+      setRecoveryStatus('No se inició la recuperación: revisá la referencia y la confirmación, o esperá a que termine la operación anterior.');
+      return false;
+    }
+    if (!targetPath || !legacyMedia.includes(targetPath)) {
+      setRecoveryStatus('La referencia seleccionada ya no está disponible en esta sesión. Actualizá ECHO antes de reintentar.');
+      return false;
+    }
     const recoveryUniverse = universeId;
-    if (!batchPath) setRecoveryBusy(true);
+    if (!batchPath) {
+      setRecoveryBusy(true);
+      setRecoveryStatus('Preparando recuperación… Comprobando que la publicación siga intacta en el servidor.');
+    }
     try {
       if (file && (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024))
         throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
