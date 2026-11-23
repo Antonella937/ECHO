@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const [legacyAvailability, setLegacyAvailability] = useState<Record<string, string>>({});
+  const [legacyReasons, setLegacyReasons] = useState<Record<string, number>>({});
   const [checkingLegacy, setCheckingLegacy] = useState(false);
   const [recoveryInventoryInfo, setRecoveryInventoryInfo] = useState<{ total: number; eligible: number; accountSuffix: string } | null>(null);
   const [autoCopyConfirmed, setAutoCopyConfirmed] = useState(false);
@@ -344,6 +345,7 @@ export default function SettingsPage() {
     setCheckingLegacy(true);
     setAutoCopyConfirmed(false);
     setLegacyAvailability({});
+    setLegacyReasons({});
     setRecoveryInventoryInfo(null);
     try {
       // Use the server-owned inventory rather than arbitrary avatar/content references.
@@ -360,15 +362,20 @@ export default function SettingsPage() {
         return;
       }
       const results: Record<string, string> = {};
+      const reasons: Record<string, number> = {};
       for (let i = 0; i < paths.length; i += 30) {
-        const response = await customFetch<{ results: Array<{ path: string; status: string }> }>('/api/storage/recovery/check-legacy', {
+        const response = await customFetch<{ results: Array<{ path: string; status: string; reason?: string }> }>('/api/storage/recovery/check-legacy', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paths: paths.slice(i, i + 30) }), responseType: 'json',
         });
-        for (const result of response.results) results[result.path] = result.status;
+        for (const result of response.results) {
+          results[result.path] = result.status;
+          if (result.status === 'unknown') reasons[result.reason ?? 'unspecified'] = (reasons[result.reason ?? 'unspecified'] ?? 0) + 1;
+        }
         setRecoveryStatus(`Comprobadas ${Math.min(i + 30, paths.length)} de ${paths.length} imágenes…`);
       }
       setLegacyAvailability(results);
+      setLegacyReasons(reasons);
       setRecoveryStatus(`Supabase: ${Object.values(results).filter(v => v === 'available').length} disponibles, ${Object.values(results).filter(v => v === 'missing').length} faltantes. No se modificaron imágenes.`);
     } catch (error) {
       setLegacyAvailability({});
@@ -571,6 +578,7 @@ export default function SettingsPage() {
             </button>
             {recoveryInventoryInfo && <p className="text-xs text-muted-foreground" role="status">Diagnóstico de inventario · Cuenta terminada en {recoveryInventoryInfo.accountSuffix} · Registros devueltos: {recoveryInventoryInfo.total} · Rutas válidas: {recoveryInventoryInfo.eligible}. Si ambos son cero, verificá que esta cuenta y el backend correspondan a la base de datos correcta.</p>}
             {Object.keys(legacyAvailability).length > 0 && <p className="text-xs text-muted-foreground">Disponibles: {Object.values(legacyAvailability).filter(v => v === 'available').length} · Faltantes: {Object.values(legacyAvailability).filter(v => v === 'missing').length} · Sin confirmar: {Object.values(legacyAvailability).filter(v => v !== 'available' && v !== 'missing').length}</p>}
+            {Object.keys(legacyReasons).length > 0 && <p className="text-xs text-muted-foreground" role="status">Motivos sin confirmar: {Object.entries(legacyReasons).map(([reason, count]) => `${({ access_denied: 'Acceso denegado por Supabase', storage_server_error: 'Error del servidor de almacenamiento', unexpected_storage_response: 'Respuesta inesperada', timeout: 'Tiempo de espera agotado', connection_error: 'Error de conexión', unspecified: 'Sin detalle' } as Record<string, string>)[reason] ?? 'Otro error'}: ${count}`).join(' · ')}. No se modificaron imágenes.</p>}
             {Object.values(legacyAvailability).some(v => v === 'available') && <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Copiar directamente desde Supabase</p>
               <p>Se recuperará una imagen de publicación o historia por vez. El original permanece en Supabase; ECHO verificará el nuevo archivo y su sincronización.</p>
