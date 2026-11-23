@@ -353,7 +353,7 @@ export default function SettingsPage() {
         method: 'GET', responseType: 'json',
       });
       const paths = Array.from(new Set((inventory.paths ?? []).map(entry => entry.path)
-        .filter(path => /^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
+        .filter(path => /^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
       setRecoveryInventoryInfo({ total: inventory.paths?.length ?? 0, eligible: paths.length, accountSuffix: user?.id?.slice(-8) ?? 'sin sesión' });
       if (!paths.length) {
         setRecoveryStatus('El inventario de esta sesión no devolvió rutas comprobables. Esto no demuestra que las fotos hayan desaparecido: revisá la cuenta y la conexión de base de datos.');
