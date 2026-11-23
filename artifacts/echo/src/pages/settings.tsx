@@ -83,7 +83,7 @@ export default function SettingsPage() {
     if (!remote.state || !check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
   }
   async function recoverSelectedAvatars() {
-    const assignments = Object.entries(recoveryAssignments).filter(([index, id]) => id && recoveryFiles[Number(index)]);
+    const assignments = Object.entries(recoveryAssignments).filter(([, id]) => Boolean(id));
     if (!assignments.length || recoveryBusy || !recoveryConfirmed) return;
     if (new Set(assignments.map(([, id]) => id)).size !== assignments.length) {
       setRecoveryStatus('Elegí un solo archivo por personaje para evitar reemplazos accidentales.'); return;
