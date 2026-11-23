@@ -364,7 +364,7 @@ export default function SettingsPage() {
           </button>
           {showRecovery && <div className="mt-4 space-y-3 text-sm">
             <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
-            <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/*" multiple
+            <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/jpeg,image/png,image/webp" multiple
               onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryConfirmed(false); setRecoveryStatus(''); }}
               className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
             {recoveryFiles.length > 0 && <div className="space-y-3">
