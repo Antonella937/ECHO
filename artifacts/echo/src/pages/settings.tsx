@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const [recoveryBatchFiles, setRecoveryBatchFiles] = useState<File[]>([]);
+  const [recoveryBatchConfirmed, setRecoveryBatchConfirmed] = useState(false);
   const [recoveryBatchAssignments, setRecoveryBatchAssignments] = useState<Record<number, string>>({});
   // Never carry file-to-account assignments across universe switches.
   useEffect(() => {
@@ -85,6 +86,7 @@ export default function SettingsPage() {
     setRecoverySearch('');
     setRecoveryBatchFiles([]);
     setRecoveryBatchAssignments({});
+    setRecoveryBatchConfirmed(false);
     setRecoveryStatus('');
   }, [universeId]);
   const { signOut } = useClerk();
@@ -318,7 +320,7 @@ export default function SettingsPage() {
     } finally { if (!batchPath) setRecoveryBusy(false); }
   }
   async function recoverContentBatch() {
-    if (recoveryBusy || recoveryBatchFiles.length === 0) return;
+    if (recoveryBusy || !recoveryBatchConfirmed || recoveryBatchFiles.length === 0) return;
     const assignments = recoveryBatchFiles.map((file, index) => ({ file, path: recoveryBatchAssignments[index] ?? '' }));
     if (assignments.some(item => !item.path || !legacyMedia.includes(item.path) || !recoveryImageType(item.file) || !item.file.size || item.file.size > 15 * 1024 * 1024) ||
         new Set(assignments.map(item => item.path)).size !== assignments.length) {
@@ -341,6 +343,7 @@ export default function SettingsPage() {
       }
       setRecoveryBatchFiles([]);
       setRecoveryBatchAssignments({});
+      setRecoveryBatchConfirmed(false);
       setRecoveryStatus(`${completed} fotos recuperadas y verificadas en R2. No se borraron originales.`);
     } catch (error) {
       setRecoveryStatus(`${completed} fotos verificadas. Se detuvo el lote: ${error instanceof Error ? error.message : 'Error desconocido'}`);
@@ -533,14 +536,14 @@ export default function SettingsPage() {
               <p className="text-muted-foreground">Mostrando {visibleLegacyMedia.length} de {filteredLegacyMedia.length} referencias filtradas. Buscá para acotar la lista.</p>
               <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={recoveryBusy}
                 aria-label="Seleccionar fotos de publicaciones en lote"
-                onChange={event => { setRecoveryBatchFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryBatchAssignments({}); }}
+                onChange={event => { setRecoveryBatchFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryBatchAssignments({}); setRecoveryBatchConfirmed(false); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
               {recoveryBatchFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
                 <RecoveryPreview file={file} />
                 <div className="min-w-0 flex-1"><p className="truncate">{file.name}</p>
                   <select className="mt-1 w-full rounded-lg bg-background p-2" aria-label={`Referencia para ${file.name}`}
                     value={recoveryBatchAssignments[index] ?? ''} disabled={recoveryBusy}
-                    onChange={event => setRecoveryBatchAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
+                    onChange={event => { setRecoveryBatchConfirmed(false); setRecoveryBatchAssignments(previous => ({ ...previous, [index]: event.target.value })); }}>
                     <option value="">Sin asignar</option>
                     {(recoveryBatchAssignments[index] && !visibleLegacyMedia.some(item => item.path === recoveryBatchAssignments[index]) ? [legacyMediaDetails.find(item => item.path === recoveryBatchAssignments[index]), ...visibleLegacyMedia] : visibleLegacyMedia).filter((item): item is (typeof legacyMediaDetails)[number] => Boolean(item)).map(item => <option key={item.path} value={item.path}>
                       {item.owners.join(', ')} · {item.posts[0]?.caption?.slice(0, 45) || item.stories[0]?.caption?.slice(0, 45) || (item.posts[0]?.createdAt ? new Date(item.posts[0].createdAt).toLocaleDateString('es-AR') : '') || (item.stories[0]?.createdAt ? new Date(item.stories[0].createdAt).toLocaleDateString('es-AR') : '') || 'Sin texto'} · {item.path.slice(-8)}
@@ -549,7 +552,11 @@ export default function SettingsPage() {
                 </div>
               </div>)}
               {recoveryBatchFiles.length > 0 && <p className="text-muted-foreground">Preparadas {Object.values(recoveryBatchAssignments).filter(Boolean).length} de {recoveryBatchFiles.length} fotos. Revisá las asociaciones antes de confirmar.</p>}
-              <button type="button" disabled={recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
+              <label className="flex items-start gap-2"><input type="checkbox" checked={recoveryBatchConfirmed} disabled={recoveryBusy || !recoveryBatchFiles.length}
+                onChange={event => setRecoveryBatchConfirmed(event.target.checked)} className="mt-0.5" />
+                Confirmo que cada foto corresponde a la publicación o historia indicada. Entiendo que un lote puede completarse parcialmente si hay un error.
+              </label>
+              <button type="button" disabled={!recoveryBatchConfirmed || recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
                 onClick={() => void recoverContentBatch()} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar lote en R2'}
               </button>
