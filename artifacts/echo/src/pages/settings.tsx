@@ -13,6 +13,7 @@ import { MessageSoundSettings } from '@/components/echo/message-sound-settings';
 import { MusicConnectionsSection } from '@/components/echo/music-connections-section';
 import { PushNotificationSettings } from '@/components/echo/push-notification-settings';
 import { toast } from '@/hooks/use-toast';
+import { customFetch } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
 import { useSettingsText } from '@/lib/settings-translations';
 import { LANGUAGES, setLanguage, useLanguage, useTranslation, type Language } from '@/lib/i18n';
@@ -40,11 +41,49 @@ export default function SettingsPage() {
   const [recoveryFiles, setRecoveryFiles] = useState<File[]>([]);
   const [showRecovery, setShowRecovery] = useState(false);
   const { user } = useUser();
+  const [recoveryAssignments, setRecoveryAssignments] = useState<Record<number, string>>({});
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState('');
   const { signOut } = useClerk();
   const back = useBack();
   const t = useTranslation();
   const st = useSettingsText();
   const language = useLanguage();
+  async function recoverSelectedAvatars() {
+    const assignments = Object.entries(recoveryAssignments).filter(([index, id]) => id && recoveryFiles[Number(index)]);
+    if (!assignments.length || recoveryBusy) return;
+    if (new Set(assignments.map(([, id]) => id)).size !== assignments.length) {
+      setRecoveryStatus('Elegí un solo archivo por personaje para evitar reemplazos accidentales.'); return;
+    }
+    setRecoveryBusy(true);
+    let completed = 0;
+    try {
+      for (const [index, id] of assignments) {
+        const file = recoveryFiles[Number(index)];
+        const character = state.characters.find(item => item.id === id);
+        if (!character || !character.avatar?.startsWith('/objects/uploads/')) continue;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024 || !file.size) {
+          throw new Error('Solo JPG, PNG o WebP de hasta 10 MB. Convertí las fotos HEIC antes de recuperarlas.');
+        }
+        setRecoveryStatus(`Subiendo ${completed + 1} de ${assignments.length}: ${character.name}…`);
+        const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+          '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contentType: file.type, size: file.size }), responseType: 'json' });
+        if (!objectPath.startsWith('/objects/r2/')) throw new Error('El almacenamiento activo no es Cloudflare R2. No se modificó el perfil.');
+        const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+        if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
+        await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objectPath }), responseType: 'json' });
+        // Persist only after upload and read-back verification. Preserve all other account fields.
+        actions.updateAccount(id, { ...character, avatar: objectPath });
+        completed++;
+      }
+      setRecoveryStatus(`Recuperados ${completed} avatar(es). Las referencias anteriores se conservan en el historial de recuperación local hasta recargar.`);
+      toast({ title: 'Avatares recuperados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
+    } catch (error) {
+      setRecoveryStatus(`Recuperados ${completed}. ${error instanceof Error ? error.message : 'No se pudo completar la recuperación.'}`);
+    } finally { setRecoveryBusy(false); }
+  }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
 
   return (
@@ -194,7 +233,23 @@ export default function SettingsPage() {
             <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/*" multiple
               onChange={event => setRecoveryFiles(Array.from(event.currentTarget.files ?? []))}
               className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
-            {recoveryFiles.length > 0 && <p role="status" className="text-xs">{recoveryFiles.length} foto(s) seleccionada(s). Todavía no se subieron.</p>}
+            {recoveryFiles.length > 0 && <div className="space-y-3">
+              <p role="status" className="text-xs">{recoveryFiles.length} foto(s) seleccionada(s). Asigná cada foto a su personaje antes de subir.</p>
+              {recoveryFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
+                <img src={URL.createObjectURL(file)} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" onLoad={event => URL.revokeObjectURL(event.currentTarget.src)} />
+                <div className="min-w-0 flex-1"><p className="truncate text-xs">{file.name}</p>
+                  <select aria-label={`Personaje para ${file.name}`} className="mt-1 w-full rounded-lg bg-background p-2 text-xs" value={recoveryAssignments[index] ?? ''}
+                    onChange={event => setRecoveryAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
+                    <option value="">No asignar todavía</option>
+                    {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character =>
+                      <option key={character.id} value={character.id}>{character.name}</option>)}
+                  </select></div></div>)}
+              <button type="button" disabled={recoveryBusy || !Object.values(recoveryAssignments).some(Boolean)}
+                onClick={() => void recoverSelectedAvatars()} className="rounded-xl bg-primary px-4 py-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+                {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar avatares en R2'}
+              </button>
+              {recoveryStatus && <p role="status" className="text-xs">{recoveryStatus}</p>}
+            </div>}
             <div className="space-y-2">
               <p className="text-xs font-semibold">Avatares que necesitan recuperación</p>
               {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character => (
@@ -203,7 +258,7 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">La asignación y subida segura a Cloudflare R2 se habilitarán después de incorporar la verificación de coincidencias. Las fotos seleccionadas permanecen en este dispositivo.</p>
+            <p className="text-xs text-muted-foreground">La recuperación de avatares requiere tu asignación manual. Las publicaciones e historias no se modifican.</p>
           </div>}
         </section>
 
