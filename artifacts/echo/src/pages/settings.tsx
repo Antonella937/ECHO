@@ -382,26 +382,22 @@ export default function SettingsPage() {
       setRecoveryStatus('Asigná una referencia distinta y válida a cada imagen JPG, PNG o WebP de hasta 15 MB.');
       return;
     }
-    const expectedUniverse = universeId;
+    // Process one item per confirmation: React's state snapshot may be stale after
+    // coordinator sync, so continuing automatically risks overwriting a prior edit.
+    const item = assignments[0];
     setRecoveryBusy(true);
-    let completed = 0;
     try {
-      for (const item of assignments) {
-        assertRecoveryUniverse(expectedUniverse);
-        setRecoveryStatus(`Recuperando foto ${completed + 1} de ${assignments.length}…`);
-        const ok = await recoverContentPhoto(item.file, item.path);
-        if (!ok) {
-          setRecoveryStatus(previous => `${completed} de ${assignments.length} fotos verificadas. Proceso detenido para evitar duplicados. ${previous}`);
-          return;
-        }
-        completed++;
-      }
-      setRecoveryBatchFiles([]);
-      setRecoveryBatchAssignments({});
+      setRecoveryStatus(`Recuperando ${item.file.name} (1 de ${assignments.length})…`);
+      const ok = await recoverContentPhoto(item.file, item.path);
+      if (!ok) return;
+      setRecoveryBatchFiles(previous => previous.slice(1));
+      setRecoveryBatchAssignments(previous => Object.fromEntries(
+        Object.entries(previous).filter(([index]) => Number(index) > 0)
+          .map(([index, path]) => [Number(index) - 1, path])));
       setRecoveryBatchConfirmed(false);
-      setRecoveryStatus(`${completed} fotos recuperadas y verificadas en R2. No se borraron originales.`);
+      setRecoveryStatus(`Foto recuperada y verificada. Quedan ${assignments.length - 1} por revisar. Confirmá el siguiente lote después de actualizar ECHO.`);
     } catch (error) {
-      setRecoveryStatus(`${completed} fotos verificadas. Se detuvo el lote: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      setRecoveryStatus(`Se detuvo la recuperación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally { setRecoveryBusy(false); }
   }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
@@ -625,9 +621,9 @@ export default function SettingsPage() {
               </label>
               <button type="button" disabled={!recoveryBatchConfirmed || recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
                 onClick={() => void recoverContentBatch()} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
-                {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar lote en R2'}
+                {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar siguiente foto'}
               </button>
-              <p className="text-muted-foreground">Cada imagen se verifica en el servidor antes de continuar. Si falla una, el lote se detiene; revisá las fotos ya recuperadas antes de reintentar.</p>
+              <p className="text-muted-foreground">Por seguridad, se procesa una foto por confirmación. Revisá la sincronización y volvé a confirmar antes de la siguiente.</p>
             </div>
             <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
