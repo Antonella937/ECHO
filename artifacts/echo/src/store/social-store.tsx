@@ -135,7 +135,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
 
   const retrySync = useCallback(async () => {
     const engine = coordinator.current;
-    if (!engine) return;
+    if (!engine) throw new Error('La sincronización no está disponible. Volvé a abrir ECHO antes de recuperar fotos.');
     if (!engine.view.state) await engine.initialize();
     else await engine.sync();
     if (engine.view.error || engine.view.conflicts.length)
@@ -352,7 +352,9 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const matches = snapshot.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === oldPath)) ||
           snapshot.stories.some(story => story.image === oldPath);
         if (!matches) throw new Error('La imagen antigua ya no está presente. Actualizá ECHO antes de intentar recuperarla.');
-        coordinator.current?.edit(s => ({
+        const engine = coordinator.current;
+        if (!engine) throw new Error('La sincronización no está disponible. No se modificaron las publicaciones.');
+        engine.edit(s => ({
           ...s,
           posts: s.posts.map(post => {
             const media = post.media?.map(item => item.type === 'image' && item.url === oldPath ? { ...item, url: newPath } : item);
