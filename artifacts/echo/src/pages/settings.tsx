@@ -89,9 +89,11 @@ export default function SettingsPage() {
       setRecoveryStatus('Elegí un solo archivo por personaje para evitar reemplazos accidentales.'); return;
     }
     const invalid = assignments.find(([index, id]) => {
-      const file = recoveryFiles[Number(index)];
+      const fileIndex = Number(index);
+      const file = recoveryFiles[fileIndex];
       const character = state.characters.find(item => item.id === id);
-      return !character?.avatar || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(character.avatar) ||
+      return !Number.isInteger(fileIndex) || fileIndex < 0 ||
+        !character?.avatar || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(character.avatar) ||
         !file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
         !file.size || file.size > 15 * 1024 * 1024;
     });
