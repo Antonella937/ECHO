@@ -42,7 +42,7 @@ export function createSupabaseStorageRouter(): IRouter {
   router.post("/storage/recovery/check-legacy", requireAuth, async (req, res) => {
     const paths = req.body?.paths;
     if (!Array.isArray(paths) || paths.length < 1 || paths.length > 30 ||
-        paths.some((path: unknown) => typeof path !== "string" || !/^\\/objects\\/uploads\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) ||
+        paths.some((path: unknown) => typeof path !== "string" || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) ||
         new Set(paths).size !== paths.length) {
       res.status(400).json({ error: "INVALID_RECOVERY_PATHS" }); return;
     }
