@@ -351,7 +351,7 @@ export default function SettingsPage() {
         method: 'GET', responseType: 'json',
       });
       const paths = Array.from(new Set((inventory.paths ?? []).map(entry => entry.path)
-        .filter(path => /^\\/objects\\/uploads\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
+        .filter(path => /^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
       if (!paths.length) {
         setRecoveryStatus('No hay archivos antiguos registrados para comprobar. Algunas referencias de avatares pueden no estar en el inventario.');
         return;
