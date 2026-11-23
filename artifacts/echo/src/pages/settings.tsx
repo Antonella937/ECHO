@@ -334,14 +334,14 @@ export default function SettingsPage() {
       ]).sort();
       if (JSON.stringify(imageSlots(state.posts)) !== JSON.stringify(imageSlots(beforeUpload.state!.posts)))
         throw new Error('El carrusel o la portada cambió en el servidor. Actualizá ECHO antes de recuperar esta imagen.');
-      let objectPath: string;
+      let objectPath = '';
       if (file) {
         // Reuse a claimed R2 upload after a failed universe sync instead of
         // creating duplicate files. Scope the checkpoint to owner, universe and
         // original media path; never store signed upload URLs or credentials.
         const checkpointKey = `echo:media-recovery:${user!.id}:${recoveryUniverse}:${oldPath}`;
         const previous = window.localStorage.getItem(checkpointKey);
-        const cachedPath = previous && /^\\/objects\\/r2\\/[0-9a-f-]{36}$/i.test(previous) ? previous : null;
+        const cachedPath = previous && previous.startsWith('/objects/r2/') && /^[0-9a-f-]{36}$/i.test(previous.slice('/objects/r2/'.length)) ? previous : null;
         if (cachedPath) {
           const existing = await customFetch<Blob>(`/api/storage/objects/r2/${cachedPath.split('/').pop()}`, {
             method: 'GET', responseType: 'blob',
