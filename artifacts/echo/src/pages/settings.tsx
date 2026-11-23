@@ -53,6 +53,7 @@ export default function SettingsPage() {
   const { user } = useUser();
   const [recoveryAssignments, setRecoveryAssignments] = useState<Record<number, string>>({});
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const { signOut } = useClerk();
   const back = useBack();
@@ -61,7 +62,7 @@ export default function SettingsPage() {
   const language = useLanguage();
   async function recoverSelectedAvatars() {
     const assignments = Object.entries(recoveryAssignments).filter(([index, id]) => id && recoveryFiles[Number(index)]);
-    if (!assignments.length || recoveryBusy) return;
+    if (!assignments.length || recoveryBusy || !recoveryConfirmed) return;
     if (new Set(assignments.map(([, id]) => id)).size !== assignments.length) {
       setRecoveryStatus('Elegí un solo archivo por personaje para evitar reemplazos accidentales.'); return;
     }
@@ -92,7 +93,7 @@ export default function SettingsPage() {
       toast({ title: 'Avatares recuperados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
     } catch (error) {
       setRecoveryStatus(`Recuperados ${completed}. ${error instanceof Error ? error.message : 'No se pudo completar la recuperación.'}`);
-    } finally { setRecoveryBusy(false); }
+    } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
   }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
 
@@ -241,7 +242,7 @@ export default function SettingsPage() {
           {showRecovery && <div className="mt-4 space-y-3 text-sm">
             <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
             <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/*" multiple
-              onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryStatus(''); }}
+              onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryConfirmed(false); setRecoveryStatus(''); }}
               className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
             {recoveryFiles.length > 0 && <div className="space-y-3">
               <p role="status" className="text-xs">{recoveryFiles.length} foto(s) seleccionada(s). Asigná cada foto a su personaje antes de subir.</p>
@@ -249,12 +250,16 @@ export default function SettingsPage() {
                 <RecoveryPreview file={file} />
                 <div className="min-w-0 flex-1"><p className="truncate text-xs">{file.name}</p>
                   <select aria-label={`Personaje para ${file.name}`} className="mt-1 w-full rounded-lg bg-background p-2 text-xs" value={recoveryAssignments[index] ?? ''}
-                    onChange={event => setRecoveryAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
+                    onChange={event => { setRecoveryConfirmed(false); setRecoveryAssignments(previous => ({ ...previous, [index]: event.target.value })); }}>
                     <option value="">No asignar todavía</option>
                     {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character =>
                       <option key={character.id} value={character.id}>{character.name}</option>)}
                   </select></div></div>)}
-              <button type="button" disabled={recoveryBusy || !Object.values(recoveryAssignments).some(Boolean)}
+              <label className="flex items-start gap-2 text-xs">
+                <input type="checkbox" checked={recoveryConfirmed} disabled={recoveryBusy} onChange={event => setRecoveryConfirmed(event.target.checked)} className="mt-0.5" />
+                Confirmo que asigné las fotos originales a los personajes correctos. Solo se reemplazarán sus avatares.
+              </label>
+              <button type="button" disabled={recoveryBusy || !recoveryConfirmed || !Object.values(recoveryAssignments).some(Boolean)}
                 onClick={() => void recoverSelectedAvatars()} className="rounded-xl bg-primary px-4 py-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar avatares en R2'}
               </button>
