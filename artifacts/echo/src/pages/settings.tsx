@@ -5,7 +5,7 @@ import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
-import { getActiveUniverseId, loadUniverse } from '@/store/persistence';
+import { loadUniverse } from '@/store/persistence';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
 import { UniverseSelector } from '@/components/echo/universe-selector';
@@ -48,7 +48,7 @@ function RecoveryPreview({ file }: { file: File }) {
 }
 
 export default function SettingsPage() {
-  const { state, me, actions, storageError, lastSavedAt } = useSocial();
+  const { state, me, actions, storageError, lastSavedAt, universeId } = useSocial();
   const [recoveryFiles, setRecoveryFiles] = useState<File[]>([]);
   const [showRecovery, setShowRecovery] = useState(false);
   const { user } = useUser();
@@ -68,7 +68,7 @@ export default function SettingsPage() {
   async function verifyRecoveredMedia(check: (remote: typeof state) => boolean) {
     if (!user?.id) throw new Error('No se pudo identificar la sesión para verificar el guardado.');
     await actions.retrySync();
-    const remote = await loadUniverse(getActiveUniverseId(user.id));
+    const remote = await loadUniverse(universeId);
     if (!remote.state || !check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
   }
   async function recoverSelectedAvatars() {
