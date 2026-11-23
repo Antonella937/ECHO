@@ -344,6 +344,7 @@ export default function SettingsPage() {
       .filter((path): path is string => typeof path === 'string' && path.startsWith('/objects/uploads/'))));
     if (!paths.length) { setRecoveryStatus('No hay imágenes antiguas para comprobar.'); return; }
     setCheckingLegacy(true);
+    setAutoCopyConfirmed(false);
     setLegacyAvailability({});
     try {
       const results: Record<string, string> = {};
@@ -357,7 +358,11 @@ export default function SettingsPage() {
       }
       setLegacyAvailability(results);
       setRecoveryStatus(`Supabase: ${Object.values(results).filter(v => v === 'available').length} disponibles, ${Object.values(results).filter(v => v === 'missing').length} faltantes. No se modificaron imágenes.`);
-    } catch (error) { setRecoveryStatus(`No se pudo comprobar Supabase: ${error instanceof Error ? error.message : 'Error desconocido'}`); }
+    } catch (error) {
+      setLegacyAvailability({});
+      setAutoCopyConfirmed(false);
+      setRecoveryStatus(`No se pudo comprobar Supabase: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
     finally { setCheckingLegacy(false); }
   }
   async function recoverAvailableContent() {
@@ -365,13 +370,16 @@ export default function SettingsPage() {
     const pending = legacyMedia.filter(path => legacyAvailability[path] === 'available');
     if (!pending.length) { setRecoveryStatus('No hay publicaciones disponibles para copiar.'); return; }
     setRecoveryBusy(true);
-    let done = 0;
     try {
       // One verified copy at a time; stop after the first to refresh the local universe
       // before the next copy and avoid applying edits from a stale state snapshot.
       const ok = await recoverContentPhoto(null, pending[0]);
-      if (ok) { done++; setLegacyAvailability(previous => ({ ...previous, [pending[0]]: 'recovered' })); }
-      setRecoveryStatus(ok ? 'Imagen copiada y sincronizada. Actualizá el inventario antes de continuar con la siguiente.' : 'No se pudo completar la copia. Revisá el resultado antes de volver a intentar.');
+      if (ok) {
+        setLegacyAvailability(previous => ({ ...previous, [pending[0]]: 'recovered' }));
+        setRecoveryStatus('Imagen copiada y sincronizada. Actualizá el inventario antes de continuar con la siguiente.');
+      }
+      // On failure, preserve the specific diagnostic from recoverContentPhoto.
+      // The copy may already exist in R2, so never retry silently.
     } finally { setRecoveryBusy(false); setAutoCopyConfirmed(false); }
   }
   async function recoverContentBatch() {
