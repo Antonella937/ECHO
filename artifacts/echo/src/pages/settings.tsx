@@ -336,6 +336,24 @@ export default function SettingsPage() {
         throw new Error('El carrusel o la portada cambió en el servidor. Actualizá ECHO antes de recuperar esta imagen.');
       let objectPath: string;
       if (file) {
+        // Reuse a claimed R2 upload after a failed universe sync instead of
+        // creating duplicate files. Scope the checkpoint to owner, universe and
+        // original media path; never store signed upload URLs or credentials.
+        const checkpointKey = `echo:media-recovery:${user!.id}:${recoveryUniverse}:${oldPath}`;
+        const previous = window.localStorage.getItem(checkpointKey);
+        const cachedPath = previous && /^\\/objects\\/r2\\/[0-9a-f-]{36}$/i.test(previous) ? previous : null;
+        if (cachedPath) {
+          const existing = await customFetch<Blob>(`/api/storage/objects/r2/${cachedPath.split('/').pop()}`, {
+            method: 'GET', responseType: 'blob',
+          }).catch(() => null);
+          if (existing && existing.size > 0) {
+            objectPath = cachedPath;
+            setRecoveryStatus('Reutilizando la foto ya subida a R2. Verificando su asociación con la publicación…');
+          } else {
+            window.localStorage.removeItem(checkpointKey);
+          }
+        }
+        if (!objectPath) {
         setRecoveryStatus('Subiendo imagen original a R2…');
         const signed = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -347,6 +365,8 @@ export default function SettingsPage() {
         if (!upload.ok) throw new Error('No se pudo subir la foto.');
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ objectPath }), responseType: 'json' });
+        window.localStorage.setItem(checkpointKey, objectPath);
+        }
       } else {
         if (!autoCopyConfirmed || legacyAvailability[oldPath] !== 'available') throw new Error('Primero comprobá y confirmá la imagen disponible en Supabase.');
         setRecoveryStatus('Copiando imagen original desde Supabase a R2…');
@@ -386,6 +406,7 @@ export default function SettingsPage() {
         !remote.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
           post.media?.some(item => item.type === 'image' && item.url === oldPath)) &&
         !remote.stories.some(story => story.image === oldPath));
+      if (file && user?.id) window.localStorage.removeItem(`echo:media-recovery:${user.id}:${recoveryUniverse}:${oldPath}`);
       setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
       if (!batchPath) {
         setRecoveryMediaPath('');
