@@ -237,6 +237,15 @@ export default function SettingsPage() {
       if (JSON.stringify(localPostRefs) !== JSON.stringify(remotePostRefs) ||
           JSON.stringify(localStoryRefs) !== JSON.stringify(remoteStoryRefs))
         throw new Error('Las publicaciones o historias cambiaron en el servidor. Actualizá ECHO antes de recuperar esta imagen.');
+      // Matching post IDs alone is insufficient: a carousel may have gained or lost
+      // an image entry while the local session was stale.
+      const imageSlots = (posts: typeof state.posts) => posts.flatMap(post => [
+        ...((post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ? [`${post.id}:cover`] : []),
+        ...(post.media ?? []).filter(item => item.type === 'image' && item.url === oldPath)
+          .map(item => `${post.id}:media:${item.id}`),
+      ]).sort();
+      if (JSON.stringify(imageSlots(state.posts)) !== JSON.stringify(imageSlots(beforeUpload.state!.posts)))
+        throw new Error('El carrusel o la portada cambió en el servidor. Actualizá ECHO antes de recuperar esta imagen.');
       setRecoveryStatus('Subiendo imagen original a R2…');
       const { uploadURL, objectPath } = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
