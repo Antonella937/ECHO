@@ -68,6 +68,50 @@ export function createSupabaseStorageRouter(): IRouter {
     }
   });
 
+  // Explicit, single-object copy only. Never delete the Supabase source or rewrite posts here.
+  router.post("/storage/recovery/copy-legacy", requireAuth, async (req, res) => {
+    const oldPath = req.body?.oldPath;
+    if (typeof oldPath !== "string" || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(oldPath)) {
+      res.status(400).json({ error: "INVALID_MEDIA_PATH" }); return;
+    }
+    try {
+      const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+        .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, oldPath))).limit(1);
+      if (!owned) { res.status(404).json({ error: "MEDIA_NOT_FOUND" }); return; }
+      const r2 = configuredR2();
+      if (!r2) { res.status(503).json({ error: "R2_NOT_CONFIGURED" }); return; }
+      const source = await fetchStored(oldPath);
+      if (!source.ok) { res.status(source.status === 404 ? 404 : 502).json({ error: "LEGACY_SOURCE_UNAVAILABLE" }); return; }
+      const mime = (source.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
+      if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
+        res.status(415).json({ error: "LEGACY_FORMAT_UNSUPPORTED" }); return;
+      }
+      const declaredLength = Number(source.headers.get("content-length") ?? 0);
+      if (declaredLength > 15 * 1024 * 1024) { await source.body?.cancel(); res.status(413).json({ error: "LEGACY_TOO_LARGE" }); return; }
+      const bytes = Buffer.from(await source.arrayBuffer());
+      if (!bytes.length || bytes.length > 15 * 1024 * 1024 || !validMediaHeader(bytes.subarray(0, 64), mime)) {
+        res.status(400).json({ error: "LEGACY_MEDIA_INVALID" }); return;
+      }
+      const objectPath = `/objects/r2/${randomUUID()}`;
+      const uploaded = await fetch(signR2Request(r2, "PUT", objectPath.slice("/objects/".length)), {
+        method: "PUT", headers: { "Content-Type": mime }, body: bytes, signal: AbortSignal.timeout(30000),
+      });
+      if (!uploaded.ok) { res.status(502).json({ error: "R2_COPY_FAILED" }); return; }
+      const verify = await fetch(signR2Request(r2, "GET", objectPath.slice("/objects/".length)), {
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!verify.ok) { res.status(502).json({ error: "R2_VERIFY_FAILED" }); return; }
+      const copied = Buffer.from(await verify.arrayBuffer());
+      if (!copied.equals(bytes)) { res.status(502).json({ error: "R2_CONTENT_MISMATCH" }); return; }
+      await db.insert(echoMediaTable).values({ ownerId: req.userId!, objectPath });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ oldPath, objectPath });
+    } catch (error) {
+      logger.warn({ err: error }, "Legacy media copy failed");
+      res.status(503).json({ error: "LEGACY_COPY_UNAVAILABLE" });
+    }
+  });
+
   router.post("/storage/uploads/request-url", requireAuth, async (req, res) => {
     const parsed = RequestUploadUrlBody.safeParse(req.body);
     if (!parsed.success || !mediaLimits[parsed.data.contentType] ||
