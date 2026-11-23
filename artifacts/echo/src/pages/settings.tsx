@@ -130,7 +130,7 @@ export default function SettingsPage() {
       setRecoveryContentFile(null);
       setRecoveryContentConfirmed(false);
     } catch (error) {
-      setRecoveryStatus(error instanceof Error ? error.message : 'No se pudo confirmar la recuperación. Comprobá el contenido antes de reintentar.');
+      setRecoveryStatus(`No se pudo confirmar la recuperación completa. Revisá primero la publicación o historia antes de reintentar para evitar duplicados. ${error instanceof Error ? error.message : ''}`);
     } finally { setRecoveryBusy(false); }
   }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
@@ -315,7 +315,7 @@ export default function SettingsPage() {
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
               <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
               <select aria-label="Imagen antigua a recuperar" className="w-full rounded-lg bg-background p-2" value={recoveryMediaPath}
-                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentConfirmed(false); }}>
+                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); }}>
                 <option value="">Elegir referencia antigua</option>
                 {legacyMedia.map((path, index) => <option key={path} value={path}>Imagen {index + 1} · {path.slice(-8)}</option>)}
               </select>
@@ -323,7 +323,7 @@ export default function SettingsPage() {
               <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || recoveryBusy}
                 onChange={event => { setRecoveryContentFile(event.currentTarget.files?.[0] ?? null); setRecoveryContentConfirmed(false); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
-              {recoveryContentFile && <p className="break-all text-muted-foreground">Archivo elegido: {recoveryContentFile.name}</p>}
+              {recoveryContentFile && <div className="flex items-center gap-3"><RecoveryPreview file={recoveryContentFile} /><p className="min-w-0 break-all text-muted-foreground">Archivo elegido: {recoveryContentFile.name}</p></div>}
               <label className="flex items-start gap-2"><input type="checkbox" checked={recoveryContentConfirmed} disabled={!recoveryMediaPath || !recoveryContentFile || recoveryBusy}
                 onChange={event => setRecoveryContentConfirmed(event.target.checked)} />
                 Confirmo que esta foto corresponde a la referencia antigua seleccionada.</label>
@@ -339,7 +339,7 @@ export default function SettingsPage() {
                 {state.posts.filter(post => post.image?.startsWith('/objects/uploads/') || post.media?.some(item => JSON.stringify(item).includes('/objects/uploads/'))).length} publicaciones ·{' '}
                 {state.stories.filter(story => story.image?.startsWith('/objects/uploads/')).length} historias
               </p>
-              <p className="mt-2 text-muted-foreground">Por ahora solo se recuperan avatares. Las publicaciones y las historias aparecen en este inventario para preparar su recuperación sin modificar contenido existente.</p>
+              <p className="mt-2 text-muted-foreground">Podés recuperar avatares, publicaciones e historias por separado. Elegí cada referencia con cuidado: la recuperación de publicaciones e historias requiere una foto original que corresponda exactamente.</p>
             </div>
           </div>}
         </section>
