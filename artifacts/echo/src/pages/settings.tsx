@@ -68,7 +68,7 @@ export default function SettingsPage() {
     if (!user?.id) throw new Error('No se pudo identificar la sesión para verificar el guardado.');
     await actions.retrySync();
     const remote = await loadUniverse(getActiveUniverseId(user.id));
-    if (!check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
+    if (!remote.state || !check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
   }
   async function recoverSelectedAvatars() {
     const assignments = Object.entries(recoveryAssignments).filter(([index, id]) => id && recoveryFiles[Number(index)]);
