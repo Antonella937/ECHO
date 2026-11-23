@@ -117,7 +117,7 @@ export default function SettingsPage() {
         const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
           '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contentType: file.type, size: file.size }), responseType: 'json' });
-        if (!objectPath.startsWith('/objects/r2/')) throw new Error('El almacenamiento activo no es Cloudflare R2. No se modificó el perfil.');
+        if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se modificó el perfil.');
         const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
         if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -195,7 +195,7 @@ export default function SettingsPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ size: file.size, contentType: file.type }), responseType: 'json',
       });
-      if (!objectPath.startsWith('/objects/r2/')) throw new Error('R2 no está habilitado. No se cambió el contenido.');
+      if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se cambió el contenido.');
       const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
       if (!upload.ok) throw new Error('No se pudo subir la foto.');
       await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
