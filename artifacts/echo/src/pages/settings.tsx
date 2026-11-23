@@ -157,7 +157,7 @@ export default function SettingsPage() {
         setRecoveryStatus(`Subiendo ${completed + 1} de ${assignments.length}: ${character.name}…`);
         const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
           '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contentType: recoveryImageType(file), size: file.size }), responseType: 'json' });
+            body: JSON.stringify({ name: file.name || 'recovered-image', contentType: recoveryImageType(file), size: file.size }), responseType: 'json' });
         if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se modificó el perfil.');
         const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
         if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
@@ -291,7 +291,7 @@ export default function SettingsPage() {
         setRecoveryStatus('Subiendo imagen original a R2…');
         const signed = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ size: file.size, contentType: recoveryImageType(file) }), responseType: 'json',
+          body: JSON.stringify({ name: file.name || 'recovered-image', size: file.size, contentType: recoveryImageType(file) }), responseType: 'json',
         });
         objectPath = signed.objectPath;
         if (!/^\/objects\/r2\/[0-9a-f-]{36}$/i.test(objectPath)) throw new Error('La referencia de R2 no es válida.');
