@@ -109,7 +109,8 @@ export default function SettingsPage() {
       for (const [index, id] of assignments) {
         const file = recoveryFiles[Number(index)];
         const character = state.characters.find(item => item.id === id);
-        if (!character || !character.avatar?.startsWith('/objects/uploads/')) continue;
+        if (!character || !character.avatar?.startsWith('/objects/uploads/'))
+          throw new Error('El avatar pendiente cambió durante la recuperación. Revisá el perfil antes de continuar.');
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024 || !file.size) {
           throw new Error('Solo JPG, PNG o WebP de hasta 15 MB. Convertí las fotos HEIC antes de recuperarlas.');
         }
