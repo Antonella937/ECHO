@@ -348,17 +348,19 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (!/^\/objects\/uploads\/[a-zA-Z0-9_-]+$/.test(oldPath) ||
             !/^\/objects\/r2\/[a-zA-Z0-9_-]+$/.test(newPath))
           throw new Error('Referencia de recuperación inválida.');
+        const snapshot = cur();
+        const matches = snapshot.posts.some(post => post.image === oldPath || post.media?.some(item => item.url === oldPath)) ||
+          snapshot.stories.some(story => story.image === oldPath);
+        if (!matches) throw new Error('La imagen antigua ya no está presente. Actualizá ECHO antes de intentar recuperarla.');
         coordinator.current?.edit(s => ({
           ...s,
           posts: s.posts.map(post => {
-            const media = post.media?.map(item => {
-              const copy = { ...item } as Record<string, unknown>;
-              for (const key of ['src', 'url', 'image', 'objectPath']) {
-                if (copy[key] === oldPath) copy[key] = newPath;
-              }
-              return copy as typeof item;
-            });
-            return { ...post, image: post.image === oldPath ? newPath : post.image, ...(media ? { media } : {}) };
+            const media = post.media?.map(item => item.url === oldPath ? { ...item, url: newPath } : item);
+            return {
+              ...post,
+              image: post.image === oldPath ? newPath : post.image,
+              ...(media ? { media } : {}),
+            };
           }),
           stories: s.stories.map(story => story.image === oldPath ? { ...story, image: newPath } : story),
         }));
