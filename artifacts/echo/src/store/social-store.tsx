@@ -17,6 +17,7 @@ import { playMessageSound } from '@/lib/message-sounds';
 
 export interface SocialActions {
   editPost(id: string, patch: Partial<PostEdit>, expected?: Partial<PostEdit>): void;
+  recoverLegacyMedia(oldPath: string, newPath: string): void;
   pinPost(id: string, pinned: boolean): void;
   movePinnedPost(id: string, direction: -1 | 1): void;
   reactStory(id: string, value: string): void;
@@ -343,6 +344,25 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (c) dispatch({ type: 'comment.liked', commentId, actorId: myId(), liked: !c.likes.includes(myId()) });
       },
       editPost(id, patch, expected) { coordinator.current?.edit(s => editSocialPost(s, id, myId(), patch, expected)); },
+      recoverLegacyMedia(oldPath, newPath) {
+        if (!/^\\/objects\\/uploads\\/[a-zA-Z0-9_-]+$/.test(oldPath) ||
+            !/^\\/objects\\/r2\\/[a-zA-Z0-9_-]+$/.test(newPath))
+          throw new Error('Referencia de recuperación inválida.');
+        coordinator.current?.edit(s => ({
+          ...s,
+          posts: s.posts.map(post => {
+            const media = post.media?.map(item => {
+              const copy = { ...item } as Record<string, unknown>;
+              for (const key of ['src', 'url', 'image', 'objectPath']) {
+                if (copy[key] === oldPath) copy[key] = newPath;
+              }
+              return copy as typeof item;
+            });
+            return { ...post, image: post.image === oldPath ? newPath : post.image, ...(media ? { media } : {}) };
+          }),
+          stories: s.stories.map(story => story.image === oldPath ? { ...story, image: newPath } : story),
+        }));
+      },
       pinPost(id, pinned) { coordinator.current?.edit(s => setPinnedPost(s, id, myId(), pinned)); },
       movePinnedPost(id, direction) { coordinator.current?.edit(s => movePinnedPost(s, id, myId(), direction)); },
       reactMessage(id, value) {
