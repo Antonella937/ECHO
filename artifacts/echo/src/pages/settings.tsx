@@ -543,7 +543,7 @@ export default function SettingsPage() {
                     onChange={event => setRecoveryBatchAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
                     <option value="">Sin asignar</option>
                     {(recoveryBatchAssignments[index] && !visibleLegacyMedia.some(item => item.path === recoveryBatchAssignments[index]) ? [legacyMediaDetails.find(item => item.path === recoveryBatchAssignments[index]), ...visibleLegacyMedia] : visibleLegacyMedia).filter((item): item is (typeof legacyMediaDetails)[number] => Boolean(item)).map(item => <option key={item.path} value={item.path}>
-                      {item.owners.join(', ')} · {item.posts[0]?.caption?.slice(0, 45) || item.stories[0]?.caption?.slice(0, 45) || item.posts[0]?.createdAt.toLocaleDateString('es-AR') || item.stories[0]?.createdAt.toLocaleDateString('es-AR') || 'Sin texto'} · {item.path.slice(-8)}
+                      {item.owners.join(', ')} · {item.posts[0]?.caption?.slice(0, 45) || item.stories[0]?.caption?.slice(0, 45) || (item.posts[0]?.createdAt ? new Date(item.posts[0].createdAt).toLocaleDateString('es-AR') : '') || (item.stories[0]?.createdAt ? new Date(item.stories[0].createdAt).toLocaleDateString('es-AR') : '') || 'Sin texto'} · {item.path.slice(-8)}
                     </option>)}
                   </select>
                 </div>
