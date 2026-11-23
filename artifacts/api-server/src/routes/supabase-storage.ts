@@ -38,6 +38,20 @@ export const fetchStored = (path: string, range?: string) => {
 
 export function createSupabaseStorageRouter(): IRouter {
   const router: IRouter = Router();
+  // Owner-scoped inventory for the recovery UI. No signed URLs or credentials exposed.
+  router.get("/storage/recovery/inventory", requireAuth, async (req, res) => {
+    try {
+      const rows = await db.select({ objectPath: echoMediaTable.objectPath, createdAt: echoMediaTable.createdAt })
+        .from(echoMediaTable).where(eq(echoMediaTable.ownerId, req.userId!));
+      const legacy = rows.filter(row => /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/i.test(row.objectPath));
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ total: legacy.length, paths: legacy.map(row => ({ path: row.objectPath, createdAt: row.createdAt })) });
+    } catch (error) {
+      logger.warn({ err: error }, "Legacy recovery inventory failed");
+      res.status(503).json({ error: "RECOVERY_INVENTORY_UNAVAILABLE" });
+    }
+  });
+
   // Read-only inventory: never expose private URLs or read another owner's media.
   router.post("/storage/recovery/check-legacy", requireAuth, async (req, res) => {
     const paths = req.body?.paths;
