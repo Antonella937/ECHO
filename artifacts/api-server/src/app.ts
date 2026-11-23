@@ -47,7 +47,9 @@ app.use(cors({
     }
   },
 }));
-app.use(express.json({ limit: "2mb" }));
+// Universe synchronization currently sends a full JSON snapshot. Keep a bounded
+// request size while allowing established worlds to exceed the original 2 MB cap.
+app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Public liveness probe: must not require Clerk, a beta seat, or database access.
