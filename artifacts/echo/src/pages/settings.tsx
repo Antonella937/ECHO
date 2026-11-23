@@ -5,6 +5,7 @@ import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
 import type { Appearance, ImageStyle } from '@/domain/types';
 import { useSocial } from '@/store/social-store';
+import { getActiveUniverseId, loadUniverse } from '@/store/persistence';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { AccountManager } from '@/components/echo/account-manager';
 import { UniverseSelector } from '@/components/echo/universe-selector';
@@ -63,6 +64,12 @@ export default function SettingsPage() {
   const t = useTranslation();
   const st = useSettingsText();
   const language = useLanguage();
+  async function verifyRecoveredMedia(check: (remote: typeof state) => boolean) {
+    if (!user?.id) throw new Error('No se pudo identificar la sesión para verificar el guardado.');
+    await actions.retrySync();
+    const remote = await loadUniverse(getActiveUniverseId(user.id));
+    if (!check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
+  }
   async function recoverSelectedAvatars() {
     const assignments = Object.entries(recoveryAssignments).filter(([index, id]) => id && recoveryFiles[Number(index)]);
     if (!assignments.length || recoveryBusy || !recoveryConfirmed) return;
@@ -71,6 +78,7 @@ export default function SettingsPage() {
     }
     setRecoveryBusy(true);
     let completed = 0;
+    const updatedAvatars: Array<{ id: string; path: string }> = [];
     try {
       for (const [index, id] of assignments) {
         const file = recoveryFiles[Number(index)];
@@ -90,11 +98,12 @@ export default function SettingsPage() {
           body: JSON.stringify({ objectPath }), responseType: 'json' });
         // Persist only after upload and read-back verification. Preserve all other account fields.
         actions.updateAccount(id, { ...character, avatar: objectPath }, character);
+        updatedAvatars.push({ id, path: objectPath });
         completed++;
       }
       if (completed > 0) {
         setRecoveryStatus(`Subidos ${completed} avatar(es). Verificando sincronización del universo…`);
-        await actions.retrySync();
+        await verifyRecoveredMedia(remote => updatedAvatars.every(item => remote.characters.some(character => character.id === item.id && character.avatar === item.path)));
       }
       setRecoveryStatus(`Recuperados y sincronizados ${completed} avatar(es). Las imágenes anteriores no se borraron.`);
       if (completed > 0) toast({ title: 'Avatares sincronizados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
@@ -129,9 +138,12 @@ export default function SettingsPage() {
       if (!upload.ok) throw new Error('No se pudo subir la foto.');
       await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objectPath }), responseType: 'json' });
-      actions.recoverLegacyMedia(recoveryMediaPath, objectPath);
-      setRecoveryStatus('Foto subida. Verificando sincronización de publicaciones e historias…');
-      await actions.retrySync();
+      const oldPath = recoveryMediaPath;
+      actions.recoverLegacyMedia(oldPath, objectPath);
+      setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
+      await verifyRecoveredMedia(remote => !remote.posts.some(post => post.image === oldPath || post.media?.some(item => item.url === oldPath)) &&
+        !remote.stories.some(story => story.image === oldPath) &&
+        (remote.posts.some(post => post.image === objectPath || post.media?.some(item => item.url === objectPath)) || remote.stories.some(story => story.image === objectPath)));
       setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
       setRecoveryMediaPath('');
       setRecoveryContentFile(null);
