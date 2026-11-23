@@ -262,7 +262,16 @@ export default function SettingsPage() {
         mediaIds: (post.media ?? []).filter(item => item.type === 'image' && item.url === oldPath).map(item => item.id),
       })).filter(post => post.cover || post.mediaIds.length > 0);
       const expectedStoryIds = state.stories.filter(story => story.image === oldPath).map(story => story.id);
+      // The upload may take several seconds. Recheck the exact references before
+      // applying the new path so concurrent edits cannot leave a partial recovery.
       assertRecoveryUniverse(recoveryUniverse);
+      const beforeApply = await loadUniverse(recoveryUniverse);
+      assertRecoveryUniverse(recoveryUniverse);
+      if (!beforeApply.state ||
+          JSON.stringify(imageSlots(beforeApply.state.posts)) !== JSON.stringify(imageSlots(state.posts)) ||
+          JSON.stringify(beforeApply.state.stories.filter(story => story.image === oldPath).map(story => story.id).sort()) !==
+            JSON.stringify(expectedStoryIds.slice().sort()))
+        throw new Error('Las referencias cambiaron mientras se subía la foto. Actualizá ECHO y revisá la publicación antes de reintentar.');
       actions.recoverLegacyMedia(oldPath, objectPath);
       setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
       await verifyRecoveredMedia(recoveryUniverse, remote =>
