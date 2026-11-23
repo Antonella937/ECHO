@@ -47,6 +47,16 @@ function RecoveryPreview({ file }: { file: File }) {
   return src ? <img src={src} alt={file.name} className="h-12 w-12 shrink-0 rounded-lg object-cover" /> : <div className="h-12 w-12 shrink-0 rounded-lg bg-secondary" />;
 }
 
+// iOS Files sometimes supplies an empty or generic MIME type for a valid image.
+// Infer only from a supported extension; the server still checks the actual bytes.
+function recoveryImageType(file: File): string {
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return file.type;
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  return extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg'
+    : extension === 'png' ? 'image/png'
+    : extension === 'webp' ? 'image/webp' : '';
+}
+
 export default function SettingsPage() {
   const { state, me, actions, storageError, lastSavedAt, universeId } = useSocial();
   const recoveryUniverseRef = useRef(universeId);
@@ -103,7 +113,7 @@ export default function SettingsPage() {
       const character = state.characters.find(item => item.id === id);
       return !Number.isInteger(fileIndex) || fileIndex < 0 ||
         !character?.avatar || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(character.avatar) ||
-        !file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
+        !file || !recoveryImageType(file) ||
         !file.size || file.size > 15 * 1024 * 1024;
     });
     if (invalid) {
@@ -121,7 +131,7 @@ export default function SettingsPage() {
         const character = state.characters.find(item => item.id === id);
         if (!character || !character.avatar?.startsWith('/objects/uploads/'))
           throw new Error('El avatar pendiente cambió durante la recuperación. Revisá el perfil antes de continuar.');
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024 || !file.size) {
+        if (!recoveryImageType(file) || file.size > 15 * 1024 * 1024 || !file.size) {
           throw new Error('Solo JPG, PNG o WebP de hasta 15 MB. Convertí las fotos HEIC antes de recuperarlas.');
         }
         // Check the server immediately before upload: another session may have restored this avatar.
@@ -134,9 +144,9 @@ export default function SettingsPage() {
         setRecoveryStatus(`Subiendo ${completed + 1} de ${assignments.length}: ${character.name}…`);
         const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
           '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contentType: file.type, size: file.size }), responseType: 'json' });
+            body: JSON.stringify({ contentType: recoveryImageType(file), size: file.size }), responseType: 'json' });
         if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se modificó el perfil.');
-        const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+        const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
         if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ objectPath }), responseType: 'json' });
@@ -214,7 +224,7 @@ export default function SettingsPage() {
     const recoveryUniverse = universeId;
     setRecoveryBusy(true);
     try {
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || !file.size || file.size > 15 * 1024 * 1024)
+      if (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024)
         throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
       const oldPath = recoveryMediaPath;
       // Check the current server snapshot before uploading: the photo may already have
@@ -255,10 +265,10 @@ export default function SettingsPage() {
       setRecoveryStatus('Subiendo imagen original a R2…');
       const { uploadURL, objectPath } = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ size: file.size, contentType: file.type }), responseType: 'json',
+        body: JSON.stringify({ size: file.size, contentType: recoveryImageType(file) }), responseType: 'json',
       });
       if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se cambió el contenido.');
-      const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
       if (!upload.ok) throw new Error('No se pudo subir la foto.');
       await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objectPath }), responseType: 'json' });
