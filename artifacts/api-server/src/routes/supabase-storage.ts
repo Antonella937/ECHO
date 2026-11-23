@@ -54,10 +54,22 @@ export function createSupabaseStorageRouter(): IRouter {
           .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, path))).limit(1);
         if (!owned) { results.push({ path, status: "not_owned" }); continue; }
         try {
-          const response = await fetch(storageUrl(base, path.slice("/objects/".length)), {
+          const url = storageUrl(base, path.slice("/objects/".length));
+          const response = await fetch(url, {
             method: "HEAD", headers: authHeaders(key), signal: AbortSignal.timeout(8000),
           });
-          results.push({ path, status: response.ok ? "available" : response.status === 404 ? "missing" : "unknown" });
+          // Some storage gateways reject HEAD despite serving GET. A tiny ranged
+          // GET checks availability without fetching the full private image.
+          if (response.status === 405 || response.status === 501) {
+            const fallback = await fetch(url, {
+              method: "GET", headers: { ...authHeaders(key), Range: "bytes=0-0" },
+              signal: AbortSignal.timeout(8000),
+            });
+            if (fallback.body) await fallback.body.cancel();
+            results.push({ path, status: fallback.ok ? "available" : fallback.status === 404 ? "missing" : "unknown" });
+          } else {
+            results.push({ path, status: response.ok ? "available" : response.status === 404 ? "missing" : "unknown" });
+          }
         } catch { results.push({ path, status: "unknown" }); }
       }
       res.setHeader("Cache-Control", "no-store");
