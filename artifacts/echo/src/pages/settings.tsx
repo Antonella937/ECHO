@@ -174,6 +174,12 @@ export default function SettingsPage() {
         ...item.stories.map(story => new Date(story.createdAt).toLocaleDateString('es-AR'))]
         .some(value => String(value ?? '').toLocaleLowerCase().includes(query)));
   }, [legacyMediaDetails, recoverySearch]);
+  // Avoid rendering thousands of <option> elements on mobile; keep the selected value visible.
+  const visibleLegacyMedia = useMemo(() => {
+    const first = filteredLegacyMedia.slice(0, 100);
+    const selected = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
+    return selected && !first.some(item => item.path === selected.path) ? [selected, ...first] : first;
+  }, [filteredLegacyMedia, legacyMediaDetails, recoveryMediaPath]);
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function recoverContentPhoto(file: File) {
     if (!recoveryContentConfirmed || !recoveryMediaPath || recoveryBusy || !legacyMedia.includes(recoveryMediaPath)) return;
@@ -402,11 +408,11 @@ export default function SettingsPage() {
               <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
               <input type="search" aria-label="Buscar fotos antiguas" placeholder="Buscar por personaje, caption o fecha…" disabled={recoveryBusy} value={recoverySearch}
                 onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
-              <p className="text-muted-foreground">{filteredLegacyMedia.length} de {legacyMediaDetails.length} referencias encontradas</p>
+              <p className="text-muted-foreground">{filteredLegacyMedia.length} de {legacyMediaDetails.length} referencias encontradas{filteredLegacyMedia.length > 100 ? ' · Mostrando las primeras 100. Escribí una cuenta, fecha o caption para encontrar las demás.' : ''}</p>
               <select aria-label="Imagen antigua a recuperar" disabled={recoveryBusy} className="w-full rounded-lg bg-background p-2 disabled:opacity-50" value={recoveryMediaPath}
                 onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); }}>
                 <option value="">Elegir referencia antigua</option>
-                {filteredLegacyMedia.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length && item.stories.length ? 'Publicación e historia' : item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
+                {visibleLegacyMedia.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length && item.stories.length ? 'Publicación e historia' : item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
               </select>
               {selectedMediaDetails && <div className="space-y-2 rounded-lg bg-secondary/30 p-3">
                 <p className="font-semibold">Cuenta: {selectedMediaDetails.owners.join(', ')}</p>
