@@ -687,7 +687,10 @@ export default function SettingsPage() {
                 Confirmo que esta foto corresponde a la referencia antigua seleccionada.</label>
               <button type="button" disabled={!recoveryContentFile || !recoveryMediaPath || !recoveryContentConfirmed || recoveryBusy}
                 onClick={() => { if (recoveryContentFile) void recoverContentPhoto(recoveryContentFile); }}
-                className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">Recuperar foto seleccionada</button>
+                className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
+                {recoveryBusy ? 'Recuperando foto…' : 'Recuperar foto seleccionada'}
+              </button>
+              {recoveryStatus && <p role="status" aria-live="polite" aria-atomic="true" className="rounded-lg bg-secondary/40 p-3 text-xs break-words">{recoveryStatus}</p>}
               <p className="text-muted-foreground">No se sube nada hasta que confirmes y toques el botón. No se eliminan originales.</p>
             </div>
             <div className="rounded-xl border border-border p-3 text-xs">
