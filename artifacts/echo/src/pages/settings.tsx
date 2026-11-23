@@ -527,7 +527,10 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-3 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Preparar recuperación de publicaciones en lote</p>
-              <p className="text-muted-foreground">Elegí varias fotos juntas. Revisá la vista previa y asigná la referencia original a cada una. Esta preparación no sube ni modifica nada.</p>
+              <p className="text-muted-foreground">Elegí varias fotos juntas, revisá cada miniatura y asigná una referencia original diferente a cada una. Solo se subirán al confirmar.</p>
+              <input type="search" aria-label="Filtrar referencias del lote" placeholder="Buscar por personaje, fecha o caption…" disabled={recoveryBusy} value={recoverySearch}
+                onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
+              <p className="text-muted-foreground">Mostrando {visibleLegacyMedia.length} de {filteredLegacyMedia.length} referencias filtradas. Buscá para acotar la lista.</p>
               <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={recoveryBusy}
                 aria-label="Seleccionar fotos de publicaciones en lote"
                 onChange={event => { setRecoveryBatchFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryBatchAssignments({}); }}
@@ -539,13 +542,13 @@ export default function SettingsPage() {
                     value={recoveryBatchAssignments[index] ?? ''} disabled={recoveryBusy}
                     onChange={event => setRecoveryBatchAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
                     <option value="">Sin asignar</option>
-                    {legacyMediaDetails.map(item => <option key={item.path} value={item.path}>
+                    {(recoveryBatchAssignments[index] && !visibleLegacyMedia.some(item => item.path === recoveryBatchAssignments[index]) ? [legacyMediaDetails.find(item => item.path === recoveryBatchAssignments[index]), ...visibleLegacyMedia] : visibleLegacyMedia).filter((item): item is (typeof legacyMediaDetails)[number] => Boolean(item)).map(item => <option key={item.path} value={item.path}>
                       {item.owners.join(', ')} · {item.posts[0]?.caption?.slice(0, 45) || item.stories[0]?.caption?.slice(0, 45) || item.posts[0]?.createdAt.toLocaleDateString('es-AR') || item.stories[0]?.createdAt.toLocaleDateString('es-AR') || 'Sin texto'} · {item.path.slice(-8)}
                     </option>)}
                   </select>
                 </div>
               </div>)}
-              {recoveryBatchFiles.length > 0 && <p className="text-muted-foreground">Preparadas {Object.values(recoveryBatchAssignments).filter(Boolean).length} de {recoveryBatchFiles.length} fotos. No se aplicarán cambios hasta que se habilite una recuperación por lotes con verificación individual.</p>}
+              {recoveryBatchFiles.length > 0 && <p className="text-muted-foreground">Preparadas {Object.values(recoveryBatchAssignments).filter(Boolean).length} de {recoveryBatchFiles.length} fotos. Revisá las asociaciones antes de confirmar.</p>}
               <button type="button" disabled={recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
                 onClick={() => void recoverContentBatch()} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar lote en R2'}
