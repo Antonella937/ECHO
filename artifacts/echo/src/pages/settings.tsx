@@ -91,7 +91,7 @@ export default function SettingsPage() {
     const invalid = assignments.find(([index, id]) => {
       const file = recoveryFiles[Number(index)];
       const character = state.characters.find(item => item.id === id);
-      return !character?.avatar || !/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(character.avatar) ||
+      return !character?.avatar || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(character.avatar) ||
         !file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
         !file.size || file.size > 15 * 1024 * 1024;
     });
@@ -142,8 +142,8 @@ export default function SettingsPage() {
   const legacyMediaDetails = useMemo(() => {
     const byPath = new Map<string, { path: string; posts: typeof state.posts; stories: typeof state.stories; owners: string[] }>();
     const ensure = (path: string) => {
-      // Match the storage API's UUID-based legacy object paths exactly.
-      if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(path)) return null;
+      // Require the UUID shape used by the storage API, not merely 36 arbitrary hex/hyphen characters.
+      if (!/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) return null;
       let item = byPath.get(path);
       if (!item) {
         item = { path, posts: [], stories: [], owners: [] };
