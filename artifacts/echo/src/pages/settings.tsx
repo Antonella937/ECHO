@@ -367,7 +367,7 @@ export default function SettingsPage() {
                 {selectedMediaDetails.posts.map(post => <div key={post.id} className="space-y-1 border-t border-border pt-2">
                   <p>Publicación · {new Date(post.createdAt).toLocaleDateString('es-AR')}</p>
                   <p className="line-clamp-3 whitespace-pre-wrap">{post.caption || 'Sin caption'}</p>
-                  {post.media?.length ? <p className="text-muted-foreground">Carrusel de {post.media.length} elementos · posición {post.media.findIndex(item => item.url === recoveryMediaPath) + 1}</p> : null}
+                  {post.media?.length ? <p className="text-muted-foreground">Carrusel de {post.media.length} elementos · {post.media.some(item => item.type === 'image' && item.url === recoveryMediaPath) ? `posición ${post.media.findIndex(item => item.type === 'image' && item.url === recoveryMediaPath) + 1}` : 'portada antigua'}</p> : null}
                 </div>)}
                 {selectedMediaDetails.stories.map(story => <div key={story.id} className="space-y-1 border-t border-border pt-2">
                   <p>Historia · {new Date(story.createdAt).toLocaleDateString('es-AR')}</p>
