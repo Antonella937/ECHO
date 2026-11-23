@@ -147,11 +147,20 @@ export default function SettingsPage() {
       await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objectPath }), responseType: 'json' });
       const oldPath = recoveryMediaPath;
+      const expectedPostIds = state.posts.filter(post =>
+        (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
+        post.media?.some(item => item.type === 'image' && item.url === oldPath)).map(post => post.id);
+      const expectedStoryIds = state.stories.filter(story => story.image === oldPath).map(story => story.id);
       actions.recoverLegacyMedia(oldPath, objectPath);
       setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
-      await verifyRecoveredMedia(remote => !remote.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === oldPath)) &&
-        !remote.stories.some(story => story.image === oldPath) &&
-        (remote.posts.some(post => (post.image === objectPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === objectPath)) || remote.stories.some(story => story.image === objectPath)));
+      await verifyRecoveredMedia(remote =>
+        expectedPostIds.every(id => remote.posts.some(post => post.id === id &&
+          ((post.image === objectPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
+            post.media?.some(item => item.type === 'image' && item.url === objectPath)))) &&
+        expectedStoryIds.every(id => remote.stories.some(story => story.id === id && story.image === objectPath)) &&
+        !remote.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
+          post.media?.some(item => item.type === 'image' && item.url === oldPath)) &&
+        !remote.stories.some(story => story.image === oldPath));
       setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
       setRecoveryMediaPath('');
       setRecoveryContentFile(null);
