@@ -73,8 +73,8 @@ export default function SettingsPage() {
         const file = recoveryFiles[Number(index)];
         const character = state.characters.find(item => item.id === id);
         if (!character || !character.avatar?.startsWith('/objects/uploads/')) continue;
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024 || !file.size) {
-          throw new Error('Solo JPG, PNG o WebP de hasta 10 MB. Convertí las fotos HEIC antes de recuperarlas.');
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15 * 1024 * 1024 || !file.size) {
+          throw new Error('Solo JPG, PNG o WebP de hasta 15 MB. Convertí las fotos HEIC antes de recuperarlas.');
         }
         setRecoveryStatus(`Subiendo ${completed + 1} de ${assignments.length}: ${character.name}…`);
         const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
@@ -277,7 +277,15 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">La recuperación de avatares requiere tu asignación manual. Las publicaciones e historias no se modifican.</p>
+            <div className="rounded-xl border border-border p-3 text-xs">
+              <p className="font-semibold">Inventario de imágenes antiguas</p>
+              <p className="mt-2 text-muted-foreground">
+                {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).length} avatares ·{' '}
+                {state.posts.filter(post => post.image?.startsWith('/objects/uploads/') || post.media?.some(item => JSON.stringify(item).includes('/objects/uploads/'))).length} publicaciones ·{' '}
+                {state.stories.filter(story => story.image?.startsWith('/objects/uploads/')).length} historias
+              </p>
+              <p className="mt-2 text-muted-foreground">Por ahora solo se recuperan avatares. Las publicaciones y las historias aparecen en este inventario para preparar su recuperación sin modificar contenido existente.</p>
+            </div>
           </div>}
         </section>
 
