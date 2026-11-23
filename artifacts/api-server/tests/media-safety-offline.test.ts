@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { byteRange, mediaLimits, validMediaHeader } from '../src/lib/mediaSafety';
 
-test('private audio formats have explicit 15 MB limits', () => {
-  for (const mime of ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav']) {
+test('private audio formats have explicit per-format limits', () => {
+  for (const mime of ['audio/webm', 'audio/ogg', 'audio/mp4']) {
     assert.equal(mediaLimits[mime], 15);
+  }
+  for (const mime of ['audio/mpeg', 'audio/wav']) {
+    assert.equal(mediaLimits[mime], 50);
   }
   assert.equal(mediaLimits['audio/aac'], undefined);
   assert.equal(mediaLimits['audio/x-m4a'], undefined);
