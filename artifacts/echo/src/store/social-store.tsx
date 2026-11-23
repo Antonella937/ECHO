@@ -357,6 +357,8 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (!matches) throw new Error('La imagen antigua ya no está presente. Actualizá ECHO antes de intentar recuperarla.');
         const engine = coordinator.current;
         if (!engine) throw new Error('La sincronización no está disponible. No se modificaron las publicaciones.');
+        if (engine.view.conflicts.length)
+          throw new Error('Hay cambios en conflicto. Resolvé la sincronización antes de recuperar fotos; no se modificaron las publicaciones.');
         engine.edit(s => ({
           ...s,
           posts: s.posts.map(post => {
