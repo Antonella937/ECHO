@@ -1,5 +1,5 @@
 import { useClerk, useUser } from '@clerk/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film, Sparkles, Image as ImageIcon, Bell } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
@@ -49,6 +49,8 @@ function RecoveryPreview({ file }: { file: File }) {
 
 export default function SettingsPage() {
   const { state, me, actions, storageError, lastSavedAt, universeId } = useSocial();
+  const recoveryUniverseRef = useRef(universeId);
+  recoveryUniverseRef.current = universeId;
   const [recoveryFiles, setRecoveryFiles] = useState<File[]>([]);
   const [showRecovery, setShowRecovery] = useState(false);
   const { user } = useUser();
@@ -76,10 +78,17 @@ export default function SettingsPage() {
   const t = useTranslation();
   const st = useSettingsText();
   const language = useLanguage();
-  async function verifyRecoveredMedia(check: (remote: typeof state) => boolean) {
+  function assertRecoveryUniverse(expected: string) {
+    if (recoveryUniverseRef.current !== expected)
+      throw new Error('Cambiaste de universo durante la recuperación. Revisá el resultado antes de reintentar.');
+  }
+  async function verifyRecoveredMedia(expectedUniverse: string, check: (remote: typeof state) => boolean) {
+    assertRecoveryUniverse(expectedUniverse);
     if (!user?.id) throw new Error('No se pudo identificar la sesión para verificar el guardado.');
     await actions.retrySync();
-    const remote = await loadUniverse(universeId);
+    assertRecoveryUniverse(expectedUniverse);
+    const remote = await loadUniverse(expectedUniverse);
+    assertRecoveryUniverse(expectedUniverse);
     if (!remote.state || !check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
   }
   async function recoverSelectedAvatars() {
@@ -102,6 +111,7 @@ export default function SettingsPage() {
       setRecoveryConfirmed(false);
       return;
     }
+    const recoveryUniverse = universeId;
     setRecoveryBusy(true);
     let completed = 0;
     const updatedAvatars: Array<{ id: string; path: string }> = [];
@@ -115,7 +125,9 @@ export default function SettingsPage() {
           throw new Error('Solo JPG, PNG o WebP de hasta 15 MB. Convertí las fotos HEIC antes de recuperarlas.');
         }
         // Check the server immediately before upload: another session may have restored this avatar.
-        const currentRemote = await loadUniverse(universeId);
+        assertRecoveryUniverse(recoveryUniverse);
+        const currentRemote = await loadUniverse(recoveryUniverse);
+        assertRecoveryUniverse(recoveryUniverse);
         const remoteCharacter = currentRemote.state?.characters.find(item => item.id === id);
         if (!remoteCharacter || remoteCharacter.avatar !== character.avatar)
           throw new Error(`El avatar de ${character.name} cambió en el servidor. Actualizá ECHO antes de volver a intentar.`);
@@ -130,9 +142,10 @@ export default function SettingsPage() {
           body: JSON.stringify({ objectPath }), responseType: 'json' });
         // Update only after the upload was claimed, then verify this avatar before proceeding.
         // A failed sync must not start uploads for the remaining characters.
+        assertRecoveryUniverse(recoveryUniverse);
         actions.updateAccount(id, { ...character, avatar: objectPath }, character);
         setRecoveryStatus(`Verificando avatar ${completed + 1} de ${assignments.length}: ${character.name}…`);
-        await verifyRecoveredMedia(remote =>
+        await verifyRecoveredMedia(recoveryUniverse, remote =>
           remote.characters.some(item => item.id === id && item.avatar === objectPath));
         updatedAvatars.push({ id, path: objectPath });
         completed++;
@@ -192,6 +205,7 @@ export default function SettingsPage() {
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function recoverContentPhoto(file: File) {
     if (!recoveryContentConfirmed || !recoveryMediaPath || recoveryBusy || !legacyMedia.includes(recoveryMediaPath)) return;
+    const recoveryUniverse = universeId;
     setRecoveryBusy(true);
     try {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || !file.size || file.size > 15 * 1024 * 1024)
@@ -213,9 +227,10 @@ export default function SettingsPage() {
         mediaIds: (post.media ?? []).filter(item => item.type === 'image' && item.url === oldPath).map(item => item.id),
       })).filter(post => post.cover || post.mediaIds.length > 0);
       const expectedStoryIds = state.stories.filter(story => story.image === oldPath).map(story => story.id);
+      assertRecoveryUniverse(recoveryUniverse);
       actions.recoverLegacyMedia(oldPath, objectPath);
       setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
-      await verifyRecoveredMedia(remote =>
+      await verifyRecoveredMedia(recoveryUniverse, remote =>
         expectedPosts.every(expected => {
           const post = remote.posts.find(item => item.id === expected.id);
           return !!post && (!expected.cover || post.image === objectPath) &&
