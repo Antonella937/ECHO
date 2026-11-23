@@ -72,6 +72,8 @@ export default function SettingsPage() {
   const [recoveryContentFile, setRecoveryContentFile] = useState<File | null>(null);
   const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
+  const [legacyAvailability, setLegacyAvailability] = useState<Record<string, string>>({});
+  const [checkingLegacy, setCheckingLegacy] = useState(false);
   const [recoveryBatchFiles, setRecoveryBatchFiles] = useState<File[]>([]);
   const [recoveryBatchConfirmed, setRecoveryBatchConfirmed] = useState(false);
   const [recoveryBatchAssignments, setRecoveryBatchAssignments] = useState<Record<number, string>>({});
@@ -88,6 +90,7 @@ export default function SettingsPage() {
     setRecoveryBatchAssignments({});
     setRecoveryBatchConfirmed(false);
     setRecoveryStatus('');
+    setLegacyAvailability({});
   }, [universeId]);
   const { signOut } = useClerk();
   const back = useBack();
@@ -319,6 +322,28 @@ export default function SettingsPage() {
       return false;
     } finally { if (!batchPath) setRecoveryBusy(false); }
   }
+  async function checkLegacyAvailability() {
+    if (checkingLegacy || recoveryBusy) return;
+    const paths = Array.from(new Set([...state.characters.map(c => c.avatar), ...legacyMedia]
+      .filter((path): path is string => typeof path === 'string' && path.startsWith('/objects/uploads/'))));
+    if (!paths.length) { setRecoveryStatus('No hay imágenes antiguas para comprobar.'); return; }
+    setCheckingLegacy(true);
+    setLegacyAvailability({});
+    try {
+      const results: Record<string, string> = {};
+      for (let i = 0; i < paths.length; i += 30) {
+        const response = await customFetch<{ results: Array<{ path: string; status: string }> }>('/api/storage/recovery/check-legacy', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paths: paths.slice(i, i + 30) }), responseType: 'json',
+        });
+        for (const result of response.results) results[result.path] = result.status;
+        setRecoveryStatus(`Comprobadas ${Math.min(i + 30, paths.length)} de ${paths.length} imágenes…`);
+      }
+      setLegacyAvailability(results);
+      setRecoveryStatus(`Supabase: ${Object.values(results).filter(v => v === 'available').length} disponibles, ${Object.values(results).filter(v => v === 'missing').length} faltantes. No se modificaron imágenes.`);
+    } catch (error) { setRecoveryStatus(`No se pudo comprobar Supabase: ${error instanceof Error ? error.message : 'Error desconocido'}`); }
+    finally { setCheckingLegacy(false); }
+  }
   async function recoverContentBatch() {
     if (recoveryBusy || !recoveryBatchConfirmed || recoveryBatchFiles.length === 0) return;
     const assignments = recoveryBatchFiles.map((file, index) => ({ file, path: recoveryBatchAssignments[index] ?? '' }));
@@ -494,6 +519,11 @@ export default function SettingsPage() {
             <ChevronDown className={cn("h-4 w-4 transition-transform", showRecovery && "rotate-180")} />
           </button>
           {showRecovery && <div className="mt-4 space-y-3 text-sm">
+            <button type="button" disabled={checkingLegacy || recoveryBusy} onClick={() => void checkLegacyAvailability()}
+              className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+              {checkingLegacy ? 'Comprobando Supabase…' : 'Comprobar fotos antiguas en Supabase (sin modificar)'}
+            </button>
+            {Object.keys(legacyAvailability).length > 0 && <p className="text-xs text-muted-foreground">Disponibles: {Object.values(legacyAvailability).filter(v => v === 'available').length} · Faltantes: {Object.values(legacyAvailability).filter(v => v === 'missing').length} · Sin confirmar: {Object.values(legacyAvailability).filter(v => v !== 'available' && v !== 'missing').length}</p>}
             <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
             <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={recoveryBusy}
               onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryConfirmed(false); setRecoveryStatus(''); }}
