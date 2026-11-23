@@ -340,13 +340,22 @@ export default function SettingsPage() {
   }
   async function checkLegacyAvailability() {
     if (checkingLegacy || recoveryBusy) return;
-    const paths = Array.from(new Set([...state.characters.map(c => c.avatar), ...legacyMedia]
-      .filter((path): path is string => typeof path === 'string' && path.startsWith('/objects/uploads/'))));
-    if (!paths.length) { setRecoveryStatus('No hay imágenes antiguas para comprobar.'); return; }
     setCheckingLegacy(true);
     setAutoCopyConfirmed(false);
     setLegacyAvailability({});
     try {
+      // Use the server-owned inventory rather than arbitrary avatar/content references.
+      // Legacy references can contain extensions or non-UUID identifiers, which the
+      // check-legacy endpoint intentionally rejects with INVALID_RECOVERY_PATHS.
+      const inventory = await customFetch<{ paths: Array<{ path: string }> }>('/api/storage/recovery/inventory', {
+        method: 'GET', responseType: 'json',
+      });
+      const paths = Array.from(new Set((inventory.paths ?? []).map(entry => entry.path)
+        .filter(path => /^\\/objects\\/uploads\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
+      if (!paths.length) {
+        setRecoveryStatus('No hay archivos antiguos registrados para comprobar. Algunas referencias de avatares pueden no estar en el inventario.');
+        return;
+      }
       const results: Record<string, string> = {};
       for (let i = 0; i < paths.length; i += 30) {
         const response = await customFetch<{ results: Array<{ path: string; status: string }> }>('/api/storage/recovery/check-legacy', {
