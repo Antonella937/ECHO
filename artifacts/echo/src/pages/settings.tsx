@@ -55,6 +55,8 @@ export default function SettingsPage() {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
   const [recoveryMediaPath, setRecoveryMediaPath] = useState('');
+  const [recoveryContentFile, setRecoveryContentFile] = useState<File | null>(null);
+  const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const { signOut } = useClerk();
   const back = useBack();
@@ -105,7 +107,7 @@ export default function SettingsPage() {
     ...state.stories.map(story => story.image),
   ].filter((value): value is string => typeof value === 'string' && value.startsWith('/objects/uploads/'))));
   async function recoverContentPhoto(file: File) {
-    if (!recoveryConfirmed || !recoveryMediaPath || recoveryBusy) return;
+    if (!recoveryContentConfirmed || !recoveryMediaPath || recoveryBusy || !legacyMedia.includes(recoveryMediaPath)) return;
     setRecoveryBusy(true);
     try {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || !file.size || file.size > 15 * 1024 * 1024)
@@ -125,7 +127,8 @@ export default function SettingsPage() {
       await actions.retrySync();
       setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
       setRecoveryMediaPath('');
-      setRecoveryConfirmed(false);
+      setRecoveryContentFile(null);
+      setRecoveryContentConfirmed(false);
     } catch (error) {
       setRecoveryStatus(error instanceof Error ? error.message : 'No se pudo confirmar la recuperación. Comprobá el contenido antes de reintentar.');
     } finally { setRecoveryBusy(false); }
@@ -312,15 +315,22 @@ export default function SettingsPage() {
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
               <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
               <select aria-label="Imagen antigua a recuperar" className="w-full rounded-lg bg-background p-2" value={recoveryMediaPath}
-                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryConfirmed(false); }}>
+                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentConfirmed(false); }}>
                 <option value="">Elegir referencia antigua</option>
                 {legacyMedia.map((path, index) => <option key={path} value={path}>Imagen {index + 1} · {path.slice(-8)}</option>)}
               </select>
               {recoveryMediaPath && <p className="break-all text-muted-foreground">{recoveryMediaPath}</p>}
-              <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || !recoveryConfirmed || recoveryBusy}
-                onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void recoverContentPhoto(file); }}
+              <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || recoveryBusy}
+                onChange={event => { setRecoveryContentFile(event.currentTarget.files?.[0] ?? null); setRecoveryContentConfirmed(false); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
-              <p className="text-muted-foreground">La foto se sube al seleccionarla, solo después de elegir la referencia y marcar la confirmación de arriba. No se eliminan originales.</p>
+              {recoveryContentFile && <p className="break-all text-muted-foreground">Archivo elegido: {recoveryContentFile.name}</p>}
+              <label className="flex items-start gap-2"><input type="checkbox" checked={recoveryContentConfirmed} disabled={!recoveryMediaPath || !recoveryContentFile || recoveryBusy}
+                onChange={event => setRecoveryContentConfirmed(event.target.checked)} />
+                Confirmo que esta foto corresponde a la referencia antigua seleccionada.</label>
+              <button type="button" disabled={!recoveryContentFile || !recoveryMediaPath || !recoveryContentConfirmed || recoveryBusy}
+                onClick={() => { if (recoveryContentFile) void recoverContentPhoto(recoveryContentFile); }}
+                className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">Recuperar foto seleccionada</button>
+              <p className="text-muted-foreground">No se sube nada hasta que confirmes y toques el botón. No se eliminan originales.</p>
             </div>
             <div className="rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Inventario de imágenes antiguas</p>
