@@ -74,6 +74,7 @@ export default function SettingsPage() {
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const [legacyAvailability, setLegacyAvailability] = useState<Record<string, string>>({});
   const [checkingLegacy, setCheckingLegacy] = useState(false);
+  const [recoveryInventoryInfo, setRecoveryInventoryInfo] = useState<{ total: number; eligible: number; accountSuffix: string } | null>(null);
   const [autoCopyConfirmed, setAutoCopyConfirmed] = useState(false);
   const [recoveryBatchFiles, setRecoveryBatchFiles] = useState<File[]>([]);
   const [recoveryBatchConfirmed, setRecoveryBatchConfirmed] = useState(false);
@@ -343,6 +344,7 @@ export default function SettingsPage() {
     setCheckingLegacy(true);
     setAutoCopyConfirmed(false);
     setLegacyAvailability({});
+    setRecoveryInventoryInfo(null);
     try {
       // Use the server-owned inventory rather than arbitrary avatar/content references.
       // Legacy references can contain extensions or non-UUID identifiers, which the
@@ -352,8 +354,9 @@ export default function SettingsPage() {
       });
       const paths = Array.from(new Set((inventory.paths ?? []).map(entry => entry.path)
         .filter(path => /^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
+      setRecoveryInventoryInfo({ total: inventory.paths?.length ?? 0, eligible: paths.length, accountSuffix: user?.id?.slice(-8) ?? 'sin sesión' });
       if (!paths.length) {
-        setRecoveryStatus('No hay archivos antiguos registrados para comprobar. Algunas referencias de avatares pueden no estar en el inventario.');
+        setRecoveryStatus('El inventario de esta sesión no devolvió rutas comprobables. Esto no demuestra que las fotos hayan desaparecido: revisá la cuenta y la conexión de base de datos.');
         return;
       }
       const results: Record<string, string> = {};
@@ -566,6 +569,7 @@ export default function SettingsPage() {
               className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
               {checkingLegacy ? 'Comprobando Supabase…' : 'Comprobar fotos antiguas en Supabase (sin modificar)'}
             </button>
+            {recoveryInventoryInfo && <p className="text-xs text-muted-foreground" role="status">Diagnóstico de inventario · Cuenta terminada en {recoveryInventoryInfo.accountSuffix} · Registros devueltos: {recoveryInventoryInfo.total} · Rutas válidas: {recoveryInventoryInfo.eligible}. Si ambos son cero, verificá que esta cuenta y el backend correspondan a la base de datos correcta.</p>}
             {Object.keys(legacyAvailability).length > 0 && <p className="text-xs text-muted-foreground">Disponibles: {Object.values(legacyAvailability).filter(v => v === 'available').length} · Faltantes: {Object.values(legacyAvailability).filter(v => v === 'missing').length} · Sin confirmar: {Object.values(legacyAvailability).filter(v => v !== 'available' && v !== 'missing').length}</p>}
             {Object.values(legacyAvailability).some(v => v === 'available') && <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Copiar directamente desde Supabase</p>
