@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
   const [recoveryMediaPath, setRecoveryMediaPath] = useState('');
+  const [recoverySearch, setRecoverySearch] = useState('');
   const [recoveryContentFile, setRecoveryContentFile] = useState<File | null>(null);
   const [recoveryContentConfirmed, setRecoveryContentConfirmed] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState('');
@@ -112,14 +113,21 @@ export default function SettingsPage() {
     } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
   }
   const legacyMedia = Array.from(new Set([
-    ...state.posts.flatMap(post => [post.image, ...(post.media ?? []).map(item => item.url)]),
+    ...state.posts.flatMap(post => [post.image, ...(post.media ?? []).filter(item => item.type === 'image').map(item => item.url)]),
     ...state.stories.map(story => story.image),
   ].filter((value): value is string => typeof value === 'string' && value.startsWith('/objects/uploads/'))));
   const legacyMediaDetails = legacyMedia.map(path => {
-    const posts = state.posts.filter(post => post.image === path || post.media?.some(item => item.url === path));
+    const posts = state.posts.filter(post => post.image === path || post.media?.some(item => item.type === 'image' && item.url === path));
     const stories = state.stories.filter(story => story.image === path);
     const ownerIds = Array.from(new Set([...posts.map(post => post.authorId), ...stories.map(story => story.authorId)]));
     return { path, posts, stories, owners: ownerIds.map(id => state.characters.find(character => character.id === id)?.name ?? 'Cuenta desconocida') };
+  });
+  const filteredLegacyMedia = legacyMediaDetails.filter(item => {
+    const query = recoverySearch.trim().toLocaleLowerCase();
+    return !query || [item.path, ...item.owners, ...item.posts.map(post => post.caption),
+      ...item.stories.map(story => story.caption), ...item.posts.map(post => new Date(post.createdAt).toLocaleDateString('es-AR')),
+      ...item.stories.map(story => new Date(story.createdAt).toLocaleDateString('es-AR'))]
+      .some(value => String(value ?? '').toLocaleLowerCase().includes(query));
   });
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function recoverContentPhoto(file: File) {
@@ -333,10 +341,13 @@ export default function SettingsPage() {
             <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
               <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
+              <input type="search" aria-label="Buscar fotos antiguas" placeholder="Buscar por personaje, caption o fecha…" value={recoverySearch}
+                onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
+              <p className="text-muted-foreground">{filteredLegacyMedia.length} de {legacyMediaDetails.length} referencias encontradas</p>
               <select aria-label="Imagen antigua a recuperar" className="w-full rounded-lg bg-background p-2" value={recoveryMediaPath}
                 onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); }}>
                 <option value="">Elegir referencia antigua</option>
-                {legacyMediaDetails.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
+                {filteredLegacyMedia.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length && item.stories.length ? 'Publicación e historia' : item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
               </select>
               {selectedMediaDetails && <div className="space-y-2 rounded-lg bg-secondary/30 p-3">
                 <p className="font-semibold">Cuenta: {selectedMediaDetails.owners.join(', ')}</p>
