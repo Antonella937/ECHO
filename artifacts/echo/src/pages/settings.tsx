@@ -370,7 +370,7 @@ export default function SettingsPage() {
           </button>
           {showRecovery && <div className="mt-4 space-y-3 text-sm">
             <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
-            <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/jpeg,image/png,image/webp" multiple
+            <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={recoveryBusy}
               onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryConfirmed(false); setRecoveryStatus(''); }}
               className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
             {recoveryFiles.length > 0 && <div className="space-y-3">
@@ -378,7 +378,7 @@ export default function SettingsPage() {
               {recoveryFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
                 <RecoveryPreview file={file} />
                 <div className="min-w-0 flex-1"><p className="truncate text-xs">{file.name}</p>
-                  <select aria-label={`Personaje para ${file.name}`} className="mt-1 w-full rounded-lg bg-background p-2 text-xs" value={recoveryAssignments[index] ?? ''}
+                  <select aria-label={`Personaje para ${file.name}`} className="mt-1 w-full rounded-lg bg-background p-2 text-xs disabled:opacity-50" disabled={recoveryBusy} value={recoveryAssignments[index] ?? ''}
                     onChange={event => { setRecoveryConfirmed(false); setRecoveryAssignments(previous => ({ ...previous, [index]: event.target.value })); }}>
                     <option value="">No asignar todavía</option>
                     {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character =>
