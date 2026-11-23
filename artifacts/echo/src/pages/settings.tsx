@@ -400,10 +400,10 @@ export default function SettingsPage() {
             <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
               <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
-              <input type="search" aria-label="Buscar fotos antiguas" placeholder="Buscar por personaje, caption o fecha…" value={recoverySearch}
+              <input type="search" aria-label="Buscar fotos antiguas" placeholder="Buscar por personaje, caption o fecha…" disabled={recoveryBusy} value={recoverySearch}
                 onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
               <p className="text-muted-foreground">{filteredLegacyMedia.length} de {legacyMediaDetails.length} referencias encontradas</p>
-              <select aria-label="Imagen antigua a recuperar" className="w-full rounded-lg bg-background p-2" value={recoveryMediaPath}
+              <select aria-label="Imagen antigua a recuperar" disabled={recoveryBusy} className="w-full rounded-lg bg-background p-2 disabled:opacity-50" value={recoveryMediaPath}
                 onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); }}>
                 <option value="">Elegir referencia antigua</option>
                 {filteredLegacyMedia.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length && item.stories.length ? 'Publicación e historia' : item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
