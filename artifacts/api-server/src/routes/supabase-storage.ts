@@ -100,8 +100,25 @@ export function createSupabaseStorageRouter(): IRouter {
       }
       const declaredLength = Number(source.headers.get("content-length") ?? 0);
       if (declaredLength > 15 * 1024 * 1024) { await source.body?.cancel(); res.status(413).json({ error: "LEGACY_TOO_LARGE" }); return; }
-      const bytes = Buffer.from(await source.arrayBuffer());
-      if (!bytes.length || bytes.length > 15 * 1024 * 1024 || !validMediaHeader(bytes.subarray(0, 64), mime)) {
+      // Bound memory even if Supabase omits or lies about Content-Length.
+      const chunks: Buffer[] = [];
+      let total = 0;
+      if (!source.body) { res.status(502).json({ error: "LEGACY_SOURCE_EMPTY" }); return; }
+      const reader = source.body.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > 15 * 1024 * 1024) {
+            await reader.cancel();
+            res.status(413).json({ error: "LEGACY_TOO_LARGE" }); return;
+          }
+          chunks.push(Buffer.from(value));
+        }
+      } finally { reader.releaseLock(); }
+      const bytes = Buffer.concat(chunks, total);
+      if (!bytes.length || !validMediaHeader(bytes.subarray(0, 64), mime)) {
         res.status(400).json({ error: "LEGACY_MEDIA_INVALID" }); return;
       }
       const objectPath = `/objects/r2/${randomUUID()}`;
