@@ -38,6 +38,43 @@ export const fetchStored = (path: string, range?: string) => {
 
 export function createSupabaseStorageRouter(): IRouter {
   const router: IRouter = Router();
+  // Owner-scoped inventory for the recovery UI. No signed URLs or credentials exposed.
+  router.get("/storage/recovery/inventory", requireAuth, async (req, res) => {
+    try {
+      const rows = await db.select({ objectPath: echoMediaTable.objectPath, createdAt: echoMediaTable.createdAt })
+        .from(echoMediaTable).where(eq(echoMediaTable.ownerId, req.userId!));
+      const legacy = rows.filter(row => row.objectPath.startsWith("/objects/uploads/") && validPath(row.objectPath));
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ total: legacy.length, paths: legacy.map(row => ({ path: row.objectPath, createdAt: row.createdAt })) });
+    } catch (error) {
+      logger.warn({ err: error }, "Legacy recovery inventory failed");
+      res.status(503).json({ error: "RECOVERY_INVENTORY_UNAVAILABLE" });
+    }
+  });
+
+  // Read-only usage counts for legacy media in this owner's universes.
+  // Avoid returning universe state or another owner's media.
+  router.get("/storage/recovery/usage", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT universe_id,
+          jsonb_array_length(COALESCE(state->'posts', '[]'::jsonb)) AS posts,
+          jsonb_array_length(COALESCE(state->'stories', '[]'::jsonb)) AS stories,
+          jsonb_array_length(COALESCE(state->'characters', '[]'::jsonb)) AS characters,
+          (state->'posts')::text LIKE '%/objects/uploads/%' AS legacy_posts,
+          (state->'stories')::text LIKE '%/objects/uploads/%' AS legacy_stories,
+          (state->'characters')::text LIKE '%/objects/uploads/%' AS legacy_characters
+         FROM echo_universes WHERE owner_id = $1`,
+        [req.userId!],
+      );
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ universes: result.rows });
+    } catch (error) {
+      logger.warn({ err: error }, "Legacy media usage inventory failed");
+      res.status(503).json({ error: "RECOVERY_USAGE_UNAVAILABLE" });
+    }
+  });
+
   // Read-only inventory: never expose private URLs or read another owner's media.
   router.post("/storage/recovery/check-legacy", requireAuth, async (req, res) => {
     const paths = req.body?.paths;
