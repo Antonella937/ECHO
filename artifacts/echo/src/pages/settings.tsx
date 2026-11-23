@@ -282,7 +282,7 @@ export default function SettingsPage() {
         inspected.push(serverStories.find(story => story.id === storyId)?.image ?? 'missing');
       }
       const oldCount = inspected.filter(path => path === oldPath).length;
-      const r2Count = inspected.filter(path => typeof path === 'string' && /^\\/objects\\/r2\\/[0-9a-f-]{36}$/i.test(path)).length;
+      const r2Count = inspected.filter(path => typeof path === 'string' && path.startsWith('/objects/r2/') && /^[0-9a-f-]{36}$/i.test(path.slice('/objects/r2/'.length))).length;
       const missingCount = inspected.length - oldCount - r2Count;
       setRecoveryStatus(oldCount > 0
         ? `El servidor conserva ${oldCount} referencia(s) antigua(s) de esta foto. ${r2Count} ya apunta(n) a R2 y ${missingCount} requieren revisión. No vuelvas a subir la foto.`
