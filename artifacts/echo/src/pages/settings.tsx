@@ -74,6 +74,7 @@ export default function SettingsPage() {
   const [recoveryStatus, setRecoveryStatus] = useState('');
   const [legacyAvailability, setLegacyAvailability] = useState<Record<string, string>>({});
   const [checkingLegacy, setCheckingLegacy] = useState(false);
+  const [autoCopyConfirmed, setAutoCopyConfirmed] = useState(false);
   const [recoveryBatchFiles, setRecoveryBatchFiles] = useState<File[]>([]);
   const [recoveryBatchConfirmed, setRecoveryBatchConfirmed] = useState(false);
   const [recoveryBatchAssignments, setRecoveryBatchAssignments] = useState<Record<number, string>>({});
@@ -91,6 +92,7 @@ export default function SettingsPage() {
     setRecoveryBatchConfirmed(false);
     setRecoveryStatus('');
     setLegacyAvailability({});
+    setAutoCopyConfirmed(false);
   }, [universeId]);
   const { signOut } = useClerk();
   const back = useBack();
@@ -228,13 +230,13 @@ export default function SettingsPage() {
     return selected && !first.some(item => item.path === selected.path) ? [selected, ...first] : first;
   }, [filteredLegacyMedia, legacyMediaDetails, recoveryMediaPath]);
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
-  async function recoverContentPhoto(file: File, batchPath?: string): Promise<boolean> {
+  async function recoverContentPhoto(file: File | null, batchPath?: string): Promise<boolean> {
     const targetPath = batchPath ?? recoveryMediaPath;
     if ((!batchPath && (!recoveryContentConfirmed || recoveryBusy)) || !targetPath || !legacyMedia.includes(targetPath)) return false;
     const recoveryUniverse = universeId;
     if (!batchPath) setRecoveryBusy(true);
     try {
-      if (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024)
+      if (file && (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024))
         throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
       const oldPath = targetPath;
       // Check the current server snapshot before uploading: the photo may already have
@@ -272,16 +274,30 @@ export default function SettingsPage() {
       ]).sort();
       if (JSON.stringify(imageSlots(state.posts)) !== JSON.stringify(imageSlots(beforeUpload.state!.posts)))
         throw new Error('El carrusel o la portada cambió en el servidor. Actualizá ECHO antes de recuperar esta imagen.');
-      setRecoveryStatus('Subiendo imagen original a R2…');
-      const { uploadURL, objectPath } = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ size: file.size, contentType: recoveryImageType(file) }), responseType: 'json',
-      });
-      if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se cambió el contenido.');
-      const upload = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
-      if (!upload.ok) throw new Error('No se pudo subir la foto.');
-      await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ objectPath }), responseType: 'json' });
+      let objectPath: string;
+      if (file) {
+        setRecoveryStatus('Subiendo imagen original a R2…');
+        const signed = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ size: file.size, contentType: recoveryImageType(file) }), responseType: 'json',
+        });
+        objectPath = signed.objectPath;
+        if (!/^\/objects\/r2\/[0-9a-f-]{36}$/i.test(objectPath)) throw new Error('La referencia de R2 no es válida.');
+        const upload = await fetch(signed.uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
+        if (!upload.ok) throw new Error('No se pudo subir la foto.');
+        await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objectPath }), responseType: 'json' });
+      } else {
+        if (!autoCopyConfirmed || legacyAvailability[oldPath] !== 'available') throw new Error('Primero comprobá y confirmá la imagen disponible en Supabase.');
+        setRecoveryStatus('Copiando imagen original desde Supabase a R2…');
+        const copied = await customFetch<{oldPath: string; objectPath: string}>('/api/storage/recovery/copy-legacy', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldPath }), responseType: 'json',
+        });
+        if (copied.oldPath !== oldPath) throw new Error('La copia no corresponde a la referencia solicitada.');
+        objectPath = copied.objectPath;
+      }
+      if (!/^\/objects\/r2\/[0-9a-f-]{36}$/i.test(objectPath)) throw new Error('La referencia de R2 no es válida.');
       const expectedPosts = state.posts.map(post => ({
         id: post.id,
         cover: post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image'),
@@ -343,6 +359,20 @@ export default function SettingsPage() {
       setRecoveryStatus(`Supabase: ${Object.values(results).filter(v => v === 'available').length} disponibles, ${Object.values(results).filter(v => v === 'missing').length} faltantes. No se modificaron imágenes.`);
     } catch (error) { setRecoveryStatus(`No se pudo comprobar Supabase: ${error instanceof Error ? error.message : 'Error desconocido'}`); }
     finally { setCheckingLegacy(false); }
+  }
+  async function recoverAvailableContent() {
+    if (recoveryBusy || checkingLegacy || !autoCopyConfirmed) return;
+    const pending = legacyMedia.filter(path => legacyAvailability[path] === 'available');
+    if (!pending.length) { setRecoveryStatus('No hay publicaciones disponibles para copiar.'); return; }
+    setRecoveryBusy(true);
+    let done = 0;
+    try {
+      // One verified copy at a time; stop after the first to refresh the local universe
+      // before the next copy and avoid applying edits from a stale state snapshot.
+      const ok = await recoverContentPhoto(null, pending[0]);
+      if (ok) { done++; setLegacyAvailability(previous => ({ ...previous, [pending[0]]: 'recovered' })); }
+      setRecoveryStatus(ok ? 'Imagen copiada y sincronizada. Actualizá el inventario antes de continuar con la siguiente.' : 'No se pudo completar la copia. Revisá el resultado antes de volver a intentar.');
+    } finally { setRecoveryBusy(false); setAutoCopyConfirmed(false); }
   }
   async function recoverContentBatch() {
     if (recoveryBusy || !recoveryBatchConfirmed || recoveryBatchFiles.length === 0) return;
@@ -524,6 +554,13 @@ export default function SettingsPage() {
               {checkingLegacy ? 'Comprobando Supabase…' : 'Comprobar fotos antiguas en Supabase (sin modificar)'}
             </button>
             {Object.keys(legacyAvailability).length > 0 && <p className="text-xs text-muted-foreground">Disponibles: {Object.values(legacyAvailability).filter(v => v === 'available').length} · Faltantes: {Object.values(legacyAvailability).filter(v => v === 'missing').length} · Sin confirmar: {Object.values(legacyAvailability).filter(v => v !== 'available' && v !== 'missing').length}</p>}
+            {Object.values(legacyAvailability).some(v => v === 'available') && <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
+              <p className="font-semibold">Copiar directamente desde Supabase</p>
+              <p>Se recuperará una imagen de publicación o historia por vez. El original permanece en Supabase; ECHO verificará el nuevo archivo y su sincronización.</p>
+              <label className="flex items-start gap-2"><input type="checkbox" checked={autoCopyConfirmed} disabled={recoveryBusy || checkingLegacy} onChange={event => setAutoCopyConfirmed(event.target.checked)} /> Confirmo que quiero copiar una imagen disponible a R2 y actualizar sus referencias.</label>
+              <button type="button" disabled={!autoCopyConfirmed || recoveryBusy || checkingLegacy || !legacyMedia.some(path => legacyAvailability[path] === 'available')}
+                onClick={() => void recoverAvailableContent()} className="rounded-xl bg-primary px-3 py-2 font-semibold text-primary-foreground disabled:opacity-50">Copiar y verificar una imagen</button>
+            </div>}
             <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
             <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={recoveryBusy}
               onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryConfirmed(false); setRecoveryStatus(''); }}
