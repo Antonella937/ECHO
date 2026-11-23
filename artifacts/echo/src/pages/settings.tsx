@@ -1,5 +1,5 @@
 import { useClerk, useUser } from '@clerk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film, Sparkles, Image as ImageIcon, Bell } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
@@ -112,23 +112,41 @@ export default function SettingsPage() {
       setRecoveryStatus(`${completed} avatar(es) procesado(s), pero no se pudo confirmar la sincronización completa. No vuelvas a subir las mismas fotos hasta comprobar los perfiles. ${error instanceof Error ? error.message : ''}`);
     } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
   }
-  const legacyMedia = Array.from(new Set([
-    ...state.posts.flatMap(post => [(!post.media?.length || post.media[0]?.type === 'image') ? post.image : '', ...(post.media ?? []).filter(item => item.type === 'image').map(item => item.url)]),
-    ...state.stories.map(story => story.image),
-  ].filter((value): value is string => typeof value === 'string' && value.startsWith('/objects/uploads/'))));
-  const legacyMediaDetails = legacyMedia.map(path => {
-    const posts = state.posts.filter(post => (post.image === path && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === path));
-    const stories = state.stories.filter(story => story.image === path);
-    const ownerIds = Array.from(new Set([...posts.map(post => post.authorId), ...stories.map(story => story.authorId)]));
-    return { path, posts, stories, owners: ownerIds.map(id => state.characters.find(character => character.id === id)?.name ?? 'Cuenta desconocida') };
-  });
-  const filteredLegacyMedia = legacyMediaDetails.filter(item => {
+  const legacyMediaDetails = useMemo(() => {
+    const byPath = new Map<string, { path: string; posts: typeof state.posts; stories: typeof state.stories; owners: string[] }>();
+    const ensure = (path: string) => {
+      if (!path.startsWith('/objects/uploads/')) return null;
+      let item = byPath.get(path);
+      if (!item) {
+        item = { path, posts: [], stories: [], owners: [] };
+        byPath.set(path, item);
+      }
+      return item;
+    };
+    for (const post of state.posts) {
+      const paths = new Set<string>();
+      if ((!post.media?.length || post.media[0]?.type === 'image') && post.image) paths.add(post.image);
+      for (const media of post.media ?? []) if (media.type === 'image') paths.add(media.url);
+      for (const path of paths) ensure(path)?.posts.push(post);
+    }
+    for (const story of state.stories) if (story.image) ensure(story.image)?.stories.push(story);
+    const names = new Map(state.characters.map(character => [character.id, character.name]));
+    return Array.from(byPath.values()).map(item => {
+      const ids = new Set([...item.posts.map(post => post.authorId), ...item.stories.map(story => story.authorId)]);
+      return { ...item, owners: Array.from(ids, id => names.get(id) ?? 'Cuenta desconocida') };
+    });
+  }, [state.posts, state.stories, state.characters]);
+  const legacyMedia = useMemo(() => legacyMediaDetails.map(item => item.path), [legacyMediaDetails]);
+  const filteredLegacyMedia = useMemo(() => {
     const query = recoverySearch.trim().toLocaleLowerCase();
-    return !query || [item.path, ...item.owners, ...item.posts.map(post => post.caption),
-      ...item.stories.map(story => story.caption), ...item.posts.map(post => new Date(post.createdAt).toLocaleDateString('es-AR')),
-      ...item.stories.map(story => new Date(story.createdAt).toLocaleDateString('es-AR'))]
-      .some(value => String(value ?? '').toLocaleLowerCase().includes(query));
-  });
+    if (!query) return legacyMediaDetails;
+    return legacyMediaDetails.filter(item =>
+      [item.path, ...item.owners, ...item.posts.map(post => post.caption),
+        ...item.stories.map(story => story.caption),
+        ...item.posts.map(post => new Date(post.createdAt).toLocaleDateString('es-AR')),
+        ...item.stories.map(story => new Date(story.createdAt).toLocaleDateString('es-AR'))]
+        .some(value => String(value ?? '').toLocaleLowerCase().includes(query)));
+  }, [legacyMediaDetails, recoverySearch]);
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function recoverContentPhoto(file: File) {
     if (!recoveryContentConfirmed || !recoveryMediaPath || recoveryBusy || !legacyMedia.includes(recoveryMediaPath)) return;
