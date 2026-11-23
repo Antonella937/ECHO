@@ -89,10 +89,14 @@ export default function SettingsPage() {
         actions.updateAccount(id, { ...character, avatar: objectPath }, character);
         completed++;
       }
-      setRecoveryStatus(`Actualizados ${completed} avatar(es). Las referencias antiguas permanecen registradas en el almacenamiento anterior; no se borraron.`);
-      toast({ title: 'Avatares recuperados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
+      if (completed > 0) {
+        setRecoveryStatus(`Subidos ${completed} avatar(es). Verificando sincronización del universo…`);
+        await actions.retrySync();
+      }
+      setRecoveryStatus(`Recuperados y sincronizados ${completed} avatar(es). Las imágenes anteriores no se borraron.`);
+      if (completed > 0) toast({ title: 'Avatares sincronizados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
     } catch (error) {
-      setRecoveryStatus(`Recuperados ${completed}. ${error instanceof Error ? error.message : 'No se pudo completar la recuperación.'}`);
+      setRecoveryStatus(`${completed} avatar(es) procesado(s), pero no se pudo confirmar la sincronización completa. No vuelvas a subir las mismas fotos hasta comprobar los perfiles. ${error instanceof Error ? error.message : ''}`);
     } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
   }
   const closeFriendContacts = state.characters.filter(c => c.id !== me.id && !c.archived && (state.follows[me.id] ?? []).includes(c.id) && (state.follows[c.id] ?? []).includes(me.id));
