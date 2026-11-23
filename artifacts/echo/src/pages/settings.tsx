@@ -410,7 +410,7 @@ export default function SettingsPage() {
                 onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
               <p className="text-muted-foreground">{filteredLegacyMedia.length} de {legacyMediaDetails.length} referencias encontradas{filteredLegacyMedia.length > 100 ? ' · Mostrando las primeras 100. Escribí una cuenta, fecha o caption para encontrar las demás.' : ''}</p>
               <select aria-label="Imagen antigua a recuperar" disabled={recoveryBusy} className="w-full rounded-lg bg-background p-2 disabled:opacity-50" value={recoveryMediaPath}
-                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); }}>
+                onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); setRecoveryStatus(''); }}>
                 <option value="">Elegir referencia antigua</option>
                 {visibleLegacyMedia.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length && item.stories.length ? 'Publicación e historia' : item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
               </select>
@@ -428,7 +428,7 @@ export default function SettingsPage() {
                 <p className="break-all text-muted-foreground">Referencia: {recoveryMediaPath}</p>
               </div>}
               <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || recoveryBusy}
-                onChange={event => { setRecoveryContentFile(event.currentTarget.files?.[0] ?? null); setRecoveryContentConfirmed(false); }}
+                onChange={event => { setRecoveryContentFile(event.currentTarget.files?.[0] ?? null); setRecoveryContentConfirmed(false); setRecoveryStatus(''); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
               {recoveryContentFile && <div className="flex items-center gap-3"><RecoveryPreview file={recoveryContentFile} /><p className="min-w-0 break-all text-muted-foreground">Archivo elegido: {recoveryContentFile.name}</p></div>}
               <label className="flex items-start gap-2"><input type="checkbox" checked={recoveryContentConfirmed} disabled={!recoveryMediaPath || !recoveryContentFile || recoveryBusy}
