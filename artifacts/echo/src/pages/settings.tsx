@@ -341,8 +341,9 @@ export default function SettingsPage() {
                 onClick={() => void recoverSelectedAvatars()} className="rounded-xl bg-primary px-4 py-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar avatares en R2'}
               </button>
-              {recoveryStatus && <p role="status" className="text-xs">{recoveryStatus}</p>}
+
             </div>}
+            {recoveryStatus && <p role="status" aria-live="polite" className="rounded-lg bg-secondary/40 p-3 text-xs">{recoveryStatus}</p>}
             <div className="space-y-2">
               <p className="text-xs font-semibold">Avatares que necesitan recuperación</p>
               {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character => (
