@@ -106,6 +106,13 @@ export default function SettingsPage() {
     ...state.posts.flatMap(post => [post.image, ...(post.media ?? []).map(item => item.url)]),
     ...state.stories.map(story => story.image),
   ].filter((value): value is string => typeof value === 'string' && value.startsWith('/objects/uploads/'))));
+  const legacyMediaDetails = legacyMedia.map(path => {
+    const posts = state.posts.filter(post => post.image === path || post.media?.some(item => item.url === path));
+    const stories = state.stories.filter(story => story.image === path);
+    const ownerIds = Array.from(new Set([...posts.map(post => post.authorId), ...stories.map(story => story.authorId)]));
+    return { path, posts, stories, owners: ownerIds.map(id => state.characters.find(character => character.id === id)?.name ?? 'Cuenta desconocida') };
+  });
+  const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function recoverContentPhoto(file: File) {
     if (!recoveryContentConfirmed || !recoveryMediaPath || recoveryBusy || !legacyMedia.includes(recoveryMediaPath)) return;
     setRecoveryBusy(true);
@@ -317,9 +324,21 @@ export default function SettingsPage() {
               <select aria-label="Imagen antigua a recuperar" className="w-full rounded-lg bg-background p-2" value={recoveryMediaPath}
                 onChange={event => { setRecoveryMediaPath(event.target.value); setRecoveryContentFile(null); setRecoveryContentConfirmed(false); }}>
                 <option value="">Elegir referencia antigua</option>
-                {legacyMedia.map((path, index) => <option key={path} value={path}>Imagen {index + 1} · {path.slice(-8)}</option>)}
+                {legacyMediaDetails.map((item, index) => <option key={item.path} value={item.path}>Imagen {index + 1} · {item.owners.join(', ').slice(0, 35)} · {item.posts.length ? 'Publicación' : 'Historia'} · {item.path.slice(-8)}</option>)}
               </select>
-              {recoveryMediaPath && <p className="break-all text-muted-foreground">{recoveryMediaPath}</p>}
+              {selectedMediaDetails && <div className="space-y-2 rounded-lg bg-secondary/30 p-3">
+                <p className="font-semibold">Cuenta: {selectedMediaDetails.owners.join(', ')}</p>
+                {selectedMediaDetails.posts.map(post => <div key={post.id} className="space-y-1 border-t border-border pt-2">
+                  <p>Publicación · {new Date(post.createdAt).toLocaleDateString('es-AR')}</p>
+                  <p className="line-clamp-3 whitespace-pre-wrap">{post.caption || 'Sin caption'}</p>
+                  {post.media?.length ? <p className="text-muted-foreground">Carrusel de {post.media.length} elementos · posición {post.media.findIndex(item => item.url === recoveryMediaPath) + 1}</p> : null}
+                </div>)}
+                {selectedMediaDetails.stories.map(story => <div key={story.id} className="space-y-1 border-t border-border pt-2">
+                  <p>Historia · {new Date(story.createdAt).toLocaleDateString('es-AR')}</p>
+                  <p className="line-clamp-3 whitespace-pre-wrap">{story.caption || 'Sin texto'}</p>
+                </div>)}
+                <p className="break-all text-muted-foreground">Referencia: {recoveryMediaPath}</p>
+              </div>}
               <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || recoveryBusy}
                 onChange={event => { setRecoveryContentFile(event.currentTarget.files?.[0] ?? null); setRecoveryContentConfirmed(false); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
