@@ -315,7 +315,7 @@ export default function SettingsPage() {
             JSON.stringify(expectedStoryIds.slice().sort()))
         throw new Error('Las referencias cambiaron mientras se subía la foto. Actualizá ECHO y revisá la publicación antes de reintentar.');
       actions.recoverLegacyMedia(oldPath, objectPath);
-      setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
+      setRecoveryStatus(file ? 'Foto subida. Verificando guardado en el servidor…' : 'Foto copiada desde Supabase. Verificando guardado en el servidor…');
       await verifyRecoveredMedia(recoveryUniverse, remote =>
         expectedPosts.every(expected => {
           const post = remote.posts.find(item => item.id === expected.id);
