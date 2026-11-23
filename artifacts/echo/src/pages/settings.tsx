@@ -247,7 +247,10 @@ export default function SettingsPage() {
   }, [filteredLegacyMedia, legacyMediaDetails, recoveryMediaPath]);
   const selectedMediaDetails = legacyMediaDetails.find(item => item.path === recoveryMediaPath);
   async function inspectRecoveryServerState() {
-    if (!recoveryMediaPath || recoveryBusy) return;
+    if (!recoveryMediaPath) {
+      setRecoveryStatus('Primero elegí una referencia antigua en el selector de publicaciones. No necesitás elegir un archivo ni confirmar una subida.');
+      return;
+    }
     setRecoveryStatus('Consultando el estado real de la publicación en el servidor…');
     try {
       const remote = await loadUniverse(universeId);
@@ -784,7 +787,7 @@ export default function SettingsPage() {
                 className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando foto…' : 'Recuperar foto seleccionada'}
               </button>
-              <button type="button" disabled={!recoveryMediaPath || recoveryBusy}
+              <button type="button"
                 onClick={() => void inspectRecoveryServerState()}
                 className="rounded-xl border border-border px-4 py-3 text-xs font-semibold disabled:opacity-50">
                 Comprobar publicación en servidor (sin subir foto)
