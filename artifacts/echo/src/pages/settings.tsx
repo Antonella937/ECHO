@@ -58,7 +58,7 @@ function recoveryImageType(file: File): string {
 }
 
 export default function SettingsPage() {
-  const { state, me, actions, storageError, lastSavedAt, universeId } = useSocial();
+  const { state, me, actions, storageError, syncConflictCount, lastSavedAt, universeId } = useSocial();
   const recoveryUniverseRef = useRef(universeId);
   recoveryUniverseRef.current = universeId;
   const [recoveryFiles, setRecoveryFiles] = useState<File[]>([]);
@@ -262,6 +262,8 @@ export default function SettingsPage() {
       setRecoveryStatus('Preparando recuperación… Comprobando que la publicación siga intacta en el servidor.');
     }
     try {
+      if (syncConflictCount > 0) throw new Error('Hay cambios en conflicto pendientes de resolver. No se subió otra copia de la foto. Revisá la sincronización antes de continuar.');
+      if (storageError) throw new Error(`La sincronización informa un problema: ${storageError}. No se subió otra copia de la foto.`);
       if (file && (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024))
         throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
       const oldPath = targetPath;
