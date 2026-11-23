@@ -77,6 +77,7 @@ interface StoreValue {
   storageError: string | null;
   lastSavedAt: number | null;
   syncing: boolean;
+  syncConflictCount: number;
   actions: SocialActions;
   dispatch(payload: SocialEventPayload, source?: EventSource): SocialEvent;
   adapter: ActivityAdapter;
@@ -557,12 +558,13 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       storageError,
       lastSavedAt,
       syncing,
+      syncConflictCount: view.conflicts.length,
       actions,
       dispatch,
       adapter,
       character: (id) => state.characters.find((c) => c.id === id),
     };
-  }, [state, meId, mediaUniverseId, storageError, lastSavedAt, syncing, actions, dispatch, adapter]);
+  }, [state, meId, mediaUniverseId, storageError, lastSavedAt, syncing, view.conflicts.length, actions, dispatch, adapter]);
 
   if (!value) {
     if (!storageError) return <>{fallback}</>;
