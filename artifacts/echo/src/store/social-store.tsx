@@ -349,16 +349,16 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
             !/^\/objects\/r2\/[a-zA-Z0-9_-]+$/.test(newPath))
           throw new Error('Referencia de recuperación inválida.');
         const snapshot = cur();
-        const matches = snapshot.posts.some(post => post.image === oldPath || post.media?.some(item => item.url === oldPath)) ||
+        const matches = snapshot.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === oldPath)) ||
           snapshot.stories.some(story => story.image === oldPath);
         if (!matches) throw new Error('La imagen antigua ya no está presente. Actualizá ECHO antes de intentar recuperarla.');
         coordinator.current?.edit(s => ({
           ...s,
           posts: s.posts.map(post => {
-            const media = post.media?.map(item => item.url === oldPath ? { ...item, url: newPath } : item);
+            const media = post.media?.map(item => item.type === 'image' && item.url === oldPath ? { ...item, url: newPath } : item);
             return {
               ...post,
-              image: post.image === oldPath ? newPath : post.image,
+              image: post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image') ? newPath : post.image,
               ...(media ? { media } : {}),
             };
           }),
