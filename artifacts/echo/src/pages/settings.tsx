@@ -122,14 +122,14 @@ export default function SettingsPage() {
         if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ objectPath }), responseType: 'json' });
-        // Persist only after upload and read-back verification. Preserve all other account fields.
+        // Update only after the upload was claimed, then verify this avatar before proceeding.
+        // A failed sync must not start uploads for the remaining characters.
         actions.updateAccount(id, { ...character, avatar: objectPath }, character);
+        setRecoveryStatus(`Verificando avatar ${completed + 1} de ${assignments.length}: ${character.name}…`);
+        await verifyRecoveredMedia(remote =>
+          remote.characters.some(item => item.id === id && item.avatar === objectPath));
         updatedAvatars.push({ id, path: objectPath });
         completed++;
-      }
-      if (completed > 0) {
-        setRecoveryStatus(`Subidos ${completed} avatar(es). Verificando sincronización del universo…`);
-        await verifyRecoveredMedia(remote => updatedAvatars.every(item => remote.characters.some(character => character.id === item.id && character.avatar === item.path)));
       }
       setRecoveryStatus(`Recuperados y sincronizados ${completed} avatar(es). Las imágenes anteriores no se borraron.`);
       if (completed > 0) {
