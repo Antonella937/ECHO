@@ -6,7 +6,7 @@ export type ErrorType<T = unknown> = ApiError<T>;
 
 export type BodyType<T> = T;
 
-export type AuthTokenGetter = () => Promise<string | null> | string | null;
+export type AuthTokenGetter = (forceRefresh?: boolean) => Promise<string | null> | string | null;
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
@@ -360,7 +360,22 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  let response = await fetch(input, { ...init, method, headers });
+
+  // Clerk can briefly return an expired cached session token after Safari
+  // resumes or a user switches posting identities. Retry only the safe
+  // upload-URL allocation request, never the actual file PUT or a post write.
+  // A fresh token is requested explicitly; reusing the cached token would
+  // make the retry ineffective.
+  const isUploadUrlRequest = method === "POST" &&
+    new URL(requestInfo.url, "https://echo.invalid").pathname === "/api/storage/uploads/request-url";
+  if (response.status === 401 && isUploadUrlRequest && _authTokenGetter) {
+    const freshToken = await _authTokenGetter(true);
+    if (freshToken && freshToken !== headers.get("authorization")?.replace(/^Bearer /i, "")) {
+      headers.set("authorization", `Bearer ${freshToken}`);
+      response = await fetch(input, { ...init, method, headers });
+    }
+  }
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

@@ -566,7 +566,7 @@ function ApiConnection({ children }: { children: ReactNode }) {
   useEffect(() => {
     const apiOrigin = import.meta.env.VITE_ECHO_API_ORIGIN?.trim();
     setBaseUrl(apiOrigin || null);
-    setAuthTokenGetter(() => getToken());
+    setAuthTokenGetter((forceRefresh = false) => getToken(forceRefresh ? { skipCache: true } : undefined));
     setReady(true);
     return () => {
       setAuthTokenGetter(null);
