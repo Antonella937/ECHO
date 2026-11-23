@@ -345,8 +345,8 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       editPost(id, patch, expected) { coordinator.current?.edit(s => editSocialPost(s, id, myId(), patch, expected)); },
       recoverLegacyMedia(oldPath, newPath) {
-        if (!/^\\/objects\\/uploads\\/[a-zA-Z0-9_-]+$/.test(oldPath) ||
-            !/^\\/objects\\/r2\\/[a-zA-Z0-9_-]+$/.test(newPath))
+        if (!/^\/objects\/uploads\/[a-zA-Z0-9_-]+$/.test(oldPath) ||
+            !/^\/objects\/r2\/[a-zA-Z0-9_-]+$/.test(newPath))
           throw new Error('Referencia de recuperación inválida.');
         coordinator.current?.edit(s => ({
           ...s,
