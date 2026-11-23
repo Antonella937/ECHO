@@ -79,7 +79,7 @@ export function createSupabaseStorageRouter(): IRouter {
   router.post("/storage/recovery/check-legacy", requireAuth, async (req, res) => {
     const paths = req.body?.paths;
     if (!Array.isArray(paths) || paths.length < 1 || paths.length > 30 ||
-        paths.some((path: unknown) => typeof path !== "string" || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) ||
+        paths.some((path: unknown) => typeof path !== "string" || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) ||
         new Set(paths).size !== paths.length) {
       res.status(400).json({ error: "INVALID_RECOVERY_PATHS" }); return;
     }
@@ -120,7 +120,7 @@ export function createSupabaseStorageRouter(): IRouter {
   // Explicit, single-object copy only. Never delete the Supabase source or rewrite posts here.
   router.post("/storage/recovery/copy-legacy", requireAuth, async (req, res) => {
     const oldPath = req.body?.oldPath;
-    if (typeof oldPath !== "string" || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(oldPath)) {
+    if (typeof oldPath !== "string" || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(oldPath)) {
       res.status(400).json({ error: "INVALID_MEDIA_PATH" }); return;
     }
     try {
