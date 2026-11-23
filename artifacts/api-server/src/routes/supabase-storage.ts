@@ -38,6 +38,36 @@ export const fetchStored = (path: string, range?: string) => {
 
 export function createSupabaseStorageRouter(): IRouter {
   const router: IRouter = Router();
+  // Read-only inventory: never expose private URLs or read another owner's media.
+  router.post("/storage/recovery/check-legacy", requireAuth, async (req, res) => {
+    const paths = req.body?.paths;
+    if (!Array.isArray(paths) || paths.length < 1 || paths.length > 30 ||
+        paths.some((path: unknown) => typeof path !== "string" || !/^\\/objects\\/uploads\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) ||
+        new Set(paths).size !== paths.length) {
+      res.status(400).json({ error: "INVALID_RECOVERY_PATHS" }); return;
+    }
+    try {
+      const { base, key } = config();
+      const results = [];
+      for (const path of paths as string[]) {
+        const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
+          .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, path))).limit(1);
+        if (!owned) { results.push({ path, status: "not_owned" }); continue; }
+        try {
+          const response = await fetch(storageUrl(base, path.slice("/objects/".length)), {
+            method: "HEAD", headers: authHeaders(key), signal: AbortSignal.timeout(8000),
+          });
+          results.push({ path, status: response.ok ? "available" : response.status === 404 ? "missing" : "unknown" });
+        } catch { results.push({ path, status: "unknown" }); }
+      }
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ results });
+    } catch (error) {
+      logger.warn({ err: error }, "Legacy recovery availability check unavailable");
+      res.status(503).json({ error: "LEGACY_STORAGE_UNAVAILABLE" });
+    }
+  });
+
   router.post("/storage/uploads/request-url", requireAuth, async (req, res) => {
     const parsed = RequestUploadUrlBody.safeParse(req.body);
     if (!parsed.success || !mediaLimits[parsed.data.contentType] ||
