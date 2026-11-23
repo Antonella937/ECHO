@@ -113,11 +113,11 @@ export default function SettingsPage() {
     } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
   }
   const legacyMedia = Array.from(new Set([
-    ...state.posts.flatMap(post => [post.image, ...(post.media ?? []).filter(item => item.type === 'image').map(item => item.url)]),
+    ...state.posts.flatMap(post => [(!post.media?.length || post.media[0]?.type === 'image') ? post.image : '', ...(post.media ?? []).filter(item => item.type === 'image').map(item => item.url)]),
     ...state.stories.map(story => story.image),
   ].filter((value): value is string => typeof value === 'string' && value.startsWith('/objects/uploads/'))));
   const legacyMediaDetails = legacyMedia.map(path => {
-    const posts = state.posts.filter(post => post.image === path || post.media?.some(item => item.type === 'image' && item.url === path));
+    const posts = state.posts.filter(post => (post.image === path && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === path));
     const stories = state.stories.filter(story => story.image === path);
     const ownerIds = Array.from(new Set([...posts.map(post => post.authorId), ...stories.map(story => story.authorId)]));
     return { path, posts, stories, owners: ownerIds.map(id => state.characters.find(character => character.id === id)?.name ?? 'Cuenta desconocida') };
@@ -149,9 +149,9 @@ export default function SettingsPage() {
       const oldPath = recoveryMediaPath;
       actions.recoverLegacyMedia(oldPath, objectPath);
       setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
-      await verifyRecoveredMedia(remote => !remote.posts.some(post => post.image === oldPath || post.media?.some(item => item.url === oldPath)) &&
+      await verifyRecoveredMedia(remote => !remote.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === oldPath)) &&
         !remote.stories.some(story => story.image === oldPath) &&
-        (remote.posts.some(post => post.image === objectPath || post.media?.some(item => item.url === objectPath)) || remote.stories.some(story => story.image === objectPath)));
+        (remote.posts.some(post => (post.image === objectPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === objectPath)) || remote.stories.some(story => story.image === objectPath)));
       setRecoveryStatus('Foto recuperada y sincronizada. Se conservaron captions, comentarios, likes y fechas.');
       setRecoveryMediaPath('');
       setRecoveryContentFile(null);
