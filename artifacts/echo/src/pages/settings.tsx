@@ -1,5 +1,5 @@
 import { useClerk, useUser } from '@clerk/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, ChevronDown, Cloud, Info, LogOut, Monitor, Moon, Palette, Search, Sun, Star, Music2, Film, Sparkles, Image as ImageIcon, Bell } from 'lucide-react';
 import { Link } from 'wouter';
 import { ACCENT_PRESETS, DEFAULT_APPEARANCE } from '@/components/echo/appearance-sync';
@@ -34,6 +34,16 @@ function CollapsibleSettings({ title, testId, icon: Icon, children }: { title: s
       </div>
     </details>
   );
+}
+
+function RecoveryPreview({ file }: { file: File }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return src ? <img src={src} alt={file.name} className="h-12 w-12 shrink-0 rounded-lg object-cover" /> : <div className="h-12 w-12 shrink-0 rounded-lg bg-secondary" />;
 }
 
 export default function SettingsPage() {
@@ -75,10 +85,10 @@ export default function SettingsPage() {
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ objectPath }), responseType: 'json' });
         // Persist only after upload and read-back verification. Preserve all other account fields.
-        actions.updateAccount(id, { ...character, avatar: objectPath });
+        actions.updateAccount(id, { ...character, avatar: objectPath }, character);
         completed++;
       }
-      setRecoveryStatus(`Recuperados ${completed} avatar(es). Las referencias anteriores se conservan en el historial de recuperación local hasta recargar.`);
+      setRecoveryStatus(`Actualizados ${completed} avatar(es). Las referencias antiguas permanecen registradas en el almacenamiento anterior; no se borraron.`);
       toast({ title: 'Avatares recuperados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
     } catch (error) {
       setRecoveryStatus(`Recuperados ${completed}. ${error instanceof Error ? error.message : 'No se pudo completar la recuperación.'}`);
@@ -229,14 +239,14 @@ export default function SettingsPage() {
             <ChevronDown className={cn("h-4 w-4 transition-transform", showRecovery && "rotate-180")} />
           </button>
           {showRecovery && <div className="mt-4 space-y-3 text-sm">
-            <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone. Esta etapa prepara la recuperación: no reemplaza ni borra imágenes sin que confirmes la correspondencia.</p>
+            <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
             <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/*" multiple
-              onChange={event => setRecoveryFiles(Array.from(event.currentTarget.files ?? []))}
+              onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryStatus(''); }}
               className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
             {recoveryFiles.length > 0 && <div className="space-y-3">
               <p role="status" className="text-xs">{recoveryFiles.length} foto(s) seleccionada(s). Asigná cada foto a su personaje antes de subir.</p>
               {recoveryFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
-                <img src={URL.createObjectURL(file)} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" onLoad={event => URL.revokeObjectURL(event.currentTarget.src)} />
+                <RecoveryPreview file={file} />
                 <div className="min-w-0 flex-1"><p className="truncate text-xs">{file.name}</p>
                   <select aria-label={`Personaje para ${file.name}`} className="mt-1 w-full rounded-lg bg-background p-2 text-xs" value={recoveryAssignments[index] ?? ''}
                     onChange={event => setRecoveryAssignments(previous => ({ ...previous, [index]: event.target.value }))}>
