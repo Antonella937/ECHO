@@ -108,7 +108,21 @@ export default function SettingsPage() {
   async function verifyRecoveredMedia(expectedUniverse: string, check: (remote: typeof state) => boolean) {
     assertRecoveryUniverse(expectedUniverse);
     if (!user?.id) throw new Error('No se pudo identificar la sesión para verificar el guardado.');
-    await actions.retrySync();
+    // The regular universe sync can wait on unrelated pending work. Bound the
+    // UI wait without cancelling that sync or claiming that the upload failed.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        actions.retrySync(),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(
+            'La foto se subió, pero la sincronización tardó demasiado. No vuelvas a subirla: revisá la publicación y el estado de sincronización antes de reintentar.'
+          )), 30000);
+        }),
+      ]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
     assertRecoveryUniverse(expectedUniverse);
     const remote = await loadUniverse(expectedUniverse);
     assertRecoveryUniverse(expectedUniverse);
