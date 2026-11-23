@@ -130,7 +130,11 @@ export default function SettingsPage() {
         await verifyRecoveredMedia(remote => updatedAvatars.every(item => remote.characters.some(character => character.id === item.id && character.avatar === item.path)));
       }
       setRecoveryStatus(`Recuperados y sincronizados ${completed} avatar(es). Las imágenes anteriores no se borraron.`);
-      if (completed > 0) toast({ title: 'Avatares sincronizados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
+      if (completed > 0) {
+        setRecoveryFiles([]);
+        setRecoveryAssignments({});
+        toast({ title: 'Avatares sincronizados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
+      }
     } catch (error) {
       setRecoveryStatus(`${completed} avatar(es) procesado(s), pero no se pudo confirmar la sincronización completa. No vuelvas a subir las mismas fotos hasta comprobar los perfiles. ${error instanceof Error ? error.message : ''}`);
     } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
