@@ -210,6 +210,20 @@ export default function SettingsPage() {
     try {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || !file.size || file.size > 15 * 1024 * 1024)
         throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
+      const oldPath = recoveryMediaPath;
+      // Check the current server snapshot before uploading: the photo may already have
+      // been recovered in another session or the selected post/story may have changed.
+      assertRecoveryUniverse(recoveryUniverse);
+      const beforeUpload = await loadUniverse(recoveryUniverse);
+      assertRecoveryUniverse(recoveryUniverse);
+      const stillPending = beforeUpload.state && (
+        beforeUpload.state.posts.some(post =>
+          (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
+          post.media?.some(item => item.type === 'image' && item.url === oldPath)) ||
+        beforeUpload.state.stories.some(story => story.image === oldPath)
+      );
+      if (!stillPending)
+        throw new Error('La referencia antigua ya no aparece en el servidor. Actualizá ECHO antes de subir esta foto.');
       setRecoveryStatus('Subiendo imagen original a R2…');
       const { uploadURL, objectPath } = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -220,7 +234,6 @@ export default function SettingsPage() {
       if (!upload.ok) throw new Error('No se pudo subir la foto.');
       await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objectPath }), responseType: 'json' });
-      const oldPath = recoveryMediaPath;
       const expectedPosts = state.posts.map(post => ({
         id: post.id,
         cover: post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image'),
