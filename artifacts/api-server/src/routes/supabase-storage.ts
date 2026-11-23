@@ -42,7 +42,16 @@ export function createSupabaseStorageRouter(): IRouter {
     const parsed = RequestUploadUrlBody.safeParse(req.body);
     if (!parsed.success || !mediaLimits[parsed.data.contentType] ||
       parsed.data.size > mediaLimits[parsed.data.contentType] * 1024 * 1024 ||
-      !parsed.data.size) { res.status(400).json({ error: "INVALID_MEDIA" }); return; }
+      !parsed.data.size) {
+      // Return a safe actionable reason, never file contents or private paths.
+      const candidate = req.body as { contentType?: unknown; size?: unknown } | undefined;
+      const mime = typeof candidate?.contentType === "string" ? candidate.contentType : "";
+      const size = typeof candidate?.size === "number" ? candidate.size : 0;
+      const reason = !mediaLimits[mime] ? "UNSUPPORTED_FORMAT"
+        : size > mediaLimits[mime] * 1024 * 1024 ? "FILE_TOO_LARGE"
+        : "INVALID_FILE_METADATA";
+      res.status(400).json({ error: "INVALID_MEDIA", reason }); return;
+    }
     try {
       if (useR2()) {
         const r2 = configuredR2();
