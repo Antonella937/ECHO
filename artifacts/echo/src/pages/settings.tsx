@@ -88,6 +88,18 @@ export default function SettingsPage() {
     if (new Set(assignments.map(([, id]) => id)).size !== assignments.length) {
       setRecoveryStatus('Elegí un solo archivo por personaje para evitar reemplazos accidentales.'); return;
     }
+    const invalid = assignments.find(([index, id]) => {
+      const file = recoveryFiles[Number(index)];
+      const character = state.characters.find(item => item.id === id);
+      return !character?.avatar?.startsWith('/objects/uploads/') ||
+        !file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
+        !file.size || file.size > 15 * 1024 * 1024;
+    });
+    if (invalid) {
+      setRecoveryStatus('Una foto o un personaje seleccionado ya no es válido. Revisá las asignaciones: solo JPG, PNG o WebP de hasta 15 MB y avatares pendientes.');
+      setRecoveryConfirmed(false);
+      return;
+    }
     setRecoveryBusy(true);
     let completed = 0;
     const updatedAvatars: Array<{ id: string; path: string }> = [];
