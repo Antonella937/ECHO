@@ -140,9 +140,15 @@ export default function SettingsPage() {
         if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ objectPath }), responseType: 'json' });
-        // Update only after the upload was claimed, then verify this avatar before proceeding.
-        // A failed sync must not start uploads for the remaining characters.
+        // The upload can take time; do not overwrite an avatar changed by another
+        // session while the file was being transferred.
         assertRecoveryUniverse(recoveryUniverse);
+        const beforeApply = await loadUniverse(recoveryUniverse);
+        assertRecoveryUniverse(recoveryUniverse);
+        if (!beforeApply.state?.characters.some(item => item.id === id && item.avatar === character.avatar))
+          throw new Error(`El avatar de ${character.name} cambió durante la subida. Revisá el perfil antes de reintentar.`);
+        // Update only after upload and claim; verify this avatar before proceeding.
+        // A failed sync must not start uploads for the remaining characters.
         actions.updateAccount(id, { ...character, avatar: objectPath }, character);
         setRecoveryStatus(`Verificando avatar ${completed + 1} de ${assignments.length}: ${character.name}…`);
         await verifyRecoveredMedia(recoveryUniverse, remote =>
