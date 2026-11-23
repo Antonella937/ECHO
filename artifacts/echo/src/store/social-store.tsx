@@ -345,8 +345,8 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
       },
       editPost(id, patch, expected) { coordinator.current?.edit(s => editSocialPost(s, id, myId(), patch, expected)); },
       recoverLegacyMedia(oldPath, newPath) {
-        if (!/^\/objects\/uploads\/[a-zA-Z0-9_-]+$/.test(oldPath) ||
-            !/^\/objects\/r2\/[a-zA-Z0-9_-]+$/.test(newPath))
+        if (!/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(oldPath) ||
+            !/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newPath))
           throw new Error('Referencia de recuperación inválida.');
         const snapshot = cur();
         const matches = snapshot.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) || post.media?.some(item => item.type === 'image' && item.url === oldPath)) ||
