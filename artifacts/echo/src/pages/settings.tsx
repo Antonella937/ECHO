@@ -147,16 +147,20 @@ export default function SettingsPage() {
       await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objectPath }), responseType: 'json' });
       const oldPath = recoveryMediaPath;
-      const expectedPostIds = state.posts.filter(post =>
-        (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
-        post.media?.some(item => item.type === 'image' && item.url === oldPath)).map(post => post.id);
+      const expectedPosts = state.posts.map(post => ({
+        id: post.id,
+        cover: post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image'),
+        mediaIds: (post.media ?? []).filter(item => item.type === 'image' && item.url === oldPath).map(item => item.id),
+      })).filter(post => post.cover || post.mediaIds.length > 0);
       const expectedStoryIds = state.stories.filter(story => story.image === oldPath).map(story => story.id);
       actions.recoverLegacyMedia(oldPath, objectPath);
       setRecoveryStatus('Foto subida. Verificando guardado en el servidor…');
       await verifyRecoveredMedia(remote =>
-        expectedPostIds.every(id => remote.posts.some(post => post.id === id &&
-          ((post.image === objectPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
-            post.media?.some(item => item.type === 'image' && item.url === objectPath)))) &&
+        expectedPosts.every(expected => {
+          const post = remote.posts.find(item => item.id === expected.id);
+          return !!post && (!expected.cover || post.image === objectPath) &&
+            expected.mediaIds.every(id => post.media?.some(item => item.id === id && item.type === 'image' && item.url === objectPath));
+        }) &&
         expectedStoryIds.every(id => remote.stories.some(story => story.id === id && story.image === objectPath)) &&
         !remote.posts.some(post => (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
           post.media?.some(item => item.type === 'image' && item.url === oldPath)) &&
