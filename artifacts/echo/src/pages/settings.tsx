@@ -224,6 +224,19 @@ export default function SettingsPage() {
       );
       if (!stillPending)
         throw new Error('La referencia antigua ya no aparece en el servidor. Actualizá ECHO antes de subir esta foto.');
+      // A stale local snapshot could otherwise replace only some references while
+      // leaving other occurrences of this image broken on the server.
+      const localPostRefs = state.posts.filter(post =>
+        (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
+        post.media?.some(item => item.type === 'image' && item.url === oldPath)).map(post => post.id).sort();
+      const remotePostRefs = beforeUpload.state!.posts.filter(post =>
+        (post.image === oldPath && (!post.media?.length || post.media[0]?.type === 'image')) ||
+        post.media?.some(item => item.type === 'image' && item.url === oldPath)).map(post => post.id).sort();
+      const localStoryRefs = state.stories.filter(story => story.image === oldPath).map(story => story.id).sort();
+      const remoteStoryRefs = beforeUpload.state!.stories.filter(story => story.image === oldPath).map(story => story.id).sort();
+      if (JSON.stringify(localPostRefs) !== JSON.stringify(remotePostRefs) ||
+          JSON.stringify(localStoryRefs) !== JSON.stringify(remoteStoryRefs))
+        throw new Error('Las publicaciones o historias cambiaron en el servidor. Actualizá ECHO antes de recuperar esta imagen.');
       setRecoveryStatus('Subiendo imagen original a R2…');
       const { uploadURL, objectPath } = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
