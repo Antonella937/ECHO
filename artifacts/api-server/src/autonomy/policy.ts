@@ -25,7 +25,7 @@ export type Opportunity = {
   commentId?: string;
   recipientId?: string;
   storyId?: string;
-  /** A text-only story uses the existing post draft schema without expanding model actions. */
+  /** A photo story uses the existing post draft schema without expanding model actions. */
   publishStory?: boolean;
   messageId?: string;
   reasonCode:
@@ -509,7 +509,7 @@ export function chooseAutonomyOpportunity(input: {
       reason: "A recent, visible message has text context and has not been reacted to by this character.", localHour: local.hour, timezone };
   }
   if (selected.situation === "post") {
-    return { situation: "post", ...(selected.publishStory ? { publishStory: true } : {}), reasonCode: "OPPORTUNITY_SELECTED", reason: selected.publishStory ? "The character may publish a short text story." : "The character may publish a feed post.", localHour: local.hour, timezone };
+    return { situation: "post", ...(selected.publishStory ? { publishStory: true } : {}), reasonCode: "OPPORTUNITY_SELECTED", reason: selected.publishStory ? "The character may publish a photo story." : "The character may publish a feed post.", localHour: local.hour, timezone };
   }
   return { situation: null, reasonCode: "NO_SOCIAL_TARGET", reason: "The selected opportunity no longer has a valid target.", localHour: local.hour, timezone };
 }

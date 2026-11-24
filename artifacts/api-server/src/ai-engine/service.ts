@@ -20,6 +20,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
   provider: TextProvider;
   vision?: (ownerId: string, state: import('@workspace/api-zod').SocialState, input: CharacterDecisionInput) => Promise<VisionContext>;
   liveDmReply?: boolean;
+  publishStory?: boolean;
 }) {
   if (!ownerId) throw new EngineError('AUTHENTICATION_REQUIRED', 401);
   if (!PreviewCharacterDecisionBody.strict().safeParse(input).success) throw new EngineError('INVALID_PREVIEW_INPUT');
@@ -194,7 +195,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
 
       'Use only this visible ECHO event; do not infer unseen image content or private messages.',
     ].filter(Boolean).join(String.fromCharCode(10));
-    selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId, fetch, analyzedGallery.map(item => item.id));
+    selectedProvider = kindroidSocialGroupProvider(groupId, kinId, input.situation as import('./social-isolation').FounderSocialSituation, context, input.characterId, fetch, analyzedGallery.map(item => item.id), dependencies.publishStory);
   }
   // Public social actions must only use the isolated Kindroid group above.
   // Never route social prompts through an individual Kin DM history.
@@ -615,5 +616,5 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       .catch(() => [] as Awaited<ReturnType<typeof relevantWorldJournals>>);
   const journalContext = approvedJournals.map(e => `[${e.truthStatus}] ${e.title}: ${e.content}`).join('\n');
   return previewDecision(selectedProvider, parsed.data.state, input, snapshot.revision,
-    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext);
+    new Date(), 'persisted_owner_universe', vision, historical, dependencies.liveDmReply ? 'live_dm_reply' : 'preview', language, galleryContext, dmPreferences, journalContext, dependencies.publishStory);
 }

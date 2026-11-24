@@ -63,6 +63,7 @@ export function kindroidSocialGroupProvider(
   echoCharacterId?: string,
   request: typeof fetch = fetch,
   allowedGalleryPhotoIds: readonly string[] = [],
+  publishStory = false,
 ): TextProvider {
   return {
     name: 'kindroid',
@@ -85,12 +86,15 @@ export function kindroidSocialGroupProvider(
       const choices = situation === 'story_reaction'
         ? 'VIEW, LIKE, LAUGH, SURPRISE, FIRE'
         : situation.startsWith('like_') ? 'LIKE, SKIP' : '';
-      const galleryInstruction = situation === 'post' && allowedGalleryPhotoIds.length
-        ? ` If attaching a photo, put PHOTO_ID: followed by exactly one of these verified gallery IDs on the LAST line: ${allowedGalleryPhotoIds.join(', ')}. Otherwise write a text-only caption. Never invent a photo ID.`
-        : ' No photo is available for verified attachment; write a text-only caption.';
+      const captionLimit = publishStory ? 80 : 150;
+      const publicationType = publishStory ? 'Instagram Story' : 'Instagram feed post';
+      const postInstruction = allowedGalleryPhotoIds.length
+        ? `Write a casual English caption for an ${publicationType} in your voice. Use ${publishStory ? 'a brief phrase' : 'at most one short sentence'} (max ${captionLimit} characters). Pick one verified photo, ground the caption in it, and put PHOTO_ID: followed by its ID on the last line: ${allowedGalleryPhotoIds.join(', ')}. Avoid narration and visual directions. If no photo fits, reply SKIP.`
+        : 'No eligible photo is available. Reply SKIP.';
       const instruction = choices
         ? `ECHO social event for ${situation}. Respond with exactly one of: ${choices}. No narration.`
-        : `ECHO social event for ${situation}. Write only a natural English ${situation === 'post' ? 'feed caption' : 'public comment'} in your voice, or SKIP if you would not engage. No narration.${situation === 'post' ? galleryInstruction : ''}`;
+        : situation === 'post' ? postInstruction
+        : 'ECHO social event for comment. Write only a natural English public comment in your voice, or SKIP if you would not engage. No narration.';
       // Kindroid determines the next Kin after receiving the group user message.
       // Do not preflight get-turn here: an idle group may legitimately have
       // the user turn, which would reject every first social event.
@@ -137,7 +141,8 @@ export function kindroidSocialGroupProvider(
       } else if (publishText.toUpperCase() === 'SKIP') {
         action = 'none';
       } else {
-        const maxLength = situation === 'post' ? 600 : 1000;
+        const maxLength = situation === 'post' ? captionLimit : 1000;
+        if (situation === 'post' && !galleryPhotoId) throw new EngineError('GALLERY_PHOTO_REQUIRED', 422);
         // Never silently publish a chopped-off sentence as the Kin's words.
         // Reject and leave the social action unexecuted instead.
         if (!publishText || publishText.length > maxLength) {

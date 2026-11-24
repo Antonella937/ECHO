@@ -107,7 +107,6 @@ export function applyAutonomyDecision(
   if (decision.action === "draft" && decision.situation === "post") {
     if (!text) throw new SocialExecutionError("EMPTY_POST_TEXT");
     if (opportunity.publishStory) {
-      // Text-only story: do not invent a photo or reuse private gallery media.
       if (state.stories.some(item => item.authorId === characterId && recentWithin(item.createdAt, now, DAY_MS))) {
         throw new SocialExecutionError("DAILY_STORY_CAP");
       }
@@ -478,6 +477,9 @@ export async function executeAutonomyDecision(input: {
 
     let mutation: ReturnType<typeof applyAutonomyDecision>;
     try {
+      if (input.decision.action === "draft" && input.decision.situation === "post" && !input.decision.galleryPhotoId) {
+        throw new SocialExecutionError("GALLERY_PHOTO_REQUIRED");
+      }
       mutation = applyAutonomyDecision(state, input.characterId, input.opportunity, input.decision, now);
     } catch (error) {
       const reasonCode = error instanceof SocialExecutionError ? error.reasonCode : "ACTION_REVALIDATION_FAILED";
@@ -514,7 +516,7 @@ export async function executeAutonomyDecision(input: {
         eq(echoCharacterGalleryTable.characterId,input.characterId),
         eq(echoCharacterGalleryTable.reserved,false),
       )).for("update").limit(1);
-      if (!selected || selected.visionStatus !== 'complete' || !selected.visionAnalysis ||
+      if (!selected?.mediaRef?.trim() || selected.visionStatus !== 'complete' || !selected.visionAnalysis ||
           !(selected.reusable || selected.usedCount === 0) ||
           !(selected.usedCount === 0 || !selected.lastUsedAt || now.getTime()-selected.lastUsedAt.getTime()>=30*DAY_MS)) {
         // The Kin explicitly chose a photo. Do not silently publish the caption

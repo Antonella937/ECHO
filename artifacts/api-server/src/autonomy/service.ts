@@ -542,6 +542,7 @@ export async function runAutonomyLiveCycle(
       preview = await previewForOwner(ownerId, decisionInput, {
         read: (id) => dependencies.repository.read(id, universeId), provider: dependencies.provider,
         vision: (id, state, input) => visionService.ensureForDecision(id, state, input),
+        publishStory: opportunity.publishStory,
         liveDmReply: true, // All live text actions use linked Kindroid, not just DM replies.
       });
     } catch (error) {
