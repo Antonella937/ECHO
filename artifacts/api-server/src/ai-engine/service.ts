@@ -308,7 +308,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // Treat consecutive incoming messages as one turn when no character reply
         // intervened. This covers a music attachment followed by its caption.
         const latestTime = newest ? new Date(newest.createdAt).getTime() : NaN;
-        const incomingBatch = isDirectReply ? activeThread.filter((m, index) =>
+        const incomingBatch = isDirectReply && recipientId === parsed.data.state.primaryCharacterId && newest
+          ? [newest]
+          : isDirectReply ? activeThread.filter((m, index) =>
           index === 0 || (
             m.senderId === recipientId &&
             activeThread.slice(0, index).every(prior => prior.senderId === recipientId) &&
@@ -501,7 +503,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // Bring this character's own main-canon scene memories into subsequent
         // private DMs. Never replay a group transcript or another character's
         // memories. Alternate-universe scenes are deliberately excluded.
-        try {
+        if (!isDirectReply || recipientId !== parsed.data.state.primaryCharacterId) try {
           const sceneMemories = await db.execute(sql`SELECT m.summary, s.title
             FROM echo_scene_memory m
             JOIN echo_scenes s ON s.owner_id = m.owner_id
