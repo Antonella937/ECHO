@@ -36,7 +36,7 @@ function GroupInboxAvatar({ avatar, name, resolveMedia }: { avatar?: string | nu
 export default function MessagesPage() {
   const t = useMessagesText();
   const resolveMedia = useMediaResolver();
-  const { user } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   const { me, state, character, actions } = useSocial();
   const groupCacheKey = user?.id ? `${user.id}:${getActiveUniverseId(user.id)}:${me.id}` : '';
   const [groupSnapshot, setGroupSnapshot] = useState<{ key: string; groups: InboxGroup[] }>(() => ({ key: groupCacheKey, groups: inboxGroupCache.get(groupCacheKey) ?? [] }));
@@ -72,19 +72,32 @@ export default function MessagesPage() {
     } catch { setRequestError('No se pudo guardar la decisión. Intentá nuevamente.'); }
   };
   useEffect(() => {
-    if (!user?.id) return;
+    if (!isLoaded || !isSignedIn || !user?.id) return;
     let active = true;
-    const key = `${user.id}:${getActiveUniverseId(user.id)}:${me.id}`;
-    const load = () => customFetch<{ groups: InboxGroup[] }>(`/api/group-dms?${new URLSearchParams({ universeId: getActiveUniverseId(user.id), actorId: me.id })}`, { method: 'GET', responseType: 'json' }).then(result => {
-      if (!active) return;
-      inboxGroupCache.set(key, result.groups);
-      setGroupSnapshot({ key, groups: result.groups });
-      setGroupLoadError(false);
-    }).catch(() => { if (active) setGroupLoadError(true); });
+    let inFlight = false;
+    const key = groupCacheKey;
+    const params = new URLSearchParams({ universeId: getActiveUniverseId(user.id), actorId: me.id });
+    setGroupLoadError(false);
+    const load = async () => {
+      if (!active || inFlight) return;
+      inFlight = true;
+      try {
+        const result = await customFetch<{ groups: InboxGroup[] }>(`/api/group-dms?${params}`, { method: 'GET', responseType: 'json' });
+        if (!Array.isArray(result.groups)) throw new Error('Invalid group response');
+        if (!active) return;
+        inboxGroupCache.set(key, result.groups);
+        setGroupSnapshot({ key, groups: result.groups });
+        setGroupLoadError(false);
+      } catch {
+        if (active) setGroupLoadError(!inboxGroupCache.has(key));
+      } finally {
+        inFlight = false;
+      }
+    };
     void load();
     const interval = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 20000);
     return () => { active = false; window.clearInterval(interval); };
-  }, [user?.id, me.id, groupComposer, groupRefresh]);
+  }, [isLoaded, isSignedIn, user?.id, me.id, groupCacheKey, groupComposer, groupRefresh]);
   const [showSaved, setShowSaved] = useState(() => new URLSearchParams(window.location.search).get('view') === 'favorites' || new URLSearchParams(window.location.search).get('tab') === 'favorites');
   const savedMessages = useMemo(() => state.messages.filter(m => m.savedByIds?.includes(me.id) && !m.hiddenForIds?.includes(me.id) && (m.senderId === me.id || m.recipientId === me.id)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [state.messages, me.id]);
   const threads = useThreads();
