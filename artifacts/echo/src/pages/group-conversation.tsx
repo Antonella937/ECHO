@@ -444,8 +444,10 @@ export default function GroupConversationPage() {
               Guardar en mi biblioteca
             </button>
           </div> : <AttachmentView key={a.id} a={a} mine={m.senderId === me.id} />)}</div>}
-          {m.text && <button type="button" aria-label="Copiar mensaje" title="Copiar mensaje" className="mt-1 flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100" onClick={async () => { try { await navigator.clipboard.writeText(m.text); setCopiedMessageId(m.id); window.setTimeout(() => setCopiedMessageId(current => current === m.id ? null : current), 1800); } catch { setError('No se pudo copiar el mensaje.'); } }}>{copiedMessageId === m.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}</button>}
-          <button type="button" onClick={() => void togglePin(m)} className="mt-1 flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100"><Pin className="h-3 w-3" />{m.pinnedAt ? 'Desfijar' : 'Fijar'}</button>
+          <div className="mt-1 flex items-center gap-3">
+          {m.text && <button type="button" aria-label="Copiar mensaje" title="Copiar mensaje" className="flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100" onClick={async () => { try { await navigator.clipboard.writeText(m.text); setCopiedMessageId(m.id); window.setTimeout(() => setCopiedMessageId(current => current === m.id ? null : current), 1800); } catch { setError('No se pudo copiar el mensaje.'); } }}>{copiedMessageId === m.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}</button>}
+          <button type="button" onClick={() => void togglePin(m)} className="flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100"><Pin className="h-3 w-3" />{m.pinnedAt ? 'Desfijar' : 'Fijar'}</button>
+          </div>
           <p className={`mt-1 text-right text-[10px] ${m.senderId === me.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
       </div>)}
