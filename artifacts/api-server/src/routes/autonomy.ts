@@ -253,7 +253,7 @@ router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): P
     const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
     if (!parsed.success) { res.status(404).json({ error: "UNIVERSE_NOT_FOUND" }); return; }
     const incoming = parsed.data.messages.find(m => m.id === messageId && m.recipientId === characterId);
-    if (!incoming || !incoming.text.includes("VANTA")) { res.status(409).json({ error: "RECOVERY_MESSAGE_MISMATCH" }); return; }
+    if (!incoming || incoming.senderId !== parsed.data.primaryCharacterId) { res.status(409).json({ error: "RECOVERY_MESSAGE_MISMATCH" }); return; }
     const thread = parsed.data.messages.filter(m => m.threadId === incoming.threadId);
     const latest = [...thread].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
     if (latest?.id !== messageId) { res.status(409).json({ error: "DM_ALREADY_ADVANCED" }); return; }
@@ -288,7 +288,7 @@ router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): P
     const previous = messages.at(-2);
     const lastIsAi = last?.sender?.toLowerCase() === "ai" || last?.sender_type?.toLowerCase() === "ai" || last?.sender === kinId;
     const previousIsUser = previous?.sender?.toLowerCase() === "user" || previous?.sender_type?.toLowerCase() === "user";
-    const matchingContext = previous?.message?.includes("[ECHO PRIVATE THREAD") && previous.message.includes("VANTA");
+    const matchingContext = previous?.message?.trim() === incoming.text.trim();
     const answer = last?.message?.trim();
     if (!lastIsAi || !previousIsUser || !matchingContext || !answer || answer.length > 30000) {
       res.status(409).json({ error: "KINDROID_REPLY_NOT_VERIFIED" }); return;
