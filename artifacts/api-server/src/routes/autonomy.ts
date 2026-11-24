@@ -264,7 +264,7 @@ router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): P
     const key = process.env.ECHO_KINDROID_API_KEY;
     if (typeof kinId !== "string" || !key) { res.status(503).json({ error: "KINDROID_RECOVERY_UNAVAILABLE" }); return; }
     type HistoryMessage = {id?: string | number; sender?: string; sender_type?: string; message?: string; timestamp?: number};
-    let cursor: number | undefined;
+    let cursor: number | undefined = Math.floor(new Date(incoming.createdAt).getTime() / 1000) - 300;
     let messages: HistoryMessage[] = [];
     let finished = false;
     for (let page = 0; page < 10; page++) {
@@ -273,7 +273,7 @@ router.post("/autonomy/recover-kindroid-reply", requireAuth, async (req, res): P
       url.searchParams.set("limit", "100");
       if (cursor !== undefined) url.searchParams.set("start_after_timestamp", String(cursor));
       const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20000) });
-      if (!response.ok) { res.status(502).json({ error: "KINDROID_HISTORY_UNAVAILABLE" }); return; }
+      if (!response.ok) { req.log.warn({ upstreamStatus: response.status, page }, "Kindroid recovery history request failed"); res.status(response.status === 429 ? 429 : 502).json({ error: response.status === 429 ? "KINDROID_RATE_LIMITED" : "KINDROID_HISTORY_UNAVAILABLE", upstreamStatus: response.status }); return; }
       const data = await response.json() as {messages?: HistoryMessage[]; pagination?: {hasMore?: boolean;lastTimestamp?: number}};
       if (!Array.isArray(data.messages)) { res.status(502).json({ error: "KINDROID_HISTORY_INVALID" }); return; }
       messages = [...messages.slice(-1), ...data.messages].slice(-3);
