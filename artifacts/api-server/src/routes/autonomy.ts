@@ -150,7 +150,7 @@ router.get("/autonomy/dm-error", requireAuth, async (req, res): Promise<void> =>
       gte(echoAutonomyRunsTable.createdAt, new Date(Date.now() - 15 * 60_000)),
     )).orderBy(desc(echoAutonomyRunsTable.createdAt)).limit(1);
     const allowed = new Set(["KINDROID_TIMEOUT_RETRY_MANUALLY","KINDROID_CONNECTION_RETRY_MANUALLY",
-      "KINDROID_REQUEST_FAILED_RETRY_MANUALLY","KINDROID_RATE_LIMITED","KINDROID_GENERATION_FAILED"]);
+      "KINDROID_REQUEST_FAILED_RETRY_MANUALLY","KINDROID_RATE_LIMITED","KINDROID_GENERATION_FAILED","KINDROID_MESSAGE_TOO_LONG"]);
     // An old failure must never be shown as the status of a newer DM.
     const latestThreadMessage = parsed.data.state.messages
       .filter(m => m.senderId === characterId || m.recipientId === characterId)
