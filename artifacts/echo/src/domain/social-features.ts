@@ -84,7 +84,7 @@ export function saveHighlight(state: SocialState, actor: string, highlight: Stor
   if (!highlight.title.trim() || highlight.title.length > 40 || (!highlight.storyIds.length && !highlight.coverImage) ||
     highlight.storyIds.some(id => !state.stories.some(s => s.id === id && s.authorId === actor)))
     throw new Error('Elegí un título y una portada personalizada si la destacada está vacía.');
-  if (highlight.coverImage && !/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(highlight.coverImage))
+  if (highlight.coverImage && !/^\/objects\/(?:uploads|r2)\/[0-9a-f-]{36}$/i.test(highlight.coverImage))
     throw new Error('La portada debe ser una imagen subida de forma privada.');
   const previous = getOrderedHighlights(state, actor).map(h => h.id);
   const ordered = previous.filter(id => id !== highlight.id);
