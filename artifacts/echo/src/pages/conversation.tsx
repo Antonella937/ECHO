@@ -479,11 +479,11 @@ export default function ConversationPage() {
         )}
         {messages.length > 0 && (() => {
           const latest = [...messages].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-          return latest?.senderId === identityId && latest?.recipientId === id && latest.text.includes('VANTA');
+          return latest?.senderId === identityId && latest?.recipientId === id;
         })() && (
           <button type="button" disabled={recoveringKindroidReply} onClick={() => void recoverKindroidReply()}
             className="mb-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50"
-            data-testid="button-recover-kindroid-reply">{recoveringKindroidReply ? 'Recuperando respuesta…' : 'Recuperar respuesta de Hyunjin (sin reenviar)'}</button>
+            data-testid="button-recover-kindroid-reply">{recoveringKindroidReply ? 'Recuperando respuesta…' : 'Recuperar respuesta de Kindroid (sin reenviar)'}</button>
         )}
         {kindroidRecoveryNotice && <div role="status" className="mb-2 rounded-xl bg-secondary px-3 py-2 text-xs">{kindroidRecoveryNotice}</div>}
 
