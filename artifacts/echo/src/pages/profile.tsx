@@ -2,7 +2,7 @@ import { useLanguage } from '@/lib/i18n';
 import { recentlyActive } from '@/domain/activity';
 import { useDiscoveryText } from '@/lib/discovery-translations';
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'wouter';
+import { Link, useLocation, useParams, useSearch } from 'wouter';
 import { Archive, LockKeyhole, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
@@ -26,13 +26,22 @@ export default function ProfilePage() {
   const language = useLanguage();
   const { id } = useParams<{ id: string }>();
   const { state, me, character, actions } = useSocial();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const search = useSearch();
   const back = useBack();
   const { openStories } = useStoryViewer();
   const person = character(id);
   const [editing, setEditing] = useState(false);
   const [showMutualFollowers, setShowMutualFollowers] = useState(false);
-  const [tab, setTab] = useState<'posts' | 'tagged'>('posts');
+  const tab = new URLSearchParams(search).get('tab') === 'tagged' ? 'tagged' : 'posts';
+  const selectTab = (nextTab: typeof tab) => {
+    if (nextTab === tab) return;
+    const params = new URLSearchParams(search);
+    if (nextTab === 'tagged') params.set('tab', nextTab);
+    else params.delete('tab');
+    const query = params.toString();
+    navigate(query ? `${location}?${query}` : location, { replace: true });
+  };
   const posts = useMemo(() => {
     const own = state.posts.filter((p) => p.authorId === id || p.collaboratorIds?.includes(id!)).sort(byDateDesc);
     const pinned = getOrderedPinnedPosts(state, id!).slice(0, 3);
@@ -199,7 +208,7 @@ export default function ProfilePage() {
 
       <div className="mt-6 flex justify-center border-t border-border/70" role="tablist">
         {([['posts', 'Fotos', Grid3x3], ['tagged', 'Etiquetas', UserSquare2]] as const).map(([k, label, Icon]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => selectTab(k)}
             className={cn('-mt-px flex h-12 items-center gap-2 border-t px-6 text-[11px] font-semibold uppercase tracking-[0.18em]', tab === k ? 'border-foreground' : 'border-transparent text-muted-foreground')}
             data-testid={`tab-profile-${k}`}>
             <Icon className="h-4 w-4" strokeWidth={1.8} /> {t(label)}
