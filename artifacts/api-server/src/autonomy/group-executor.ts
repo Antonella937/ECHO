@@ -133,7 +133,10 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       // Kindroid's group response endpoint ignores the provider context fields.
       // Inject the actual recent conversation before asking the selected Kin to reply.
       if (linkedKinId && kindroidGroupId) {
-        await sendKindroidSocialGroupContext(kindroidGroupId, kinPrompt.slice(0, 1450));
+        const primaryId = (state as { primaryCharacterId?: string } | undefined)?.primaryCharacterId;
+        const plainOwnerMessage = !sceneMode && latest && String(latest.sender_id) === primaryId
+          ? String(latest.body ?? "").trim() : "";
+        await sendKindroidSocialGroupContext(kindroidGroupId, plainOwnerMessage || kinPrompt.slice(0, 1450));
       }
       completion = await (linkedKinId
         ? kindroidPeerGroupProvider(kindroidGroupId!, linkedKinId, speakerId, fetch, true)
