@@ -788,11 +788,6 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
         <SharedMusicPlayer trackId={m.musicTrackId} />
         <MusicDmSaveButton trackId={m.musicTrackId} characterId={meId} />
       </div>}
-      {m.attachments?.length ? (
-        <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
-          {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
-        </div>
-      ) : null}
       <div className={cn('flex w-full min-w-0 max-w-full flex-col items-start gap-0.5 sm:items-center sm:gap-1', mine ? 'sm:flex-row-reverse items-end' : 'sm:flex-row items-start')}>
         {visibleText && (
           <p
@@ -816,6 +811,11 @@ function Bubble({ m, layout, mine, meId, otherId, showTime, state, quoted, names
           <button type="button" onClick={onToggleHiding} aria-label={t("Eliminar para mí")} title={t("Eliminar para mí")} aria-expanded={hiding} className="tap grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary" data-testid={`button-hide-${m.id}`}><Trash2 className="h-4 w-4" /></button>
         </span>
       </div>
+      {m.attachments?.length ? (
+        <div className={cn('mt-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
+          {m.attachments.map(a => <AttachmentView key={a.id} a={a} mine={mine} messageId={m.id} />)}
+        </div>
+      ) : null}
       {menuOpen && (
         <div role="menu" aria-label={t("Opciones del mensaje")} className="mt-1 flex max-w-[90vw] flex-wrap gap-1 rounded-2xl border border-border bg-card p-2 shadow-lg" data-testid={`menu-message-${m.id}`}>
           {canListen && <button type="button" disabled={listening} onClick={() => { setMenuOpen(false); onListen(); }} className="rounded-xl bg-secondary px-3 py-2 text-xs">{t("Escuchar con su voz")}</button>}
