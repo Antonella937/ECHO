@@ -141,7 +141,7 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
   const [generatingCommunity, setGeneratingCommunity] = useState(false);
   const [generatedBatches, setGeneratedBatches] = useState(0);
   const post = state.posts.find((p) => p.id === postId);
-  const canAddCommunity = post?.authorId === me.id && post.commentsEnabled !== false;
+  const canAddCommunity = !me.privateAccount && post?.authorId === me.id && post.commentsEnabled !== false;
   const ref = useRef<HTMLTextAreaElement>(null);
   const target = replyTo ? character(replyTo.authorId) : undefined;
 
