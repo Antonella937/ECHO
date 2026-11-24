@@ -1,9 +1,12 @@
 import { useAccountManagementText } from '@/lib/account-management-translations';
 import { useLanguage } from '@/lib/i18n';
 import { galleryLabels } from '@/lib/gallery-translations';
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Reorder, useDragControls } from 'framer-motion';
+import { useUser } from '@clerk/react';
+import { getActiveUniverseId } from '@/store/persistence';
 import { Link, useLocation } from 'wouter';
-import { Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, Images, Star } from 'lucide-react';
+import { Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, Images, Star, GripVertical } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { CharacterAvatar } from './avatar';
 import { VerifiedBadge } from './verified-badge';
@@ -11,6 +14,33 @@ import { AccountEditor } from './account-editor';
 import { accountTypes } from '@/domain/accounts';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+function SortableAccount({ id, label, className, onMove, children }: {
+  id: string;
+  label: string;
+  className: string;
+  onMove?: (direction: number) => void;
+  children: ReactNode;
+}) {
+  const controls = useDragControls();
+  return (
+    <Reorder.Item as="div" value={id} dragListener={false} dragControls={controls} dragMomentum={false}
+      layout="position" className={className} data-testid={`row-account-${id}`}>
+      {onMove && <button type="button" aria-label={label} title={label}
+        onPointerDown={event => controls.start(event)}
+        onKeyDown={event => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          onMove(event.key === 'ArrowUp' ? -1 : 1);
+        }}
+        className="grid h-11 w-8 shrink-0 touch-none cursor-grab place-items-center rounded-lg text-muted-foreground hover:bg-secondary active:cursor-grabbing"
+        data-testid={`drag-account-${id}`}>
+        <GripVertical className="h-4 w-4" aria-hidden="true" />
+      </button>}
+      {children}
+    </Reorder.Item>
+  );
+}
 
 /** Identity switcher + account management (active / archived). */
 export function AccountManager() {
@@ -30,12 +60,33 @@ export function AccountManager() {
   };
   const primaryText = primaryLabels[language] ?? primaryLabels.en;
   const { state, me, actions } = useSocial();
+  const { user } = useUser();
+  const orderKey = user?.id ? `echo:account-order:${user.id}:${getActiveUniverseId(user.id)}` : '';
+  const [savedOrder, setSavedOrder] = useState<{ key: string; ids: string[] }>({ key: '', ids: [] });
+  useEffect(() => {
+    let ids: string[] = [];
+    try {
+      const value: unknown = orderKey ? JSON.parse(localStorage.getItem(orderKey) ?? '[]') : [];
+      if (Array.isArray(value)) ids = value.filter((entry): entry is string => typeof entry === 'string');
+    } catch { /* Keep the default order when device storage is unavailable. */ }
+    setSavedOrder({ key: orderKey, ids });
+  }, [orderKey]);
+  const orderedIds = savedOrder.key === orderKey ? savedOrder.ids : [];
+  const rank = new Map(orderedIds.map((id, index) => [id, index]));
+  const saveOrder = (ids: string[]) => {
+    const updated = [...ids, ...orderedIds.filter(id => !ids.includes(id))];
+    setSavedOrder({ key: orderKey, ids: updated });
+    try {
+      if (orderKey) localStorage.setItem(orderKey, JSON.stringify(updated));
+    } catch { /* The order remains available in this session. */ }
+  };
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const [professionalCreation, setProfessionalCreation] = useState(false);
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
-  const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived));
+  const list = state.characters.filter((c) => (tab === 'archived' ? c.archived : !c.archived))
+    .sort((first, second) => (rank.get(first.id) ?? Infinity) - (rank.get(second.id) ?? Infinity));
   const archivedCount = state.characters.filter((c) => c.archived).length;
   const primaryId = state.primaryCharacterId ?? state.currentCharacterId;
   const groups = [
@@ -72,10 +123,24 @@ export function AccountManager() {
             {tab === 'archived' ? translate('No hay cuentas archivadas. Todo sigue a la vista.') : translate('Sin cuentas activas.')}
           </p>
         )}
-        {groups.map(group => <div key={group.id} className="space-y-2"><div className="flex items-center justify-between px-1 pt-2"><h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{group.label}</h3><span className="text-xs text-muted-foreground">{group.accounts.length}</span></div>{group.accounts.map((c) => {
+        {groups.map(group => {
+          const ids = group.accounts.map(account => account.id);
+          return <div key={group.id} className="space-y-2">
+            <div className="flex items-center justify-between px-1 pt-2"><h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{group.label}</h3><span className="text-xs text-muted-foreground">{ids.length}</span></div>
+            <Reorder.Group as="div" axis="y" values={ids} onReorder={saveOrder} className="space-y-2">
+            {group.accounts.map((c, index) => {
           const active = c.id === me.id;
+          const move = (direction: number) => {
+            const target = index + direction;
+            if (target < 0 || target >= ids.length) return;
+            const next = [...ids];
+            [next[index], next[target]] = [next[target], next[index]];
+            saveOrder(next);
+          };
           return (
-            <div key={c.id} className={cn('flex items-center gap-2 rounded-2xl border p-2 pr-1.5', active ? 'border-primary/50 bg-accent/40' : 'border-border')} data-testid={`row-account-${c.id}`}>
+            <SortableAccount key={c.id} id={c.id} onMove={ids.length > 1 ? move : undefined}
+              label={language === 'es' ? `Reordenar ${c.name}. Arrastrá o usá las flechas arriba y abajo.` : `Reorder ${c.name}. Drag or use the up and down arrow keys.`}
+              className={cn('relative flex items-center gap-2 rounded-2xl border bg-card p-2 pr-1.5', active ? 'border-primary/50 bg-accent/40' : 'border-border')}>
               <button
                 role={tab === 'active' ? 'radio' : undefined}
                 aria-checked={tab === 'active' ? active : undefined}
@@ -139,9 +204,11 @@ export function AccountManager() {
                   </div>
                 )}
               </div>
-            </div>
+            </SortableAccount>
           );
-        })}</div>)}
+            })}</Reorder.Group>
+          </div>;
+        })}
       </div>
 
       <AccountEditor open={editing !== undefined || professionalCreation} accountId={professionalCreation ? null : editing} initialType={professionalCreation ? "band" : "personal"} onClose={() => { setEditing(undefined); setProfessionalCreation(false); }} />
