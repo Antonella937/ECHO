@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLanguage } from '@/lib/i18n';
 const groupLabels: Record<string, Record<string,string>> = {"en":{"Salir del grupo":"Leave group","Eliminar grupo definitivamente":"Permanently delete group","Salir del modo espectadora":"Exit spectator mode","Estás viendo este grupo como espectadora. No sos participante.":"You're viewing this group as a spectator. You're not a participant."},"pt":{"Salir del grupo":"Sair do grupo","Eliminar grupo definitivamente":"Excluir grupo permanentemente","Salir del modo espectadora":"Sair do modo espectador","Estás viendo este grupo como espectadora. No sos participante.":"Você está vendo este grupo como espectadora. Não é participante."},"fr":{"Salir del grupo":"Quitter le groupe","Eliminar grupo definitivamente":"Supprimer définitivement le groupe","Salir del modo espectadora":"Quitter le mode spectateur","Estás viendo este grupo como espectadora. No sos participante.":"Vous regardez ce groupe en spectatrice. Vous ne participez pas."},"de":{"Salir del grupo":"Gruppe verlassen","Eliminar grupo definitivamente":"Gruppe endgültig löschen","Salir del modo espectadora":"Zuschauermodus verlassen","Estás viendo este grupo como espectadora. No sos participante.":"Du siehst diese Gruppe als Zuschauerin und bist kein Mitglied."},"it":{"Salir del grupo":"Esci dal gruppo","Eliminar grupo definitivamente":"Elimina definitivamente il gruppo","Salir del modo espectadora":"Esci dalla modalità spettatore","Estás viendo este grupo como espectadora. No sos participante.":"Stai osservando questo gruppo senza partecipare."},"ko":{"Salir del grupo":"그룹 나가기","Eliminar grupo definitivamente":"그룹 영구 삭제","Salir del modo espectadora":"관전자 모드 나가기","Estás viendo este grupo como espectadora. No sos participante.":"이 그룹을 관전 중이며 참여자가 아닙니다."},"ja":{"Salir del grupo":"グループを退出","Eliminar grupo definitivamente":"グループを完全に削除","Salir del modo espectadora":"観戦モードを終了","Estás viendo este grupo como espectadora. No sos participante.":"このグループを観覧中です。参加者ではありません。"},"zh":{"Salir del grupo":"退出群组","Eliminar grupo definitivamente":"永久删除群组","Salir del modo espectadora":"退出旁观模式","Estás viendo este grupo como espectadora. No sos participante.":"你正在旁观此群组，并非参与者。"}};
 import { useLocation, useParams } from 'wouter';
-import { ChevronLeft, Send, Users, MoreHorizontal, Search, Pin, Plus, X, Mic, Square } from 'lucide-react';
+import { ChevronLeft, Send, Users, MoreHorizontal, Search, Pin, Plus, X, Mic, Square, Copy, Check } from 'lucide-react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useSocial } from '@/store/social-store';
@@ -81,6 +81,7 @@ export default function GroupConversationPage() {
   const [searchResults, setSearchResults] = useState<GroupMessage[]>([]);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -443,6 +444,7 @@ export default function GroupConversationPage() {
               Guardar en mi biblioteca
             </button>
           </div> : <AttachmentView key={a.id} a={a} mine={m.senderId === me.id} />)}</div>}
+          {m.text && <button type="button" aria-label="Copiar mensaje" title="Copiar mensaje" className="mt-1 flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100" onClick={async () => { try { await navigator.clipboard.writeText(m.text); setCopiedMessageId(m.id); window.setTimeout(() => setCopiedMessageId(current => current === m.id ? null : current), 1800); } catch { setError('No se pudo copiar el mensaje.'); } }}>{copiedMessageId === m.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}</button>}
           <button type="button" onClick={() => void togglePin(m)} className="mt-1 flex items-center gap-1 text-[10px] opacity-70 hover:opacity-100"><Pin className="h-3 w-3" />{m.pinnedAt ? 'Desfijar' : 'Fijar'}</button>
           <p className={`mt-1 text-right text-[10px] ${m.senderId === me.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
