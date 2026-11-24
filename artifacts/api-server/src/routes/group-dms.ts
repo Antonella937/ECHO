@@ -381,7 +381,7 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
         const visual: string[] = [];
         for (const attachment of attachments.filter(a => a.type === "image").slice(0, 2)) {
           try { visual.push(await describeGroupAttachment(req.userId!, attachment)); }
-          catch { visual.push("Image attached in ECHO; visual analysis unavailable."); }
+          catch (error) { console.warn("[kindroid-group] vision failed", { groupId, messageId, code: error instanceof Error ? error.message : "UNKNOWN" }); visual.push("Image attached in ECHO; visual analysis unavailable."); }
         }
         const context = visual.length ? "\n[Attached image description: " + visual.join("; ").slice(0, 900) + "]" : "";
         const message = text || (visual.length ? "" : "[Attachment shared in ECHO]");
@@ -510,6 +510,17 @@ router.post("/group-dms/:groupId/leave", async (req, res) => {
 });
 // Only the group creator may permanently delete a conversation for every participant.
 // Leaving is separate and does not erase shared history.
+router.delete("/group-dms/:groupId/messages/:messageId", async (req, res) => {
+  const parsed = scope.safeParse(req.query);
+  if (!parsed.success || !id.safeParse(req.params.groupId).success || !id.safeParse(req.params.messageId).success) { res.status(400).json({error:"INVALID_MESSAGE"}); return; }
+  const {universeId, actorId} = parsed.data;
+  if (!await getUniverse(req.userId!, universeId, actorId)) { res.status(403).json({error:"INVALID_IDENTITY"}); return; }
+  try {
+    const result = await db.execute(sql`DELETE FROM echo_group_messages m WHERE m.owner_id=${req.userId!} AND m.universe_id=${universeId} AND m.group_id=${String(req.params.groupId)} AND m.id=${String(req.params.messageId)} AND m.sender_id=${actorId} AND EXISTS (SELECT 1 FROM echo_group_conversations g WHERE g.owner_id=m.owner_id AND g.universe_id=m.universe_id AND g.id=m.group_id AND g.participant_ids ? ${actorId}) RETURNING m.id`);
+    if (!result.rows.length) {res.status(404).json({error:"MESSAGE_NOT_FOUND"});return;}
+    res.json({deleted:true});
+  } catch {res.status(503).json({error:"MESSAGE_DELETE_FAILED"});}
+});
 router.delete("/group-dms/:groupId", async (req, res) => {
   const parsed = scope.safeParse(req.query);
   if (!parsed.success || !id.safeParse(req.params.groupId).success) { res.status(400).json({ error: "INVALID_GROUP" }); return; }
