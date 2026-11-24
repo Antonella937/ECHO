@@ -1376,6 +1376,7 @@ export const GetUniverseResponse = zod.object({
   "image": zod.string(),
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
+  "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
 })),
@@ -1926,6 +1927,7 @@ export const SaveUniverseBody = zod.object({
   "image": zod.string(),
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
+  "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
 })),
@@ -2466,6 +2468,7 @@ export const SaveUniverseResponse = zod.object({
   "image": zod.string(),
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
+  "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
 })),
@@ -3054,6 +3057,7 @@ export const VerifyUniverseResponse = zod.object({
   "image": zod.string(),
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
+  "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
 })),
@@ -3915,6 +3919,7 @@ export const CreateCreatorUniverseBody = zod.object({
   "image": zod.string(),
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
+  "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
 })),
@@ -4453,6 +4458,7 @@ export const CreateCreatorUniverseResponse = zod.object({
   "image": zod.string(),
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
+  "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
 })),

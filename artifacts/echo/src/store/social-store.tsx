@@ -478,6 +478,13 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         return id;
       },
       createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly, musicClip, repostOfPostId }) {
+        if (repostOfPostId) {
+          const source = cur().posts.find(post => post.id === repostOfPostId);
+          const author = source && cur().characters.find(account => account.id === source.authorId);
+          if (!author || author.archived || author.privateAccount) {
+            throw new Error('Solo podés compartir publicaciones de cuentas públicas.');
+          }
+        }
         const allowedViewerIds = closeFriendsOnly ? (cur().closeFriends?.[myId()] ?? []) : [];
         if (closeFriendsOnly && !allowedViewerIds.length) throw new Error('Agregá al menos un mejor amigo antes de publicar.');
         const id = uid('s');

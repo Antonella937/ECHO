@@ -1205,6 +1205,7 @@ components:
         image: { type: string }
         caption: { type: string }
         createdAt: { type: string, format: date-time }
+        repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
     Message:
@@ -1487,6 +1488,7 @@ components:
         image: { type: string }
         caption: { type: string }
         createdAt: { type: string, format: date-time }
+        repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
     Message:
@@ -1585,6 +1587,7 @@ components:
         image: { type: string }
         caption: { type: string }
         createdAt: { type: string, format: date-time }
+        repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
     Message:
@@ -1867,6 +1870,7 @@ components:
         image: { type: string }
         caption: { type: string }
         createdAt: { type: string, format: date-time }
+        repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
     Message:

@@ -114,17 +114,18 @@ export function ShareSheet({ post, open, onClose }: { post: Post; open: boolean;
 
   return (
     <Sheet open={open} onClose={onClose} title={t("Compartir")} testId="sheet-share">
-      <button type="button" onClick={() => setStoryComposerOpen(true)} className="mb-5 flex h-12 w-full items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-share-to-story"><BookImage className="h-5 w-5" /> Agregar a mi historia</button>
+      <button type="button" disabled={!post.image || !author || author.privateAccount || author.archived} onClick={() => setStoryComposerOpen(true)} className="mb-5 disabled:opacity-50 flex h-12 w-full items-center gap-3 rounded-2xl bg-secondary px-4 text-sm font-medium" data-testid="button-share-to-story"><BookImage className="h-5 w-5" /> Agregar a mi historia</button>
       {storyComposerOpen && (
         <div className="mb-5 space-y-3 rounded-2xl border border-border bg-background p-3" data-testid="composer-repost-story">
           <div className="text-sm font-semibold">Vista previa de tu historia</div>
           <div className="relative mx-auto flex aspect-[9/13] max-h-[48dvh] w-full max-w-[300px] flex-col items-center justify-center overflow-hidden rounded-xl bg-[#19171d] p-5 text-white">
-            <div className="w-full overflow-hidden rounded-xl bg-[#090909] shadow-xl">
-              <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold">@{author?.handle ?? 'publicacion'}</div>
+            {previewImage && <img src={previewImage} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-2xl" />}
+            <div className="relative w-full overflow-hidden rounded-xl border border-white/15 bg-[#18151d] shadow-xl">
+              <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold">{author && <CharacterAvatar character={author} size={24} />}@{author?.handle ?? 'publicacion'}</div>
               {previewImage ? <img src={previewImage} alt="Vista previa de la publicación" className="max-h-[28dvh] w-full object-contain" /> : <div className="flex h-[25dvh] w-full items-center justify-center bg-gradient-to-br from-[#342b37] via-[#24212b] to-[#17161e]" role="status" aria-label="Cargando vista previa"><div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-white/80" /></div>}
               <div className="px-3 py-2 text-[10px] text-white/70">Ver publicación original</div>
             </div>
-            {storyText.trim() && <p className="mt-4 max-w-full break-words text-center text-sm font-medium">{storyText}</p>}
+            {storyText.trim() && <p className="relative mt-4 max-w-full break-words text-center text-sm font-medium">{storyText}</p>}
           </div>
           <textarea value={storyText} onChange={e => setStoryText(e.target.value.slice(0, 500))} placeholder="Escribí algo sobre esta publicación..." aria-label="Texto de tu historia" maxLength={500} rows={3} className="w-full resize-none rounded-xl border border-border bg-secondary p-3 text-sm outline-none" data-testid="input-repost-story-text" />
           <div className="flex gap-2">

@@ -119,11 +119,14 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const originalAuthor = originalStory ? state.characters.find(c => c.id === originalStory.authorId) : undefined;
   // Media authorization must use the original object's owner and content id.
   const sourcePost = liveStory.repostOfPostId ? state.posts.find(p => p.id === liveStory.repostOfPostId) : undefined;
+  const isPostRepost = Boolean(liveStory.repostOfPostId);
+  const postAuthor = sourcePost ? state.characters.find(account => account.id === sourcePost.authorId) : undefined;
+  const canOpenPost = Boolean(sourcePost && postAuthor && !postAuthor.privateAccount && !postAuthor.archived);
   const mediaOwner = originalStory ?? liveStory;
   const storyMediaSource = sourcePost
     ? { sourceUniverseId: universeId, sourceCharacterId: sourcePost.authorId, sourceType: 'post' as const, sourceContentId: sourcePost.id }
     : { sourceUniverseId: universeId, sourceCharacterId: mediaOwner.authorId, sourceType: 'story' as const, sourceContentId: mediaOwner.id };
-  const storyImage = resolveMedia(mediaOwner.image, storyMediaSource);
+  const storyImage = resolveMedia(!isPostRepost || canOpenPost ? mediaOwner.image : "", storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
   // A private image can take a few seconds to resolve on mobile. Loading is not an error.
   useEffect(() => {
@@ -289,7 +292,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       </button>
 
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
-        {storyImage && !sourcePost && (
+        {storyImage && !isPostRepost && (
           <img
             key={story.id}
             src={storyImage}
@@ -301,24 +304,29 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             data-testid={`img-story-${story.id}`}
           />
         )}
-        {sourcePost && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#19171d] px-7 py-24">
-            <button type="button" onClick={() => { onClose(); navigate(`/p/${sourcePost.id}`); }} className="pointer-events-auto w-full max-w-[350px] overflow-hidden rounded-2xl bg-[#0b0b0d] text-left text-white shadow-2xl" data-testid="button-story-repost-card" aria-label="Abrir publicación original">
-              <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold">
-                {state.characters.find(c => c.id === sourcePost.authorId)?.handle ? `@${state.characters.find(c => c.id === sourcePost.authorId)?.handle}` : 'Publicación original'}
-                <span className="ml-auto text-[11px] font-normal text-white/60">Publicación</span>
-              </div>
-              {storyImage && <img src={storyImage} onLoad={() => setFailedStoryImage(current => current === story.id ? null : current)} onError={() => setFailedStoryImage(story.id)} alt="Publicación compartida" className="max-h-[52dvh] w-full object-contain" />}
-              <div className="px-4 py-3 text-xs text-white/70">Ver publicación original ↗</div>
-            </button>
+        {isPostRepost && (
+          <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col items-center justify-center gap-3 overflow-hidden bg-[#19171d] px-7 pt-20 pb-32">
+            {storyImage && <img src={storyImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-2xl" />}
+            {sourcePost && postAuthor && canOpenPost ? (
+              <button type="button" onClick={() => { onClose(); navigate(`/p/${encodeURIComponent(sourcePost.id)}`); }} className="pointer-events-auto relative w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/15 bg-[#18151d] text-left text-white shadow-xl focus-visible:ring-2 focus-visible:ring-white" data-testid="button-story-repost-card" aria-label={`Abrir publicación original de @${postAuthor.handle}`}>
+                <div className="flex items-center gap-2.5 px-3 py-2.5">
+                  <CharacterAvatar character={postAuthor} size={28} />
+                  <span className="min-w-0 truncate text-sm font-semibold">@{postAuthor.handle}</span>
+                  <VerifiedBadge account={postAuthor} className="h-3.5 w-3.5" />
+                </div>
+                {storyImage && <img src={storyImage} onLoad={() => setFailedStoryImage(current => current === story.id ? null : current)} onError={() => setFailedStoryImage(story.id)} alt="Publicación compartida" className="max-h-[43dvh] w-full object-contain" />}
+                <div className="px-3 py-2.5 text-xs text-white/75">Ver publicación original ↗</div>
+              </button>
+            ) : <p className="relative text-center text-sm text-white/80">La publicación original no está disponible.</p>}
+            {story.caption && <p className="relative line-clamp-3 max-w-[350px] break-words text-center text-sm text-white"><SocialText text={story.caption} onNavigate={onClose} /></p>}
           </div>
         )}
-        {imageIsPrivate && imageUnavailable && !showImageError && (
+        {(!isPostRepost || canOpenPost) && imageIsPrivate && imageUnavailable && !showImageError && (
           <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/40" role="status" aria-label="Cargando imagen">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
           </div>
         )}
-        {imageIsPrivate && showImageError && (
+        {(!isPostRepost || canOpenPost) && imageIsPrivate && showImageError && (
           <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-black/70 px-8 text-center text-white" role="status">
             <p className="text-sm">La foto de esta historia todavía no está disponible.</p>
             <button type="button" onClick={retryStoryImage} className="rounded-full border border-white/50 px-5 py-2 text-sm font-medium">Reintentar imagen</button>
@@ -441,7 +449,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             </span>
           )}
           
-          {story.caption && (
+          {!isPostRepost && story.caption && (
             <p className="max-w-full break-words font-display text-base font-light leading-relaxed text-foreground/95 sm:text-lg"><SocialText text={story.caption} onNavigate={onClose} /></p>
           )}
           {mentioned.length > 0 && (
