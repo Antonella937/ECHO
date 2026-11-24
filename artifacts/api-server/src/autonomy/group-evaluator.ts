@@ -21,14 +21,16 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
     ORDER BY created_at DESC LIMIT 1`);
   const last = messages.rows[0];
   const participants = Array.isArray(group.participant_ids) ? group.participant_ids.filter((v): v is string => typeof v === "string") : [];
-  const candidates = (state.characters ?? []).filter(c => participants.includes(c.id)).map(c => {
+  const primaryId = (state as { primaryCharacterId?: string }).primaryCharacterId;
+  const ownerTurn = !sceneMode && !!primaryId && last?.sender_id === primaryId;
+  const candidates = (state.characters ?? []).filter(c => participants.includes(c.id) && c.id !== primaryId).map(c => {
     const control = controls.characters.get(c.id);
     return {
       id: c.id, archived: c.archived, // An explicitly started spectator scene opts the GROUP into conversation.
       // It must not depend on unrelated spontaneous feed/DM opt-ins.
       // Preserve explicit character-level autonomy disablement (e.g. the owner's avatar).
       enabled: sceneMode ? control?.enabled !== false : control?.enabled === true,
-      dmEnabled: sceneMode ? control?.dmEnabled !== false : control?.dmEnabled === true,
+      dmEnabled: sceneMode ? control?.dmEnabled !== false : ownerTurn ? control?.enabled === true : control?.dmEnabled === true,
       sleeping: /\b(sleep|sleeping|dormir|durmiendo|descansando)\b/i.test(c.configuration?.currentState?.activity ?? ""),
     };
   });
