@@ -141,7 +141,13 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         const primaryId = (state as { primaryCharacterId?: string } | undefined)?.primaryCharacterId;
         const plainOwnerMessage = !sceneMode && latest && String(latest.sender_id) === primaryId
           ? String(latest.body ?? "").trim() : "";
-        await sendKindroidSocialGroupContext(kindroidGroupId, plainOwnerMessage || kinPrompt.slice(0, 1450));
+        // Linked participant groups receive user messages at the HTTP send endpoint.
+        // Do not inject the same user message again when autonomy generates a reply.
+        const directDeliveryEnabled = !sceneMode && typeof group.kindroid_group_id === "string"
+          && group.kindroid_group_id === kindroidGroupId;
+        if (!directDeliveryEnabled) {
+          await sendKindroidSocialGroupContext(kindroidGroupId, plainOwnerMessage || kinPrompt.slice(0, 1450));
+        }
       }
       completion = await (linkedKinId
         ? kindroidPeerGroupProvider(kindroidGroupId!, linkedKinId, speakerId, fetch, true)
