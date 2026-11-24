@@ -405,7 +405,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         // Only attach it when the incoming message refers to a story, to protect
         // Kindroid's limited context budget and avoid irrelevant social leakage.
         const asksAboutStory = /\b(story|stories|status|historia|historias|subiste|publicaste)\b/i.test(newest?.text ?? '');
-        if (asksAboutStory && !storyForReply) {
+        if (asksAboutStory && !storyForReply && (!isDirectReply || recipientId !== parsed.data.state.primaryCharacterId)) {
           const ownStories = parsed.data.state.stories
             .filter(st => st.authorId === input.characterId)
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
