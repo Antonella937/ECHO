@@ -140,13 +140,13 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
   const [communityFrequency, setCommunityFrequency] = useState('normal');
   const [generatingCommunity, setGeneratingCommunity] = useState(false);
   const [generatedBatches, setGeneratedBatches] = useState(0);
-  const communityEnabled = me.communityCommentsEnabled === true || (me.communityCommentsEnabled !== false && ['band', 'business', 'venue', 'artist'].includes(me.accountType ?? ''));
   const post = state.posts.find((p) => p.id === postId);
+  const canAddCommunity = post?.authorId === me.id && post.commentsEnabled !== false;
   const ref = useRef<HTMLTextAreaElement>(null);
   const target = replyTo ? character(replyTo.authorId) : undefined;
 
   const generateCommunity = async () => {
-    if (generatingCommunity || !communityEnabled || post?.authorId !== me.id) return;
+    if (generatingCommunity || !canAddCommunity) return;
     setGeneratingCommunity(true);
     setError(null);
     try {
@@ -202,9 +202,9 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
           </button>
         </div>
       )}
-      {post?.authorId === me.id && <div className="mb-3 rounded-xl border border-border p-3 text-sm">
-        <label className="flex items-center justify-between gap-3"><span>{ct("Comentarios de comunidad ficticia")}</span><input type="checkbox" checked={communityEnabled} onChange={e => actions.setCommunityCommentsEnabled(me.id, e.target.checked)} /></label>
-        {communityEnabled && <div className="mt-3 space-y-2">
+      {canAddCommunity && <details key={postId} className="mb-3 rounded-xl border border-border p-3 text-sm">
+        <summary className="cursor-pointer font-medium">{ct("Comentarios de comunidad ficticia")}</summary>
+        <div className="mt-3 space-y-2">
           <label className="block text-xs text-muted-foreground" htmlFor="community-frequency">{ct("Cantidad por tanda")}</label>
           <select id="community-frequency" className="w-full rounded-lg border border-input bg-background p-2" value={communityFrequency} onChange={e => setCommunityFrequency(e.target.value)}>
             <option value="occasional">{ct("Ocasional · 1–2")}</option>
@@ -215,12 +215,12 @@ export function CommentComposer({ postId, replyTo, onClearReply, autoFocus }: { 
           <p className="text-xs text-muted-foreground">{ct("Solo se generan al tocar el botón (máximo seis por tanda). Las publicaciones antiguas no se modifican automáticamente.")}</p>
           <button type="button" className="text-primary" onClick={() => setCommunityOpen(!communityOpen)}>{communityOpen ? ct('Cerrar') : ct('+ Agregar comentario manual')}</button>
           {communityOpen && <form className="space-y-2" onSubmit={e => { e.preventDefault(); try { actions.addCommunityComment(postId, guestHandle, guestText); setGuestText(''); setError(null); } catch (err) { setError((err as Error).message); } }}>
-            <input className="w-full rounded-lg border border-input bg-background p-2" value={guestHandle} onChange={e => setGuestHandle(e.target.value)} placeholder="@deadstatic.fans" maxLength={33} aria-label={ct("Usuario ficticio")} />
+            <input className="w-full rounded-lg border border-input bg-background p-2" value={guestHandle} onChange={e => setGuestHandle(e.target.value)} placeholder={`@${me.handle}.fans`} maxLength={33} aria-label={ct("Usuario ficticio")} />
             <textarea className="w-full rounded-lg border border-input bg-background p-2" value={guestText} onChange={e => setGuestText(e.target.value)} placeholder={ct("Comentario de fan")} maxLength={500} aria-label={ct("Comentario ficticio")} />
             <button className="rounded-lg bg-primary px-3 py-2 text-primary-foreground" type="submit">{ct("Agregar comentario")}</button>
           </form>}
-        </div>}
-      </div>}
+        </div>
+      </details>}
       <form onSubmit={submit} className="flex flex-wrap items-center gap-3 pb-1"><FormattingToolbar inputRef={ref} value={text} onChange={setText} maxLength={500} className="w-full" />
         <CharacterAvatar character={me} size={34} />
         <textarea

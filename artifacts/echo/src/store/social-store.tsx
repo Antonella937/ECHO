@@ -48,7 +48,6 @@ export interface SocialActions {
   toggleCommentLike(commentId: string): void;
   editComment(commentId: string, text: string): void;
   deleteComment(commentId: string): void;
-  setCommunityCommentsEnabled(accountId: string, enabled: boolean): void;
   addCommunityComment(postId: string, handle: string, text: string): void;
   respondCollaboration(postId: string, accept: boolean): void;
   votePoll(postId: string, optionId: string): void;
@@ -316,16 +315,10 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
           },
         });
       },
-      setCommunityCommentsEnabled(accountId, enabled) {
-        if (accountId !== myId()) throw new Error('Solo podés configurar tu cuenta activa.');
-        coordinator.current?.edit(state => ({ ...state, characters: state.characters.map(c => c.id === accountId ? { ...c, communityCommentsEnabled: enabled } : c) }));
-      },
       addCommunityComment(postId, handle, text) {
         const post = cur().posts.find(p => p.id === postId);
         if (!post || post.authorId !== myId()) throw new Error('Solo podés agregar comentarios a tus publicaciones.');
-        const account = cur().characters.find(c => c.id === post.authorId);
-        const communityEligible = account?.communityCommentsEnabled === true || (account?.communityCommentsEnabled !== false && ['band', 'business', 'venue', 'artist'].includes(account?.accountType ?? ''));
-        if (!communityEligible || post.commentsEnabled === false) throw new Error('Activá primero los comentarios de comunidad.');
+        if (post.commentsEnabled === false) throw new Error('Esta publicación tiene los comentarios desactivados.');
         const safeHandle = handle.trim().replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '').slice(0, 32);
         if (safeHandle.length < 3 || !text.trim() || text.length > 500) throw new Error('Ingresá un usuario válido y un comentario de hasta 500 caracteres.');
         coordinator.current?.edit(state => ({ ...state, comments: [...state.comments, { id: uid('community'), postId, authorId: post.authorId, guestHandle: safeHandle, text: text.trim(), createdAt: new Date().toISOString(), parentId: null, replyToAuthorId: null, likes: [], origin: 'user' as const }] }));

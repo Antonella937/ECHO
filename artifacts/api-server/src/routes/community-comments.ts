@@ -52,11 +52,10 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
   const ownerId = req.userId!;
   try {
     const { state } = await readUniverse(ownerId, parsed.data.universeId);
-    const universe = state as { currentCharacterId?: string; characters?: Array<{ id: string; handle: string; name: string; accountType?: string; communityCommentsEnabled?: boolean }>; posts?: Array<{ id: string; authorId: string; caption?: string; commentsEnabled?: boolean }>; comments?: Array<{ postId: string; guestHandle?: string; text: string }> } | null;
+    const universe = state as { currentCharacterId?: string; characters?: Array<{ id: string; handle: string; name: string; accountType?: string }>; posts?: Array<{ id: string; authorId: string; caption?: string; commentsEnabled?: boolean }>; comments?: Array<{ postId: string; guestHandle?: string; text: string }> } | null;
     const post = universe?.posts?.find(p => p.id === parsed.data.postId);
     const account = universe?.characters?.find(c => c.id === post?.authorId);
-    const communityEligible = account?.communityCommentsEnabled === true || (account?.communityCommentsEnabled !== false && ["band", "business", "venue", "artist"].includes(account?.accountType ?? ""));
-    if (!post || !account || post.authorId !== universe?.currentCharacterId || !communityEligible || post.commentsEnabled === false) {
+    if (!post || !account || post.authorId !== universe?.currentCharacterId || post.commentsEnabled === false) {
       res.status(403).json({ error: "COMMUNITY_COMMENTS_NOT_ENABLED_OR_NOT_OWNER" }); return;
     }
     let visualContext: string | null = null;
@@ -75,7 +74,7 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
     const existing = (universe?.comments ?? []).filter(c => c.postId === post.id).slice(-20).map(c => ({ handle: c.guestHandle ?? "character", text: c.text.slice(0, 180) }));
     const provider = new MeteredTextProvider(ownerId, "brain_text", new GeminiDmProvider(undefined, fetch, ownerId));
     const generated = await provider.complete({
-      system: "Generate fictional social-network fan comments for an explicitly fictional roleplay world. Output ONLY a JSON object with key comments, an array of objects {handle,text}. Never impersonate real users or celebrities. Handles must be fictional and not match existing real accounts. Keep comments short, varied, natural and contextual. When visualContext is provided, comment on specific visible clothing, styling, instruments, colors or other observable details, not just the caption. Do not invent unseen details. Do not write hateful, sexual, violent, or personally identifying material. Do not create replies or conversations. Do not mention AI. Respect language and vibe of the account. No markdown.",
+      system: "Generate fictional social-network fan comments for an explicitly fictional roleplay world. Output ONLY a JSON object with key comments, an array of objects {handle,text}. Never impersonate real users or celebrities. Handles must be fictional and not match existing real accounts. Keep comments short, varied, natural and contextual. Match the post: a personal art post can attract people who discovered the work, without assuming the author has an established fanbase. When visualContext is provided, comment on specific visible clothing, styling, instruments, colors or other observable details, not just the caption. Do not invent unseen details. Do not write hateful, sexual, violent, or personally identifying material. Do not create replies or conversations. Do not mention AI. Respect language and vibe of the account. No markdown.",
       context: JSON.stringify({ account: { name: account.name, handle: account.handle, type: account.accountType }, postCaption: (post.caption ?? "").slice(0, 600), visualContext, existing, count: parsed.data.count }),
       outputSchema: { type: "object", properties: { comments: { type: "array", items: { type: "object", properties: { handle: { type: "string" }, text: { type: "string" } }, required: ["handle", "text"] } } }, required: ["comments"] },
     });
