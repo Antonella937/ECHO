@@ -107,6 +107,8 @@ const kindroidHistoryLastCheck = new Map<string, number>();
 const kindroidHistoryPending = new Map<string, Promise<void>>();
 // A provider-wide 429 must pause ALL history readers, including UI-triggered reads.
 // This does not delay DM generation or mutate any Kindroid conversation.
+const kindroidHistoryCursors = new Map<string, number>();
+const KINDROID_HISTORY_POLL_MS = 2 * 60_000;
 let kindroidHistoryRateLimitedUntil = 0;
 const KINDROID_HISTORY_RATE_LIMIT_BACKOFF_MS = 5 * 60_000;
 export async function reconcileKindroidGroupHistory(ownerId: string, universeId: string, groupId: string) {
@@ -117,7 +119,7 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
   const cacheKey = ownerId + ":" + universeId + ":" + groupId;
   const pending = kindroidHistoryPending.get(cacheKey);
   if (pending) return pending;
-  if (Date.now() - (kindroidHistoryLastCheck.get(cacheKey) ?? 0) < 300_000) return;
+  if (Date.now() - (kindroidHistoryLastCheck.get(cacheKey) ?? 0) < KINDROID_HISTORY_POLL_MS) return;
   kindroidHistoryLastCheck.set(cacheKey, Date.now());
   const task = (async () => {
     const group = await db.execute(sql`SELECT participant_ids, kindroid_group_id FROM echo_group_conversations
@@ -144,7 +146,8 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
       const kinId = String(link.kin_id ?? "");
       if (members.includes(characterId) && kinId) byKin.set(kinId, characterId);
     }
-    let cursor: number | undefined;
+    const cursorKey = cacheKey + ":" + groupIdOnKindroid;
+    let cursor = kindroidHistoryCursors.get(cursorKey);
     for (let page = 0; page < 5; page++) {
       const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
       url.searchParams.set("group_id", groupIdOnKindroid);
@@ -175,12 +178,14 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
       for (const raw of data.messages) {
         if (!raw || typeof raw !== "object") continue;
         const item = raw as Record<string, unknown>;
-        const sourceId = typeof item.id === "string" ? item.id : "";
+        const sourceId = typeof item.id === "string" || typeof item.id === "number" ? String(item.id) : "";
         const sender = typeof item.sender === "string" ? item.sender : "";
         const displayName = typeof item.display_name === "string" ? item.display_name.trim().toLowerCase() : "";
+        const senderType = String(item.sender_type ?? sender).toLowerCase();
+        if (senderType === "user" || senderType === "human") continue;
         const senderId = byKin.get(sender) ?? (displayName ? byName.get(displayName) : undefined);
         const body = typeof item.message === "string" ? item.message.trim() : "";
-        const timestamp = Number(item.timestamp);
+        const timestamp = typeof item.timestamp === "number" || (typeof item.timestamp === "string" && item.timestamp.trim()) ? Number(item.timestamp) : NaN;
         if (!sourceId) { rejected.missingId++; continue; }
         if (!senderId) { rejected.unmatchedSender++; continue; }
         if (!body || body.length > 10000) { rejected.missingBody++; continue; }
@@ -192,6 +197,8 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         const existing = await db.execute(sql`SELECT id FROM echo_group_messages
           WHERE owner_id=${ownerId} AND universe_id=${universeId} AND group_id=${groupId}
           AND sender_id=${senderId} AND body=${body}
+          AND id NOT LIKE 'kindroid_%'
+          AND abs(extract(epoch from (created_at - ${date.toISOString()}::timestamptz))) < 90
           LIMIT 1`);
         if (existing.rows.length) continue;
         // Older live group replies were forcibly truncated at 800 characters.
@@ -200,7 +207,7 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         if (body.length > 800) {
           const truncated = await db.execute(sql`SELECT id FROM echo_group_messages
             WHERE owner_id=${ownerId} AND universe_id=${universeId} AND group_id=${groupId}
-              AND sender_id=${senderId} AND length(body)=800
+              AND sender_id=${senderId} AND id NOT LIKE 'kindroid_%' AND length(body)=800
               AND body=left(${body}, 800)
               AND abs(extract(epoch from (created_at - ${date.toISOString()}::timestamptz))) < 600
             ORDER BY created_at DESC LIMIT 1`);
@@ -221,8 +228,11 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
         }
       }
       console.info("[kindroid-group] history counts " + JSON.stringify({ group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other", page, total: data.messages.length, accepted, rejected }));
-      if (!data.pagination?.hasMore || !Number.isFinite(data.pagination.lastTimestamp) || data.pagination.lastTimestamp === cursor) break;
-      cursor = data.pagination.lastTimestamp;
+      const nextCursor = data.pagination?.lastTimestamp;
+      if (typeof nextCursor !== "number" || !Number.isFinite(nextCursor) || (cursor !== undefined && nextCursor <= cursor)) break;
+      kindroidHistoryCursors.set(cursorKey, nextCursor);
+      cursor = nextCursor;
+      if (!data.pagination?.hasMore) break;
     }
   })().catch(error => {
     console.warn("[kindroid-group] history reconciliation failed", { error: error instanceof Error ? error.name : "unknown" });
@@ -371,12 +381,14 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
   if (!inserted.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   await db.execute(sql`UPDATE echo_group_conversations SET updated_at = now()
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
-  let kindroidDelivery: "not_linked" | "sent" | "failed" = "not_linked";
+  let kindroidDelivery: "not_linked" | "sent" | "failed" | "too_long" = "not_linked";
   if (req.userId! === "user_3LeoBfUicTthDVixNbkPlqXFkdZ") {
     const linked = await db.execute(sql`SELECT kindroid_group_id FROM echo_group_conversations
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
     const target = linked.rows[0]?.kindroid_group_id;
-    if (typeof target === "string" && target) {
+    if (typeof target === "string" && target && text.length > 1500) {
+      kindroidDelivery = "too_long";
+    } else if (typeof target === "string" && target) {
       try {
         const visual: string[] = [];
         for (const attachment of attachments.filter(a => a.type === "image").slice(0, 2)) {
@@ -385,7 +397,9 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
         }
         const context = visual.length ? "\n[Attached image description: " + visual.join("; ").slice(0, 900) + "]" : "";
         const message = text || (visual.length ? "" : "[Attachment shared in ECHO]");
-        await sendKindroidSocialGroupContext(target, message + context.slice(0, Math.max(0, 1500 - message.length)));
+        const available = 1500 - message.length;
+        const visualContext = context.length <= available ? context : available > 40 ? context.slice(0, available - 1) + "]" : "";
+        await sendKindroidSocialGroupContext(target, message + visualContext);
         kindroidDelivery = "sent";
       } catch {
         kindroidDelivery = "failed";

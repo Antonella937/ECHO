@@ -94,6 +94,7 @@ export default function GroupConversationPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GroupMessage[]>([]);
   const [error, setError] = useState('');
+  const [kindroidNotice, setKindroidNotice] = useState('');
   const [sending, setSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -368,13 +369,16 @@ export default function GroupConversationPage() {
     try {
       setUploading(pendingFiles.length > 0);
       const attachments = await Promise.all(pendingFiles.map(file => uploadAttachment(file)));
-      await customFetch(`/api/group-dms/${encodeURIComponent(id)}/messages`, {
+      const saved = await customFetch<GroupMessage & { kindroidDelivery?: string }>(`/api/group-dms/${encodeURIComponent(id)}/messages`, {
         method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ universeId: getActiveUniverseId(user?.id ?? ''), actorId: me.id, text: message, attachments }),
       });
       setText(''); setPendingFiles([]);
-      const result = await customFetch<{ messages: GroupMessage[] }>(`/api/group-dms/${encodeURIComponent(id)}/messages?${scope}`, { method: 'GET', responseType: 'json' });
-      setMessages(result.messages); setError('');
+      setMessages(current => current.some(item => item.id === saved.id) ? current : [...current, saved]);
+      setKindroidNotice(saved.kindroidDelivery === 'too_long'
+        ? 'Guardado en ECHO. Kindroid admite hasta 1.500 caracteres por mensaje grupal.'
+        : saved.kindroidDelivery === 'failed' ? 'Guardado en ECHO. No se pudo confirmar la entrega a Kindroid.' : '');
+      setError('');
     } catch { setError('No se pudo enviar el mensaje.'); }
     finally { setSending(false); setUploading(false); }
   };
@@ -495,6 +499,7 @@ export default function GroupConversationPage() {
       </div>
     </div>}
     {sceneStatus && <p role="status" className="px-4 text-xs text-muted-foreground">{sceneStatus}</p>}
+    {kindroidNotice && <p role="status" className="px-4 text-sm text-muted-foreground">{kindroidNotice}</p>}
     {error && <p role="alert" className="px-4 text-sm text-destructive">{error}</p>}
     {!!pendingFiles.length && <div className="flex shrink-0 flex-wrap gap-2 border-t border-border px-3 py-2">{pendingFiles.map((file, index) => <span key={index} className="inline-flex max-w-full items-center gap-1 rounded-lg bg-secondary px-2 py-1 text-xs"><span className="max-w-36 truncate">{file.name}</span><button type="button" aria-label="Quitar archivo" onClick={() => setPendingFiles(files => files.filter((_, i) => i !== index))}><X className="h-3 w-3" /></button></span>)}</div>}
     {recorder.status !== 'idle' && <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2 text-sm"><span>{recorder.status === 'requesting' ? 'Solicitando micrófono…' : `Grabando · ${formatDuration(recorder.elapsed)}`}</span><div className="flex gap-3"><button type="button" onClick={recorder.cancel} className="text-muted-foreground">Cancelar</button><button type="button" onClick={recorder.stop} className="font-semibold text-primary">Terminar</button></div></div>}

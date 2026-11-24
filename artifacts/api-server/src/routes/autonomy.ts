@@ -190,7 +190,7 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
     if (!latest || latest.recipientId !== characterId) { res.json({ status: "no_pending_dm" }); return; }
     const key = process.env.ECHO_KINDROID_API_KEY;
     if (!key) { res.status(503).json({ error: "KINDROID_KEY_MISSING" }); return; }
-    let cursor: number | undefined;
+    let cursor: number | undefined = Math.floor(new Date(latest.createdAt).getTime() / 1000) - 300;
     let lastMessages: Array<{sender?:string;sender_type?:string;timestamp?:number;message?:string}> = [];
     for (let page = 0; page < 10; page++) {
       const url = new URL("https://api.kindroid.ai/v1/get-chat-messages");
@@ -201,7 +201,7 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
       if (!response.ok) { res.status(502).json({ error: "KINDROID_HISTORY_UNAVAILABLE", upstreamStatus: response.status }); return; }
       const data = await response.json() as {messages?: typeof lastMessages; pagination?:{hasMore?:boolean;lastTimestamp?:number}};
       if (!Array.isArray(data.messages)) { res.status(502).json({ error: "KINDROID_HISTORY_INVALID" }); return; }
-      lastMessages = data.messages.slice(-3);
+      lastMessages = [...lastMessages.slice(-1), ...data.messages].slice(-3);
       if (!data.pagination?.hasMore) break;
       if (typeof data.pagination.lastTimestamp !== "number" || data.pagination.lastTimestamp === cursor) {
         res.status(502).json({ error: "KINDROID_HISTORY_PAGINATION_FAILED" }); return;
@@ -214,8 +214,7 @@ router.get("/autonomy/kindroid-pending-reply", requireAuth, async (req, res): Pr
     const previous = lastMessages.at(-2);
     const lastIsAi = !!last && (last.sender_type?.toLowerCase() === "ai" || last.sender?.toLowerCase() === "ai" || last.sender === kinId);
     const previousIsUser = !!previous && (previous.sender_type?.toLowerCase() === "user" || previous.sender_type?.toLowerCase() === "human" || previous.sender?.toLowerCase() === "user" || previous.sender?.toLowerCase() === "human");
-    const matchesEchoContext = !!previous?.message && previous.message.includes("[ECHO PRIVATE THREAD") &&
-      (previous.message.includes("VANTA") || previous.message.includes("ECHO_PROFILE"));
+    const matchesEchoContext = !!latest.text.trim() && previous?.message?.trim() === latest.text.trim();
     // Return only structural diagnostics, never conversation text or provider credentials.
     res.json({ status: lastIsAi && previousIsUser && matchesEchoContext ? "reply_found_in_kindroid" : "not_verified",
       pendingMessageId: latest.id, providerReplyPresent: lastIsAi, contextMatches: matchesEchoContext,
