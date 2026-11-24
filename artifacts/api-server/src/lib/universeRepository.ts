@@ -11,6 +11,17 @@ import { DEFAULT_AI_CATEGORY_WEIGHTS, DEFAULT_MONTHLY_HARD_CEILING_UNITS } from 
 import { ensureCharacterPrivacyDefaultsInTransaction } from "./characterPrivacy";
 import { removeCharacterSocialRecordsForDeletedCharacters } from "./characterFollows";
 
+// PostgreSQL jsonb rejects isolated UTF-16 surrogates and U+0000.
+ // Repair only invalid code units at the persistence boundary; valid emoji survive.
+function repairJsonText(value: string): string {
+  return value.replace(/\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
+}
+function repairUniverseJson(state: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(state, (_key, value) =>
+    typeof value === "string" ? repairJsonText(value) : value
+  )) as Record<string, unknown>;
+}
+
 export class StructuralLimitError extends Error {
   constructor(readonly code: "UNIVERSE_LIMIT_REACHED" | "CHARACTER_LIMIT_REACHED") { super(code); }
 }
@@ -124,13 +135,14 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
         plan: entitlements.plan,
       },
     };
+    const safeState = repairUniverseJson(canonicalState);
     const rows = expectedRevision === 0
       ? await tx.insert(echoUniversesTable)
-        .values({ ownerId, universeId, state: canonicalState, revision: 1 })
+        .values({ ownerId, universeId, state: safeState, revision: 1 })
         .onConflictDoNothing()
         .returning({ state: echoUniversesTable.state, revision: echoUniversesTable.revision })
       : await tx.update(echoUniversesTable)
-        .set({ state: canonicalState, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date() })
+        .set({ state: safeState, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date() })
         .where(and(
           eq(echoUniversesTable.ownerId, ownerId),
           eq(echoUniversesTable.universeId, universeId),
@@ -145,14 +157,14 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
           ownerId,
           universeId,
           current.state,
-          canonicalState,
+          safeState,
         );
       }
       // Opt-in only after the archive table migration is deployed. Keep writes
       // in the same transaction so a failed revision never archives anything.
       if (current && process.env.ECHO_MEMORY_ARCHIVE_ENABLED === "true") {
         const before = SaveUniverseBody.shape.state.safeParse(current.state);
-        const after = SaveUniverseBody.shape.state.safeParse(canonicalState);
+        const after = SaveUniverseBody.shape.state.safeParse(safeState);
         if (before.success && after.success) {
           const events = displacedMemories(before.data, after.data);
           if (events.length) await tx.insert(echoMemoryArchiveTable)
@@ -160,7 +172,7 @@ export async function writeUniverse(ownerId: string, state: Record<string, unkno
             .onConflictDoNothing();
         }
       }
-      await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, canonicalState);
+      await ensureCharacterPrivacyDefaultsInTransaction(tx, ownerId, universeId, safeState);
       if (afterSave) await afterSave(tx);
     }
     return saved;
