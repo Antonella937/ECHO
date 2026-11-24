@@ -1,3 +1,4 @@
+import { describeGroupAttachment } from "../vision/service";
 import { sendKindroidSocialGroupContext } from "../ai-engine/kindroid-social-group";
 import { notifyNewGroupMessage } from "../lib/group-push-dispatch";
 import { privateConversationCandidates } from "../lib/canon-knowledge";
@@ -377,7 +378,14 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
     const target = linked.rows[0]?.kindroid_group_id;
     if (typeof target === "string" && target) {
       try {
-        await sendKindroidSocialGroupContext(target, text || "[Attachment shared in ECHO]");
+        const visual: string[] = [];
+        for (const attachment of attachments.filter(a => a.type === "image").slice(0, 2)) {
+          try { visual.push(await describeGroupAttachment(req.userId!, attachment)); }
+          catch { visual.push("Image attached in ECHO; visual analysis unavailable."); }
+        }
+        const context = visual.length ? "\n[Attached image description: " + visual.join("; ").slice(0, 900) + "]" : "";
+        const message = text || (visual.length ? "" : "[Attachment shared in ECHO]");
+        await sendKindroidSocialGroupContext(target, message + context.slice(0, Math.max(0, 1500 - message.length)));
         kindroidDelivery = "sent";
       } catch {
         kindroidDelivery = "failed";
