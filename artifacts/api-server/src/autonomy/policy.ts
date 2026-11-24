@@ -40,6 +40,7 @@ export type Opportunity = {
   timezone: string;
 };
 
+export const AUTONOMOUS_STORIES_PER_DAY = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const frequencyWeight = (value: unknown) =>
   value === "frequent" ? 1.55 : value === "rare" ? 0.55 : 1;
@@ -455,13 +456,11 @@ export function chooseAutonomyOpportunity(input: {
   };
   const postCount = state.posts.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const storyCount = state.stories.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
-  // A manually posted story does not consume the autonomous story allowance.
-  const anyStoryToday = state.stories.some((item) => item.authorId === character.id && recentDate(item.createdAt));
   const commentCount = state.comments.filter((item) => item.authorId === character.id && item.origin === "autonomy" && recentDate(item.createdAt)).length;
   const actionCount = (situation: AutonomySituation) => history.filter(item => item.situation === situation).length;
   const weights = [
     ...(input.allowSocialActions !== false && postCount < 1 ? [{ situation: "post" as const, weight: frequencyWeight(social?.postsFrequency), publishStory: false }] : []),
-    ...(input.allowSocialActions !== false && storyCount < 1 && !anyStoryToday ? [{ situation: "post" as const, weight: frequencyWeight(social?.storiesFrequency), publishStory: true }] : []),
+    ...(input.allowSocialActions !== false && storyCount < AUTONOMOUS_STORIES_PER_DAY ? [{ situation: "post" as const, weight: 2 * frequencyWeight(social?.storiesFrequency), publishStory: true }] : []),
     ...(input.allowSocialActions !== false && comment && commentCount < 3 ? [{ situation: "comment" as const, weight: frequencyWeight(social?.commentsFrequency) }] : []),
     ...(input.allowSocialActions !== false && targetPost && actionCount("like_post") < 3
       ? [{ situation: "like_post" as const, weight: frequencyWeight(social?.likesFrequency) }] : []),

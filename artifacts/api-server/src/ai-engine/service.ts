@@ -94,7 +94,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         eq(echoCharacterGalleryTable.reserved,false),
       ))
     : [];
-  const galleryContext = gallery.filter(photo => (photo.reusable || photo.usedCount === 0) &&
+  const galleryPlacement = dependencies.publishStory ? 'story' : 'feed';
+  const galleryContext = gallery.filter(photo =>
+    (photo.placement === 'both' || photo.placement === galleryPlacement) &&
+    photo.visionStatus === 'complete' && photo.visionAnalysis && (photo.reusable || photo.usedCount === 0) &&
     (!photo.lastUsedAt || photo.usedCount === 0 || Date.now() - photo.lastUsedAt.getTime() >= 30 * 24 * 60 * 60_000))
     .slice(0,20).map(photo => {
       const analysis = photo.visionStatus === 'complete' ? photo.visionAnalysis : null;

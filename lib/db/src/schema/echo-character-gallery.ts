@@ -8,6 +8,7 @@ export const echoCharacterGalleryTable = pgTable("echo_character_gallery", {
   description: text("description").notNull().default(""),
   visionAnalysis: jsonb("vision_analysis").$type<Record<string, unknown> | null>(),
   visionStatus: text("vision_status").notNull().default("pending"),
+  placement: text("placement").$type<"both" | "feed" | "story">().notNull().default("both"),
   reusable: boolean("reusable").notNull().default(false),
   reserved: boolean("reserved").notNull().default(false),
   usedCount: integer("used_count").notNull().default(0),

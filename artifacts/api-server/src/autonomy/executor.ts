@@ -20,7 +20,7 @@ import {
   echoCharacterGalleryTable,
 } from "@workspace/db";
 import { DEFAULT_CHARACTER_CONTROL, isAutonomyLiveExecutionEnabled, isAutonomyOwnerAuthorized } from "./constants";
-import type { Opportunity } from "./policy";
+import { AUTONOMOUS_STORIES_PER_DAY, type Opportunity } from "./policy";
 import { recordAutonomyEvent } from "./event-memory";
 import { displacedMemories } from "../lib/memoryArchive";
 import { canCharacterViewCloseFriendsStory } from "../lib/storySharePolicy";
@@ -107,7 +107,7 @@ export function applyAutonomyDecision(
   if (decision.action === "draft" && decision.situation === "post") {
     if (!text) throw new SocialExecutionError("EMPTY_POST_TEXT");
     if (opportunity.publishStory) {
-      if (state.stories.some(item => item.authorId === characterId && recentWithin(item.createdAt, now, DAY_MS))) {
+      if (state.stories.filter(item => item.authorId === characterId && item.origin === "autonomy" && recentWithin(item.createdAt, now, DAY_MS)).length >= AUTONOMOUS_STORIES_PER_DAY) {
         throw new SocialExecutionError("DAILY_STORY_CAP");
       }
       const story: Story = {
@@ -439,7 +439,9 @@ export async function executeAutonomyDecision(input: {
     const typeCaps: Record<string, number> = {
       post: 1, comment: 3, dm: 1, like_post: 3, like_comment: 3, story_reaction: 2, dm_reaction: 2,
     };
-    const situationCount = history.filter((item) => item.situation === input.opportunity.situation).length;
+    const storyIds = new Set(state.stories.map(item => item.id));
+    const situationCount = history.filter(item => item.situation === input.opportunity.situation &&
+      (item.situation !== "post" || !item.targetId || !storyIds.has(item.targetId))).length;
     const stateTypeCount = input.opportunity.situation === "post"
       ? state.posts.filter((item) => item.authorId === input.characterId && item.origin !== "autonomy" &&
         toTime(item.createdAt) >= since.getTime()).length
@@ -462,7 +464,7 @@ export async function executeAutonomyDecision(input: {
     const socialLimitHit = recent + history.filter((item) => item.situation !== "dm" && item.situation !== "dm_reaction").length >= maxActionsPerDay ||
       (latestActivity > 0 && now.getTime() - latestActivity < minCooldownMinutes * 60_000);
     const totalLimitHit = isDm ? dmLimitHit : socialLimitHit;
-    if (totalLimitHit || (!isDm && input.opportunity.situation &&
+    if (totalLimitHit || (!isDm && !input.opportunity.publishStory && input.opportunity.situation &&
       situationCount + stateTypeCount >= (typeCaps[input.opportunity.situation] ?? 0))) {
       await tx.update(echoAutonomyRunsTable).set({
         status: "rate_limited", lastErrorCode: totalLimitHit ? "CHARACTER_COOLDOWN_OR_DAILY_CAP" : "ACTION_TYPE_CAP",
@@ -516,7 +518,9 @@ export async function executeAutonomyDecision(input: {
         eq(echoCharacterGalleryTable.characterId,input.characterId),
         eq(echoCharacterGalleryTable.reserved,false),
       )).for("update").limit(1);
-      if (!selected?.mediaRef?.trim() || selected.visionStatus !== 'complete' || !selected.visionAnalysis ||
+      const placement = input.opportunity.publishStory ? "story" : "feed";
+      if (!selected?.mediaRef?.trim() ||
+          (selected.placement !== "both" && selected.placement !== placement) || selected.visionStatus !== 'complete' || !selected.visionAnalysis ||
           !(selected.reusable || selected.usedCount === 0) ||
           !(selected.usedCount === 0 || !selected.lastUsedAt || now.getTime()-selected.lastUsedAt.getTime()>=30*DAY_MS)) {
         // The Kin explicitly chose a photo. Do not silently publish the caption
