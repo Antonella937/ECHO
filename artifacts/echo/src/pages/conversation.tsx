@@ -160,6 +160,21 @@ export default function ConversationPage() {
   const [kindroidFailure, setKindroidFailure] = useState<string | null>(null);
   const [recoveringKindroidReply, setRecoveringKindroidReply] = useState(false);
   const [kindroidRecoveryNotice, setKindroidRecoveryNotice] = useState<string | null>(null);
+  const retryKindroidReply = async () => {
+    if (!user?.id || !id || recoveringKindroidReply) return;
+    const latest = [...messages].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    if (!latest || latest.senderId !== identityId || latest.recipientId !== id) return;
+    setRecoveringKindroidReply(true); setKindroidRecoveryNotice(null);
+    try {
+      await customFetch('/api/autonomy/retry-dm-reply', {
+        method: 'POST', responseType: 'json',
+        body: JSON.stringify({ universeId: getActiveUniverseId(user.id), characterId: id, messageId: latest.id }),
+      });
+      setKindroidRecoveryNotice('Reintento solicitado. No se creó otro mensaje en ECHO.');
+    } catch {
+      setKindroidRecoveryNotice('No se pudo solicitar el reintento.');
+    } finally { setRecoveringKindroidReply(false); }
+  };
   const recoverKindroidReply = async () => {
     if (!user?.id || !id || recoveringKindroidReply) return;
     const latest = [...messages].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
@@ -459,6 +474,7 @@ export default function ConversationPage() {
         {kindroidFailure && (
           <div role="alert" className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" data-testid="kindroid-dm-error">
             {kindroidFailure}
+            <button type="button" disabled={recoveringKindroidReply} onClick={() => void retryKindroidReply()} className="mt-2 block font-semibold underline disabled:opacity-50">Reintentar mensaje original</button>
           </div>
         )}
         {messages.length > 0 && (() => {
