@@ -23,6 +23,20 @@ type Group = { id: string; name: string; avatar?: string | null; wallpaperUrl?: 
 type MusicAttachment = { id: string; type: 'music'; trackId: string; title: string; durationSeconds: number };
 type GroupMessage = { id: string; senderId: string; text: string; attachments?: Array<MessageAttachment | MusicAttachment>; createdAt: string; pinnedAt?: string | null; pinnedBy?: string | null };
 
+function PendingGroupFile({file, onRemove, disabled}: {file: File; onRemove: () => void; disabled: boolean}) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const preview = URL.createObjectURL(file);
+    setUrl(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [file]);
+  return <div className="relative shrink-0 rounded-xl border border-white/20 p-1">
+    {url ? <img src={url} alt={file.name} className="h-20 w-20 rounded-lg object-cover" /> : <span className="block max-w-28 truncate p-2 text-xs">{file.name}</span>}
+    <button type="button" disabled={disabled} onClick={onRemove} aria-label="Quitar archivo" className="absolute right-0 top-0 rounded-full bg-background p-1"><X className="h-4 w-4"/></button>
+  </div>;
+}
+
 export default function GroupConversationPage() {
   const language = useLanguage();
   const gl = (label:string) => language === 'es' ? label : (groupLabels[language]?.[label] ?? groupLabels.en[label] ?? label);
@@ -496,6 +510,10 @@ export default function GroupConversationPage() {
     {group?.participantIds.includes(me.id) && !sceneObserverEnabled && <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);try{validateAttachments(files,pendingFiles.length);setPendingFiles(old=>[...old,...files]);setError('');}catch(err){setError((err as Error).message);}e.target.value='';}} />
+      {!!pendingFiles.length && <div className="w-full min-w-0">
+        <div className="mb-1 text-xs text-muted-foreground">{uploading ? 'Subiendo archivos…' : `${pendingFiles.length} archivo(s) listo(s) para enviar`}</div>
+        <div className="flex gap-2 overflow-x-auto">{pendingFiles.map((file,index) => <PendingGroupFile key={`${file.name}-${file.lastModified}-${index}`} file={file} disabled={sending} onRemove={() => setPendingFiles(old => old.filter((_,i) => i !== index))}/>)}</div>
+      </div>}
       <div className="relative shrink-0">
         {toolsOpen&&<div role="menu" aria-label="Opciones del grupo" className="absolute bottom-full left-0 z-50 mb-3 w-[min(19rem,calc(100vw-2rem))] rounded-3xl border border-white/20 bg-background/90 p-2 shadow-2xl backdrop-blur-2xl">
           <button type="button" role="menuitem" onClick={()=>{setToolsOpen(false);setEventsOpen(true);}} className="block w-full rounded-2xl p-3 text-left text-sm hover:bg-white/10">♧ Acontecimientos del grupo</button>
