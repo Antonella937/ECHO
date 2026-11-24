@@ -353,7 +353,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
             ? (recipientId === parsed.data.state.primaryCharacterId
                 ? latestIncomingText // Send the owner's actual message, not a fabricated ECHO instruction.
                 : `[ECHO incoming private DM from ${recipientName}. Reply to ${recipientName}, not to another contact. Latest message:]\n${latestIncomingText}`)
-            : `Private message opportunity with ${recipientName}. No new message from ${recipientName} is pending.`);
+            : `Start a new private DM from ${actorName} to ${recipientName} only. No new message from ${recipientName} is pending. This is not a group chat or scene turn. Do not continue or answer a previous group conversation, address another participant, or narrate sending a group message. Write a natural private message to ${recipientName}.`);
         // A profile card shared in this exact private thread grants a one-time
         // read of that profile's public posts; it does not create a follow.
         const sharedProfileIds = [...incomingBatch.flatMap(message => [...(message.text ?? '').matchAll(/\[ECHO_PROFILE:([a-zA-Z0-9_-]{1,120})\]/g)])]
