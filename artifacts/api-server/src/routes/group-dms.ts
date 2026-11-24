@@ -1,3 +1,4 @@
+import { sendKindroidSocialGroupContext } from "../ai-engine/kindroid-social-group";
 import { notifyNewGroupMessage } from "../lib/group-push-dispatch";
 import { privateConversationCandidates } from "../lib/canon-knowledge";
 import { runGroupAutonomyOnce } from "../autonomy/group-executor";
@@ -369,7 +370,22 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
   if (!inserted.rows.length) { res.status(404).json({ error: "GROUP_NOT_FOUND" }); return; }
   await db.execute(sql`UPDATE echo_group_conversations SET updated_at = now()
     WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
-  res.status(201).json({ id: messageId, groupId, senderId: actorId, text, attachments, createdAt: inserted.rows[0].created_at });
+  let kindroidDelivery: "not_linked" | "sent" | "failed" = "not_linked";
+  if (req.userId! === "user_3LeoBfUicTthDVixNbkPlqXFkdZ") {
+    const linked = await db.execute(sql`SELECT kindroid_group_id FROM echo_group_conversations
+      WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND id = ${groupId}`);
+    const target = linked.rows[0]?.kindroid_group_id;
+    if (typeof target === "string" && target) {
+      try {
+        await sendKindroidSocialGroupContext(target, text || "[Attachment shared in ECHO]");
+        kindroidDelivery = "sent";
+      } catch {
+        kindroidDelivery = "failed";
+        console.warn("[kindroid-group] direct delivery failed", { groupId, messageId });
+      }
+    }
+  }
+  res.status(201).json({ id: messageId, groupId, senderId: actorId, text, attachments, createdAt: inserted.rows[0].created_at, kindroidDelivery });
 });
 // Share an explicitly published ECHO Music track into a group conversation.
 // The track is referenced, never regenerated or copied. Group membership and
