@@ -114,6 +114,10 @@ export default function GroupConversationPage() {
   const [sceneTurnMode, setSceneTurnMode] = useState<'automatic' | 'round_robin' | 'manual'>('automatic');
   const [sceneResponseSpeed, setSceneResponseSpeed] = useState<'immediate' | 'normal' | 'slow'>('normal');
   const [sceneObserverEnabled, setSceneObserverEnabled] = useState(false);
+  const isGroupMember = group?.participantIds.includes(me.id) ?? false;
+  const observerProfileId = state.primaryCharacterId ?? group?.createdBy;
+  const isWatchingScene = sceneObserverEnabled && (!isGroupMember || me.id === observerProfileId);
+  const canWriteToGroup = isGroupMember && !isWatchingScene;
   const [sceneLoaded, setSceneLoaded] = useState(false);
   const [sceneSaving, setSceneSaving] = useState(false);
   const [sceneRunning, setSceneRunning] = useState(false);
@@ -359,7 +363,7 @@ export default function GroupConversationPage() {
   const send = async (event: FormEvent) => {
     event.preventDefault();
     const message = text.trim();
-    if ((!message && !pendingFiles.length) || !id || sending || uploading || !group?.participantIds.includes(me.id)) return;
+    if ((!message && !pendingFiles.length) || !id || sending || uploading || !canWriteToGroup) return;
     setSending(true);
     try {
       setUploading(pendingFiles.length > 0);
@@ -447,7 +451,7 @@ export default function GroupConversationPage() {
       {!group?.participantIds.includes(me.id) && <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">{gl("Estás viendo este grupo como espectadora. No sos participante.")}</p><button type="button" onClick={() => navigate('/messages')} className="rounded-lg border border-border px-3 py-2 text-sm">{gl("Salir del modo espectadora")}</button></div>}
     </div>}
     <main className="relative z-10 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-transparent px-4 py-5" data-testid="group-messages">
-      {sceneLoaded && messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">{sceneObserverEnabled ? 'Tocá la foto de un personaje para empezar la conversación.' : 'Podés iniciar la conversación enviando un mensaje.'}</p></div>}
+      {sceneLoaded && messages.length === 0 && <div className="mx-auto mt-12 max-w-xs text-center"><div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-secondary"><Users className="h-7 w-7 text-muted-foreground" /></div><p className="font-semibold">El grupo está listo 🖤</p><p className="mt-1 text-sm text-muted-foreground">{isWatchingScene ? 'Tocá la foto de un personaje para empezar la conversación.' : 'Podés iniciar la conversación enviando un mensaje.'}</p></div>}
       {messages.filter(m => m.pinnedAt).length > 0 && <div className="mb-3 rounded-xl bg-secondary/70 px-3 py-2 text-xs"><Pin className="mr-1 inline h-3 w-3" /> {messages.filter(m => m.pinnedAt).length} mensaje(s) fijado(s)</div>}
       {messages.map(m => <div key={m.id} className={`flex items-end gap-2 ${m.senderId === me.id ? 'justify-end' : 'justify-start'}`}>
         {m.senderId !== me.id && <div className="shrink-0"><CharacterAvatar character={character(m.senderId) ?? me} size={30} /></div>}
@@ -478,9 +482,9 @@ export default function GroupConversationPage() {
       </div>)}
       <div ref={bottomRef} />
     </main>
-    {sceneLoaded && sceneObserverEnabled && group && <div className="relative z-30 shrink-0 bg-background/15 px-3 py-2 pb-[max(env(safe-area-inset-bottom),12px)] backdrop-blur-sm">
+    {sceneLoaded && isWatchingScene && group && <div className="relative z-30 shrink-0 bg-background/15 px-3 py-2 pb-[max(env(safe-area-inset-bottom),12px)] backdrop-blur-sm">
       <div className="flex items-center justify-around gap-2 overflow-x-auto" aria-label="Tocá un personaje para hacerlo hablar">
-        {group.participantIds.filter(pid => sceneObserverEnabled || pid !== me.id).map(pid => {
+        {group.participantIds.filter(pid => pid !== observerProfileId).map(pid => {
           const participant = character(pid);
           if (!participant) return null;
           return <button key={pid} type="button" disabled={sceneRunning} onClick={() => { setFirstSpeakerId(pid); setError(''); void advanceScene(1, pid); }} aria-label={`Hacer hablar a ${participant.name}`} title={participant.name} className="flex min-w-0 shrink-0 flex-col items-center gap-1 rounded-xl px-1 py-1 text-foreground transition-transform active:scale-95 disabled:opacity-50">
@@ -518,7 +522,7 @@ export default function GroupConversationPage() {
     </div>
     {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="relative block cursor-pointer overflow-hidden rounded-xl border border-white/20 p-3 text-sm">{wallpaperUploading ? "Subiendo fondo..." : "Elegir foto de fondo"}<input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={e=>{void changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>void changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
     {eventsOpen && group && id && group.participantIds.includes(me.id) && <div className="relative z-40 mx-3 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><button type="button" onClick={()=>setEventsOpen(false)} className="mb-2 text-sm">✕ Cerrar acontecimientos</button><GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} /></div>}
-    {group?.participantIds.includes(me.id) && !sceneObserverEnabled && <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
+    {canWriteToGroup && <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);try{validateAttachments(files,pendingFiles.length);setPendingFiles(old=>[...old,...files]);setError('');}catch(err){setError((err as Error).message);}e.target.value='';}} />
       {!!pendingFiles.length && <div className="w-full min-w-0">
