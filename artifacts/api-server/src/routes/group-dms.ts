@@ -115,7 +115,7 @@ export async function reconcileKindroidGroupHistory(ownerId: string, universeId:
   const cacheKey = ownerId + ":" + universeId + ":" + groupId;
   const pending = kindroidHistoryPending.get(cacheKey);
   if (pending) return pending;
-  if (Date.now() - (kindroidHistoryLastCheck.get(cacheKey) ?? 0) < 30_000) return;
+  if (Date.now() - (kindroidHistoryLastCheck.get(cacheKey) ?? 0) < 300_000) return;
   kindroidHistoryLastCheck.set(cacheKey, Date.now());
   const task = (async () => {
     const group = await db.execute(sql`SELECT participant_ids, kindroid_group_id FROM echo_group_conversations
