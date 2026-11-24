@@ -208,9 +208,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     toast({ title: `${t('Respuesta enviada a')} ${group.author.name.split(' ')[0]}`, description: t('La encontrarás en Mensajes.') });
   };
 
-  const viewers = storyViewerIds(liveStory).map(character).filter(Boolean);
   const likedViewerIds = new Set(liveStory.likes ?? []);
-  const viewerRows = (viewerFilter === 'likes' ? [...likedViewerIds] : storyViewerIds(liveStory).filter(id => !likedViewerIds.has(id))).map(character).filter((v): v is NonNullable<typeof v> => !!v);
+  const viewerRows = (viewerFilter === 'likes' ? [...likedViewerIds] : storyViewerIds(liveStory)).map(character).filter((v): v is NonNullable<typeof v> => !!v);
   const totalViews = storyViewCount(liveStory);
   const active = isStoryActive(liveStory);
   const mentioned = (liveStory.mentionedAccountIds ?? []).map(character).filter((c): c is NonNullable<typeof c> => !!c);
@@ -267,7 +266,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   return (
     <motion.div
       onTouchStart={(e) => { if (isMine && !showViewers) swipeStartY.current = e.touches[0]?.clientY ?? null; }}
-      onTouchEnd={(e) => { if (isMine && swipeStartY.current !== null && swipeStartY.current - (e.changedTouches[0]?.clientY ?? swipeStartY.current) > 65) setShowViewers(true); swipeStartY.current = null; }}
+      onTouchEnd={(e) => { if (isMine && swipeStartY.current !== null && swipeStartY.current - (e.changedTouches[0]?.clientY ?? swipeStartY.current) > 65) { setViewerFilter('views'); setShowViewers(true); } swipeStartY.current = null; }}
       className="echo-dark-surface fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(240_8%_3%)] text-foreground"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -499,12 +498,16 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                 <div className="absolute bottom-0 left-0 right-0 z-30 max-h-[65dvh] overflow-hidden rounded-t-3xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl" data-testid="story-viewers-sheet">
                   <div className="flex items-center justify-between border-b border-border px-4 py-3">
                     <div className="flex items-center gap-3 text-sm font-semibold">
-                      <span className="flex items-center gap-1"><Eye className="h-4 w-4" />{formatCount(totalViews)}</span>
-                      <span className="flex items-center gap-1"><Heart className="h-4 w-4 text-red-500" fill="currentColor" />{liveStory.likes?.length ?? 0}</span>
+                      <button type="button" onClick={() => setViewerFilter('views')} aria-pressed={viewerFilter === 'views'} aria-label={`${t('Vista por')} ${formatCount(totalViews)}`} className="flex h-10 items-center gap-1 rounded-full px-2.5 aria-pressed:bg-secondary" data-testid="button-story-show-views">
+                        <Eye className="h-4 w-4" />{formatCount(totalViews)}
+                      </button>
+                      <button type="button" onClick={() => setViewerFilter('likes')} aria-pressed={viewerFilter === 'likes'} aria-label={`${t('Me gusta')}: ${likedViewerIds.size}`} className="flex h-10 items-center gap-1 rounded-full px-2.5 aria-pressed:bg-secondary" data-testid="button-story-show-likes">
+                        <Heart className="h-4 w-4 text-red-500" fill="currentColor" />{likedViewerIds.size}
+                      </button>
                     </div>
                     <button type="button" onClick={() => setShowViewers(false)} className="grid h-9 w-9 place-items-center rounded-full bg-secondary" aria-label={t("Cerrar")} data-testid="button-story-viewers-close"><ChevronDown className="h-5 w-5" /></button>
                   </div>
-                  <div className="max-h-[calc(65dvh-64px)] overflow-y-auto overscroll-contain p-3">
+                  <div key={viewerFilter} className="max-h-[calc(65dvh-64px)] overflow-y-auto overscroll-contain p-3">
                     {viewerRows.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">{viewerFilter === 'likes' ? t('Me gusta') + ': 0' : t('Nadie la ha visto todavía')}</p> : viewerRows.map(v => (
                       <div key={v.id} className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm" data-testid={`story-viewer-row-${v.id}`}>
                         <CharacterAvatar character={v} size={38} />
