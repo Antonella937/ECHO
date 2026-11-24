@@ -34,7 +34,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       AND (${sceneMode} OR autonomy_enabled = true)
       AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
       AND (CASE WHEN ${sceneMode} THEN (scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
-    RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed`);
+    RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed, kindroid_group_id`);
   if (!claimed.rows.length) return { status: "skipped", reason: "CLAIM_UNAVAILABLE" };
   try {
     const group = claimed.rows[0];
@@ -90,7 +90,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         "group_kindroid_dead_static": "uzlDUKZ5MQMnR9sBHh6p",
       } : {};
       kindroidGroupId = verifiedFounderGroups[groupId] ?? null;
-      let groupMappingSource: "verified" | "environment" = "verified";
+      let groupMappingSource: "verified" | "environment" | "database" = "verified";
       const raw = process.env.ECHO_KINDROID_GROUP_IDS_JSON;
       if (raw) {
         try {
@@ -105,6 +105,11 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         } catch {
           // Invalid mapping must fail closed, never fall back to private Kin DMs.
         }
+      }
+      const storedMapping = group.kindroid_group_id;
+      if (typeof storedMapping === "string" && /^[A-Za-z0-9_-]{10,120}$/.test(storedMapping)) {
+        kindroidGroupId = storedMapping;
+        groupMappingSource = "database";
       }
       if (!kindroidGroupId) return { status: "skipped", reason: "KINDROID_GROUP_MAPPING_MISSING" };
       console.info("[kindroid-group] mapping resolved " + JSON.stringify({ source: groupMappingSource, group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other" }));
