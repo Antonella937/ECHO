@@ -115,8 +115,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   // Stories without a valid music clip retain their standard duration.
   const storyDurationMs = liveStory.musicClip && (liveStory.musicClip.clipSeconds === 15 || liveStory.musicClip.clipSeconds === 30)
     ? liveStory.musicClip.clipSeconds * 1000 : DEFAULT_STORY_DURATION_MS;
+  const isStoryRepost = Boolean(liveStory.repostOfStoryId);
   const originalStory = liveStory.repostOfStoryId ? state.stories.find(s => s.id === liveStory.repostOfStoryId) : undefined;
   const originalAuthor = originalStory ? state.characters.find(c => c.id === originalStory.authorId) : undefined;
+  const canShowOriginalStory = Boolean(originalStory && originalAuthor && !originalAuthor.privateAccount && !originalAuthor.archived && !originalStory.closeFriendsOnly);
   // Media authorization must use the original object's owner and content id.
   const sourcePost = liveStory.repostOfPostId ? state.posts.find(p => p.id === liveStory.repostOfPostId) : undefined;
   const isPostRepost = Boolean(liveStory.repostOfPostId);
@@ -126,7 +128,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const storyMediaSource = sourcePost
     ? { sourceUniverseId: universeId, sourceCharacterId: sourcePost.authorId, sourceType: 'post' as const, sourceContentId: sourcePost.id }
     : { sourceUniverseId: universeId, sourceCharacterId: mediaOwner.authorId, sourceType: 'story' as const, sourceContentId: mediaOwner.id };
-  const storyImage = resolveMedia(!isPostRepost || canOpenPost ? mediaOwner.image : "", storyMediaSource);
+  const canShowMedia = (!isPostRepost || canOpenPost) && (!isStoryRepost || canShowOriginalStory);
+  const storyImage = resolveMedia(canShowMedia ? mediaOwner.image : "", storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
   // A private image can take a few seconds to resolve on mobile. Loading is not an error.
   useEffect(() => {
@@ -292,7 +295,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       </button>
 
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
-        {storyImage && !isPostRepost && (
+        {storyImage && !isPostRepost && !isStoryRepost && (
           <img
             key={story.id}
             src={storyImage}
@@ -321,12 +324,28 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             {story.caption && <p className="relative line-clamp-3 max-w-[350px] break-words text-center text-sm text-white"><SocialText text={story.caption} onNavigate={onClose} /></p>}
           </div>
         )}
-        {(!isPostRepost || canOpenPost) && imageIsPrivate && imageUnavailable && !showImageError && (
+        {isStoryRepost && (
+          <div className="pointer-events-none absolute inset-x-0 top-[max(76px,calc(env(safe-area-inset-top)+56px))] bottom-[max(124px,calc(env(safe-area-inset-bottom)+110px))] z-[1] flex flex-col items-center justify-center gap-3 px-7">
+            {storyImage && <img src={storyImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-25 blur-2xl" />}
+            {canShowOriginalStory && originalStory && originalAuthor ? (
+              <div className="pointer-events-auto relative min-h-0 w-full max-w-[350px] overflow-y-auto rounded-2xl border border-white/15 bg-[#18151d] text-white shadow-xl" data-testid="story-repost-source-card">
+                <button type="button" onClick={() => { onClose(); navigate(`/profile/${encodeURIComponent(originalAuthor.id)}`); }} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold" data-testid="story-repost-credit">
+                  <CharacterAvatar character={originalAuthor} size={28} />
+                  <span className="truncate">@{originalAuthor.handle}</span>
+                </button>
+                {storyImage && <img src={storyImage} onLoad={() => setFailedStoryImage(null)} onError={() => setFailedStoryImage(story.id)} alt="Historia original" className="max-h-[35dvh] w-full object-contain" />}
+                {originalStory.caption && <p className="whitespace-pre-wrap break-words px-3 py-2.5 text-sm" data-testid="story-repost-original-caption"><SocialText text={originalStory.caption} onNavigate={onClose} /></p>}
+              </div>
+            ) : <p className="relative text-center text-sm text-white/80">La historia original no está disponible.</p>}
+            {story.caption && <p className="pointer-events-auto relative max-h-[15dvh] w-full max-w-[350px] shrink-0 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-black/55 px-3 py-2 text-center text-sm text-white" data-testid="story-repost-added-caption"><SocialText text={story.caption} onNavigate={onClose} /></p>}
+          </div>
+        )}
+        {canShowMedia && imageIsPrivate && imageUnavailable && !showImageError && (
           <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/40" role="status" aria-label="Cargando imagen">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
           </div>
         )}
-        {(!isPostRepost || canOpenPost) && imageIsPrivate && showImageError && (
+        {canShowMedia && imageIsPrivate && showImageError && (
           <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-black/70 px-8 text-center text-white" role="status">
             <p className="text-sm">La foto de esta historia todavía no está disponible.</p>
             <button type="button" onClick={retryStoryImage} className="rounded-full border border-white/50 px-5 py-2 text-sm font-medium">Reintentar imagen</button>
@@ -339,10 +358,11 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/90 px-5 py-10" data-testid="composer-mentioned-story-repost">
             <div className="flex w-full max-w-[380px] flex-col gap-4 rounded-2xl bg-card p-4">
               <div className="text-base font-semibold">Compartir en mi historia</div>
-              <div className="relative mx-auto flex max-h-[48dvh] w-full flex-col items-center overflow-hidden rounded-xl bg-black p-3">
+              <div className="relative mx-auto flex max-h-[48dvh] w-full flex-col overflow-y-auto rounded-xl bg-black p-3">
                 <div className="w-full rounded-xl border border-white/20 bg-[#18161c] p-2">
-                  <div className="pb-2 text-xs font-semibold text-white">@{group.author.handle} · Historia original</div>
+                  <div className="flex items-center gap-2 pb-2 text-xs font-semibold text-white"><CharacterAvatar character={group.author} size={24} />@{group.author.handle}</div>
                   {storyImage && <img src={storyImage} alt="Historia original" className="max-h-[31dvh] w-full object-contain" />}
+                  {liveStory.caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white">{liveStory.caption}</p>}
                 </div>
                 {repostCaption.trim() && <p className="mt-3 break-words text-center text-sm text-white">{repostCaption}</p>}
               </div>
@@ -354,7 +374,6 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             </div>
           </div>
         )}
-        {originalAuthor && <button type="button" onClick={() => { onClose(); navigate(`/profile/${originalAuthor.id}`); }} className="absolute left-4 top-20 z-20 rounded-lg bg-black/75 px-3 py-2 text-xs font-semibold text-white backdrop-blur" data-testid="story-repost-credit">Compartido de @{originalAuthor.handle} ↗</button>}
 
         {/* progress */}
         <div className="relative z-10 flex gap-1 px-3 pt-[max(env(safe-area-inset-top),12px)]">
@@ -449,7 +468,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             </span>
           )}
           
-          {!isPostRepost && story.caption && (
+          {!isPostRepost && !isStoryRepost && story.caption && (
             <p className="max-w-full break-words font-display text-base font-light leading-relaxed text-foreground/95 sm:text-lg"><SocialText text={story.caption} onNavigate={onClose} /></p>
           )}
           {mentioned.length > 0 && (

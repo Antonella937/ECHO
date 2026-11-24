@@ -22,6 +22,7 @@ export interface Story {
   image: string;
   caption: string;
   createdAt: Date;
+  repostOfStoryId?: string;
   repostOfPostId?: string;
   seenBy: string[];
   origin: string;
