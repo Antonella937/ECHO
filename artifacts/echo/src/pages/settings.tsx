@@ -61,12 +61,9 @@ export default function SettingsPage() {
   const { state, me, actions, storageError, syncConflictCount, lastSavedAt, universeId } = useSocial();
   const recoveryUniverseRef = useRef(universeId);
   recoveryUniverseRef.current = universeId;
-  const [recoveryFiles, setRecoveryFiles] = useState<File[]>([]);
   const [showRecovery, setShowRecovery] = useState(false);
   const { user } = useUser();
-  const [recoveryAssignments, setRecoveryAssignments] = useState<Record<number, string>>({});
   const [recoveryBusy, setRecoveryBusy] = useState(false);
-  const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
   const [recoveryMediaPath, setRecoveryMediaPath] = useState('');
   const [recoverySearch, setRecoverySearch] = useState('');
   const [recoveryContentFile, setRecoveryContentFile] = useState<File | null>(null);
@@ -75,16 +72,12 @@ export default function SettingsPage() {
   const [legacyAvailability, setLegacyAvailability] = useState<Record<string, string>>({});
   const [legacyReasons, setLegacyReasons] = useState<Record<string, number>>({});
   const [checkingLegacy, setCheckingLegacy] = useState(false);
-  const [recoveryInventoryInfo, setRecoveryInventoryInfo] = useState<{ total: number; eligible: number; accountSuffix: string } | null>(null);
   const [autoCopyConfirmed, setAutoCopyConfirmed] = useState(false);
   const [recoveryBatchFiles, setRecoveryBatchFiles] = useState<File[]>([]);
   const [recoveryBatchConfirmed, setRecoveryBatchConfirmed] = useState(false);
   const [recoveryBatchAssignments, setRecoveryBatchAssignments] = useState<Record<number, string>>({});
   // Never carry file-to-account assignments across universe switches.
   useEffect(() => {
-    setRecoveryFiles([]);
-    setRecoveryAssignments({});
-    setRecoveryConfirmed(false);
     setRecoveryMediaPath('');
     setRecoveryContentFile(null);
     setRecoveryContentConfirmed(false);
@@ -127,81 +120,6 @@ export default function SettingsPage() {
     const remote = await loadUniverse(expectedUniverse);
     assertRecoveryUniverse(expectedUniverse);
     if (!remote.state || !check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
-  }
-  async function recoverSelectedAvatars() {
-    const assignments = Object.entries(recoveryAssignments).filter(([, id]) => Boolean(id));
-    if (!assignments.length || recoveryBusy || !recoveryConfirmed) return;
-    if (new Set(assignments.map(([, id]) => id)).size !== assignments.length) {
-      setRecoveryStatus('Elegí un solo archivo por personaje para evitar reemplazos accidentales.'); return;
-    }
-    const invalid = assignments.find(([index, id]) => {
-      const fileIndex = Number(index);
-      const file = recoveryFiles[fileIndex];
-      const character = state.characters.find(item => item.id === id);
-      return !Number.isInteger(fileIndex) || fileIndex < 0 ||
-        !character?.avatar || !/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(character.avatar) ||
-        !file || !recoveryImageType(file) ||
-        !file.size || file.size > 15 * 1024 * 1024;
-    });
-    if (invalid) {
-      setRecoveryStatus('Una foto o un personaje seleccionado ya no es válido. Revisá las asignaciones: solo JPG, PNG o WebP de hasta 15 MB y avatares pendientes.');
-      setRecoveryConfirmed(false);
-      return;
-    }
-    const recoveryUniverse = universeId;
-    setRecoveryBusy(true);
-    let completed = 0;
-    const updatedAvatars: Array<{ id: string; path: string }> = [];
-    try {
-      for (const [index, id] of assignments) {
-        const file = recoveryFiles[Number(index)];
-        const character = state.characters.find(item => item.id === id);
-        if (!character || !character.avatar?.startsWith('/objects/uploads/'))
-          throw new Error('El avatar pendiente cambió durante la recuperación. Revisá el perfil antes de continuar.');
-        if (!recoveryImageType(file) || file.size > 15 * 1024 * 1024 || !file.size) {
-          throw new Error('Solo JPG, PNG o WebP de hasta 15 MB. Convertí las fotos HEIC antes de recuperarlas.');
-        }
-        // Check the server immediately before upload: another session may have restored this avatar.
-        assertRecoveryUniverse(recoveryUniverse);
-        const currentRemote = await loadUniverse(recoveryUniverse);
-        assertRecoveryUniverse(recoveryUniverse);
-        const remoteCharacter = currentRemote.state?.characters.find(item => item.id === id);
-        if (!remoteCharacter || remoteCharacter.avatar !== character.avatar)
-          throw new Error(`El avatar de ${character.name} cambió en el servidor. Actualizá ECHO antes de volver a intentar.`);
-        setRecoveryStatus(`Subiendo ${completed + 1} de ${assignments.length}: ${character.name}…`);
-        const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
-          '/api/storage/uploads/request-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: file.name || 'recovered-image', contentType: recoveryImageType(file), size: file.size }), responseType: 'json' });
-        if (!/^\/objects\/r2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectPath)) throw new Error('La referencia devuelta por R2 no es válida. No se modificó el perfil.');
-        const uploaded = await fetch(uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
-        if (!uploaded.ok) throw new Error('Cloudflare R2 rechazó la subida.');
-        await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ objectPath }), responseType: 'json' });
-        // The upload can take time; do not overwrite an avatar changed by another
-        // session while the file was being transferred.
-        assertRecoveryUniverse(recoveryUniverse);
-        const beforeApply = await loadUniverse(recoveryUniverse);
-        assertRecoveryUniverse(recoveryUniverse);
-        if (!beforeApply.state?.characters.some(item => item.id === id && item.avatar === character.avatar))
-          throw new Error(`El avatar de ${character.name} cambió durante la subida. Revisá el perfil antes de reintentar.`);
-        // Update only after upload and claim; verify this avatar before proceeding.
-        // A failed sync must not start uploads for the remaining characters.
-        actions.updateAccount(id, { ...character, avatar: objectPath }, character);
-        setRecoveryStatus(`Verificando avatar ${completed + 1} de ${assignments.length}: ${character.name}…`);
-        await verifyRecoveredMedia(recoveryUniverse, remote =>
-          remote.characters.some(item => item.id === id && item.avatar === objectPath));
-        updatedAvatars.push({ id, path: objectPath });
-        completed++;
-      }
-      setRecoveryStatus(`Recuperados y sincronizados ${completed} avatar(es). Las imágenes anteriores no se borraron.`);
-      if (completed > 0) {
-        setRecoveryFiles([]);
-        setRecoveryAssignments({});
-        toast({ title: 'Avatares sincronizados', description: `${completed} foto(s) guardada(s) en Cloudflare R2.` });
-      }
-    } catch (error) {
-      setRecoveryStatus(`${completed} avatar(es) procesado(s), pero no se pudo confirmar la sincronización completa. No vuelvas a subir las mismas fotos hasta comprobar los perfiles. ${error instanceof Error ? error.message : ''}`);
-    } finally { setRecoveryBusy(false); setRecoveryConfirmed(false); }
   }
   const legacyMediaDetails = useMemo(() => {
     const byPath = new Map<string, { path: string; posts: typeof state.posts; stories: typeof state.stories; owners: string[] }>();
@@ -443,7 +361,6 @@ export default function SettingsPage() {
     setAutoCopyConfirmed(false);
     setLegacyAvailability({});
     setLegacyReasons({});
-    setRecoveryInventoryInfo(null);
     try {
       // Use the server-owned inventory rather than arbitrary avatar/content references.
       // Legacy references can contain extensions or non-UUID identifiers, which the
@@ -451,11 +368,10 @@ export default function SettingsPage() {
       const inventory = await customFetch<{ paths: Array<{ path: string }> }>('/api/storage/recovery/inventory', {
         method: 'GET', responseType: 'json',
       });
-      const paths = Array.from(new Set((inventory.paths ?? []).map(entry => entry.path)
-        .filter(path => /^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path))));
-      setRecoveryInventoryInfo({ total: inventory.paths?.length ?? 0, eligible: paths.length, accountSuffix: user?.id?.slice(-8) ?? 'sin sesión' });
+      const ownedPaths = new Set((inventory.paths ?? []).map(entry => entry.path));
+      const paths = legacyMedia.filter(path => ownedPaths.has(path));
       if (!paths.length) {
-        setRecoveryStatus('El inventario de esta sesión no devolvió rutas comprobables. Esto no demuestra que las fotos hayan desaparecido: revisá la cuenta y la conexión de base de datos.');
+        setRecoveryStatus('No se encontraron referencias comprobables de publicaciones o historias en esta sesión.');
         return;
       }
       const results: Record<string, string> = {};
@@ -669,62 +585,15 @@ export default function SettingsPage() {
             <ChevronDown className={cn("h-4 w-4 transition-transform", showRecovery && "rotate-180")} />
           </button>
           {showRecovery && <div className="mt-4 space-y-3 text-sm">
-            <button type="button" disabled={checkingLegacy || recoveryBusy} onClick={() => void checkLegacyAvailability()}
-              className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-              {checkingLegacy ? 'Comprobando Supabase…' : 'Comprobar fotos antiguas en Supabase (sin modificar)'}
-            </button>
-            {recoveryInventoryInfo && <p className="text-xs text-muted-foreground" role="status">Diagnóstico de inventario · Cuenta terminada en {recoveryInventoryInfo.accountSuffix} · Registros devueltos: {recoveryInventoryInfo.total} · Rutas válidas: {recoveryInventoryInfo.eligible}. Si ambos son cero, verificá que esta cuenta y el backend correspondan a la base de datos correcta.</p>}
-            {Object.keys(legacyAvailability).length > 0 && <p className="text-xs text-muted-foreground">Disponibles: {Object.values(legacyAvailability).filter(v => v === 'available').length} · Faltantes: {Object.values(legacyAvailability).filter(v => v === 'missing').length} · Sin confirmar: {Object.values(legacyAvailability).filter(v => v !== 'available' && v !== 'missing').length}</p>}
-            {Object.keys(legacyReasons).length > 0 && <p className="text-xs text-muted-foreground" role="status">Motivos sin confirmar: {Object.entries(legacyReasons).map(([reason, count]) => `${({ access_denied: 'Acceso denegado por Supabase', storage_server_error: 'Error del servidor de almacenamiento', unexpected_storage_response: 'Respuesta inesperada', timeout: 'Tiempo de espera agotado', connection_error: 'Error de conexión', unspecified: 'Sin detalle' } as Record<string, string>)[reason] ?? (reason.startsWith('http_') ? `HTTP ${reason.slice(5)}` : 'Otro error')}: ${count}`).join(' · ')}. No se modificaron imágenes.</p>}
-            {Object.values(legacyAvailability).some(v => v === 'available') && <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
-              <p className="font-semibold">Copiar directamente desde Supabase</p>
-              <p>Se recuperará una imagen de publicación o historia por vez. El original permanece en Supabase; ECHO verificará el nuevo archivo y su sincronización.</p>
-              <label className="flex items-start gap-2"><input type="checkbox" checked={autoCopyConfirmed} disabled={recoveryBusy || checkingLegacy} onChange={event => setAutoCopyConfirmed(event.target.checked)} /> Confirmo que quiero copiar una imagen disponible a R2 y actualizar sus referencias.</label>
-              <button type="button" disabled={!autoCopyConfirmed || recoveryBusy || checkingLegacy || !legacyMedia.some(path => legacyAvailability[path] === 'available')}
-                onClick={() => void recoverAvailableContent()} className="rounded-xl bg-primary px-3 py-2 font-semibold text-primary-foreground disabled:opacity-50">Copiar y verificar una imagen</button>
-            </div>}
-            <p className="text-xs text-muted-foreground">Seleccioná varias fotos desde tu iPhone y asigná cada una a un avatar. Solo se actualizarán los perfiles que confirmes; las fotos antiguas no se borran.</p>
-            <input aria-label="Seleccionar imágenes para recuperar" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={recoveryBusy}
-              onChange={event => { setRecoveryFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryAssignments({}); setRecoveryConfirmed(false); setRecoveryStatus(''); }}
-              className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-foreground" />
-            {recoveryFiles.length > 0 && <div className="space-y-3">
-              <p role="status" className="text-xs">{recoveryFiles.length} foto(s) seleccionada(s). Asigná cada foto a su personaje antes de subir.</p>
-              {recoveryFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
-                <RecoveryPreview file={file} />
-                <div className="min-w-0 flex-1"><p className="truncate text-xs">{file.name}</p>
-                  <select aria-label={`Personaje para ${file.name}`} className="mt-1 w-full rounded-lg bg-background p-2 text-xs disabled:opacity-50" disabled={recoveryBusy} value={recoveryAssignments[index] ?? ''}
-                    onChange={event => { setRecoveryConfirmed(false); setRecoveryAssignments(previous => ({ ...previous, [index]: event.target.value })); }}>
-                    <option value="">No asignar todavía</option>
-                    {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character =>
-                      <option key={character.id} value={character.id}>{character.name}</option>)}
-                  </select></div></div>)}
-              <label className="flex items-start gap-2 text-xs">
-                <input type="checkbox" checked={recoveryConfirmed} disabled={recoveryBusy} onChange={event => setRecoveryConfirmed(event.target.checked)} className="mt-0.5" />
-                Confirmo que asigné las fotos originales a los personajes correctos. Solo se reemplazarán sus avatares.
-              </label>
-              <button type="button" disabled={recoveryBusy || !recoveryConfirmed || !Object.values(recoveryAssignments).some(Boolean)}
-                onClick={() => void recoverSelectedAvatars()} className="rounded-xl bg-primary px-4 py-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">
-                {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar avatares en R2'}
-              </button>
-
-            </div>}
             {recoveryStatus && <p role="status" aria-live="polite" className="rounded-lg bg-secondary/40 p-3 text-xs">{recoveryStatus}</p>}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold">Avatares que necesitan recuperación</p>
-              {state.characters.filter(character => character.avatar?.startsWith('/objects/uploads/')).map(character => (
-                <div key={character.id} className="flex items-center justify-between gap-2 rounded-lg bg-secondary/40 px-3 py-2 text-xs">
-                  <span className="truncate">{character.name}</span><span className="shrink-0 text-muted-foreground">Copia antigua</span>
-                </div>
-              ))}
-            </div>
             <div className="space-y-3 rounded-xl border border-border p-3 text-xs">
-              <p className="font-semibold">Preparar recuperación de publicaciones en lote</p>
+              <p className="font-semibold">Recuperar publicaciones e historias en lote</p>
               <p className="text-muted-foreground">Elegí varias fotos juntas, revisá cada miniatura y asigná una referencia original diferente a cada una. Solo se subirán al confirmar.</p>
               <input type="search" aria-label="Filtrar referencias del lote" placeholder="Buscar por personaje, fecha o caption…" disabled={recoveryBusy} value={recoverySearch}
                 onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
               <p className="text-muted-foreground">Mostrando {visibleLegacyMedia.length} de {filteredLegacyMedia.length} referencias filtradas. Buscá para acotar la lista.</p>
               <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={recoveryBusy}
-                aria-label="Seleccionar fotos de publicaciones en lote"
+                aria-label="Seleccionar fotos de publicaciones e historias en lote"
                 onChange={event => { setRecoveryBatchFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryBatchAssignments({}); setRecoveryBatchConfirmed(false); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
               {recoveryBatchFiles.map((file, index) => <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2">
@@ -753,6 +622,19 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
               <p className="font-semibold">Recuperar fotos de publicaciones e historias</p>
+            <button type="button" disabled={checkingLegacy || recoveryBusy} onClick={() => void checkLegacyAvailability()}
+              className="rounded-xl border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+              {checkingLegacy ? 'Comprobando Supabase…' : 'Buscar originales de publicaciones e historias en Supabase'}
+            </button>
+            {Object.keys(legacyAvailability).length > 0 && <p className="text-xs text-muted-foreground">Disponibles: {Object.values(legacyAvailability).filter(v => v === 'available').length} · Faltantes: {Object.values(legacyAvailability).filter(v => v === 'missing').length} · Sin confirmar: {Object.values(legacyAvailability).filter(v => v !== 'available' && v !== 'missing').length}</p>}
+            {Object.keys(legacyReasons).length > 0 && <p className="text-xs text-muted-foreground" role="status">Motivos sin confirmar: {Object.entries(legacyReasons).map(([reason, count]) => `${({ access_denied: 'Acceso denegado por Supabase', storage_server_error: 'Error del servidor de almacenamiento', unexpected_storage_response: 'Respuesta inesperada', timeout: 'Tiempo de espera agotado', connection_error: 'Error de conexión', unspecified: 'Sin detalle' } as Record<string, string>)[reason] ?? (reason.startsWith('http_') ? `HTTP ${reason.slice(5)}` : 'Otro error')}: ${count}`).join(' · ')}. No se modificaron imágenes.</p>}
+            {Object.values(legacyAvailability).some(v => v === 'available') && <div className="space-y-2 rounded-xl border border-border p-3 text-xs">
+              <p className="font-semibold">Copiar directamente desde Supabase</p>
+              <p>Se recuperará una imagen de publicación o historia por vez. El original permanece en Supabase; ECHO verificará el nuevo archivo y su sincronización.</p>
+              <label className="flex items-start gap-2"><input type="checkbox" checked={autoCopyConfirmed} disabled={recoveryBusy || checkingLegacy} onChange={event => setAutoCopyConfirmed(event.target.checked)} /> Confirmo que quiero copiar una imagen disponible a R2 y actualizar sus referencias.</label>
+              <button type="button" disabled={!autoCopyConfirmed || recoveryBusy || checkingLegacy || !legacyMedia.some(path => legacyAvailability[path] === 'available')}
+                onClick={() => void recoverAvailableContent()} className="rounded-xl bg-primary px-3 py-2 font-semibold text-primary-foreground disabled:opacity-50">Copiar y verificar una imagen</button>
+            </div>}
               <p className="text-muted-foreground">Seleccioná la referencia antigua exacta y después la foto original. Si una imagen se usa varias veces, se recuperan todas esas apariciones juntas.</p>
               <input type="search" aria-label="Buscar fotos antiguas" placeholder="Buscar por personaje, caption o fecha…" disabled={recoveryBusy} value={recoverySearch}
                 onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
