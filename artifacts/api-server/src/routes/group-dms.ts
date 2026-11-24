@@ -266,7 +266,7 @@ router.put("/group-dms/:groupId/read", async (req, res) => {
   const groupId=String(req.params.groupId);
   const group=await db.execute(sql`SELECT id FROM echo_group_conversations WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND id=${groupId} AND participant_ids ? ${actorId} LIMIT 1`);
   if (!group.rows.length) {res.status(404).json({error:"GROUP_NOT_FOUND"});return;}
-  await db.execute(sql`UPDATE echo_group_messages SET read_by=COALESCE(read_by,'[]'::jsonb) || jsonb_build_array(${actorId})
+  await db.execute(sql`UPDATE echo_group_messages SET read_by=COALESCE(read_by,'[]'::jsonb) || jsonb_build_array(${actorId}::text)
     WHERE owner_id=${req.userId!} AND universe_id=${universeId} AND group_id=${groupId}
     AND sender_id <> ${actorId} AND NOT (COALESCE(read_by,'[]'::jsonb) ? ${actorId})`);
   res.json({ok:true});
