@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { VisionError, type VisionProvider } from "../src/vision/contracts";
+import { VisionAnalysisSchema, VisionError, type VisionProvider } from "../src/vision/contracts";
 
 test("Cloudflare receives image bytes inline and returns a validated analysis", async (t) => {
   const env = process.env;
@@ -19,14 +19,14 @@ test("Cloudflare receives image bytes inline and returns a validated analysis", 
     assert.equal(input.model, "@cf/google/gemma-4-26b-a4b-it");
     assert.equal(input.messages[0].content[0].image_url.url, "data:image/jpeg;base64,aW1hZ2U=");
     return Response.json({
-      choices: [{ message: { content: '{"sceneDescription":"A mint green car."}' } }],
+      choices: [{ message: { content: "A mint green car." } }],
       usage: { prompt_tokens: 120, completion_tokens: 20 },
     });
   });
   const result = await provider.analyze({
     image: { mimeType: "image/jpeg", base64: "aW1hZ2U=" },
     prompt: "Describe this image.",
-    validate: JSON.parse,
+    validate: text => VisionAnalysisSchema.parse(JSON.parse(text)),
   });
   assert.equal(result.analysis.sceneDescription, "A mint green car.");
   assert.equal(result.usage.promptTokens, 120);
