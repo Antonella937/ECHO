@@ -3,7 +3,7 @@ import { kindroidSocialGroupProvider } from './kindroid-social-group';
 import { PreviewCharacterDecisionBody, SaveUniverseBody, type CharacterDecisionInput } from '@workspace/api-zod';
 import { EngineError, unknownUsage, type TextProvider } from './contracts';
 import { previewDecision } from './engine';
-import type { VisionContext } from '../vision/contracts';
+import type { VisionAnalysis, VisionContext } from '../vision/contracts';
 import { visionService } from '../vision/service';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { parseDmConversationPreferences, type DmConversationPreferences } from './dm-conversation-preferences';
@@ -60,10 +60,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         : "";
       const budgetBlocked = code === "AUTONOMY_BUDGET_PROTECTED" ||
         code === "AI_MONTHLY_HARD_CEILING";
-      if (!(input.situation === "dm" && dependencies.liveDmReply === true && budgetBlocked)) {
+      if (!(input.storyId || (input.situation === "dm" && dependencies.liveDmReply === true && budgetBlocked))) {
         throw error;
       }
-      console.warn("ECHO_DM_VISION_BUDGET_SKIPPED", { situation: input.situation, code });
+      console.warn("ECHO_REPLY_VISION_UNAVAILABLE", { situation: input.situation, code });
     }
   }
   // A story reply needs the image, not merely its caption. Analyze once through
@@ -81,6 +81,11 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       }
     }
   }
+  const describePhoto = (analysis: VisionAnalysis) => [
+    analysis.sceneDescription.slice(0, 330),
+    analysis.notableDetails.slice(0, 4).join('; ').slice(0, 260),
+    analysis.uncertainty.length ? `Uncertainty: ${analysis.uncertainty.slice(0, 2).join('; ').slice(0, 100)}` : '',
+  ].filter(Boolean).join(' | ');
   // Narrative language is independent of the owner's interface language.
   // Each character's configured voice.outputLanguage takes precedence in previewDecision.
   const language = 'en';
@@ -327,7 +332,22 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           ? '' // The owner's existing Kindroid conversation already holds its own history.
           : previousTurns.reverse().map(m =>
               `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
-        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n').slice(0, 3000);
+        const photoContext: string[] = [];
+        if (!storyForReply && dependencies.liveDmReply && newest && isDirectReply) {
+          for (const attachment of (newest.attachments ?? []).filter(item => item.type === 'image').slice(0, 2)) {
+            try {
+              const analysis = await visionService.analyzeDmPhoto(ownerId, input.universeId ?? 'primary', newest.id, attachment);
+              photoContext.push(describePhoto(analysis).slice(0, 600));
+            } catch (error) {
+              console.warn('ECHO_DM_PHOTO_VISION_UNAVAILABLE', { code: error instanceof Error ? error.message : 'unknown' });
+            }
+          }
+        }
+        const photoNotes = photoContext.length
+          ? `\n[ECHO attached photo observations. React naturally to a distinctive visible detail when relevant. Do not infer identity or details outside the photo. \n${photoContext.join('\n')}\n]`
+          : '';
+        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n')
+          .slice(0, 3000 - photoNotes.length) + photoNotes;
         const peerContext = recipientId === parsed.data.state.primaryCharacterId
           ? '' // Do not inject a role-boundary lecture into the owner's natural Kin chat.
           : `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
@@ -337,7 +357,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           ? vision.analyses[`story:${storyForReply.id}:story:${storyForReply.id}`]
           : undefined;
         const visualContext = storyVisual
-          ? `Cached visual observations (not identity verification): ${storyVisual.sceneDescription.slice(0,700)}. Visible activities: ${storyVisual.activities.slice(0,4).join('; ').slice(0,240)}. Notable details: ${storyVisual.notableDetails.slice(0,4).join('; ').slice(0,240)}. Uncertainties: ${storyVisual.uncertainty.slice(0,3).join('; ').slice(0,200)}.`
+          ? `Photo observations: ${describePhoto(storyVisual)}`
           : 'No verified visual description is available for this story. Do not claim to see specific objects, people, places or actions from the image.';
         const storyMentions = storyForReply
           ? (storyForReply.mentionedAccountIds ?? []).map(id => {
@@ -352,7 +372,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           ? `Media type: ${storyForReply.image ? 'PHOTO (still image, not video or clip)' : 'text-only story (no photo)'}. Tagged accounts: ${storyMentions || 'none'}. Tagged accounts are explicitly named people, but a tag alone does not prove a face's identity. ${namedStorySubject ? `The story explicitly tags ${namedStorySubject}. If the caption refers to a singular person being teased or photographed and the visual observations are consistent, understand that ${namedStorySubject} is the intended subject; refer to ${namedStorySubject} by name, not yourself. If visual evidence conflicts or multiple people make the subject ambiguous, distinguish the tag from what can be seen instead of asserting identity. ` : ''}`
           : '';
         let outgoingPrompt = peerContext + (storyForReply
-          ? `[ECHO story reply: You (${actorName}) are viewing ${recipientName}'s story, not appearing in it. ${storyMetadata} Caption: ${(storyForReply.caption ?? '').slice(0,250)}. ${visualContext.slice(0,650)} Tags do not verify faces. Do not claim the photo is yours or invent details. Reply as yourself to ${recipientName}, naturally, with your usual narration and dialogue when appropriate; do not shorten your style.]`
+          ? `[ECHO story reply: You (${actorName}) are viewing ${recipientName}'s story, not appearing in it. ${storyMetadata} Caption: ${(storyForReply.caption ?? '').slice(0,250)}. ${visualContext} When relevant, respond to a distinctive visual detail such as the observed hair shade or outfit. Tags do not verify faces. Do not claim the photo is yours or invent details. Reply as yourself to ${recipientName}, naturally, with your usual narration and dialogue when appropriate; do not shorten your style.]`
           : isDirectReply
             ? (recipientId === parsed.data.state.primaryCharacterId
                 ? latestIncomingText // Send the owner's actual message, not a fabricated ECHO instruction.
