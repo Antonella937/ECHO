@@ -80,16 +80,27 @@ export default function ProfilePage() {
         title={`@${person.handle}`}
         onBack={back}
         right={
-          isMe && (
-            <>
+          <>
+            {!person.archived && (
+              <Link href={`/phone/${encodeURIComponent(person.id)}`}
+                aria-label={language === 'es' ? 'Abrir celular' : 'Open phone'}
+                title={language === 'es' ? 'Abrir celular' : 'Open phone'}
+                className="tap grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+                data-testid="link-profile-phone">
+                <span className="grid size-8 place-items-center rounded-full border border-border">
+                  <Smartphone size={16} aria-hidden="true" />
+                </span>
+              </Link>
+            )}
+            {isMe && <>
               <Link href="/saved" aria-label={t("Guardados")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="link-profile-saved">
                 <Bookmark className="h-[22px] w-[22px]" strokeWidth={1.6} />
               </Link>
               <Link href="/settings" aria-label={t("Ajustes")} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-secondary" data-testid="link-profile-settings">
                 <Settings className="h-[22px] w-[22px]" strokeWidth={1.6} />
               </Link>
-            </>
-          )
+            </>}
+          </>
         }
       />
 
@@ -204,11 +215,6 @@ export default function ProfilePage() {
         )}
       </section>
 
-      {!person.archived && <div className="mb-4 px-5">
-        <Link href={`/phone/${encodeURIComponent(person.id)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold" data-testid="link-profile-phone">
-          <Smartphone size={17} /> {language === 'es' ? 'Abrir celular' : 'Open phone'}
-        </Link>
-      </div>}
       <div className="px-5"><HighlightsRow authorId={person.id} isMe={isMe} /></div>
 
       <div className="mt-6 flex justify-center border-t border-border/70" role="tablist">
