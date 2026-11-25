@@ -25,6 +25,7 @@ export class CloudflareVisionProvider implements VisionProvider {
         model,
         max_completion_tokens: 1400,
         store: false,
+        chat_template_kwargs: { enable_thinking: false },
         messages: [{
           role: "user",
           content: [
