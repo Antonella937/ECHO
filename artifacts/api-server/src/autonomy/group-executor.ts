@@ -22,9 +22,9 @@ const schema = { type: "object", additionalProperties: false, required: ["text"]
 /** Explicit one-group execution, never called from the HTTP read endpoints.
  * Generation is metered; the database claim prevents concurrent duplicate generation.
  */
-export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false, preferredSpeakerId?: string) {
+export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false, preferredSpeakerId?: string, replyToMessageId?: string) {
   const now = new Date();
-  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode, preferredSpeakerId);
+  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode, preferredSpeakerId, replyToMessageId);
   if (!choice.speakerId) return { status: "skipped", reason: choice.reason };
   const speakerId = choice.speakerId;
   const claimId = randomUUID();
@@ -33,17 +33,20 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
       AND (${sceneMode} OR autonomy_enabled = true)
       AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
-      AND (CASE WHEN ${sceneMode} THEN (scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
+      AND (CASE WHEN ${sceneMode} THEN (scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (${Boolean(replyToMessageId)} OR last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
     RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed, kindroid_group_id`);
   if (!claimed.rows.length) return { status: "skipped", reason: "CLAIM_UNAVAILABLE" };
   try {
     const group = claimed.rows[0];
     const participantIds = Array.isArray(group.participant_ids) ? group.participant_ids.filter((x): x is string => typeof x === "string") : [];
-    const messages = await db.execute(sql`SELECT sender_id, body, created_at FROM echo_group_messages
+    const messages = await db.execute(sql`SELECT id, sender_id, body, created_at FROM echo_group_messages
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
       ORDER BY created_at DESC LIMIT 16`);
     const latest = messages.rows[0];
-    if (!sceneMode && (!latest || !String(latest.body ?? "").trim() || new Date(String(latest.created_at)).getTime() > now.getTime() - 120000)) {
+    if (replyToMessageId && latest?.id !== replyToMessageId) {
+      return { status: "skipped", reason: "GROUP_MESSAGE_SUPERSEDED" };
+    }
+    if (!sceneMode && !replyToMessageId && (!latest || !String(latest.body ?? "").trim() || new Date(String(latest.created_at)).getTime() > now.getTime() - 120000)) {
       return { status: "skipped", reason: "CONVERSATION_NOT_READY" };
     }
     const [universe] = await db.select({ state: echoUniversesTable.state }).from(echoUniversesTable)
@@ -113,6 +116,9 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       }
       if (!kindroidGroupId) return { status: "skipped", reason: "KINDROID_GROUP_MAPPING_MISSING" };
       console.info("[kindroid-group] mapping resolved " + JSON.stringify({ source: groupMappingSource, group: groupId === "group_kindroid_dead_static" ? "dead_static" : "other" }));
+    }
+    if (replyToMessageId && (!linkedKinId || kindroidGroupId !== group.kindroid_group_id)) {
+      return { status: "skipped", reason: "KINDROID_REPLY_MAPPING_MISSING" };
     }
     // NOTE: The current Kindroid group adapter only calls get-turn and
     // ai-response with group_id/ai_id; it does NOT transmit the prompt below.

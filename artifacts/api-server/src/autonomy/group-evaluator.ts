@@ -4,7 +4,7 @@ import { readOwnerControls } from "./repository";
 import { chooseGroupSpeaker } from "./group-policy";
 
 /** Read-only evaluation. It cannot generate text or mutate a group. */
-export async function evaluateGroupAutonomy(ownerId: string, universeId: string, groupId: string, now = new Date(), sceneMode = false, preferredSpeakerId?: string) {
+export async function evaluateGroupAutonomy(ownerId: string, universeId: string, groupId: string, now = new Date(), sceneMode = false, preferredSpeakerId?: string, replyToMessageId?: string) {
   const controls = await readOwnerControls(ownerId, universeId);
   if (controls.globalKillSwitchEngaged || !controls.liveExecutionEnabled) return { speakerId: null, reason: "OWNER_DISABLED" };
   const [universe] = await db.select({ state: echoUniversesTable.state, archivedAt: echoUniversesTable.archivedAt, deletedAt: echoUniversesTable.deletedAt })
@@ -16,13 +16,16 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
     FROM echo_group_conversations WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId} LIMIT 1`);
   const group = groups.rows[0];
   if (!group || (!sceneMode && group.autonomy_enabled !== true)) return { speakerId: null, reason: "GROUP_DISABLED" };
-  const messages = await db.execute(sql`SELECT sender_id, body, created_at FROM echo_group_messages
+  const messages = await db.execute(sql`SELECT id, sender_id, body, created_at FROM echo_group_messages
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
     ORDER BY created_at DESC LIMIT 1`);
   const last = messages.rows[0];
   const participants = Array.isArray(group.participant_ids) ? group.participant_ids.filter((v): v is string => typeof v === "string") : [];
   const primaryId = (state as { primaryCharacterId?: string }).primaryCharacterId;
   const ownerTurn = !sceneMode && !!primaryId && last?.sender_id === primaryId;
+  if (replyToMessageId && (!ownerTurn || last?.id !== replyToMessageId)) {
+    return { speakerId: null, reason: "GROUP_MESSAGE_SUPERSEDED" };
+  }
   const candidates = (state.characters ?? []).filter(c => participants.includes(c.id) && c.id !== primaryId).map(c => {
     const control = controls.characters.get(c.id);
     return {
@@ -40,7 +43,7 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
   const speakerId = selected?.id ?? chooseGroupSpeaker({
     enabled: true, globalKillSwitchEngaged: controls.globalKillSwitchEngaged,
     liveExecutionEnabled: controls.liveExecutionEnabled,
-    intervalMinutes: sceneMode ? 0 : Number(group.autonomy_interval_minutes), sceneMode, turnMode: String(group.scene_turn_mode ?? 'automatic') as 'automatic' | 'round_robin' | 'manual',
+    intervalMinutes: sceneMode || replyToMessageId ? 0 : Number(group.autonomy_interval_minutes), sceneMode: sceneMode || Boolean(replyToMessageId), turnMode: String(group.scene_turn_mode ?? 'automatic') as 'automatic' | 'round_robin' | 'manual',
     lastGroupActionAt: group.last_autonomy_at as Date | null,
     participantIds: participants, candidates, now,
     lastSenderId: last?.sender_id as string | undefined,
