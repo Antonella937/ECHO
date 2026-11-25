@@ -12,7 +12,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Clapperboard, Copy, Check, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Trash2, X } from 'lucide-react';
+import { Clapperboard, Copy, Check, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Smartphone, Trash2, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -407,7 +407,10 @@ export default function ConversationPage() {
             </div>
           </Link>
 
-          {showAiPreferences && <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="z-10 ml-auto tap flex h-11 min-w-[58px] items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-3 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-4 w-4" /><span className="text-xs font-semibold">IA</span></button>}
+          <div className="z-10 ml-auto flex gap-1">
+            {!other.archived && <Link href={`/phone/${encodeURIComponent(other.id)}`} aria-label={t("Abrir celular")} title={t("Abrir celular")} className="grid size-10 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl" data-testid="link-dm-phone"><Smartphone size={17} /></Link>}
+          {showAiPreferences && <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="tap flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-2 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-3.5 w-3.5" /><span className="hidden text-xs font-semibold sm:inline">IA</span></button>}
+          </div>
         </div>
       </header>
 

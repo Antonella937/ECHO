@@ -3,7 +3,7 @@ import { recentlyActive } from '@/domain/activity';
 import { useDiscoveryText } from '@/lib/discovery-translations';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams, useSearch } from 'wouter';
-import { Archive, LockKeyhole, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings } from 'lucide-react';
+import { Archive, LockKeyhole, Bookmark, Grid3x3, UserSquare2, MapPin, MessageCircle, Pencil, PlusSquare, Repeat2, Settings, Smartphone } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
@@ -204,6 +204,11 @@ export default function ProfilePage() {
         )}
       </section>
 
+      {!person.archived && <div className="mb-4 px-5">
+        <Link href={`/phone/${encodeURIComponent(person.id)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold" data-testid="link-profile-phone">
+          <Smartphone size={17} /> {language === 'es' ? 'Abrir celular' : 'Open phone'}
+        </Link>
+      </div>}
       <div className="px-5"><HighlightsRow authorId={person.id} isMe={isMe} /></div>
 
       <div className="mt-6 flex justify-center border-t border-border/70" role="tablist">

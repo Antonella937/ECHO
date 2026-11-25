@@ -36,6 +36,7 @@ const SearchPage = lazy(() => import('@/pages/search'));
 import { AppSkeleton } from '@/components/echo/skeletons';
 import { EchoSplash } from '@/components/branding/echo-brand';
 import HomePage from '@/pages/home';
+const CharacterPhonePage = lazy(() => import('@/pages/character-phone'));
 const ProfilePage = lazy(() => import('@/pages/profile'));
 const PostPage = lazy(() => import('@/pages/post'));
 const CreatePage = lazy(() => import('@/pages/create'));
@@ -304,6 +305,7 @@ function ProtectedRouter() {
         <Suspense fallback={<AppSkeleton />}>
         <Switch>
           <Route path="/" component={HomePage} />
+          <Route path="/phone/:id" component={CharacterPhonePage} />
           <Route path="/profile/:id" component={ProfilePage} />
           <Route path="/p/:id" component={PostPage} />
           <Route path="/create" component={CreatePage} />
