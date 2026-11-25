@@ -173,19 +173,19 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   const primaryClass = 'rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50';
 
   if (screen === 'home') return (
-    <main className="mx-auto max-w-md px-3 pb-28">
-      <div className="relative isolate mt-3 overflow-hidden rounded-[2rem] border border-white/10 bg-[#15121a] text-white">
+    <main className="mx-auto h-[100dvh] w-full sm:max-w-[520px] sm:p-3">
+      <div className="relative isolate flex h-full min-h-0 flex-col overflow-hidden bg-[#15121a] pt-safe text-white sm:rounded-[2rem] sm:border sm:border-white/10">
         {phone.wallpaper && <img src={phone.wallpaper} alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-55" />}
-        <header className="flex items-center justify-between gap-2 px-3 pt-2">
+        <header className="flex shrink-0 items-center justify-between gap-2 px-4 py-2">
           <button type="button" onClick={back} aria-label={es ? 'Volver' : 'Back'} className="grid size-11 place-items-center rounded-full bg-black/35"><ChevronLeft size={20} /></button>
           <span className="truncate text-sm font-medium">{account.name}</span>
           <button type="button" onClick={() => open('settings')} aria-label={labels.settings} className="grid size-11 place-items-center rounded-full bg-black/35"><Settings size={18} /></button>
         </header>
         <div ref={pager} onScroll={(event: UIEvent<HTMLDivElement>) => {
           const node = event.currentTarget;
-          setShowPage(Math.round(node.scrollLeft / node.clientWidth));
-        }} className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]">
-          <section aria-label={es ? 'Inicio' : 'Home'} className="min-h-[390px] w-full shrink-0 snap-start px-5 py-6">
+          if (node.clientWidth) setShowPage(Math.round(node.scrollLeft / node.clientWidth));
+        }} className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
+          <section aria-label={es ? 'Inicio' : 'Home'} className="w-full shrink-0 snap-start overflow-y-auto px-5 py-[clamp(12px,4dvh,36px)]">
             <time className="block font-display text-6xl tabular-nums">{formatTime({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</time>
             <p className="mt-1 text-sm text-white/75">{formatTime({ weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -199,7 +199,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
               </button>
             </div>
           </section>
-          <section aria-label={es ? 'Aplicaciones' : 'Apps'} className="w-full shrink-0 snap-start px-5 py-7">
+          <section aria-label={es ? 'Aplicaciones' : 'Apps'} className="w-full shrink-0 snap-start overflow-y-auto px-5 py-7">
             <div className="grid grid-cols-3 gap-y-6">
               {!phone.pulseHidden && tile('Pulse', <Activity size={21} />, 'pulse')}
               {tile(labels.notes, <StickyNote size={20} />, 'notes')}
@@ -208,10 +208,10 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
             </div>
           </section>
         </div>
-        <nav className="flex justify-center gap-1" aria-label={es ? 'Pantallas del celular' : 'Phone pages'}>
+        <nav className="flex shrink-0 justify-center gap-1" aria-label={es ? 'Pantallas del celular' : 'Phone pages'}>
           {[0, 1].map(index => <button key={index} type="button" aria-current={showPage === index ? 'page' : undefined} aria-label={es ? `Pantalla ${index + 1}` : `Page ${index + 1}`} className="grid size-9 place-items-center" onClick={() => pager.current?.scrollTo({ left: index * (pager.current?.clientWidth ?? 0), behavior: 'smooth' })}><span className={`size-1.5 rounded-full ${showPage === index ? 'bg-primary' : 'bg-white/45'}`} /></button>)}
         </nav>
-        <div className="mx-4 mb-4 grid grid-cols-4 gap-2 rounded-3xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
+        <div className="mx-4 mb-[max(12px,env(safe-area-inset-bottom))] grid shrink-0 grid-cols-4 gap-2 rounded-3xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
           {tile(es ? 'Mensajes' : 'Messages', <MessageCircle size={20} />, { href: isActive ? '/messages' : `/messages/${encodeURIComponent(account.id)}` }, true)}
           {tile('ECHO', <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="size-7 object-contain" />, { href: `/profile/${encodeURIComponent(account.id)}` }, true)}
           {tile(labels.gallery, <Image size={21} />, 'gallery', true)}
@@ -223,7 +223,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
 
   const pulseTarget = response ? pulse.find(item => item.id === response.id) : undefined;
   const entries = screen === 'calendar' ? [...(phone.events ?? [])].sort((first, second) => (first.date ?? '').localeCompare(second.date ?? '')) : phone.notes ?? [];
-  return <main className="mx-auto max-w-lg px-4 pb-28">
+  return <main className="mx-auto max-w-lg px-4 pb-[max(20px,env(safe-area-inset-bottom))]">
     <TopBar title={labels[screen]} sub={account.name} onBack={() => open('home')} />
     {error && <p role="alert" className="my-3 text-sm text-destructive">{error}</p>}
     {screen === 'settings' && <div className="mt-4 space-y-4">
