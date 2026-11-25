@@ -38,8 +38,12 @@ export default function CreatePage() {
   const extra = (index: number) => (extraLabels[language] ?? extraLabels.en)[index];
   const resolveMedia = useMediaResolver();
   const search = useSearch();
-  const initialMode: Mode = new URLSearchParams(search).get('mode') === 'story' ? 'story' : 'post';
-  const { me, state, actions } = useSocial();
+  const params = new URLSearchParams(search);
+  const initialMode: Mode = params.get('mode') === 'story' ? 'story' : 'post';
+  const galleryPhotoId = params.get('galleryPhoto');
+  const galleryCharacterId = params.get('galleryCharacter');
+  const { me, state, actions, universeId } = useSocial();
+  const galleryIdentityMismatch = !!galleryPhotoId && (galleryCharacterId !== me.id || params.get('galleryUniverse') !== universeId);
   const imageCoStarOptions = (state.characters ?? []).filter(c => !c.archived && c.id !== me.id);
   const { user } = useUser();
   const [, navigate] = useLocation();
@@ -76,6 +80,28 @@ export default function CreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
+  const [loadedGalleryPhoto, setLoadedGalleryPhoto] = useState<string>();
+  const galleryLoading = !!galleryPhotoId && loadedGalleryPhoto !== galleryPhotoId && !galleryIdentityMismatch && !error;
+  useEffect(() => {
+    if (!galleryPhotoId || galleryIdentityMismatch || loadedGalleryPhoto === galleryPhotoId) return;
+    let active = true;
+    const query = new URLSearchParams({ universeId, characterId: me.id });
+    void customFetch<{ photos: Array<{ id: string; mediaRef: string }> }>(`/api/character-gallery?${query}`, { responseType: 'json' })
+      .then(result => {
+        if (!active) return;
+        const photo = result.photos.find(item => item.id === galleryPhotoId);
+        if (!photo?.mediaRef) throw new Error('PHOTO_NOT_FOUND');
+        setItems([{ id: photo.id, type: 'image', url: photo.mediaRef }]);
+        setLoadedGalleryPhoto(galleryPhotoId);
+      })
+      .catch(() => {
+        if (active) {
+          setLoadedGalleryPhoto(galleryPhotoId);
+          setError(language === 'es' ? 'La foto del Carrete no está disponible.' : 'The camera roll photo is unavailable.');
+        }
+      });
+    return () => { active = false; };
+  }, [galleryPhotoId, galleryIdentityMismatch, universeId, me.id, language, loadedGalleryPhoto]);
   const fileRef = useRef<HTMLInputElement>(null);
   /** null = append, number = replace that index */
   const replaceAt = useRef<number | null>(null);
@@ -218,7 +244,7 @@ export default function CreatePage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (busy) return;
+    if (busy || galleryLoading || galleryIdentityMismatch) return;
     if (mediaSource === 'ai') { setError(t("La generación IA está en modo preparación. Cambiá a Subir foto o video para publicar.")); return; }
     if (!image) {
       setError(t('Elige una foto para continuar.'));
@@ -523,6 +549,8 @@ export default function CreatePage() {
           </>
         )}
 
+        {galleryLoading && <p role="status" className="mt-4 text-sm text-muted-foreground">{language === 'es' ? 'Cargando foto del Carrete…' : 'Loading camera roll photo…'}</p>}
+        {galleryIdentityMismatch && <p role="alert" className="mt-4 text-sm text-destructive">{language === 'es' ? 'Volvé al Carrete y activá la cuenta que va a publicar.' : 'Return to the camera roll and switch to the account that will publish.'}</p>}
         {error && (
           <p role="alert" className="mt-4 rounded-2xl bg-destructive/15 px-4 py-3 text-sm text-destructive" data-testid="text-create-error">
             {error}
@@ -531,7 +559,7 @@ export default function CreatePage() {
 
         <button
           type="submit"
-          disabled={mediaSource === 'ai' || !image || busy || tooManyForStory || storyVideo || musicPartial}
+          disabled={mediaSource === 'ai' || !image || busy || galleryLoading || galleryIdentityMismatch || tooManyForStory || storyVideo || musicPartial}
           className="tap mt-6 h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground disabled:opacity-40"
           data-testid="button-publish"
         >

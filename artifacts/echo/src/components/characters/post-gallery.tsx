@@ -1,3 +1,4 @@
+import { Link } from 'wouter';
 import { useEffect, useRef, useState } from 'react';
 import { customFetch } from '@workspace/api-client-react';
 import { useLanguage, type Language } from '@/lib/i18n';
@@ -19,7 +20,7 @@ const copy:Record<Language,[string,string,string,string,string,string,string,str
  zh:['发帖图库','供角色日后自主发布的私人照片，与外观参考图分开。','上传照片','允许重复使用','保留（不发布）','已使用','未使用','删除','无法更新图库。','请先保存角色。']
 };
 type Scheduled = {id:string;galleryPhotoId:string;caption:string;scheduledAt:string;status:string};
-export function CharacterPostGallery({characterId,universeId='primary',accountType='personal'}:{characterId?:string;universeId?:string;accountType?:string}) {
+export function CharacterPostGallery({characterId,universeId='primary',accountType='personal',publishFromGallery=false}:{characterId?:string;universeId?:string;accountType?:string;publishFromGallery?:boolean}) {
  const lang=useLanguage();const t=copy[lang];const resolve=useMediaResolver();
  const professional=accountType!=='personal';
  const [scheduled,setScheduled]=useState<Scheduled[]>([]);
@@ -61,6 +62,13 @@ export function CharacterPostGallery({characterId,universeId='primary',accountTy
     </label>
     <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={photo.reusable} disabled={busy} onChange={e=>void patch(photo,{reusable:e.target.checked})}/>{t[3]}</label>
     <label className="mb-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={photo.reserved} disabled={busy} onChange={e=>void patch(photo,{reserved:e.target.checked})}/>{t[4]}</label>
+    {publishFromGallery && characterId && <div className="mb-2 flex flex-wrap gap-x-3 gap-y-2 border-t border-border pt-2 text-xs font-medium text-primary">
+      {(['post', 'story'] as const).filter(mode => mode === 'post' ? photo.placement !== 'story' : photo.placement !== 'feed').map(mode => (
+        <Link key={mode} href={`/create?${new URLSearchParams({ mode, galleryPhoto: photo.id, galleryCharacter: characterId, galleryUniverse: universeId })}`} className="flex min-h-9 items-center">
+          {mode === 'post' ? (lang === 'es' ? 'Publicar en feed' : 'Post to feed') : (lang === 'es' ? 'Subir a historia' : 'Share to story')}
+        </Link>
+      ))}
+    </div>}
     {professional && <button type="button" disabled={busy} onClick={()=>{setSelected(photo.id);setCaption(photo.description)}} className="mb-2 flex items-center gap-1 text-xs text-primary"><CalendarClock size={14}/>{lang==="es"?"Programar publicación":"Schedule post"}</button>}
     <button type="button" disabled={busy} onClick={()=>void remove(photo)} className="flex items-center gap-1 text-xs text-destructive"><Trash2 size={13}/>{t[7]}</button>
    </div>)}</div></>:<p className="text-xs text-muted-foreground">{t[9]}</p>}

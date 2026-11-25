@@ -37,7 +37,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   universeId: string;
   isActive: boolean;
 }) {
-  const { character } = useSocial();
+  const { character, actions } = useSocial();
   const language = useLanguage();
   const es = language === 'es';
   const back = useBack();
@@ -245,7 +245,12 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
         {phone[field] && <button type="button" disabled={uploadingImage} className="text-sm text-primary" onClick={() => save({ ...phone, [field]: undefined })}>{es ? 'Quitar imagen' : 'Remove image'}</button>}
       </div>)}
     </div>}
-    {screen === 'gallery' && <CharacterPostGallery characterId={account.id} universeId={universeId} accountType={account.accountType} />}
+    {screen === 'gallery' && <>
+      {!isActive && <button type="button" className={`mt-4 ${primaryClass}`} onClick={() => actions.switchIdentity(account.id)}>
+        {es ? `Activar @${account.handle} para publicar` : `Switch to @${account.handle} to publish`}
+      </button>}
+      <CharacterPostGallery characterId={account.id} universeId={universeId} accountType={account.accountType} publishFromGallery={isActive} />
+    </>}
     {screen === 'music' && <section className="mt-4 space-y-3">
       {audio && <div className="space-y-2 rounded-2xl border border-border p-3">
         <p className="text-sm font-semibold">{audio.track.title}</p>
