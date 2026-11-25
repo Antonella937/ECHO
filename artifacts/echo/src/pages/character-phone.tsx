@@ -159,7 +159,14 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
     home: account.name, settings: es ? 'Personalizar' : 'Customize', gallery: es ? 'Carrete' : 'Camera roll',
     music: 'ECHO Music', notes: es ? 'Notas' : 'Notes', calendar: es ? 'Calendario' : 'Calendar', pulse: 'Pulse',
   };
-  const appIcon = 'grid size-12 place-items-center rounded-2xl border border-white/15 bg-black/55 text-white shadow-sm backdrop-blur-md';
+  const glass = 'border border-white/20 bg-white/[0.10] shadow-[inset_0_1px_0_rgb(255_255_255/0.10)] backdrop-blur-xl';
+  const glassControl = `grid size-11 place-items-center rounded-full ${glass} hover:bg-white/20`;
+  const backdrop = <>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(ellipse_at_12%_12%,#765268_0%,transparent_54%),radial-gradient(ellipse_at_96%_70%,#41385e_0%,transparent_62%),linear-gradient(145deg,#19131d,#101016)]" />
+    {phone.wallpaper && <img src={phone.wallpaper} alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-80" />}
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-black/35 via-black/10 to-black/40" />
+  </>;
+  const appIcon = `grid size-12 place-items-center rounded-2xl text-white ${glass}`;
   const tile = (title: string, icon: React.ReactNode, action: Screen | { href: string }, dock = false) => {
     const contents = <><span className={appIcon}>{icon}</span>{!dock && <span className="text-xs">{title}</span>}</>;
     const className = 'flex min-w-0 flex-col items-center gap-1.5 text-center';
@@ -169,17 +176,17 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   };
   const widgetImage = phone.widgetPhoto?.startsWith('data:') ? phone.widgetPhoto : phone.widgetPhoto ? resolve(phone.widgetPhoto) : '';
   const trackCover = phone.lastTrack?.coverPath ? resolve(phone.lastTrack.coverPath) : '';
-  const fieldClass = 'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm';
+  const fieldClass = 'w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm';
   const primaryClass = 'rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50';
 
   if (screen === 'home') return (
     <main className="mx-auto h-[100dvh] w-full sm:max-w-[520px] sm:p-3">
       <div className="relative isolate flex h-full min-h-0 flex-col overflow-hidden bg-[#15121a] pt-safe text-white sm:rounded-[2rem] sm:border sm:border-white/10">
-        {phone.wallpaper && <img src={phone.wallpaper} alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-55" />}
+        {backdrop}
         <header className="flex shrink-0 items-center justify-between gap-2 px-4 py-2">
-          <button type="button" onClick={back} aria-label={es ? 'Volver' : 'Back'} className="grid size-11 place-items-center rounded-full bg-black/35"><ChevronLeft size={20} /></button>
+          <button type="button" onClick={back} aria-label={es ? 'Volver' : 'Back'} className={glassControl}><ChevronLeft size={20} /></button>
           <span className="truncate text-sm font-medium">{account.name}</span>
-          <button type="button" onClick={() => open('settings')} aria-label={labels.settings} className="grid size-11 place-items-center rounded-full bg-black/35"><Settings size={18} /></button>
+          <button type="button" onClick={() => open('settings')} aria-label={labels.settings} className={glassControl}><Settings size={18} /></button>
         </header>
         <div ref={pager} onScroll={(event: UIEvent<HTMLDivElement>) => {
           const node = event.currentTarget;
@@ -189,10 +196,10 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
             <time className="block font-display text-6xl tabular-nums">{formatTime({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</time>
             <p className="mt-1 text-sm text-white/75">{formatTime({ weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <button type="button" onClick={() => open(phone.widgetPhoto ? 'gallery' : 'settings')} className="relative grid aspect-square place-items-center overflow-hidden rounded-2xl border border-white/15 bg-black/40" aria-label={phone.widgetPhoto ? labels.gallery : es ? 'Elegir foto del widget' : 'Choose widget photo'}>
+              <button type="button" onClick={() => open(phone.widgetPhoto ? 'gallery' : 'settings')} className={`relative grid aspect-square place-items-center overflow-hidden rounded-2xl ${glass}`} aria-label={phone.widgetPhoto ? labels.gallery : es ? 'Elegir foto del widget' : 'Choose widget photo'}>
                 {phone.widgetPhoto ? <img src={widgetImage || undefined} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <Image size={23} />}
               </button>
-              <button type="button" onClick={() => open('music')} className="flex min-w-0 flex-col justify-between rounded-2xl border border-white/15 bg-black/45 p-3 text-left backdrop-blur-md">
+              <button type="button" onClick={() => open('music')} className={`flex min-w-0 flex-col justify-between rounded-2xl p-3 text-left ${glass}`}>
                 {trackCover ? <img src={trackCover} alt="" className="size-10 rounded-lg object-cover" /> : <Music2 size={20} className="text-primary" />}
                 <span className="mt-2 block min-w-0"><span className="block truncate text-sm font-semibold">{phone.lastTrack?.title ?? 'ECHO Music'}</span>
                 <span className="block truncate text-xs text-white/70">{phone.lastTrack ? (es ? 'Último tema' : 'Last played') : (es ? 'Biblioteca' : 'Library')}</span></span>
@@ -211,9 +218,9 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
         <nav className="flex shrink-0 justify-center gap-1" aria-label={es ? 'Pantallas del celular' : 'Phone pages'}>
           {[0, 1].map(index => <button key={index} type="button" aria-current={showPage === index ? 'page' : undefined} aria-label={es ? `Pantalla ${index + 1}` : `Page ${index + 1}`} className="grid size-9 place-items-center" onClick={() => pager.current?.scrollTo({ left: index * (pager.current?.clientWidth ?? 0), behavior: 'smooth' })}><span className={`size-1.5 rounded-full ${showPage === index ? 'bg-primary' : 'bg-white/45'}`} /></button>)}
         </nav>
-        <div className="mx-4 mb-[max(12px,env(safe-area-inset-bottom))] grid shrink-0 grid-cols-4 gap-2 rounded-3xl border border-white/15 bg-white/10 p-2 backdrop-blur-xl">
+        <div className={`mx-4 mb-[max(12px,env(safe-area-inset-bottom))] grid shrink-0 grid-cols-4 gap-2 rounded-3xl p-2 ${glass}`}>
           {tile(es ? 'Mensajes' : 'Messages', <MessageCircle size={20} />, { href: isActive ? '/messages' : `/messages/${encodeURIComponent(account.id)}` }, true)}
-          {tile('ECHO', <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="size-7 object-contain" />, { href: `/profile/${encodeURIComponent(account.id)}` }, true)}
+          {tile('ECHO', <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="size-7 rounded-full object-contain opacity-90 mix-blend-screen" />, { href: `/profile/${encodeURIComponent(account.id)}` }, true)}
           {tile(labels.gallery, <Image size={21} />, 'gallery', true)}
           {tile(labels.music, <Music2 size={20} />, 'music', true)}
         </div>
@@ -223,15 +230,22 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
 
   const pulseTarget = response ? pulse.find(item => item.id === response.id) : undefined;
   const entries = screen === 'calendar' ? [...(phone.events ?? [])].sort((first, second) => (first.date ?? '').localeCompare(second.date ?? '')) : phone.notes ?? [];
-  return <main className="mx-auto max-w-lg px-4 pb-[max(20px,env(safe-area-inset-bottom))]">
-    <TopBar title={labels[screen]} sub={account.name} onBack={() => open('home')} />
+  return <main className="relative isolate mx-auto min-h-[100dvh] max-w-[520px] px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-safe text-white">
+    {backdrop}
+    <header className={`sticky top-[env(safe-area-inset-top)] z-10 mt-2 flex items-center gap-3 rounded-2xl px-2 py-1.5 ${glass}`}>
+      <button type="button" onClick={() => open('home')} aria-label={es ? 'Volver al inicio' : 'Back to home'} className={glassControl}><ChevronLeft size={20} /></button>
+      <div className="min-w-0">
+        <h1 className="truncate text-sm font-semibold">{labels[screen]}</h1>
+        <p className="truncate text-xs text-white/70">{account.name}</p>
+      </div>
+    </header>
     {error && <p role="alert" className="my-3 text-sm text-destructive">{error}</p>}
     {screen === 'settings' && <div className="mt-4 space-y-4">
-      <label className="flex items-center justify-between gap-3 rounded-2xl border border-border p-4 text-sm">
+      <label className={`flex items-center justify-between gap-3 rounded-2xl p-4 text-sm ${glass}`}>
         <span>{es ? 'Mostrar Pulse' : 'Show Pulse'}</span>
         <input type="checkbox" checked={!phone.pulseHidden} disabled={uploadingImage} onChange={event => save({ ...phone, pulseHidden: !event.target.checked })} />
       </label>
-      {(['wallpaper', 'widgetPhoto'] as const).map(field => <div key={field} className="space-y-2 rounded-2xl border border-border p-4">
+      {(['wallpaper', 'widgetPhoto'] as const).map(field => <div key={field} className={`space-y-2 rounded-2xl p-4 ${glass}`}>
         <label className="block text-sm font-semibold">{field === 'wallpaper' ? (es ? 'Fondo del celular' : 'Wallpaper') : (es ? 'Foto del widget' : 'Widget photo')}
           <input type="file" accept="image/*" disabled={uploadingImage} className="mt-2 block w-full text-xs" onChange={event => void changeImage(field, event.currentTarget.files?.[0])} />
         </label>
@@ -252,17 +266,17 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
       <CharacterPostGallery characterId={account.id} universeId={universeId} accountType={account.accountType} publishFromGallery={isActive} />
     </>}
     {screen === 'music' && <section className="mt-4 space-y-3">
-      {audio && <div className="space-y-2 rounded-2xl border border-border p-3">
+      {audio && <div className={`space-y-2 rounded-2xl p-3 ${glass}`}>
         <p className="text-sm font-semibold">{audio.track.title}</p>
         <audio key={audio.url} src={audio.url} controls autoPlay className="w-full" onPlay={() => save({ ...phone, lastTrack: audio.track })} />
       </div>}
-      {tracks.map(track => <button key={track.id} type="button" disabled={Boolean(loadingTrack)} onClick={() => void play(track)} className="flex w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left text-sm">
+      {tracks.map(track => <button key={track.id} type="button" disabled={Boolean(loadingTrack)} onClick={() => void play(track)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm ${glass}`}>
         <Music2 size={17} className="shrink-0 text-primary" /><span className="flex-1 truncate">{track.title}</span><ChevronRight size={16} />
       </button>)}
       {isActive && <Link href="/music" className="inline-block text-sm text-primary">{es ? 'Abrir ECHO Music' : 'Open ECHO Music'}</Link>}
     </section>}
     {(screen === 'notes' || screen === 'calendar' || screen === 'pulse') && <section className="mt-4 space-y-3">
-      <form onSubmit={publish} className="space-y-2 rounded-2xl border border-border p-3">
+      <form onSubmit={publish} className={`space-y-2 rounded-2xl p-3 ${glass}`}>
         {pulseTarget && <div className="flex justify-between gap-2 text-xs text-muted-foreground">
           <span className="truncate">{response?.kind === 'reply' ? (es ? 'En respuesta a' : 'Replying to') : (es ? 'Citando' : 'Quoting')} @{character(pulseTarget.characterId)?.handle}</span>
           <button type="button" onClick={() => setResponse(null)}>{es ? 'Cancelar' : 'Cancel'}</button>
@@ -274,7 +288,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
       {screen === 'pulse' ? pulse.filter(item => character(item.characterId) && !character(item.characterId)?.archived).map(item => {
         const author = character(item.characterId);
         const target = pulse.find(post => post.id === (item.parentId ?? item.quoteId));
-        return <article key={item.id} className="space-y-2 rounded-2xl border border-border p-3 text-sm">
+        return <article key={item.id} className={`space-y-2 rounded-2xl p-3 text-sm ${glass}`}>
           <p className="font-semibold">{author?.name} <span className="font-normal text-muted-foreground">@{author?.handle}</span></p>
           {item.parentId && target && <p className="text-xs text-muted-foreground">{es ? 'En respuesta a' : 'Replying to'} @{character(target.characterId)?.handle}</p>}
           <p className="whitespace-pre-wrap break-words">{item.text}</p>
@@ -284,7 +298,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
             <button type="button" onClick={() => setResponse({ id: item.id, kind: 'quote' })}>{es ? 'Citar' : 'Quote'}</button>
           </div>
         </article>;
-      }) : entries.map(item => <article key={item.id} className="flex items-start gap-3 rounded-2xl border border-border p-3 text-sm">
+      }) : entries.map(item => <article key={item.id} className={`flex items-start gap-3 rounded-2xl p-3 text-sm ${glass}`}>
         <div className="min-w-0 flex-1">
           {item.date && <time dateTime={item.date} className="text-xs text-muted-foreground">{item.date}</time>}
           <p className="whitespace-pre-wrap break-words">{item.text}</p>
