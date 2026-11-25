@@ -6,6 +6,7 @@ import { db, echoMediaTable, echoMusicLibraryTable, echoUniversesTable } from "@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { pipeMedia } from "../lib/pipeMedia";
+import { fetchStored } from "./supabase-storage";
 import { fetchPrivateGeneratedMusic } from "../lib/musicPrivateStorage";
 import { canReadSocialCharacter, readableUniverseFilter, storyIsStillVisible } from "../lib/socialContentAccess";
 import { storePrivateVocalSample, fetchOwnedPrivateVocalSample } from "../lib/musicVoiceSampleStorage";
@@ -368,6 +369,24 @@ router.delete("/music/voices/:characterId", async (req,res) => {
     res.json({configured:false,characterId:parsed.data});
   } catch { res.status(503).json({error:"VOICE_UNLINK_UNAVAILABLE"}); }
 });
+const libraryAudioPath = /^\/objects\/(?:uploads\/[a-f0-9-]+|r2\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i;
+
+async function openLibraryAudio(path: string, range?: string) {
+  if (path.startsWith("/objects/r2/")) {
+    const response = await fetchStored(path, range);
+    const headers = new Headers();
+    for (const name of ["content-type", "content-length", "content-range", "accept-ranges"]) {
+      const value = response.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+    headers.set("X-Content-Type-Options", "nosniff");
+    return { status: response.status, headers, body: response.body };
+  }
+  const storage = new ObjectStorageService();
+  const file = await storage.getObjectEntityFile(path);
+  return storage.downloadObject(file, 0, range);
+}
+
 const libraryItem = z.object({
   id: z.string().uuid(),
   characterId: z.string().min(1).max(128),
@@ -504,7 +523,7 @@ router.post("/music/library", async (req, res) => {
     res.status(409).json({ error: "GENERATED_TRACK_SERVER_MANAGED" }); return;
   }
   if (item.audioPath) {
-    if (!item.audioPath.startsWith("/objects/uploads/") || !/^\/objects\/uploads\/[a-f0-9-]+$/i.test(item.audioPath)) {
+    if (!libraryAudioPath.test(item.audioPath)) {
       res.status(400).json({ error: "INVALID_AUDIO_PATH" }); return;
     }
     const [owned] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
@@ -747,9 +766,7 @@ router.get("/music/clip/:id/audio", async (req, res) => {
     const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
       .where(and(eq(echoMediaTable.ownerId, track.ownerId), eq(echoMediaTable.objectPath, track.audioPath))).limit(1);
     if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
-    const storage = new ObjectStorageService();
-    const file = await storage.getObjectEntityFile(media.objectPath);
-    const response = await storage.downloadObject(file, 0, req.headers.range);
+    const response = await openLibraryAudio(media.objectPath, req.headers.range);
     response.headers.forEach((value, key) => res.setHeader(key, value));
     res.setHeader("Cache-Control", "private, no-store");
     res.status(response.status);
@@ -831,9 +848,7 @@ router.get("/music/library/:id/audio", async (req, res) => {
     const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable)
       .where(and(eq(echoMediaTable.ownerId, req.userId!), eq(echoMediaTable.objectPath, track.audioPath))).limit(1);
     if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
-    const storage = new ObjectStorageService();
-    const file = await storage.getObjectEntityFile(media.objectPath);
-    const response = await storage.downloadObject(file, 0, req.headers.range);
+    const response = await openLibraryAudio(media.objectPath, req.headers.range);
     response.headers.forEach((value, key) => res.setHeader(key, value));
     res.setHeader("Cache-Control", "private, no-store");
     res.status(response.status);
@@ -882,9 +897,7 @@ router.get("/music/published/:id/audio", async (req, res) => {
     const [media] = await db.select({ objectPath: echoMediaTable.objectPath }).from(echoMediaTable).where(and(
       eq(echoMediaTable.objectPath, track.audioPath), eq(echoMediaTable.ownerId, track.ownerId))).limit(1);
     if (!media) { res.status(404).json({ error: "AUDIO_NOT_FOUND" }); return; }
-    const storage = new ObjectStorageService();
-    const file = await storage.getObjectEntityFile(media.objectPath);
-    const response = await storage.downloadObject(file, 0, req.headers.range);
+    const response = await openLibraryAudio(media.objectPath, req.headers.range);
     response.headers.forEach((value, key) => res.setHeader(key, value));
     res.setHeader("Cache-Control", "private, no-store");
     res.status(response.status);
