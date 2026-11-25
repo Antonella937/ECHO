@@ -1,3 +1,5 @@
+import { deliverNarratedDmPhoto } from "./dm-camera-delivery";
+import { narratedCameraShot } from "./dm-camera-policy";
 import {
   RunAutonomyDryRunBody,
   SaveUniverseBody,
@@ -669,6 +671,11 @@ export async function runAutonomyLiveCycle(
       } catch (error) {
         console.warn("OneSignal dispatch failed", { reason: error instanceof Error ? error.name : "UNKNOWN" });
       }
+    }
+    if (outcome.status === "executed" && outcome.messageId && opportunity.situation === "dm" &&
+        opportunity.recipientId === state.primaryCharacterId && narratedCameraShot(preview.decision.text ?? "")) {
+      await deliverNarratedDmPhoto({ ownerId, universeId, characterId: character.id, messageId: outcome.messageId })
+        .catch(() => console.warn("ECHO_NARRATED_DM_PHOTO_UNAVAILABLE"));
     }
     return {
       status: outcome.status,

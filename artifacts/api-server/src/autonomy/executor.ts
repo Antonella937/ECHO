@@ -29,7 +29,7 @@ const DAY_MS = 24 * 60 * 60_000;
 const ALLOWED_REACTIONS = new Set(["❤", "😂", "😮", "😢", "🔥", "👏"]);
 
 export type LiveExecutionOutcome =
-  | { status: "executed"; action: string; situation: string; targetId: string | null; revision: number }
+  | { status: "executed"; action: string; situation: string; targetId: string | null; messageId?: string; revision: number }
   | { status: "no_action" | "disabled" | "duplicate" | "stale_revision" | "blocked" | "rate_limited"; reasonCode: string };
 
 export class SocialExecutionError extends Error {
@@ -79,7 +79,7 @@ export function applyAutonomyDecision(
   decision: CharacterDecision,
   now = new Date(),
   idFactory: () => string = randomUUID,
-): { state: SocialState; changed: boolean; targetId: string | null } {
+): { state: SocialState; changed: boolean; targetId: string | null; messageId?: string } {
   if (decision.action === "none" && decision.situation === "story_reaction" && opportunity.storyId) {
     const story = state.stories.find(item => item.id === opportunity.storyId);
     if (!story || !recentWithin(story.createdAt, now, DAY_MS) ||
@@ -189,7 +189,7 @@ export function applyAutonomyDecision(
     return {
       state: recordAutonomyEvent({ ...state, messages: [...state.messages, message], notifications: [...state.notifications, notification] },
         characterId, { sourceId: message.id, kind: "conversation", text: `Envié un mensaje: ${text}`, targetId: recipientId }, now),
-      changed: true, targetId: recipientId,
+      changed: true, targetId: recipientId, messageId: message.id,
     };
   }
 
@@ -582,6 +582,7 @@ export async function executeAutonomyDecision(input: {
       action: input.decision.action,
       situation: input.decision.situation,
       targetId: mutation.targetId,
+      messageId: mutation.messageId,
       revision: saved.revision,
     };
   });
