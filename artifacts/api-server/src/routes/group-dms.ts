@@ -408,6 +408,13 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
     }
   }
   res.status(201).json({ id: messageId, groupId, senderId: actorId, text, attachments, createdAt: inserted.rows[0].created_at, kindroidDelivery });
+  if (kindroidDelivery === "sent") {
+    void runGroupAutonomyOnce(req.userId!, universeId, groupId, false, undefined, messageId)
+      .then(result => {
+        if (result.status === "skipped") req.log.info({ groupId, messageId, reason: result.reason }, "Kindroid group reply skipped");
+      })
+      .catch(() => req.log.warn({ groupId, messageId }, "Kindroid group reply failed"));
+  }
 });
 // Share an explicitly published ECHO Music track into a group conversation.
 // The track is referenced, never regenerated or copied. Group membership and
