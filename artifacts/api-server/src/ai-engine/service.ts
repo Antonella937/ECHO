@@ -270,9 +270,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       // A pair of identities can have multiple conversation threads.
       // Never pass messages from a different thread to the linked Kin.
       const activeThread = newest ? thread.filter(m => m.threadId === newest.threadId) : [];
-      // The SocialState DM schema may not expose an attachment array.
-      // Read optional metadata defensively without assuming media bytes exist.
-      const describeDmMessage = (message: (typeof thread)[number]) => {
+      const describeDmMessage = (message: (typeof thread)[number], imageDescriptions: string[] = []) => {
         const record = message as unknown as Record<string, unknown>;
         // Preserve complete ordinary multi-paragraph DMs (including closing questions).
         // Bound exceptionally long messages to protect the Kindroid prompt budget.
@@ -282,6 +280,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           if (!raw || typeof raw !== 'object') return '[attachment; content not analyzed]';
           const item = raw as Record<string, unknown>;
           const type = typeof item.type === 'string' ? item.type.slice(0, 32) : 'file';
+          if (type === 'image' && imageDescriptions.length) return '';
           const duration = typeof item.durationSeconds === 'number' && Number.isFinite(item.durationSeconds)
             ? `, ${Math.round(item.durationSeconds)} seconds` : '';
           // Only expose metadata explicitly present on the attachment.
@@ -293,7 +292,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
         });
         const music = typeof record.musicTrackId === 'string' && record.musicTrackId.trim() 
           ? `[ECHO Music track shared${typeof record.musicTitle === 'string' ? `: ${record.musicTitle.slice(0, 120)}` : ''}; audio content not analyzed]` : '';
-        return [text, music, ...attachments].filter(Boolean).join(' ');
+        return [text, music, ...attachments, ...imageDescriptions].filter(Boolean).join(' ');
       };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
       // fabricate an incoming human message just to make Kindroid respond.
@@ -332,26 +331,20 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           ? '' // The owner's existing Kindroid conversation already holds its own history.
           : previousTurns.reverse().map(m =>
               `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
-        const photoContext: string[] = [];
-        const incomingPhotos = !storyForReply && dependencies.liveDmReply && newest && isDirectReply
-          ? (newest.attachments ?? []).filter(item => item.type === 'image') : [];
-        if (newest) {
-          for (const attachment of incomingPhotos.slice(0, 2)) {
-            try {
-              const analysis = await visionService.analyzeDmPhoto(ownerId, input.universeId ?? 'primary', newest.id, attachment);
-              photoContext.push(describePhoto(analysis).slice(0, 600));
-            } catch (error) {
-              console.warn('ECHO_DM_PHOTO_VISION_UNAVAILABLE', { code: error instanceof Error ? error.message : 'unknown' });
-            }
+        const incomingTexts: string[] = [];
+        for (const message of incomingBatch.slice().reverse()) {
+          const imageDescriptions: string[] = [];
+          for (const attachment of dependencies.liveDmReply && !storyForReply ? (message.attachments ?? []) : []) {
+            if (attachment.type !== 'image') continue;
+            const analysis = await visionService.analyzeDmPhoto(ownerId, input.universeId ?? 'primary', message.id, attachment).catch(error => {
+              console.warn('[kindroid-dm] vision failed', { code: error instanceof Error ? error.message : 'UNKNOWN' });
+              throw new EngineError('DM_IMAGE_ANALYSIS_UNAVAILABLE', 503);
+            });
+            imageDescriptions.push(`[Attached photo ${imageDescriptions.length + 1}: ${describePhoto(analysis).slice(0, 350)}]`);
           }
+          incomingTexts.push(describeDmMessage(message, imageDescriptions));
         }
-        const photoNotes = photoContext.length
-          ? `\n[ECHO attached photo observations. If asked what stands out or what changed, lead with the most distinctive observed feature, including the visible hair shade if it stands out. Do not substitute remembered details for observations of this photo. Do not infer identity or details outside the photo. \n${photoContext.join('\n')}\n]`
-          : incomingPhotos.length
-            ? '\n[ECHO could not analyze the attached photo. Say you could not make out the image if asked about it. Do not claim to see it or use past photos or memories as visual evidence.]'
-            : '';
-        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n')
-          .slice(0, 3000 - photoNotes.length) + photoNotes;
+        const latestIncomingText = incomingTexts.filter(Boolean).join('\n');
         const peerContext = recipientId === parsed.data.state.primaryCharacterId
           ? '' // Do not inject a role-boundary lecture into the owner's natural Kin chat.
           : `[ECHO PRIVATE THREAD — ROLE BOUNDARY]\nYou are ${actorName}. You are writing a PRIVATE DM to ${recipientName}, not to ${ownerName} unless those names refer to the same person. The other participant in this thread is ${recipientName}. Any earlier Kindroid conversation with ${ownerName} or another contact is NOT the current conversation. Never address the account owner or narrate their actions unless they are the actual recipient. Use only this thread's messages as conversation history. Keep your established personality, voice and relationships. Write in English.\nRecent messages in this exact ECHO thread:\n${peerHistory || '(No previous messages)'}\n[END ECHO THREAD CONTEXT]\n`;
