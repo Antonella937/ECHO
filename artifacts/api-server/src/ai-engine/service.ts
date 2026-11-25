@@ -272,7 +272,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const activeThread = newest ? thread.filter(m => m.threadId === newest.threadId) : [];
       // The SocialState DM schema may not expose an attachment array.
       // Read optional metadata defensively without assuming media bytes exist.
-      const describeDmMessage = (message: (typeof thread)[number]) => {
+      const describeDmMessage = (message: (typeof thread)[number], omitImageMarker = false) => {
         const record = message as unknown as Record<string, unknown>;
         // Preserve complete ordinary multi-paragraph DMs (including closing questions).
         // Bound exceptionally long messages to protect the Kindroid prompt budget.
@@ -282,6 +282,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           if (!raw || typeof raw !== 'object') return '[attachment; content not analyzed]';
           const item = raw as Record<string, unknown>;
           const type = typeof item.type === 'string' ? item.type.slice(0, 32) : 'file';
+          if (type === 'image' && omitImageMarker) return '';
           const duration = typeof item.durationSeconds === 'number' && Number.isFinite(item.durationSeconds)
             ? `, ${Math.round(item.durationSeconds)} seconds` : '';
           // Only expose metadata explicitly present on the attachment.
@@ -346,11 +347,13 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           }
         }
         const photoNotes = photoContext.length
-          ? `\n[ECHO attached photo observations. If asked what stands out or what changed, lead with the most distinctive observed feature, including the visible hair shade if it stands out. Do not substitute remembered details for observations of this photo. Do not infer identity or details outside the photo. \n${photoContext.join('\n')}\n]`
+          ? `\n[Photo: ${photoContext.join(' ')}]`
           : incomingPhotos.length
-            ? '\n[ECHO could not analyze the attached photo. Say you could not make out the image if asked about it. Do not claim to see it or use past photos or memories as visual evidence.]'
+            ? '\n[Photo unavailable]'
             : '';
-        const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n')
+        const latestIncomingText = incomingBatch.slice().reverse()
+          .map(message => describeDmMessage(message, message.id === newest?.id && incomingPhotos.length > 0))
+          .filter(Boolean).join('\n')
           .slice(0, 3000 - photoNotes.length) + photoNotes;
         const peerContext = recipientId === parsed.data.state.primaryCharacterId
           ? '' // Do not inject a role-boundary lecture into the owner's natural Kin chat.
