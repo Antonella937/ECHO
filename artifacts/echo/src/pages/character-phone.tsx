@@ -193,7 +193,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
           if (node.clientWidth) setShowPage(Math.round(node.scrollLeft / node.clientWidth));
         }} className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
           <section aria-label={es ? 'Inicio' : 'Home'} className="w-full shrink-0 snap-start overflow-y-auto px-5 py-[clamp(12px,4dvh,36px)]">
-            <time className="block font-display text-6xl tabular-nums">{formatTime({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</time>
+            <time className="block font-[family-name:system-ui] text-[clamp(3.5rem,14vw,4.75rem)] font-light leading-none tracking-tight lining-nums tabular-nums">{formatTime({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</time>
             <p className="mt-1 text-sm text-white/75">{formatTime({ weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button type="button" onClick={() => open(phone.widgetPhoto ? 'gallery' : 'settings')} className={`relative grid aspect-square place-items-center overflow-hidden rounded-2xl ${glass}`} aria-label={phone.widgetPhoto ? labels.gallery : es ? 'Elegir foto del widget' : 'Choose widget photo'}>
