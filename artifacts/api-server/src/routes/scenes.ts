@@ -1,3 +1,4 @@
+import { describeImageAttachment } from "../vision/service";
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
 import { Router, type IRouter } from "express";
 import { and, eq, sql } from "drizzle-orm";
@@ -22,7 +23,8 @@ const create = scope.extend({
   participantIds: z.array(id).min(1).max(20),
 }).strict();
 const event = scope.extend({
-  sceneId: id, actorId: id, text: z.string().trim().min(1).max(5000),
+  sceneId: id, actorId: id, text: z.string().trim().max(5000),
+  photo: z.object({ id, url: z.string().regex(/^\/objects\/(?:uploads|r2)\/[a-f0-9-]{20,}$/i) }).strict().optional(),
   visibility: z.enum(["public", "participants", "private"]).default("participants"),
   audienceIds: z.array(id).max(20).default([]),
 }).strict();
@@ -119,9 +121,9 @@ scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
       AND universe_id = ${parsed.data.universeId} AND scene_id = ${sceneId.data} LIMIT 1`);
     const members = scenes.rows[0]?.participant_ids;
     if (!Array.isArray(members) || !members.includes(viewer.data)) { res.status(403).json({ error: "SCENE_VIEWER_NOT_ALLOWED" }); return; }
-    const rows = await db.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId", visibility, audience_ids AS "audienceIds", text, created_at AS "createdAt"
+    const rows = await db.execute(sql`SELECT event_id AS "eventId", actor_id AS "actorId", visibility, audience_ids AS "audienceIds", text, photo_path AS "photoPath", created_at AS "createdAt"
       FROM echo_scene_events WHERE owner_id = ${req.userId!} AND universe_id = ${parsed.data.universeId}
-      AND scene_id = ${sceneId.data} AND text <> '' ORDER BY created_at, event_id LIMIT 500`);
+      AND scene_id = ${sceneId.data} AND (text <> '' OR photo_path IS NOT NULL) ORDER BY created_at, event_id LIMIT 500`);
     res.json({ events: rows.rows.filter(row => row.visibility === "public" || row.actorId === viewer.data || (Array.isArray(row.audienceIds) ? row.audienceIds.includes(viewer.data) : false) || (row.visibility === "participants" && (!Array.isArray(row.audienceIds) || row.audienceIds.length === 0))) });
   } catch { res.status(503).json({ error: "SCENE_EVENTS_UNAVAILABLE" }); }
 });
@@ -233,7 +235,8 @@ scenesRouter.post("/scenes/:sceneId/canon-candidates/:eventId/dismiss", async (r
 scenesRouter.post("/scenes/events", async (req, res) => {
   const parsed = event.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "INVALID_SCENE_EVENT" }); return; }
-  const { universeId, sceneId, actorId, text, visibility, audienceIds } = parsed.data;
+  const { universeId, sceneId, actorId, text, visibility, audienceIds, photo } = parsed.data;
+  if (!text && !photo) { res.status(400).json({ error: "INVALID_SCENE_EVENT" }); return; }
   try {
     const rows = await db.execute(sql`SELECT participant_ids, status FROM echo_scenes
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId} LIMIT 1`);
@@ -248,8 +251,13 @@ scenesRouter.post("/scenes/events", async (req, res) => {
     }
     const eventId = randomUUID();
     const audience = JSON.stringify(audienceIds);
-    await db.execute(sql`INSERT INTO echo_scene_events (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text)
-      VALUES (${req.userId!},${universeId},${sceneId},${eventId},${actorId},${visibility},${audience}::jsonb,${text})`);
+    const description = photo ? await describeImageAttachment(req.userId!, photo).catch(error => {
+      console.warn("[scene] vision failed", { code: error instanceof Error ? error.message : "UNKNOWN" });
+      return null;
+    }) : null;
+    if (photo && !description) { res.status(503).json({ error: "SCENE_IMAGE_ANALYSIS_UNAVAILABLE" }); return; }
+    await db.execute(sql`INSERT INTO echo_scene_events (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text,photo_path,photo_description)
+      VALUES (${req.userId!},${universeId},${sceneId},${eventId},${actorId},${visibility},${audience}::jsonb,${text},${photo?.url ?? null},${description})`);
     res.status(201).json({ eventId });
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
@@ -425,8 +433,8 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
         res.status(409).json({ error: "OUT_OF_ORDER" }); return;
       }
     }
-    const history = await db.execute(sql`SELECT event_id, actor_id, text, visibility, audience_ids FROM echo_scene_events
-      WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND text <> ''
+    const history = await db.execute(sql`SELECT event_id, actor_id, text, visibility, audience_ids, photo_description FROM echo_scene_events
+      WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND scene_id = ${sceneId.data} AND (text <> '' OR photo_path IS NOT NULL)
       ORDER BY created_at DESC, event_id DESC LIMIT 60`);
     const visible = [...history.rows].reverse().filter(e =>
       e.actor_id === characterId ||
@@ -475,7 +483,7 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
     const context = JSON.stringify({ scene: { sceneId: sceneId.data, title: scene.title, premise: scene.premise, canon: scene.canon },
       character: { ...character, avatar: undefined, identity: undefined, referenceImages: undefined },
       participants: people, sceneMemory: previousSummary,
-      visibleEvents: visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text })) }).slice(0,18000);
+      visibleEvents: visible.slice(-20).map(e => ({ actorId: e.actor_id, text: e.text, photoDescription: e.photo_description })) }).slice(0,18000);
     // Linked Kindroid characters use their existing voice for scene dialogue.
     // Do not silently fall back to another model if the external provider fails.
     const links = await db.execute(sql`SELECT kin_id FROM echo_kindroid_character_links
@@ -493,10 +501,12 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       // restricted scene events, including character-specific memories, to it.
       const sharedEvents = visible.filter(e => e.visibility === "public" ||
         (e.visibility === "participants" && (!Array.isArray(e.audience_ids) || e.audience_ids.length === 0)));
+      const latestSharedPhoto = sharedEvents.slice(-5).reverse().find(event => typeof event.photo_description === "string")?.photo_description;
       const scenePrompt = [
         "[ECHO Scene: " + String(scene.title).slice(0, 100) + "]",
         "Setting: " + String(scene.premise).slice(0, 250),
         "Continue as " + character.name + ". Write only your own dialogue and actions; do not speak for others.",
+        typeof latestSharedPhoto === "string" ? "[Attached photo: " + latestSharedPhoto.slice(0, 450) + "]" : "",
         "Recent shared scene events:",
         ...sharedEvents.slice(-5).map(e => String(e.actor_id) + ": " + String(e.text).slice(-250)),
       ].join("\n").slice(0, 1450);

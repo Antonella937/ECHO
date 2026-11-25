@@ -1,4 +1,4 @@
-import { describeGroupAttachment } from "../vision/service";
+import { describeImageAttachment } from "../vision/service";
 import { sendKindroidSocialGroupContext } from "../ai-engine/kindroid-social-group";
 import { notifyNewGroupMessage } from "../lib/group-push-dispatch";
 import { privateConversationCandidates } from "../lib/canon-knowledge";
@@ -391,16 +391,23 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
     } else if (typeof target === "string" && target) {
       try {
         const visual: string[] = [];
-        for (const attachment of attachments.filter(a => a.type === "image").slice(0, 2)) {
-          try { visual.push(await describeGroupAttachment(req.userId!, attachment)); }
-          catch (error) { console.warn("[kindroid-group] vision failed", { groupId, messageId, code: error instanceof Error ? error.message : "UNKNOWN" }); visual.push("Image attached in ECHO; visual analysis unavailable."); }
+        const images = attachments.filter(attachment => attachment.type === "image");
+        for (const attachment of images) {
+          try {
+            const description = await describeImageAttachment(req.userId!, attachment);
+            visual.push(`[Attached photo ${visual.length + 1}: ${description.slice(0, 200)}]`);
+          } catch (error) {
+            console.warn("[kindroid-group] vision failed", { groupId, messageId, code: error instanceof Error ? error.message : "UNKNOWN" });
+            throw error;
+          }
         }
-        const context = visual.length ? "\n[Attached image description: " + visual.join("; ").slice(0, 900) + "]" : "";
-        const message = text || (visual.length ? "" : "[Attachment shared in ECHO]");
-        const available = 1500 - message.length;
-        const visualContext = context.length <= available ? context : available > 40 ? context.slice(0, available - 1) + "]" : "";
-        await sendKindroidSocialGroupContext(target, message + visualContext);
-        kindroidDelivery = "sent";
+        const message = [text, ...visual].filter(Boolean).join("\n") || "[Attachment shared in ECHO]";
+        if (message.length > 1500) {
+          kindroidDelivery = "too_long";
+        } else {
+          await sendKindroidSocialGroupContext(target, message);
+          kindroidDelivery = "sent";
+        }
       } catch {
         kindroidDelivery = "failed";
         console.warn("[kindroid-group] direct delivery failed", { groupId, messageId });
