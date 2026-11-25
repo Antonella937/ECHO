@@ -9,7 +9,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { FreeModelProvider } from "../ai-engine/free-models";
 import { MeteredTextProvider } from "../lib/metered-ai";
 import { kindroidPeerGroupProvider } from "../ai-engine/kindroid";
-import { sendKindroidSocialGroupContext } from "../ai-engine/kindroid-social-group";
+import { sendKindroidSocialGroupContext, withGroupLock } from "../ai-engine/kindroid-social-group";
 import { EngineError } from "../ai-engine/contracts";
 
 export const scenesRouter: IRouter = Router();
@@ -238,7 +238,7 @@ scenesRouter.post("/scenes/events", async (req, res) => {
   const { universeId, sceneId, actorId, text, visibility, audienceIds, photo } = parsed.data;
   if (!text && !photo) { res.status(400).json({ error: "INVALID_SCENE_EVENT" }); return; }
   try {
-    const rows = await db.execute(sql`SELECT participant_ids, status FROM echo_scenes
+    const rows = await db.execute(sql`SELECT participant_ids, status, turn_settings FROM echo_scenes
       WHERE owner_id = ${req.userId!} AND universe_id = ${universeId} AND scene_id = ${sceneId} LIMIT 1`);
     const scene = rows.rows[0];
     const participants = Array.isArray(scene?.participant_ids) ? scene.participant_ids : [];
@@ -249,6 +249,13 @@ scenesRouter.post("/scenes/events", async (req, res) => {
         audienceIds.some(a => !participants.includes(a))) {
       res.status(403).json({ error: "SCENE_EVENT_NOT_ALLOWED" }); return;
     }
+    const groupId = (scene.turn_settings as { kindroidGroupId?: unknown } | null)?.kindroidGroupId;
+    const shared = visibility === "public" || (visibility === "participants" && audienceIds.length === 0);
+    const linkedGroup = shared && typeof groupId === "string" && /^[a-zA-Z0-9_-]{10,120}$/.test(groupId) ? groupId : null;
+    if (linkedGroup && text.length > 1500) {
+      res.status(400).json({ error: "SCENE_KINDROID_MESSAGE_TOO_LONG", maxLength: 1500 });
+      return;
+    }
     const eventId = randomUUID();
     const audience = JSON.stringify(audienceIds);
     const description = photo ? await describeGroupAttachment(req.userId!, photo).catch(error => {
@@ -258,7 +265,24 @@ scenesRouter.post("/scenes/events", async (req, res) => {
     if (photo && !description) { res.status(503).json({ error: "SCENE_IMAGE_ANALYSIS_UNAVAILABLE" }); return; }
     await db.execute(sql`INSERT INTO echo_scene_events (owner_id,universe_id,scene_id,event_id,actor_id,visibility,audience_ids,text,photo_path,photo_description)
       VALUES (${req.userId!},${universeId},${sceneId},${eventId},${actorId},${visibility},${audience}::jsonb,${text},${photo?.url ?? null},${description})`);
-    res.status(201).json({ eventId });
+    let kindroidDelivery: "not_linked" | "sent" | "failed" = "not_linked";
+    if (linkedGroup) {
+      const separator = text ? "\n" : "";
+      const remaining = 1500 - text.length - separator.length;
+      const photoNote = description && remaining > 12
+        ? "[Photo: " + description.slice(0, Math.min(450, remaining - 9)) + "]" : "";
+      const message = photoNote ? text + separator + photoNote : text;
+      try {
+        await withGroupLock(linkedGroup, () => sendKindroidSocialGroupContext(linkedGroup, message));
+        kindroidDelivery = "sent";
+      } catch (error) {
+        kindroidDelivery = "failed";
+        console.warn("ECHO_SCENE_KINDROID_DELIVERY_FAILED", {
+          code: error instanceof EngineError ? error.code : "UNKNOWN",
+        });
+      }
+    }
+    res.status(201).json({ eventId, kindroidDelivery });
   } catch { res.status(503).json({ error: "SCENE_EVENT_FAILED" }); }
 });
 
@@ -497,22 +521,11 @@ scenesRouter.post("/scenes/:sceneId/reply", async (req, res) => {
       if (!/^[a-zA-Z0-9_-]{10,120}$/.test(groupId)) {
         throw new EngineError("SCENE_KINDROID_GROUP_NOT_LINKED", 409);
       }
-      // A group prompt is visible to every Kin in that group. Never transmit
-      // restricted scene events, including character-specific memories, to it.
-      const sharedEvents = visible.filter(e => e.visibility === "public" ||
-        (e.visibility === "participants" && (!Array.isArray(e.audience_ids) || e.audience_ids.length === 0)));
-      const latestSharedPhoto = sharedEvents.slice(-5).reverse().find(event => typeof event.photo_description === "string")?.photo_description;
-      const scenePrompt = [
-        "[ECHO Scene: " + String(scene.title).slice(0, 100) + "]",
-        "Setting: " + String(scene.premise).slice(0, 250),
-        "Continue as " + character.name + ". Write only your own dialogue and actions; do not speak for others.",
-        typeof latestSharedPhoto === "string" ? "[Attached photo: " + latestSharedPhoto.slice(0, 450) + "]" : "",
-        "Recent shared scene events:",
-        ...sharedEvents.slice(-5).map(e => String(e.actor_id) + ": " + String(e.text).slice(-250)),
-      ].join("\n").slice(0, 1450);
-      await sendKindroidSocialGroupContext(groupId, scenePrompt);
-      const completion = await kindroidPeerGroupProvider(groupId, kinId, characterId, fetch, true)
-        .complete({ system: "", context: "", outputSchema: sceneOutputSchema });
+      // The user event is delivered when it is created. Continuing a turn
+      // only requests a response from the chosen Kin in the existing group.
+      const completion = await withGroupLock(groupId, () =>
+        kindroidPeerGroupProvider(groupId, kinId, characterId, fetch, true)
+          .complete({ system: "", context: "", outputSchema: sceneOutputSchema }));
       const draft = z.object({ action: z.literal("draft"), text: z.string().trim().min(1).max(2000) })
         .passthrough().parse(JSON.parse(completion.text));
       replyText = draft.text;
