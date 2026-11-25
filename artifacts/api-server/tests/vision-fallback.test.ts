@@ -37,3 +37,25 @@ test("a busy backup can recover after OpenRouter rate limits the photo", async (
     else process.env.ECHO_VISION_WORKER_TOKEN = previousToken;
   }
 });
+
+test("Cloudflare receives image bytes inline and returns a validated analysis", async () => {
+  const { CloudflareVisionProvider } = await import("../src/vision/cloudflare");
+  const provider = new CloudflareVisionProvider("test-account", "test-token", async (endpoint, request) => {
+    assert.match(String(endpoint), /api\.cloudflare\.com\/.*\/ai\/v1\/chat\/completions$/);
+    const input = JSON.parse(String(request?.body));
+    assert.equal(input.store, false);
+    assert.equal(input.model, "@cf/google/gemma-4-26b-a4b-it");
+    assert.equal(input.messages[0].content[0].image_url.url, "data:image/jpeg;base64,aW1hZ2U=");
+    return Response.json({
+      choices: [{ message: { content: '{"sceneDescription":"A mint green car."}' } }],
+      usage: { prompt_tokens: 120, completion_tokens: 20 },
+    });
+  });
+  const result = await provider.analyze({
+    image: { mimeType: "image/jpeg", base64: "aW1hZ2U=" },
+    prompt: "Describe this image.",
+    validate: JSON.parse,
+  });
+  assert.equal(result.analysis.sceneDescription, "A mint green car.");
+  assert.equal(result.usage.promptTokens, 120);
+});
