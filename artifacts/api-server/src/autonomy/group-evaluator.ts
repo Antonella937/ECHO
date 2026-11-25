@@ -15,7 +15,7 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
   const groups = await db.execute(sql`SELECT participant_ids, autonomy_enabled, autonomy_interval_minutes, last_autonomy_at, scene_turn_mode
     FROM echo_group_conversations WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId} LIMIT 1`);
   const group = groups.rows[0];
-  if (!group || (!sceneMode && group.autonomy_enabled !== true)) return { speakerId: null, reason: "GROUP_DISABLED" };
+  if (!group || (!sceneMode && !replyToMessageId && group.autonomy_enabled !== true)) return { speakerId: null, reason: "GROUP_DISABLED" };
   const messages = await db.execute(sql`SELECT id, sender_id, body, created_at FROM echo_group_messages
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
     ORDER BY created_at DESC LIMIT 1`);
@@ -26,15 +26,19 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
   if (replyToMessageId && (!ownerTurn || last?.id !== replyToMessageId)) {
     return { speakerId: null, reason: "GROUP_MESSAGE_SUPERSEDED" };
   }
-  const candidates = (state.characters ?? []).filter(c => participants.includes(c.id) && c.id !== primaryId).map(c => {
+  const linkedSpeakers = replyToMessageId ? await db.execute(sql`SELECT character_id FROM echo_kindroid_character_links
+    WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND enabled = true`) : null;
+  const linkedIds = linkedSpeakers && new Set(linkedSpeakers.rows.map(row => row.character_id));
+  const candidates = (state.characters ?? []).filter(c =>
+    participants.includes(c.id) && c.id !== primaryId && (!linkedIds || linkedIds.has(c.id))).map(c => {
     const control = controls.characters.get(c.id);
     return {
       id: c.id, archived: c.archived, // An explicitly started spectator scene opts the GROUP into conversation.
       // It must not depend on unrelated spontaneous feed/DM opt-ins.
       // Preserve explicit character-level autonomy disablement (e.g. the owner's avatar).
-      enabled: sceneMode ? control?.enabled !== false : control?.enabled === true,
-      dmEnabled: sceneMode ? control?.dmEnabled !== false : ownerTurn ? control?.enabled === true : control?.dmEnabled === true,
-      sleeping: /\b(sleep|sleeping|dormir|durmiendo|descansando)\b/i.test(c.configuration?.currentState?.activity ?? ""),
+      enabled: sceneMode || replyToMessageId ? control?.enabled !== false : control?.enabled === true,
+      dmEnabled: replyToMessageId ? true : sceneMode ? control?.dmEnabled !== false : ownerTurn ? control?.enabled === true : control?.dmEnabled === true,
+      sleeping: !replyToMessageId && /\b(sleep|sleeping|dormir|durmiendo|descansando)\b/i.test(c.configuration?.currentState?.activity ?? ""),
     };
   });
   const selected = sceneMode && preferredSpeakerId ? candidates.find(c => c.id === preferredSpeakerId && c.enabled && c.dmEnabled && !c.archived && !c.sleeping) : undefined;

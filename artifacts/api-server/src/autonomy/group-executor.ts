@@ -31,7 +31,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
   const claimed = await db.execute(sql`UPDATE echo_group_conversations
     SET autonomy_claim_id = ${claimId}, autonomy_claim_until = now() + interval '2 minutes'
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
-      AND (${sceneMode} OR autonomy_enabled = true)
+      AND (${sceneMode} OR ${Boolean(replyToMessageId)} OR autonomy_enabled = true)
       AND (autonomy_claim_until IS NULL OR autonomy_claim_until < now())
       AND (CASE WHEN ${sceneMode} THEN (scene_observer_enabled = true AND (last_autonomy_at IS NULL OR last_autonomy_at < now() - interval '2 seconds')) ELSE (${Boolean(replyToMessageId)} OR last_autonomy_at IS NULL OR last_autonomy_at <= now() - autonomy_interval_minutes * interval '1 minute') END)
     RETURNING name, participant_ids, scene_context, scene_turn_mode, scene_response_speed, kindroid_group_id`);
@@ -184,12 +184,16 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
       (owner_id, universe_id, id, group_id, sender_id, body, read_by)
       SELECT ${ownerId}, ${universeId}, ${randomUUID()}, id, ${speakerId}, ${text}, ${JSON.stringify([speakerId])}::jsonb
       FROM echo_group_conversations WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId}
-      AND (${sceneMode} OR autonomy_enabled = true) AND autonomy_claim_id = ${claimId}
+      AND (${sceneMode} OR ${Boolean(replyToMessageId)} OR autonomy_enabled = true) AND autonomy_claim_id = ${claimId}
       AND participant_ids ? ${speakerId}
       AND (NOT EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId})
         OR EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId}
         AND universe_id = ${universeId} AND group_id = ${groupId}
         GROUP BY group_id HAVING max(created_at) <= ${now.toISOString()}::timestamptz))
+      AND (${!replyToMessageId} OR ${replyToMessageId ?? null} = (
+        SELECT id FROM echo_group_messages WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
+          AND group_id = ${groupId} ORDER BY created_at DESC, id DESC LIMIT 1
+      ))
       RETURNING id`);
     if (!inserted.rows.length) return { status: "skipped", reason: "STALE_CONVERSATION" };
     void notifyNewGroupMessage({ownerId,universeId,groupId,senderId:speakerId,messageId:String(inserted.rows[0].id)}).catch(()=>{});
