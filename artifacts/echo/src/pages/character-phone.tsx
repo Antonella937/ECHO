@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type UIEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { customFetch } from '@workspace/api-client-react';
-import { Activity, CalendarDays, ChevronLeft, ChevronRight, Image, MessageCircle, Music2, Settings, StickyNote, Trash2, BookOpen, Pencil, Sparkles } from 'lucide-react';
+import { Activity, CalendarDays, ChevronLeft, ChevronRight, Image, MessageCircle, Music2, Settings, StickyNote, Trash2, BookOpen, Pencil, Sparkles, Grip, Check } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterPostGallery } from '@/components/characters/post-gallery';
@@ -10,9 +10,20 @@ import { compressImage, useMediaResolver } from '@/lib/media';
 import { useSocial } from '@/store/social-store';
 
 type Screen = 'home' | 'settings' | 'gallery' | 'music' | 'notes' | 'calendar' | 'pulse' | 'diary';
+const defaultLayout = {
+  first: ['clock', 'photo', 'music-widget'],
+  second: ['pulse', 'notes', 'diary', 'calendar', 'settings'],
+  dock: ['messages', 'echo', 'gallery', 'music'],
+} as const;
+type Region = keyof typeof defaultLayout;
+type HomeItem = (typeof defaultLayout)[Region][number];
+type HomeLayout = Record<Region, HomeItem[]>;
+const regions: Region[] = ['first', 'second', 'dock'];
+const isWidget = (item: HomeItem) => item === 'clock' || item === 'photo' || item === 'music-widget';
+
 type Entry = { id: string; text: string; date?: string; title?: string };
 type Track = { id: string; title: string; artistName?: string | null; coverPath?: string | null; characterId: string; status: string; audioPath?: string | null };
-type Phone = { pulseHidden?: boolean; wallpaper?: string; widgetPhoto?: string; notes?: Entry[]; diary?: Entry[]; events?: Entry[]; lastTrack?: Track };
+type Phone = { layout?: HomeLayout; pulseHidden?: boolean; wallpaper?: string; widgetPhoto?: string; notes?: Entry[]; diary?: Entry[]; events?: Entry[]; lastTrack?: Track };
 type PulsePost = Entry & { characterId: string; parentId?: string; quoteId?: string };
 
 function readLocal<T>(key: string, fallback: T): T {
@@ -47,6 +58,12 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   const [phone, setPhone] = useState(() => readLocal<Phone>(key, {}));
   const [pulse, setPulse] = useState(() => readLocal<PulsePost[]>(pulseKey, []));
   const [screen, setScreen] = useState<Screen>('home');
+  const [arranging, setArranging] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<HomeItem>();
+  const movedByPointer = useRef(false);
+  const dragOrigin = useRef<{ x: number; y: number } | undefined>(undefined);
+  const [dragPreview, setDragPreview] = useState<{ item: HomeItem; x: number; y: number }>();
+  const layout = phone.layout ?? defaultLayout;
   const [showPage, setShowPage] = useState(0);
   const pager = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(() => new Date());
@@ -117,6 +134,8 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
     setResponse(null);
   }
   function open(next: Screen) {
+    setArranging(false);
+    setSelectedItem(undefined);
     if (screen === 'music') {
       trackRequest.current++;
       if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
@@ -221,7 +240,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   const appIcon = `grid size-12 place-items-center rounded-2xl text-white ${glass}`;
   const tile = (title: string, icon: React.ReactNode, action: Screen | { href: string }, dock = false) => {
     const contents = <><span className={appIcon}>{icon}</span>{!dock && <span className="text-xs">{title}</span>}</>;
-    const className = 'flex min-w-0 flex-col items-center gap-1.5 text-center';
+    const className = 'flex w-full min-w-0 flex-col items-center gap-1.5 text-center';
     return typeof action === 'string'
       ? <button type="button" className={className} aria-label={title} onClick={() => open(action)}>{contents}</button>
       : <Link href={action.href} className={className} aria-label={title}>{contents}</Link>;
@@ -231,53 +250,153 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   const fieldClass = 'w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm';
   const primaryClass = 'rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50';
 
+  const titles: Record<HomeItem, string> = {
+    clock: es ? 'Reloj' : 'Clock', photo: es ? 'Foto' : 'Photo', 'music-widget': labels.music,
+    pulse: labels.pulse, notes: labels.notes, diary: 'Secret Space', calendar: labels.calendar,
+    settings: labels.settings, messages: es ? 'Mensajes' : 'Messages', echo: 'ECHO', gallery: labels.gallery, music: labels.music,
+  };
+  function moveItem(item: HomeItem, destination: Region, target?: HomeItem) {
+    const source = regions.find(region => (layout[region] as readonly HomeItem[]).includes(item));
+    if (!source || item === target || (destination === 'dock' && isWidget(item))) return false;
+    const next: HomeLayout = { first: [...layout.first], second: [...layout.second], dock: [...layout.dock] };
+    const fromIndex = next[source].indexOf(item);
+    const toIndex = target ? next[destination].indexOf(target) : next[destination].length;
+    if (target && toIndex < 0) return false;
+    if (source !== 'dock' && destination === 'dock' && next.dock.length >= 4) {
+      if (!target) return false;
+      next[source][fromIndex] = target;
+      next.dock[toIndex] = item;
+    } else {
+      next[source].splice(fromIndex, 1);
+      next[destination].splice(toIndex, 0, item);
+    }
+    if (!save({ ...phone, layout: next })) return false;
+    setSelectedItem(undefined);
+    if (destination !== 'dock') scrollPage(destination === 'first' ? 0 : 1);
+    return true;
+  }
+  function scrollPage(index: number) {
+    const node = pager.current;
+    if (node) node.scrollTo({ left: index * node.clientWidth, behavior: 'smooth' });
+  }
+  function wrapItem(item: HomeItem, region: Region, contents: React.ReactNode) {
+    const width = region === 'dock' ? '' : item === 'clock' ? 'col-span-6' : isWidget(item) ? 'col-span-3' : 'col-span-2';
+    return <div key={item} data-phone-item={item} data-phone-region={region} className={`relative min-w-0 ${width}`}>
+      <div inert={arranging}>{contents}</div>
+      {arranging && <button type="button" aria-pressed={selectedItem === item} aria-label={`${es ? 'Mover' : 'Move'} ${titles[item]}`}
+        className="absolute inset-0 grid touch-none cursor-grab place-items-center rounded-xl border border-dashed border-white/35 bg-black/25 aria-pressed:border-primary aria-pressed:bg-primary/20"
+        onPointerDown={event => {
+          if (!event.isPrimary || event.button !== 0) return;
+          movedByPointer.current = false;
+          dragOrigin.current = { x: event.clientX, y: event.clientY };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={event => {
+          const start = dragOrigin.current;
+          if (start && event.currentTarget.hasPointerCapture(event.pointerId) &&
+              Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) {
+            setDragPreview({ item, x: event.clientX, y: event.clientY });
+          }
+        }}
+        onLostPointerCapture={() => { dragOrigin.current = undefined; setDragPreview(undefined); }}
+        onPointerUp={event => {
+          const start = dragOrigin.current;
+          dragOrigin.current = undefined;
+          setDragPreview(undefined);
+          if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 6) return;
+          movedByPointer.current = true;
+          const hit = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-phone-region]');
+          const destination = hit?.dataset.phoneRegion as Region | undefined;
+          const target = hit?.dataset.phoneItem as HomeItem | undefined;
+          if (destination && target !== item) moveItem(item, destination, target);
+        }}
+        onClick={() => {
+          if (movedByPointer.current) { movedByPointer.current = false; return; }
+          if (selectedItem && selectedItem !== item) moveItem(selectedItem, region, item);
+          else setSelectedItem(current => current === item ? undefined : item);
+        }}>
+        <Grip size={18} aria-hidden="true" />
+      </button>}
+    </div>;
+  }
+
+  function renderItem(item: HomeItem, region: Region) {
+    const dock = region === 'dock';
+    const content: Record<HomeItem, React.ReactNode> = {
+      clock: <>
+            <time className="block w-fit origin-left scale-x-[0.79] bg-[linear-gradient(155deg,rgba(255,255,255,0.82),rgba(228,208,239,0.32)_47%,rgba(255,255,255,0.58))] bg-clip-text font-[family-name:system-ui] text-6xl font-semibold leading-none tracking-[-0.045em] text-transparent lining-nums tabular-nums [-webkit-text-stroke:0.65px_rgba(255,255,255,0.58)] drop-shadow-[0_2px_5px_rgba(15,9,24,0.32)]">
+              {formatTime({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}
+            </time>
+            <p className="mt-1 text-sm text-white/75">{formatTime({ weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      </>,
+      photo: (
+              <button type="button" onClick={() => open(phone.widgetPhoto ? 'gallery' : 'settings')} className={`relative grid w-full aspect-square place-items-center overflow-hidden rounded-2xl ${glass}`} aria-label={phone.widgetPhoto ? labels.gallery : es ? 'Elegir foto del widget' : 'Choose widget photo'}>
+                {phone.widgetPhoto ? <img src={widgetImage || undefined} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <Image size={23} />}
+              </button>
+      ),
+      'music-widget': (
+              <button type="button" onClick={() => open('music')} className={`flex aspect-square w-full min-w-0 flex-col justify-between rounded-2xl p-3 text-left ${glass}`}>
+                {trackCover ? <img src={trackCover} alt="" className="size-10 rounded-lg object-cover" /> : <Music2 size={20} className="text-primary" />}
+                <span className="mt-2 block min-w-0"><span className="block truncate text-sm font-semibold">{phone.lastTrack?.title ?? 'ECHO Music'}</span>
+                <span className="block truncate text-xs text-white/70">{phone.lastTrack ? (es ? 'Último tema' : 'Last played') : (es ? 'Biblioteca' : 'Library')}</span></span>
+              </button>
+      ),
+      pulse: tile(titles.pulse, <Activity size={21} />, 'pulse', dock),
+      notes: tile(titles.notes, <StickyNote size={20} />, 'notes', dock),
+      diary: tile(titles.diary, <BookOpen size={20} />, 'diary', dock),
+      calendar: tile(titles.calendar, <CalendarDays size={20} />, 'calendar', dock),
+      settings: tile(titles.settings, <Settings size={20} />, 'settings', dock),
+      messages: tile(titles.messages, <MessageCircle size={20} />, { href: isActive ? '/messages' : `/messages/${encodeURIComponent(account.id)}` }, dock),
+      echo: tile(titles.echo, <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="size-7 rounded-full object-contain opacity-90 mix-blend-screen" />, { href: `/profile/${encodeURIComponent(account.id)}` }, dock),
+      gallery: tile(titles.gallery, <Image size={21} />, 'gallery', dock),
+      music: tile(titles.music, <Music2 size={20} />, 'music', dock),
+    };
+    return item === 'pulse' && phone.pulseHidden ? null : wrapItem(item, region, content[item]);
+  }
+
   if (screen === 'home') return (
     <main className="mx-auto h-[100dvh] w-full sm:max-w-[520px] sm:p-3">
       <div className="relative isolate flex h-full min-h-0 flex-col overflow-hidden bg-[#15121a] pt-safe text-white sm:rounded-[2rem] sm:border sm:border-white/10">
         {backdrop}
         <header className="flex shrink-0 items-center justify-between gap-2 px-4 py-2">
           <button type="button" onClick={back} aria-label={es ? 'Volver' : 'Back'} className={glassControl}><ChevronLeft size={20} /></button>
-          <span className="truncate text-sm font-medium">{account.name}</span>
+          <span className="truncate text-sm font-medium">{arranging ? (es ? 'Organizar inicio' : 'Arrange home') : account.name}</span>
+          <button type="button" onClick={() => { setArranging(current => !current); setSelectedItem(undefined); }} aria-label={arranging ? (es ? 'Listo' : 'Done') : (es ? 'Organizar inicio' : 'Arrange home')} className={glassControl}>
+            {arranging ? <Check size={18} /> : <Grip size={18} />}
+          </button>
           <button type="button" onClick={() => open('settings')} aria-label={labels.settings} className={glassControl}><Settings size={18} /></button>
         </header>
         <div ref={pager} onScroll={(event: UIEvent<HTMLDivElement>) => {
           const node = event.currentTarget;
           if (node.clientWidth) setShowPage(Math.round(node.scrollLeft / node.clientWidth));
         }} className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
-          <section aria-label={es ? 'Inicio' : 'Home'} className="w-full shrink-0 snap-start overflow-y-auto px-5 py-[clamp(12px,4dvh,36px)]">
-            <time className="block w-fit origin-left scale-x-[0.79] bg-[linear-gradient(155deg,rgba(255,255,255,0.82),rgba(228,208,239,0.32)_47%,rgba(255,255,255,0.58))] bg-clip-text font-[family-name:system-ui] text-6xl font-semibold leading-none tracking-[-0.045em] text-transparent lining-nums tabular-nums [-webkit-text-stroke:0.65px_rgba(255,255,255,0.58)] drop-shadow-[0_2px_5px_rgba(15,9,24,0.32)]">
-              {formatTime({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}
-            </time>
-            <p className="mt-1 text-sm text-white/75">{formatTime({ weekday: 'long', day: 'numeric', month: 'long' })}</p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <button type="button" onClick={() => open(phone.widgetPhoto ? 'gallery' : 'settings')} className={`relative grid aspect-square place-items-center overflow-hidden rounded-2xl ${glass}`} aria-label={phone.widgetPhoto ? labels.gallery : es ? 'Elegir foto del widget' : 'Choose widget photo'}>
-                {phone.widgetPhoto ? <img src={widgetImage || undefined} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <Image size={23} />}
-              </button>
-              <button type="button" onClick={() => open('music')} className={`flex min-w-0 flex-col justify-between rounded-2xl p-3 text-left ${glass}`}>
-                {trackCover ? <img src={trackCover} alt="" className="size-10 rounded-lg object-cover" /> : <Music2 size={20} className="text-primary" />}
-                <span className="mt-2 block min-w-0"><span className="block truncate text-sm font-semibold">{phone.lastTrack?.title ?? 'ECHO Music'}</span>
-                <span className="block truncate text-xs text-white/70">{phone.lastTrack ? (es ? 'Último tema' : 'Last played') : (es ? 'Biblioteca' : 'Library')}</span></span>
-              </button>
+          {(['first', 'second'] as const).map(region => <section key={region} data-phone-region={region}
+            aria-label={region === 'first' ? (es ? 'Inicio' : 'Home') : (es ? 'Aplicaciones' : 'Apps')}
+            className="w-full shrink-0 snap-start overflow-y-auto px-5 py-[clamp(12px,4dvh,36px)]">
+            <div className="grid grid-cols-6 items-start gap-x-3 gap-y-5">
+              {layout[region].map(item => renderItem(item, region))}
+              {arranging && <button type="button" disabled={!selectedItem} onClick={() => selectedItem && moveItem(selectedItem, region)}
+                className="col-span-6 min-h-12 rounded-xl border border-dashed border-white/30 px-2 text-xs text-white/75">
+                {es ? 'Mover acá' : 'Move here'}
+              </button>}
             </div>
-          </section>
-          <section aria-label={es ? 'Aplicaciones' : 'Apps'} className="w-full shrink-0 snap-start overflow-y-auto px-5 py-7">
-            <div className="grid grid-cols-3 gap-y-6">
-              {!phone.pulseHidden && tile('Pulse', <Activity size={21} />, 'pulse')}
-              {tile(labels.notes, <StickyNote size={20} />, 'notes')}
-              {tile('Secret Space', <BookOpen size={20} />, 'diary')}
-              {tile(labels.calendar, <CalendarDays size={20} />, 'calendar')}
-              {tile(labels.settings, <Settings size={20} />, 'settings')}
-            </div>
-          </section>
+          </section>)}
         </div>
+        {dragPreview && <span aria-hidden="true" className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-full px-3 py-2 text-xs ${glass}`}
+          style={{ left: dragPreview.x, top: dragPreview.y - 12 }}>{titles[dragPreview.item]}</span>}
         <nav className="flex shrink-0 justify-center gap-1" aria-label={es ? 'Pantallas del celular' : 'Phone pages'}>
-          {[0, 1].map(index => <button key={index} type="button" aria-current={showPage === index ? 'page' : undefined} aria-label={es ? `Pantalla ${index + 1}` : `Page ${index + 1}`} className="grid size-9 place-items-center" onClick={() => pager.current?.scrollTo({ left: index * (pager.current?.clientWidth ?? 0), behavior: 'smooth' })}><span className={`size-1.5 rounded-full ${showPage === index ? 'bg-primary' : 'bg-white/45'}`} /></button>)}
+          {(['first', 'second'] as const).map((region, index) => <button key={region} type="button"
+            data-phone-region={arranging ? region : undefined}
+            aria-current={showPage === index ? 'page' : undefined} aria-label={es ? `Pantalla ${index + 1}` : `Page ${index + 1}`}
+            className={arranging ? 'min-h-9 rounded-full border border-white/20 px-3 text-xs' : 'grid size-9 place-items-center'}
+            onClick={() => selectedItem && arranging ? moveItem(selectedItem, region) : scrollPage(index)}>
+            {arranging ? (es ? `Pantalla ${index + 1}` : `Page ${index + 1}`) : <span className={`size-1.5 rounded-full ${showPage === index ? 'bg-primary' : 'bg-white/45'}`} />}
+          </button>)}
         </nav>
-        <div className={`mx-4 mb-[max(12px,env(safe-area-inset-bottom))] grid shrink-0 grid-cols-4 gap-2 rounded-3xl p-2 ${glass}`}>
-          {tile(es ? 'Mensajes' : 'Messages', <MessageCircle size={20} />, { href: isActive ? '/messages' : `/messages/${encodeURIComponent(account.id)}` }, true)}
-          {tile('ECHO', <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="size-7 rounded-full object-contain opacity-90 mix-blend-screen" />, { href: `/profile/${encodeURIComponent(account.id)}` }, true)}
-          {tile(labels.gallery, <Image size={21} />, 'gallery', true)}
-          {tile(labels.music, <Music2 size={20} />, 'music', true)}
+        <div data-phone-region="dock" className={`mx-4 mb-[max(12px,env(safe-area-inset-bottom))] mt-1 grid min-h-16 shrink-0 grid-cols-4 gap-2 rounded-3xl p-2 ${glass}`}>
+          {layout.dock.map(item => renderItem(item, 'dock'))}
+          {arranging && layout.dock.length < 4 && <button type="button" aria-label={es ? 'Mover al dock' : 'Move to dock'} disabled={!selectedItem || isWidget(selectedItem)}
+            onClick={() => selectedItem && moveItem(selectedItem, 'dock')} className="rounded-xl border border-dashed border-white/30 text-lg">+</button>}
         </div>
       </div>
     </main>
