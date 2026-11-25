@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import communityCommentsRouter from "./community-comments";
+import characterPhoneRouter from "./character-phone";
 import groupDmsRouter from "./group-dms";
 import dmRequestsRouter from "./dm-requests";
 import { dmConversationPreferencesRouter } from "./dm-conversation-preferences";
@@ -41,6 +42,7 @@ router.use(createOwnerConsentRouter());
 
 router.use(healthRouter);
 router.use(communityCommentsRouter);
+router.use(characterPhoneRouter);
 router.use(groupDmsRouter);
 router.use(dmRequestsRouter);
 router.use(dmConversationPreferencesRouter);

@@ -44,7 +44,7 @@ export async function sendKindroidSocialGroupContext(
  */
 const groupQueues = new Map<string, Promise<void>>();
 
-async function withGroupLock<T>(groupId: string, run: () => Promise<T>): Promise<T> {
+export async function withGroupLock<T>(groupId: string, run: () => Promise<T>): Promise<T> {
   const previous = groupQueues.get(groupId) ?? Promise.resolve();
   let release!: () => void;
   const current = new Promise<void>(resolve => { release = resolve; });

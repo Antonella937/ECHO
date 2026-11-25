@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type UIEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { customFetch } from '@workspace/api-client-react';
-import { Activity, CalendarDays, ChevronLeft, ChevronRight, Image, MessageCircle, Music2, Settings, StickyNote, Trash2 } from 'lucide-react';
+import { Activity, CalendarDays, ChevronLeft, ChevronRight, Image, MessageCircle, Music2, Settings, StickyNote, Trash2, BookOpen, Pencil, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterPostGallery } from '@/components/characters/post-gallery';
@@ -9,10 +9,10 @@ import { useLanguage } from '@/lib/i18n';
 import { compressImage, useMediaResolver } from '@/lib/media';
 import { useSocial } from '@/store/social-store';
 
-type Screen = 'home' | 'settings' | 'gallery' | 'music' | 'notes' | 'calendar' | 'pulse';
+type Screen = 'home' | 'settings' | 'gallery' | 'music' | 'notes' | 'calendar' | 'pulse' | 'diary';
 type Entry = { id: string; text: string; date?: string };
 type Track = { id: string; title: string; artistName?: string | null; coverPath?: string | null; characterId: string; status: string; audioPath?: string | null };
-type Phone = { pulseHidden?: boolean; wallpaper?: string; widgetPhoto?: string; notes?: Entry[]; events?: Entry[]; lastTrack?: Track };
+type Phone = { pulseHidden?: boolean; wallpaper?: string; widgetPhoto?: string; notes?: Entry[]; diary?: Entry[]; events?: Entry[]; lastTrack?: Track };
 type PulsePost = Entry & { characterId: string; parentId?: string; quoteId?: string };
 
 function readLocal<T>(key: string, fallback: T): T {
@@ -52,6 +52,12 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
+  const [editingId, setEditingId] = useState<string>();
+  const [direction, setDirection] = useState('');
+  const [showDraftTools, setShowDraftTools] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const draftRequest = useRef(0);
+  const textLimit = screen === 'pulse' ? 280 : screen === 'diary' ? 700 : 500;
   const [date, setDate] = useState('');
   const [response, setResponse] = useState<{ id: string; kind: 'reply' | 'quote' } | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; mediaRef: string }[]>([]);
@@ -68,6 +74,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   }, []);
   useEffect(() => () => {
     trackRequest.current++;
+    draftRequest.current++;
     if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
   }, []);
   useEffect(() => {
@@ -95,8 +102,17 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   }, [screen, account.id, es]);
 
   function save(next: Phone) {
-    try { localStorage.setItem(key, JSON.stringify(next)); setPhone(next); setError(''); }
-    catch { setError(es ? 'No se pudo guardar en este navegador.' : 'Could not save in this browser.'); }
+    try { localStorage.setItem(key, JSON.stringify(next)); setPhone(next); setError(''); return true; }
+    catch { setError(es ? 'No se pudo guardar en este navegador.' : 'Could not save in this browser.'); return false; }
+  }
+  function resetDraft() {
+    draftRequest.current++;
+    setDrafting(false);
+    setDraft('');
+    setEditingId(undefined);
+    setDirection('');
+    setShowDraftTools(false);
+    setResponse(null);
   }
   function open(next: Screen) {
     if (screen === 'music') {
@@ -107,8 +123,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
       setLoadingTrack(undefined);
     }
     setError('');
-    setDraft('');
-    setResponse(null);
+    resetDraft();
     setScreen(next);
     if (next === 'home') setShowPage(0);
   }
@@ -132,22 +147,55 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
     } catch { if (request === trackRequest.current) setError(es ? 'No se pudo reproducir el tema.' : 'Could not play this track.'); }
     finally { if (request === trackRequest.current) setLoadingTrack(undefined); }
   }
+  async function draftWithKindroid() {
+    if (drafting || (screen !== 'pulse' && screen !== 'notes' && screen !== 'diary')) return;
+    const request = ++draftRequest.current;
+    setDrafting(true);
+    setError('');
+    try {
+      const target = response && pulse.find(item => item.id === response.id);
+      const result = await customFetch<{ text: string }>('/api/character-phone/draft', {
+        method: 'POST', responseType: 'json', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ universeId, characterId: account.id, kind: screen, draft, direction, replyContext: target ? target.text : '' }),
+      });
+      if (request === draftRequest.current) setDraft(result.text);
+    } catch (error) {
+      if (request !== draftRequest.current) return;
+      const code = (error as { data?: { error?: string } }).data?.error;
+      setError(code === 'PHONE_KINDROID_NOT_LINKED' || code === 'PHONE_KINDROID_GROUP_UNAVAILABLE'
+        ? (es ? 'Kindroid todavía no está configurado para esta app del personaje.' : 'Kindroid is not set up for this character app.')
+        : (es ? 'No se pudo preparar el borrador con Kindroid.' : 'Could not draft with Kindroid.'));
+    } finally { if (request === draftRequest.current) setDrafting(false); }
+  }
   function publish(event: FormEvent) {
     event.preventDefault();
-    const value = draft.trim();
-    if (!value || (screen === 'calendar' && !date)) return;
-    const item = { id: crypto.randomUUID(), text: value };
+    const text = draft.trim();
+    if (drafting || !text || text.length > textLimit || (screen === 'calendar' && !date)) return;
+    const item = { id: crypto.randomUUID(), text };
     if (screen === 'pulse') {
-      const next = [{ ...item, characterId: account.id, date: new Date().toISOString(),
-        ...(response?.kind === 'reply' ? { parentId: response.id } : {}),
-        ...(response?.kind === 'quote' ? { quoteId: response.id } : {}),
-      }, ...pulse];
+      const next = editingId
+        ? pulse.map(post => post.id === editingId && post.characterId === account.id ? { ...post, text } : post)
+        : [{ ...item, characterId: account.id, date: new Date().toISOString(),
+            ...(response?.kind === 'reply' ? { parentId: response.id } : {}),
+            ...(response?.kind === 'quote' ? { quoteId: response.id } : {}),
+          }, ...pulse];
       try { localStorage.setItem(pulseKey, JSON.stringify(next)); setPulse(next); }
       catch { setError(es ? 'No se pudo guardar el post.' : 'Could not save the post.'); return; }
-      setResponse(null);
-    } else if (screen === 'calendar') save({ ...phone, events: [...(phone.events ?? []), { ...item, date }] });
-    else save({ ...phone, notes: [item, ...(phone.notes ?? [])] });
-    setDraft('');
+    } else {
+      const collection = screen === 'calendar' ? 'events' : screen === 'diary' ? 'diary' : 'notes';
+      const list = phone[collection] ?? [];
+      const next = editingId ? list.map(entry => entry.id === editingId ? { ...entry, text, ...(screen === 'calendar' ? { date } : {}) } : entry)
+        : [{ ...item, ...(screen === 'calendar' ? { date } : screen === 'diary' ? { date: new Date().toISOString() } : {}) }, ...list];
+      if (!save({ ...phone, [collection]: next })) return;
+    }
+    resetDraft();
+  }
+  function edit(item: Entry) {
+    resetDraft();
+    setEditingId(item.id);
+    setDraft(item.text);
+    if (screen === 'calendar') setDate(item.date ?? '');
+    document.getElementById('phone-entry-editor')?.scrollIntoView({ block: 'center' });
   }
 
   const timeZone = account.configuration?.routine?.timezone;
@@ -157,7 +205,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   };
   const labels = {
     home: account.name, settings: es ? 'Personalizar' : 'Customize', gallery: es ? 'Carrete' : 'Camera roll',
-    music: 'ECHO Music', notes: es ? 'Notas' : 'Notes', calendar: es ? 'Calendario' : 'Calendar', pulse: 'Pulse',
+    music: 'ECHO Music', diary: es ? 'Diario' : 'Diary', notes: es ? 'Notas' : 'Notes', calendar: es ? 'Calendario' : 'Calendar', pulse: 'Pulse',
   };
   const glass = 'border border-white/20 bg-white/[0.10] shadow-[inset_0_1px_0_rgb(255_255_255/0.10)] backdrop-blur-xl';
   const glassControl = `grid size-11 place-items-center rounded-full ${glass} hover:bg-white/20`;
@@ -212,6 +260,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
             <div className="grid grid-cols-3 gap-y-6">
               {!phone.pulseHidden && tile('Pulse', <Activity size={21} />, 'pulse')}
               {tile(labels.notes, <StickyNote size={20} />, 'notes')}
+              {tile(labels.diary, <BookOpen size={20} />, 'diary')}
               {tile(labels.calendar, <CalendarDays size={20} />, 'calendar')}
               {tile(labels.settings, <Settings size={20} />, 'settings')}
             </div>
@@ -231,7 +280,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   );
 
   const pulseTarget = response ? pulse.find(item => item.id === response.id) : undefined;
-  const entries = screen === 'calendar' ? [...(phone.events ?? [])].sort((first, second) => (first.date ?? '').localeCompare(second.date ?? '')) : phone.notes ?? [];
+  const entries = screen === 'calendar' ? [...(phone.events ?? [])].sort((first, second) => (first.date ?? '').localeCompare(second.date ?? '')) : (screen === 'diary' ? phone.diary : phone.notes) ?? [];
   return <main className="relative isolate mx-auto min-h-[100dvh] max-w-[520px] px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-safe text-white">
     {backdrop}
     <header className={`sticky top-[env(safe-area-inset-top)] z-10 mt-2 flex items-center gap-3 rounded-2xl px-2 py-1.5 ${glass}`}>
@@ -277,15 +326,27 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
       </button>)}
       {isActive && <Link href="/music" className="inline-block text-sm text-primary">{es ? 'Abrir ECHO Music' : 'Open ECHO Music'}</Link>}
     </section>}
-    {(screen === 'notes' || screen === 'calendar' || screen === 'pulse') && <section className="mt-4 space-y-3">
-      <form onSubmit={publish} className={`space-y-2 rounded-2xl p-3 ${glass}`}>
+    {(screen === 'notes' || screen === 'calendar' || screen === 'pulse' || screen === 'diary') && <section className="mt-4 space-y-3">
+      <form id="phone-entry-editor" onSubmit={publish} className={`space-y-2 rounded-2xl p-3 ${glass}`}>
         {pulseTarget && <div className="flex justify-between gap-2 text-xs text-muted-foreground">
           <span className="truncate">{response?.kind === 'reply' ? (es ? 'En respuesta a' : 'Replying to') : (es ? 'Citando' : 'Quoting')} @{character(pulseTarget.characterId)?.handle}</span>
           <button type="button" onClick={() => setResponse(null)}>{es ? 'Cancelar' : 'Cancel'}</button>
         </div>}
         {screen === 'calendar' && <input type="date" required aria-label={es ? 'Fecha' : 'Date'} value={date} onChange={event => setDate(event.target.value)} className={fieldClass} />}
-        <textarea rows={3} required aria-label={labels[screen]} placeholder={screen === 'pulse' ? (es ? `Escribir como @${account.handle}` : `Post as @${account.handle}`) : undefined} maxLength={screen === 'pulse' ? 280 : 500} value={draft} onChange={event => setDraft(event.target.value)} className={fieldClass} />
-        <button className={primaryClass} disabled={!draft.trim()}>{screen === 'pulse' ? (es ? 'Publicar' : 'Post') : (es ? 'Guardar' : 'Save')}</button>
+        <textarea rows={3} required aria-label={labels[screen]} placeholder={screen === 'pulse' ? (es ? `Escribir como @${account.handle}` : `Post as @${account.handle}`) : undefined} maxLength={textLimit} disabled={drafting} value={draft} onChange={event => setDraft(event.target.value)} className={fieldClass} />
+        {screen !== 'calendar' && <button type="button" aria-expanded={showDraftTools} onClick={() => setShowDraftTools(value => !value)} className="flex items-center gap-2 py-2 text-sm text-primary">
+          <Sparkles size={16} /> {es ? 'Escribir con Kindroid' : 'Write with Kindroid'}
+        </button>}
+        {showDraftTools && <div className="space-y-2 rounded-xl border border-white/15 p-3">
+          <input className={fieldClass} aria-label={es ? 'Indicaciones para Kindroid' : 'Instructions for Kindroid'} placeholder={es ? 'De qué escribir o qué cambiar' : 'What to write or change'} maxLength={300} value={direction} disabled={drafting} onChange={event => setDirection(event.target.value)} />
+          <button type="button" disabled={drafting} onClick={() => void draftWithKindroid()} className="text-sm font-semibold text-primary disabled:opacity-50">
+            {drafting ? (es ? 'Preparando borrador…' : 'Drafting…') : draft.trim() ? (es ? 'Reescribir borrador' : 'Rewrite draft') : (es ? 'Generar borrador' : 'Generate draft')}
+          </button>
+        </div>}
+        <div className="flex flex-wrap items-center gap-3">
+          <button className={primaryClass} disabled={!draft.trim() || drafting}>{screen === 'pulse' && !editingId ? (es ? 'Publicar' : 'Post') : (es ? 'Guardar' : 'Save')}</button>
+          {editingId && <button type="button" className="text-sm" onClick={resetDraft}>{es ? 'Cancelar' : 'Cancel'}</button>}
+        </div>
       </form>
       {screen === 'pulse' ? pulse.filter(item => character(item.characterId) && !character(item.characterId)?.archived).map(item => {
         const author = character(item.characterId);
@@ -296,8 +357,9 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
           <p className="whitespace-pre-wrap break-words">{item.text}</p>
           {item.quoteId && target && <blockquote className="break-words rounded-xl border border-border p-2 text-xs">@{character(target.characterId)?.handle} · {target.text}</blockquote>}
           <div className="flex gap-4 text-xs text-primary">
-            <button type="button" onClick={() => setResponse({ id: item.id, kind: 'reply' })}>{es ? 'Responder' : 'Reply'}</button>
-            <button type="button" onClick={() => setResponse({ id: item.id, kind: 'quote' })}>{es ? 'Citar' : 'Quote'}</button>
+            <button type="button" onClick={() => { resetDraft(); setResponse({ id: item.id, kind: 'reply' }); }}>{es ? 'Responder' : 'Reply'}</button>
+            <button type="button" onClick={() => { resetDraft(); setResponse({ id: item.id, kind: 'quote' }); }}>{es ? 'Citar' : 'Quote'}</button>
+            {item.characterId === account.id && <button type="button" onClick={() => edit(item)}>{es ? 'Editar' : 'Edit'}</button>}
           </div>
         </article>;
       }) : entries.map(item => <article key={item.id} className={`flex items-start gap-3 rounded-2xl p-3 text-sm ${glass}`}>
@@ -305,7 +367,8 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
           {item.date && <time dateTime={item.date} className="text-xs text-muted-foreground">{item.date}</time>}
           <p className="whitespace-pre-wrap break-words">{item.text}</p>
         </div>
-        <button type="button" aria-label={es ? 'Eliminar' : 'Delete'} onClick={() => save({ ...phone, [screen === 'calendar' ? 'events' : 'notes']: entries.filter(entry => entry.id !== item.id) })}><Trash2 size={17} /></button>
+        <button type="button" aria-label={es ? 'Editar' : 'Edit'} onClick={() => edit(item)}><Pencil size={17} /></button>
+        <button type="button" aria-label={es ? 'Eliminar'  : 'Delete'} onClick={() => save({ ...phone, [screen === 'calendar' ? 'events' : screen === 'diary' ? 'diary' : 'notes']: entries.filter(entry => entry.id !== item.id) })}><Trash2 size={17} /></button>
       </article>)}
     </section>}
   </main>;
