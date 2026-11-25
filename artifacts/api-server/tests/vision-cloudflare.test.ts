@@ -15,6 +15,7 @@ test("Cloudflare receives image bytes inline and returns a validated analysis", 
     assert.match(String(endpoint), /api\.cloudflare\.com\/.*\/ai\/v1\/chat\/completions$/);
     const input = JSON.parse(String(request?.body));
     assert.equal(input.store, false);
+    assert.deepEqual(input.chat_template_kwargs, { enable_thinking: false });
     assert.equal(input.model, "@cf/google/gemma-4-26b-a4b-it");
     assert.equal(input.messages[0].content[0].image_url.url, "data:image/jpeg;base64,aW1hZ2U=");
     return Response.json({
