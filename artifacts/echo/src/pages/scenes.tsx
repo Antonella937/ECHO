@@ -145,9 +145,18 @@ export default function ScenesPage() {
   };
   const pendingPhoto = scenePhoto?.sceneId === selected ? scenePhoto.file : null;
   const send = async (e:FormEvent) => {e.preventDefault();if(!selected||(!message.trim()&&!pendingPhoto))return;setBusy(true);setError('');
+    if (active?.turnSettings?.kindroidGroupId && message.trim().length > 1500) {
+      setBusy(false);
+      setError(es ? 'Kindroid admite hasta 1500 caracteres por mensaje. Separá el texto en dos envíos.' : 'Kindroid allows up to 1,500 characters per message. Split the text into two messages.');
+      return;
+    }
     try {const photo = pendingPhoto ? await uploadPrivateFile(pendingPhoto) : undefined;
-      await customFetch('/api/scenes/events',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,sceneId:selected,actorId:me.id,text:message.trim(),visibility:'participants',audienceIds:[],photo:photo ? { id: photo.id, url: photo.url } : undefined})});setMessage('');setScenePhoto(null);
+      const delivery = await customFetch<{ kindroidDelivery?: 'not_linked' | 'sent' | 'failed' }>('/api/scenes/events',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,sceneId:selected,actorId:me.id,text:message.trim(),visibility:'participants',audienceIds:[],photo:photo ? { id: photo.id, url: photo.url } : undefined})});setMessage('');setScenePhoto(null);
       const r=await customFetch<{events:SceneEvent[]}>(`/api/scenes/${encodeURIComponent(selected)}/events?${new URLSearchParams({universeId,viewerId:me.id})}`,{method:'GET',responseType:'json'});setEvents(r.events);
+      if (delivery.kindroidDelivery === 'failed') {
+        setError(es ? 'El mensaje quedó guardado en ECHO. No se pudo confirmar la entrega a Kindroid.' : 'The message was saved in ECHO. Delivery to Kindroid could not be confirmed.');
+        return;
+      }
       if(active?.turnSettings?.autoReply && active?.status==='active' && active.turnSettings?.mode!=='manual'){
         const ai=active.participantIds.filter(id=>id!==me.id && (presence[id]??'present')==='present');
         const turn=active.turnSettings;
