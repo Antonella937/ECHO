@@ -10,7 +10,7 @@ import { compressImage, useMediaResolver } from '@/lib/media';
 import { useSocial } from '@/store/social-store';
 
 type Screen = 'home' | 'settings' | 'gallery' | 'music' | 'notes' | 'calendar' | 'pulse' | 'diary';
-type Entry = { id: string; text: string; date?: string };
+type Entry = { id: string; text: string; date?: string; title?: string };
 type Track = { id: string; title: string; artistName?: string | null; coverPath?: string | null; characterId: string; status: string; audioPath?: string | null };
 type Phone = { pulseHidden?: boolean; wallpaper?: string; widgetPhoto?: string; notes?: Entry[]; diary?: Entry[]; events?: Entry[]; lastTrack?: Track };
 type PulsePost = Entry & { characterId: string; parentId?: string; quoteId?: string };
@@ -52,12 +52,13 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
   const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
+  const [diaryTitle, setDiaryTitle] = useState('');
   const [editingId, setEditingId] = useState<string>();
   const [direction, setDirection] = useState('');
   const [showDraftTools, setShowDraftTools] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const draftRequest = useRef(0);
-  const textLimit = screen === 'pulse' ? 280 : screen === 'diary' ? 700 : 500;
+  const textLimit = screen === 'pulse' ? 280 : screen === 'diary' ? 6000 : 500;
   const [date, setDate] = useState('');
   const [response, setResponse] = useState<{ id: string; kind: 'reply' | 'quote' } | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<{ id: string; mediaRef: string }[]>([]);
@@ -110,6 +111,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
     setDrafting(false);
     setDraft('');
     setEditingId(undefined);
+    setDiaryTitle('');
     setDirection('');
     setShowDraftTools(false);
     setResponse(null);
@@ -184,8 +186,9 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
     } else {
       const collection = screen === 'calendar' ? 'events' : screen === 'diary' ? 'diary' : 'notes';
       const list = phone[collection] ?? [];
-      const next = editingId ? list.map(entry => entry.id === editingId ? { ...entry, text, ...(screen === 'calendar' ? { date } : {}) } : entry)
-        : [{ ...item, ...(screen === 'calendar' ? { date } : screen === 'diary' ? { date: new Date().toISOString() } : {}) }, ...list];
+      const title = screen === 'diary' ? { title: diaryTitle.trim() } : {};
+      const next = editingId ? list.map(entry => entry.id === editingId ? { ...entry, text, ...title, ...(screen === 'calendar' ? { date } : {}) } : entry)
+        : [{ ...item, ...title, ...(screen === 'calendar' ? { date } : screen === 'diary' ? { date: new Date().toISOString() } : {}) }, ...list];
       if (!save({ ...phone, [collection]: next })) return;
     }
     resetDraft();
@@ -194,18 +197,19 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
     resetDraft();
     setEditingId(item.id);
     setDraft(item.text);
+    setDiaryTitle(item.title ?? '');
     if (screen === 'calendar') setDate(item.date ?? '');
     document.getElementById('phone-entry-editor')?.scrollIntoView({ block: 'center' });
   }
 
   const timeZone = account.configuration?.routine?.timezone;
-  const formatTime = (options: Intl.DateTimeFormatOptions) => {
-    try { return new Intl.DateTimeFormat(language, { ...options, timeZone }).format(now); }
-    catch { return new Intl.DateTimeFormat(language, options).format(now); }
+  const formatTime = (options: Intl.DateTimeFormatOptions, value = now) => {
+    try { return new Intl.DateTimeFormat(language, { ...options, timeZone }).format(value); }
+    catch { return new Intl.DateTimeFormat(language, options).format(value); }
   };
   const labels = {
     home: account.name, settings: es ? 'Personalizar' : 'Customize', gallery: es ? 'Carrete' : 'Camera roll',
-    music: 'ECHO Music', diary: es ? 'Diario' : 'Diary', notes: es ? 'Notas' : 'Notes', calendar: es ? 'Calendario' : 'Calendar', pulse: 'Pulse',
+    music: 'ECHO Music', diary: es ? 'Diario privado' : 'Private diary', notes: es ? 'Notas' : 'Notes', calendar: es ? 'Calendario' : 'Calendar', pulse: 'Pulse',
   };
   const glass = 'border border-white/20 bg-white/[0.10] shadow-[inset_0_1px_0_rgb(255_255_255/0.10)] backdrop-blur-xl';
   const glassControl = `grid size-11 place-items-center rounded-full ${glass} hover:bg-white/20`;
@@ -260,7 +264,7 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
             <div className="grid grid-cols-3 gap-y-6">
               {!phone.pulseHidden && tile('Pulse', <Activity size={21} />, 'pulse')}
               {tile(labels.notes, <StickyNote size={20} />, 'notes')}
-              {tile(labels.diary, <BookOpen size={20} />, 'diary')}
+              {tile('Secret Space', <BookOpen size={20} />, 'diary')}
               {tile(labels.calendar, <CalendarDays size={20} />, 'calendar')}
               {tile(labels.settings, <Settings size={20} />, 'settings')}
             </div>
@@ -333,7 +337,10 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
           <button type="button" onClick={() => setResponse(null)}>{es ? 'Cancelar' : 'Cancel'}</button>
         </div>}
         {screen === 'calendar' && <input type="date" required aria-label={es ? 'Fecha' : 'Date'} value={date} onChange={event => setDate(event.target.value)} className={fieldClass} />}
-        <textarea rows={3} required aria-label={labels[screen]} placeholder={screen === 'pulse' ? (es ? `Escribir como @${account.handle}` : `Post as @${account.handle}`) : undefined} maxLength={textLimit} disabled={drafting} value={draft} onChange={event => setDraft(event.target.value)} className={fieldClass} />
+        {screen === 'diary' && <input className={fieldClass} value={diaryTitle} maxLength={100} disabled={drafting}
+          aria-label={es ? 'Título de la entrada' : 'Entry title'} placeholder={es ? 'Título de la entrada' : 'Entry title'}
+          onChange={event => setDiaryTitle(event.target.value)} />}
+        <textarea rows={screen === 'diary' ? 10 : 3} required aria-label={labels[screen]} placeholder={screen === 'pulse' ? (es ? `Escribir como @${account.handle}` : `Post as @${account.handle}`) : undefined} maxLength={textLimit} disabled={drafting} value={draft} onChange={event => setDraft(event.target.value)} className={fieldClass} />
         {screen !== 'calendar' && <button type="button" aria-expanded={showDraftTools} onClick={() => setShowDraftTools(value => !value)} className="flex items-center gap-2 py-2 text-sm text-primary">
           <Sparkles size={16} /> {es ? 'Escribir con Kindroid' : 'Write with Kindroid'}
         </button>}
@@ -362,13 +369,33 @@ function PhoneView({ account, ownerKey, universeId, isActive }: {
             {item.characterId === account.id && <button type="button" onClick={() => edit(item)}>{es ? 'Editar' : 'Edit'}</button>}
           </div>
         </article>;
+      }) : screen === 'diary' ? entries.map(item => {
+        const created = item.date ? new Date(item.date) : null;
+        const stamp = created && Number.isFinite(created.getTime())
+          ? formatTime({ day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }, created) : null;
+        return <details key={item.id} className={`rounded-3xl px-5 py-4 sm:px-7 ${glass}`}>
+          <summary className="cursor-pointer">
+            {stamp && <time dateTime={item.date} className="mb-2 block text-xs text-white/70">{stamp}</time>}
+            <span className="break-words font-[family-name:Instrument_Serif,Georgia,serif] text-3xl">
+              {item.title || (es ? 'Entrada sin título' : 'Untitled entry')}
+            </span>
+          </summary>
+          <p className="mt-5 whitespace-pre-wrap break-words text-base leading-[1.95] text-white/90">{item.text}</p>
+          <div className="mt-5 flex justify-end border-t border-white/15 pt-3">
+            <button type="button" onClick={() => edit(item)} className="flex min-h-11 items-center gap-2 px-2 text-sm text-primary">
+              <Pencil size={16} /> {es ? 'Editar' : 'Edit'}
+            </button>
+            <button type="button" aria-label={es ? 'Eliminar' : 'Delete'} className="grid size-11 place-items-center"
+              onClick={() => { if (window.confirm(es ? '¿Eliminar esta entrada?' : 'Delete this entry?')) save({ ...phone, diary: entries.filter(entry => entry.id !== item.id) }); }}><Trash2 size={17} /></button>
+          </div>
+        </details>;
       }) : entries.map(item => <article key={item.id} className={`flex items-start gap-3 rounded-2xl p-3 text-sm ${glass}`}>
         <div className="min-w-0 flex-1">
           {item.date && <time dateTime={item.date} className="text-xs text-muted-foreground">{item.date}</time>}
           <p className="whitespace-pre-wrap break-words">{item.text}</p>
         </div>
         <button type="button" aria-label={es ? 'Editar' : 'Edit'} onClick={() => edit(item)}><Pencil size={17} /></button>
-        <button type="button" aria-label={es ? 'Eliminar'  : 'Delete'} onClick={() => save({ ...phone, [screen === 'calendar' ? 'events' : screen === 'diary' ? 'diary' : 'notes']: entries.filter(entry => entry.id !== item.id) })}><Trash2 size={17} /></button>
+        <button type="button" aria-label={es ? 'Eliminar'  : 'Delete'} onClick={() => save({ ...phone, [screen === 'calendar' ? 'events' : 'notes']: entries.filter(entry => entry.id !== item.id) })}><Trash2 size={17} /></button>
       </article>)}
     </section>}
   </main>;
