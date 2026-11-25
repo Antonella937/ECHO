@@ -12,6 +12,7 @@ import { kindroidDmProvider, kindroidStoryDecisionProvider, kindroidLikeDecision
 import { canCharacterViewCloseFriendsStory } from '../lib/storySharePolicy';
 import { buildCharacterContext } from './context';
 import { visibleSeenStoriesForKindroid, kindroidMemoryAllowed } from '../lib/kindroidSocialPrivacy';
+import { describeSharedMusic } from '../lib/musicListening';
 import { relevantWorldJournals } from '../lib/worldJournalRecall';
 
 /** Owner must come from verified server authentication, never from request JSON. */
@@ -183,6 +184,9 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     // technical groups are visible through the same post thread, not through
     // another group's private chat history.
     const threadPost = post ?? commentParentPost;
+    const musicClip = (story ?? threadPost)?.musicClip;
+    const musicContext = musicClip && input.situation === 'comment'
+      ? await describeSharedMusic(ownerId, musicClip.trackId, musicClip).catch(() => null) : null;
     const visibleThread = threadPost
       ? parsed.data.state.comments.filter(item => item.postId === threadPost.id)
           .slice(-8).map(item => {
@@ -199,6 +203,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       (post ?? commentParentPost) ? `Visible post by ${parsed.data.state.characters.find(c => c.id === (post ?? commentParentPost)!.authorId)?.name ?? (post ?? commentParentPost)!.authorId}: ${((post ?? commentParentPost)!.caption ?? '[image or post without caption; visual content not analyzed]').slice(0,500)}` : '',
       comment ? `Visible comment by ${parsed.data.state.characters.find(c => c.id === comment.authorId)?.name ?? comment.authorId}: ${comment.text.slice(0,300)}` : '',
       story ? `Visible story by ${parsed.data.state.characters.find(c => c.id === story.authorId)?.name ?? story.authorId}: ${(story.caption ?? '[story without caption; visual content not analyzed]').slice(0,400)}` : '',
+      musicContext ? `Audio observations from the attached excerpt: ${musicContext}` : '',
       visibleThread ? `Recent visible comments in this ECHO thread (across all Kindroid groups):\n${visibleThread}` : '',
 
       'Use only this visible ECHO event; do not infer unseen image content or private messages.',
@@ -272,7 +277,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
       const activeThread = newest ? thread.filter(m => m.threadId === newest.threadId) : [];
       // The SocialState DM schema may not expose an attachment array.
       // Read optional metadata defensively without assuming media bytes exist.
-      const describeDmMessage = (message: (typeof thread)[number], omitImageMarker = false) => {
+      const describeDmMessage = (message: (typeof thread)[number], omitImageMarker = false, musicDescription?: string) => {
         const record = message as unknown as Record<string, unknown>;
         // Preserve complete ordinary multi-paragraph DMs (including closing questions).
         // Bound exceptionally long messages to protect the Kindroid prompt budget.
@@ -293,7 +298,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           return `[${type} attachment shared in ECHO${metadata ? `, ${metadata}` : ''}${duration}; content not analyzed]`;
         });
         const music = typeof record.musicTrackId === 'string' && record.musicTrackId.trim() 
-          ? `[ECHO Music track shared${typeof record.musicTitle === 'string' ? `: ${record.musicTitle.slice(0, 120)}` : ''}; audio content not analyzed]` : '';
+          ? musicDescription ? `[Music observations: ${musicDescription}]` : `[ECHO Music track shared${typeof record.musicTitle === 'string' ? `: ${record.musicTitle.slice(0, 120)}` : ''}; audio content not analyzed]` : '';
         return [text, music, ...attachments].filter(Boolean).join(' ');
       };
       // A linked Kin writes both direct replies and spontaneous DMs. Never
@@ -351,8 +356,16 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           : incomingPhotos.length
             ? '\n[Photo unavailable]'
             : '';
+        const trackMessage = dependencies.liveDmReply ? incomingBatch.find(message => message.musicTrackId) : undefined;
+        const musicDescription = trackMessage?.musicTrackId
+          ? await describeSharedMusic(ownerId, trackMessage.musicTrackId).catch(() => null)
+          : null;
+        const storyClip = dependencies.liveDmReply ? storyForReply?.musicClip : undefined;
+        const storyMusic = storyClip
+          ? await describeSharedMusic(ownerId, storyClip.trackId, storyClip).catch(() => null)
+          : null;
         const latestIncomingText = incomingBatch.slice().reverse()
-          .map(message => describeDmMessage(message, message.id === newest?.id && incomingPhotos.length > 0))
+          .map(message => describeDmMessage(message, message.id === newest?.id && incomingPhotos.length > 0, message.id === trackMessage?.id ? musicDescription ?? undefined : undefined))
           .filter(Boolean).join('\n')
           .slice(0, 3000 - photoNotes.length) + photoNotes;
         const peerContext = recipientId === parsed.data.state.primaryCharacterId
@@ -379,7 +392,7 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           ? `Media type: ${storyForReply.image ? 'PHOTO (still image, not video or clip)' : 'text-only story (no photo)'}. Tagged accounts: ${storyMentions || 'none'}. Tagged accounts are explicitly named people, but a tag alone does not prove a face's identity. ${namedStorySubject ? `The story explicitly tags ${namedStorySubject}. If the caption refers to a singular person being teased or photographed and the visual observations are consistent, understand that ${namedStorySubject} is the intended subject; refer to ${namedStorySubject} by name, not yourself. If visual evidence conflicts or multiple people make the subject ambiguous, distinguish the tag from what can be seen instead of asserting identity. ` : ''}`
           : '';
         let outgoingPrompt = peerContext + (storyForReply
-          ? `[ECHO story reply: You (${actorName}) are viewing ${recipientName}'s story, not appearing in it. ${storyMetadata} Caption: ${(storyForReply.caption ?? '').slice(0,250)}. ${visualContext} When relevant, respond to a distinctive visual detail such as the observed hair shade or outfit. Tags do not verify faces. Do not claim the photo is yours or invent details. Reply as yourself to ${recipientName}, naturally, with your usual narration and dialogue when appropriate; do not shorten your style.]`
+          ? `[ECHO story reply: You (${actorName}) are viewing ${recipientName}'s story, not appearing in it. ${storyMetadata} Caption: ${(storyForReply.caption ?? '').slice(0,250)}. ${visualContext} ${storyMusic ? `Audio observations from the shared excerpt: ${storyMusic}` : ''} When relevant, respond to a distinctive visual detail such as the observed hair shade or outfit. Tags do not verify faces. Do not claim the photo is yours or invent details. Reply as yourself to ${recipientName}, naturally, with your usual narration and dialogue when appropriate; do not shorten your style.]`
           : isDirectReply
             ? (recipientId === parsed.data.state.primaryCharacterId
                 ? latestIncomingText // Send the owner's actual message, not a fabricated ECHO instruction.

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 import { Router, raw, type IRouter } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -380,7 +381,7 @@ async function openLibraryAudio(path: string, range?: string) {
       if (value) headers.set(name, value);
     }
     headers.set("X-Content-Type-Options", "nosniff");
-    return { status: response.status, headers, body: response.body };
+    return { status: response.status, headers, body: response.body ? Readable.fromWeb(response.body as import("node:stream/web").ReadableStream) : null };
   }
   const storage = new ObjectStorageService();
   const file = await storage.getObjectEntityFile(path);
