@@ -333,8 +333,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           : previousTurns.reverse().map(m =>
               `${m.senderId === input.characterId ? actorName : recipientName}: ${describeDmMessage(m).slice(0, 450)}`).join('\n');
         const photoContext: string[] = [];
-        if (!storyForReply && dependencies.liveDmReply && newest && isDirectReply) {
-          for (const attachment of (newest.attachments ?? []).filter(item => item.type === 'image').slice(0, 2)) {
+        const incomingPhotos = !storyForReply && dependencies.liveDmReply && newest && isDirectReply
+          ? (newest.attachments ?? []).filter(item => item.type === 'image') : [];
+        if (newest) {
+          for (const attachment of incomingPhotos.slice(0, 2)) {
             try {
               const analysis = await visionService.analyzeDmPhoto(ownerId, input.universeId ?? 'primary', newest.id, attachment);
               photoContext.push(describePhoto(analysis).slice(0, 600));
@@ -344,8 +346,10 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
           }
         }
         const photoNotes = photoContext.length
-          ? `\n[ECHO attached photo observations. React naturally to a distinctive visible detail when relevant. Do not infer identity or details outside the photo. \n${photoContext.join('\n')}\n]`
-          : '';
+          ? `\n[ECHO attached photo observations. If asked what stands out or what changed, lead with the most distinctive observed feature, including the visible hair shade if it stands out. Do not substitute remembered details for observations of this photo. Do not infer identity or details outside the photo. \n${photoContext.join('\n')}\n]`
+          : incomingPhotos.length
+            ? '\n[ECHO could not analyze the attached photo. Say you could not make out the image if asked about it. Do not claim to see it or use past photos or memories as visual evidence.]'
+            : '';
         const latestIncomingText = incomingBatch.slice().reverse().map(describeDmMessage).filter(Boolean).join('\n')
           .slice(0, 3000 - photoNotes.length) + photoNotes;
         const peerContext = recipientId === parsed.data.state.primaryCharacterId
