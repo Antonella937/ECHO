@@ -22,6 +22,7 @@ export interface VoiceDecisionInput {
   /** Provider usage budget remaining, in normalized billable characters. */
   remainingCharacters: number;
   messageLength: number;
+  fitsConversation?: boolean;
   random?: () => number;
 }
 
@@ -32,6 +33,7 @@ export function chooseVoiceDelivery(input: VoiceDecisionInput): VoiceDelivery {
     input.remainingCharacters < input.messageLength) return "text";
   // A request from any DM participant does not override the owner-controlled policy.
   if (input.requestedVoice && input.preference !== "off") return "voice";
+  if (!input.fitsConversation) return "text";
   const chance = input.preference === "frequent" ? 0.28 : input.preference === "occasional" ? 0.1 : 0;
   const draw = input.random?.() ?? Math.random();
   return draw >= 0 && draw < chance ? "voice" : "text";
@@ -42,4 +44,18 @@ export function isExplicitVoiceRequest(text: string): boolean {
   const normalized = text.toLocaleLowerCase().trim();
   return /(?:nota de voz|mensaje de voz|audio|voice (?:note|message))/.test(normalized) &&
     /(?:mand[aáe]|envi[aáe]|respond[eéa]|contest[aáe]|grab[aáe]|send|reply|record)/.test(normalized);
+}
+
+/** Read only spoken dialogue. Asterisks and underscores mark roleplay narration. */
+export function getSpokenVoiceText(text: string): string {
+  if (/https?:\/\/|`|\[(?:ECHO|Transcripción)/i.test(text)) return "";
+  const dialogue = text.replace(/\*{1,2}[^*]+\*{1,2}|(?<!\w)_[^_]+_(?!\w)/g, " ")
+    .replace(/\s+/g, " ").trim();
+  return /\p{L}/u.test(dialogue) ? dialogue : "";
+}
+
+/** A short voice note fits affectionate, reassuring, or voice-related moments. */
+export function fitsVoiceConversation(incoming: string, dialogue: string): boolean {
+  return /\b(?:hear (?:your|my) voice|miss (?:you|your voice)|good ?night|good morning|sweet dreams|i(?:'|’)m here|i promise|can(?:'|’)t wait|thinking (?:of|about) you|te extraño|buenas noches|buen día|estoy acá|te prometo|quiero escucharte)\b|[🖤❤️]/iu
+    .test(incoming + " " + dialogue);
 }

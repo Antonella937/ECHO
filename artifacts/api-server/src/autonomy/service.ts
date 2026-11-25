@@ -19,7 +19,7 @@ import {
 } from "./constants";
 import type { LiveExecutionOutcome } from "./executor";
 import { sendNewOwnerPush } from "../lib/onesignal-push";
-import { chooseVoiceDelivery, isExplicitVoiceRequest, type VoiceDecisionInput } from "./voice-policy";
+import { chooseVoiceDelivery, fitsVoiceConversation, getSpokenVoiceText, isExplicitVoiceRequest, type VoiceDecisionInput } from "./voice-policy";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -314,7 +314,7 @@ export async function runAutonomyLiveCycle(
       voiceMessagesToday: number;
       remainingCharacters: number;
       preference: "off" | "occasional" | "frequent";
-      dispatch(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }): Promise<void>;
+      dispatch(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; spokenText: string; voiceId: string }): Promise<void>;
       resolveVoiceId(input: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string | null }): Promise<string | null>;
     };
   },
@@ -627,21 +627,23 @@ export async function runAutonomyLiveCycle(
             message.senderId === character.id && message.recipientId === opportunity.recipientId &&
             message.origin === "autonomy" && message.text === preview.decision.text?.trim());
           const incoming = [...state.messages].reverse().find(message =>
-            message.senderId === opportunity.recipientId && message.recipientId === character.id);
+            message.id === opportunity.messageId && message.senderId === opportunity.recipientId && message.recipientId === character.id);
           const voiceId = await delivery.resolveVoiceId({ ownerId, universeId, characterId: character.id,
             basicVoiceId: character.configuration?.voice?.basicVoiceId });
-          if (outgoing && voiceId && outgoing.text.length <= 180 && !outgoing.attachments?.some(a => a.type === "audio")) {
+          const spokenText = outgoing ? getSpokenVoiceText(outgoing.text) : "";
+          if (outgoing && voiceId && spokenText.length <= 180 && !outgoing.attachments?.some(a => a.type === "audio")) {
             const policy: VoiceDecisionInput = {
               voiceId, ownerEnabled: delivery.ownerEnabled, engineReady: delivery.engineReady,
               requestedVoice: !!incoming && isExplicitVoiceRequest(incoming.text),
               preference: delivery.preference, voiceMessagesToday: delivery.voiceMessagesToday,
               maxVoiceMessagesPerDay: delivery.maxVoiceMessagesPerDay,
-              remainingCharacters: delivery.remainingCharacters, messageLength: outgoing.text.length,
+              remainingCharacters: delivery.remainingCharacters, messageLength: spokenText.length,
+              fitsConversation: fitsVoiceConversation(incoming?.text ?? "", spokenText),
               random: dependencies.random,
             };
             if (chooseVoiceDelivery(policy) === "voice") {
               await delivery.dispatch({ ownerId, universeId, characterId: character.id,
-                messageId: outgoing.id, text: outgoing.text, voiceId });
+                messageId: outgoing.id, text: outgoing.text, spokenText, voiceId });
             }
           }
         }

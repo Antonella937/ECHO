@@ -5,6 +5,7 @@ import { db, pool, echoMediaTable, echoVoiceBudgetsTable, echoVoiceUsageTable, e
 import { SaveUniverseBody } from "@workspace/api-zod";
 import { canUseBasicVoices, resolveEchoPlan } from "../lib/entitlements";
 import { elevenLabsHeaders, elevenLabsVoiceStatus } from "../lib/elevenLabsVoice";
+import { configuredR2, signR2Request } from "../lib/cloudflareR2";
 import { mp3DurationSeconds } from "../lib/mp3Duration";
 import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
 
@@ -14,12 +15,6 @@ const voices: Record<string, string> = {
   "echo-m-02": "am_eric", "echo-m-03": "am_liam", "echo-m-04": "bm_daniel", "echo-m-05": "bm_george",
 };
 const month = () => new Date().toISOString().slice(0, 7);
-const storageReady = () => {
-  const raw = process.env.SUPABASE_URL;
-  if (!raw || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false;
-  try { const url = new URL(raw); return url.protocol === "https:" && url.hostname.endsWith(".supabase.co") && !url.username && !url.password; } catch { return false; }
-};
-
 /** Resolve the selected premium voice from owner-scoped storage; never trust a client voice ID. */
 export async function resolveAutonomousVoiceId({ ownerId, universeId, characterId, basicVoiceId }: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string | null }): Promise<string | null> {
   // A linked social account uses the canonical person's selected Premium voice.
@@ -50,7 +45,7 @@ export async function getVoiceOwnerControls(ownerId: string) {
   if (!await canUseBasicVoices(ownerId)) return null;
   const [row] = await db.select().from(echoVoiceBudgetsTable).where(eq(echoVoiceBudgetsTable.ownerId, ownerId)).limit(1);
   const customReady = await resolveEchoPlan(ownerId) === "premium" && elevenLabsVoiceStatus(ownerId).generationAvailable;
-  const engineReady = storageReady() && (basicVoiceProviderReady() || customReady);
+  const engineReady = !!configuredR2() && (basicVoiceProviderReady() || customReady);
   const enabled = row?.enabled === true && engineReady;
   if (!enabled || !row) return null;
   const [spent] = await db.select({ total: sql<number>`coalesce(sum(${echoVoiceUsageTable.characters}),0)` })
@@ -84,10 +79,9 @@ export async function completeVoiceNarration(ownerId: string, id: string, succee
 }
 
 /** Voice is attached only after the text DM is committed; TTS failures never roll back the text. */
-export async function dispatchAutonomousVoice(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; voiceId: string }) {
-  if (!await canUseBasicVoices(input.ownerId) || !input.text.trim() || input.text.length > 500 || !storageReady()) return;
-  const base = new URL(process.env.SUPABASE_URL!).origin;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+export async function dispatchAutonomousVoice(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; spokenText: string; voiceId: string }) {
+  const r2 = configuredR2();
+  if (!r2 || !await canUseBasicVoices(input.ownerId) || !input.spokenText.trim() || input.spokenText.length > 500) return;
   const custom = input.voiceId.startsWith("elevenlabs:");
   let audioBytes: Buffer;
   let mimeType: "audio/wav" | "audio/mpeg";
@@ -100,9 +94,9 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
       .from(echoVoiceUsageTable).where(and(eq(echoVoiceUsageTable.ownerId, input.ownerId), eq(echoVoiceUsageTable.monthKey, month())));
     const [daily] = await tx.select({ total: sql<number>`count(*)` }).from(echoVoiceUsageTable)
       .where(and(eq(echoVoiceUsageTable.ownerId, input.ownerId), gte(echoVoiceUsageTable.createdAt, new Date(Date.now() - 86400000))));
-    if (Number(used?.total ?? 0) + input.text.length > budget.monthlyCharacterLimit || Number(daily?.total ?? 0) >= budget.maxDailyMessages) return false;
+    if (Number(used?.total ?? 0) + input.spokenText.length > budget.monthlyCharacterLimit || Number(daily?.total ?? 0) >= budget.maxDailyMessages) return false;
     const inserted = await tx.insert(echoVoiceUsageTable).values({ ownerId: input.ownerId, messageId: input.messageId,
-      monthKey: month(), characterId: input.characterId, characters: input.text.length, status: "reserved" })
+      monthKey: month(), characterId: input.characterId, characters: input.spokenText.length, status: "reserved" })
       .onConflictDoNothing().returning({ messageId: echoVoiceUsageTable.messageId });
     return inserted.length > 0;
   });
@@ -118,7 +112,7 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
       if (!charge.allowed) { creditRequest = null; throw Error("CUSTOM_VOICE_CREDITS_EXHAUSTED"); }
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
         method: "POST", headers: { ...elevenLabsHeaders(), "Accept": "audio/mpeg" },
-        body: JSON.stringify({ text: input.text, model_id: "eleven_multilingual_v2" }), signal: AbortSignal.timeout(45000),
+        body: JSON.stringify({ text: input.spokenText, model_id: "eleven_multilingual_v2" }), signal: AbortSignal.timeout(45000),
       });
       if (!response.ok) throw Error("ELEVENLABS_TTS_FAILED");
       audioBytes = Buffer.from(await response.arrayBuffer());
@@ -129,12 +123,13 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
     } else {
       const voice = voices[input.voiceId];
       if (!voice || !basicVoiceProviderReady()) throw Error("BASIC_VOICE_NOT_AVAILABLE");
-      const audio = await synthesizeBasicVoiceAudio({ text: input.text, voice, requestId: input.messageId });
+      const audio = await synthesizeBasicVoiceAudio({ text: input.spokenText, voice, requestId: input.messageId });
       audioBytes = audio.bytes; mimeType = audio.mimeType;
     }
-    const objectPath = `/objects/uploads/${randomUUID()}`;
-    const uploaded = await fetch(`${base}/storage/v1/object/echo-media/${objectPath.slice("/objects/".length)}`, {
-      method: "POST", headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": mimeType, "x-upsert": "false" },
+    const objectKey = `r2/${randomUUID()}`;
+    const objectPath = `/objects/${objectKey}`;
+    const uploaded = await fetch(signR2Request(r2, "PUT", objectKey), {
+      method: "PUT", redirect: "error", headers: { "Content-Type": mimeType },
       body: new Uint8Array(audioBytes), signal: AbortSignal.timeout(20000),
     });
     if (!uploaded.ok) throw Error("VOICE_UPLOAD_FAILED");
@@ -149,7 +144,7 @@ export async function dispatchAutonomousVoice(input: { ownerId: string; universe
       await tx.insert(echoMediaTable).values({ ownerId: input.ownerId, objectPath });
       const attachment = { id: `voice-${input.messageId}`, type: "audio" as const, url: objectPath, mimeType };
       const state = { ...parsed.data, messages: parsed.data.messages.map(m => m.id === input.messageId
-        ? { ...m, attachments: [...(m.attachments ?? []), attachment] } : m) };
+        ? { ...m, text: `${m.text}\n\n[Transcripción de nota de voz]: ${input.spokenText}`, attachments: [...(m.attachments ?? []), attachment] } : m) };
       await tx.update(echoUniversesTable).set({ state, revision: sql`${echoUniversesTable.revision} + 1`, updatedAt: new Date() })
         .where(and(eq(echoUniversesTable.ownerId, input.ownerId), eq(echoUniversesTable.universeId, input.universeId)));
       await tx.update(echoVoiceUsageTable).set({ status: "succeeded", objectPath }).where(and(eq(echoVoiceUsageTable.ownerId, input.ownerId), eq(echoVoiceUsageTable.messageId, input.messageId)));
