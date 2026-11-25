@@ -16,6 +16,7 @@ import { PushNotificationSettings } from '@/components/echo/push-notification-se
 import { toast } from '@/hooks/use-toast';
 import { customFetch } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
+import { compressImage } from '@/lib/media';
 import { useSettingsText } from '@/lib/settings-translations';
 import { LANGUAGES, setLanguage, useLanguage, useTranslation, type Language } from '@/lib/i18n';
 
@@ -55,6 +56,26 @@ function recoveryImageType(file: File): string {
   return extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg'
     : extension === 'png' ? 'image/png'
     : extension === 'webp' ? 'image/webp' : '';
+}
+
+const recoveryFileTypes = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif';
+const recoveryMaxBytes = 15 * 1024 * 1024;
+
+function canRecoverImage(file: File): boolean {
+  return file.size > 0 && Boolean(recoveryImageType(file) ||
+    /^image\/hei[cf](?:-sequence)?$/i.test(file.type) || /\.hei[cf]$/i.test(file.name));
+}
+
+async function prepareRecoveryImage(file: File): Promise<Blob> {
+  const mime = recoveryImageType(file);
+  if (mime && file.size <= recoveryMaxBytes) return new Blob([file], { type: mime });
+  // Safari can decode HEIC when the device supports the source format.
+  const source = file.type.startsWith('image/') ? file : new File([file], file.name, { type: mime || 'image/heic' });
+  try {
+    return await fetch(await compressImage(source, 2400, 0.92)).then(response => response.blob());
+  } catch {
+    throw new Error('No se pudo convertir esta foto. Exportala como JPG o PNG y volvé a elegirla.');
+  }
 }
 
 export default function SettingsPage() {
@@ -122,13 +143,13 @@ export default function SettingsPage() {
     if (!remote.state || !check(remote.state)) throw new Error('El servidor todavía no refleja la imagen recuperada. Comprobá el perfil antes de reintentar.');
   }
   const legacyMediaDetails = useMemo(() => {
-    const byPath = new Map<string, { path: string; posts: typeof state.posts; stories: typeof state.stories; owners: string[] }>();
+    const byPath = new Map<string, { path: string; posts: typeof state.posts; stories: typeof state.stories; owners: string[]; handles: string[] }>();
     const ensure = (path: string) => {
       // Require the UUID shape used by the storage API, not merely 36 arbitrary hex/hyphen characters.
       if (!/^\/objects\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) return null;
       let item = byPath.get(path);
       if (!item) {
-        item = { path, posts: [], stories: [], owners: [] };
+        item = { path, posts: [], stories: [], owners: [], handles: [] };
         byPath.set(path, item);
       }
       return item;
@@ -140,18 +161,19 @@ export default function SettingsPage() {
       for (const path of paths) ensure(path)?.posts.push(post);
     }
     for (const story of state.stories) if (story.image) ensure(story.image)?.stories.push(story);
-    const names = new Map(state.characters.map(character => [character.id, character.name]));
+    const characters = new Map(state.characters.map(character => [character.id, character]));
     return Array.from(byPath.values()).map(item => {
       const ids = new Set([...item.posts.map(post => post.authorId), ...item.stories.map(story => story.authorId)]);
-      return { ...item, owners: Array.from(ids, id => names.get(id) ?? 'Cuenta desconocida') };
+      return { ...item, owners: Array.from(ids, id => characters.get(id)?.name ?? 'Cuenta desconocida'),
+        handles: Array.from(ids, id => characters.get(id)?.handle ?? '') };
     });
   }, [state.posts, state.stories, state.characters]);
   const legacyMedia = useMemo(() => legacyMediaDetails.map(item => item.path), [legacyMediaDetails]);
   const filteredLegacyMedia = useMemo(() => {
-    const query = recoverySearch.trim().toLocaleLowerCase();
+    const query = recoverySearch.trim().replace(/^@/, '').toLocaleLowerCase();
     if (!query) return legacyMediaDetails;
     return legacyMediaDetails.filter(item =>
-      [item.path, ...item.owners, ...item.posts.map(post => post.caption),
+      [item.path, ...item.owners, ...item.handles, ...item.posts.map(post => post.caption),
         ...item.stories.map(story => story.caption),
         ...item.posts.map(post => new Date(post.createdAt).toLocaleDateString('es-AR')),
         ...item.stories.map(story => new Date(story.createdAt).toLocaleDateString('es-AR'))]
@@ -232,8 +254,8 @@ export default function SettingsPage() {
     try {
       if (syncConflictCount > 0) throw new Error('Hay cambios en conflicto pendientes de resolver. No se subió otra copia de la foto. Revisá la sincronización antes de continuar.');
       if (storageError) throw new Error(`La sincronización informa un problema: ${storageError}. No se subió otra copia de la foto.`);
-      if (file && (!recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024))
-        throw new Error('Usá JPG, PNG o WebP de hasta 15 MB.');
+      if (file && !canRecoverImage(file))
+        throw new Error('Usá una foto JPG, PNG, WebP o HEIC.');
       const oldPath = targetPath;
       // Check the current server snapshot before uploading: the photo may already have
       // been recovered in another session or the selected post/story may have changed.
@@ -290,15 +312,16 @@ export default function SettingsPage() {
           }
         }
         if (!objectPath) {
-        setRecoveryStatus('Subiendo imagen original a R2…');
+        const image = await prepareRecoveryImage(file);
+        setRecoveryStatus('Subiendo foto a R2…');
         const signed = await customFetch<{uploadURL: string; objectPath: string}>('/api/storage/uploads/request-url', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: file.name || 'recovered-image', size: file.size, contentType: recoveryImageType(file) }), responseType: 'json',
+          body: JSON.stringify({ name: file.name || 'recovered-image', size: image.size, contentType: image.type }), responseType: 'json',
         });
         objectPath = signed.objectPath;
         if (!/^\/objects\/r2\/[0-9a-f-]{36}$/i.test(objectPath)) throw new Error('La referencia de R2 no es válida.');
-        const upload = await fetch(signed.uploadURL, { method: 'PUT', headers: { 'Content-Type': recoveryImageType(file) }, body: file });
-        if (!upload.ok) throw new Error('No se pudo subir la foto.');
+        const upload = await fetch(signed.uploadURL, { method: 'PUT', headers: { 'Content-Type': image.type }, body: image });
+        if (!upload.ok) throw new Error(`R2 rechazó la subida de la foto (HTTP ${upload.status}).`);
         await customFetch('/api/storage/uploads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ objectPath }), responseType: 'json' });
         window.localStorage.setItem(checkpointKey, objectPath);
@@ -417,9 +440,9 @@ export default function SettingsPage() {
   async function recoverContentBatch() {
     if (recoveryBusy || !recoveryBatchConfirmed || recoveryBatchFiles.length === 0) return;
     const assignments = recoveryBatchFiles.map((file, index) => ({ file, path: recoveryBatchAssignments[index] ?? '' }));
-    if (assignments.some(item => !item.path || !legacyMedia.includes(item.path) || !recoveryImageType(item.file) || !item.file.size || item.file.size > 15 * 1024 * 1024) ||
+    if (assignments.some(item => !item.path || !legacyMedia.includes(item.path) || !canRecoverImage(item.file)) ||
         new Set(assignments.map(item => item.path)).size !== assignments.length) {
-      setRecoveryStatus('Asigná una referencia distinta y válida a cada imagen JPG, PNG o WebP de hasta 15 MB.');
+      setRecoveryStatus('Asigná una referencia distinta y válida a cada foto JPG, PNG, WebP o HEIC.');
       return;
     }
     // Process one item per confirmation: React's state snapshot may be stale after
@@ -592,7 +615,9 @@ export default function SettingsPage() {
               <input type="search" aria-label="Filtrar referencias del lote" placeholder="Buscar por personaje, fecha o caption…" disabled={recoveryBusy} value={recoverySearch}
                 onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
               <p className="text-muted-foreground">Mostrando {visibleLegacyMedia.length} de {filteredLegacyMedia.length} referencias filtradas. Buscá para acotar la lista.</p>
-              <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={recoveryBusy}
+              <input type="search" aria-label="Filtrar referencias del lote" placeholder="Buscar por nombre, @usuario, caption o fecha…" disabled={recoveryBusy} value={recoverySearch}
+                onChange={event => setRecoverySearch(event.target.value)} className="w-full rounded-lg bg-background p-2" />
+              <input type="file" multiple accept={recoveryFileTypes} disabled={recoveryBusy}
                 aria-label="Seleccionar fotos de publicaciones e historias en lote"
                 onChange={event => { setRecoveryBatchFiles(Array.from(event.currentTarget.files ?? [])); setRecoveryBatchAssignments({}); setRecoveryBatchConfirmed(false); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
@@ -614,7 +639,7 @@ export default function SettingsPage() {
                 onChange={event => setRecoveryBatchConfirmed(event.target.checked)} className="mt-0.5" />
                 Confirmo que cada foto corresponde a la publicación o historia indicada. Entiendo que un lote puede completarse parcialmente si hay un error.
               </label>
-              <button type="button" disabled={!recoveryBatchConfirmed || recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !recoveryImageType(file) || !file.size || file.size > 15 * 1024 * 1024) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
+              <button type="button" disabled={!recoveryBatchConfirmed || recoveryBusy || !recoveryBatchFiles.length || recoveryBatchFiles.some((file, index) => !recoveryBatchAssignments[index] || !canRecoverImage(file)) || new Set(Object.values(recoveryBatchAssignments).filter(Boolean)).size !== recoveryBatchFiles.length}
                 onClick={() => void recoverContentBatch()} className="rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">
                 {recoveryBusy ? 'Recuperando…' : 'Confirmar y recuperar siguiente foto'}
               </button>
@@ -657,7 +682,7 @@ export default function SettingsPage() {
                 </div>)}
                 <p className="break-all text-muted-foreground">Referencia: {recoveryMediaPath}</p>
               </div>}
-              <input type="file" accept="image/jpeg,image/png,image/webp" aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || recoveryBusy}
+              <input type="file" accept={recoveryFileTypes} aria-label="Foto original para publicación o historia" disabled={!recoveryMediaPath || recoveryBusy}
                 onChange={event => { setRecoveryContentFile(event.currentTarget.files?.[0] ?? null); setRecoveryContentConfirmed(false); setRecoveryStatus(''); }}
                 className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2" />
               {recoveryContentFile && <div className="flex items-center gap-3"><RecoveryPreview file={recoveryContentFile} /><p className="min-w-0 break-all text-muted-foreground">Archivo elegido: {recoveryContentFile.name}</p></div>}
