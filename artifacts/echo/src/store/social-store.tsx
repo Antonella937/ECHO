@@ -52,7 +52,7 @@ export interface SocialActions {
   respondCollaboration(postId: string, accept: boolean): void;
   votePoll(postId: string, optionId: string): void;
   createPost(input: { image: string; media?: PostMedia[]; caption: string; location: string; taggedAccountIds?: string[]; collaborationInvites?: string[]; poll?: import('@/domain/types').Post['poll']; commentsEnabled?: boolean; musicClip?: import('@/domain/types').MusicClip }): string;
-  createStory(input: { image: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip; repostOfPostId?: string }): string;
+  createStory(input: { image: string; mediaMimeType?: string; caption: string; mentionedAccountIds?: string[]; music?: import('@workspace/api-client-react').StoryMusic; closeFriendsOnly?: boolean; musicClip?: import('@/domain/types').MusicClip; repostOfPostId?: string }): string;
   repostMentionedStory(storyId: string, caption?: string): string;
   deletePost(postId: string): void;
   deleteStory(storyId: string): void;
@@ -473,7 +473,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         coordinator.current?.edit(s => mentionNotifications(s, caption, myId(), { postId: id }, taggedAccountIds));
         return id;
       },
-      createStory({ image, caption, mentionedAccountIds, music, closeFriendsOnly, musicClip, repostOfPostId }) {
+      createStory({ image, mediaMimeType, caption, mentionedAccountIds, music, closeFriendsOnly, musicClip, repostOfPostId }) {
         if (repostOfPostId) {
           const source = cur().posts.find(post => post.id === repostOfPostId);
           const author = source && cur().characters.find(account => account.id === source.authorId);
@@ -486,7 +486,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         const id = uid('s');
         dispatch({
           type: 'story.created',
-          story: { id, authorId: myId(), image, caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
+          story: { id, authorId: myId(), image, ...(mediaMimeType ? { mediaMimeType } : {}), caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
             ...(mentionedAccountIds ? { mentionedAccountIds: mentionedAccountIds.filter(id => !closeFriendsOnly || allowedViewerIds.includes(id)) } : {}),
             ...(closeFriendsOnly ? { closeFriendsOnly: true, allowedViewerIds } : {}), ...(music ? { music } : {}), ...(musicClip ? { musicClip } : {}), ...(repostOfPostId ? { repostOfPostId } : {}) },
         });
@@ -505,7 +505,7 @@ export function SocialStoreProvider({ children, fallback, userId }: { children: 
         if (!author || author.privateAccount || source.closeFriendsOnly) throw new Error('Todavía no se pueden repostear historias privadas.');
         const id = uid('s');
         dispatch({ type: 'story.created', story: {
-          id, authorId: myId(), repostOfStoryId: source.id, image: source.image,
+          id, authorId: myId(), repostOfStoryId: source.id, image: source.image, ...(source.mediaMimeType ? { mediaMimeType: source.mediaMimeType } : {}),
           caption: caption.trim(), createdAt: new Date().toISOString(), seenBy: [], origin: 'user',
           ...(source.music ? { music: source.music } : {}),
           ...(source.musicClip ? { musicClip: source.musicClip } : {}),

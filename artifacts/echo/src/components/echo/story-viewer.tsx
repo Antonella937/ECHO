@@ -4,7 +4,7 @@ import { VerifiedBadge } from './verified-badge';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AtSign, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Music2, Send, Trash2, X } from 'lucide-react';
+import { AtSign, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Music2, Send, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { canViewStory, canRepostMentionedStory, isStoryActive } from '@/domain/social-features';
 import { storyViewCount, storyViewerIds, formatCount } from '@/domain/accounts';
 import { StoryMetricsEditor } from './story-metrics-editor';
@@ -82,6 +82,9 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const t = useStoryViewerText();
   const resolveMedia = useMediaResolver();
   const [failedStoryImage, setFailedStoryImage] = useState<string | null>(null);
+  const [mutedVideo, setMutedVideo] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoDuration, setVideoDuration] = useState<{ id: string; ms: number }>();
   const [storyImageWaitExpired, setStoryImageWaitExpired] = useState(false);
   const { me, actions, state, character, universeId } = useSocial();
   const [, navigate] = useLocation();
@@ -113,7 +116,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   const editingMetrics = editingMetricsId === story.id;
   // A music story stays open for the full selected clip (15 or 30 seconds).
   // Stories without a valid music clip retain their standard duration.
-  const storyDurationMs = liveStory.musicClip && (liveStory.musicClip.clipSeconds === 15 || liveStory.musicClip.clipSeconds === 30)
+  const storyDurationMs = videoDuration?.id === story.id ? videoDuration.ms : liveStory.musicClip && (liveStory.musicClip.clipSeconds === 15 || liveStory.musicClip.clipSeconds === 30)
     ? liveStory.musicClip.clipSeconds * 1000 : DEFAULT_STORY_DURATION_MS;
   const isStoryRepost = Boolean(liveStory.repostOfStoryId);
   const originalStory = liveStory.repostOfStoryId ? state.stories.find(s => s.id === liveStory.repostOfStoryId) : undefined;
@@ -129,6 +132,8 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
     ? { sourceUniverseId: universeId, sourceCharacterId: sourcePost.authorId, sourceType: 'post' as const, sourceContentId: sourcePost.id }
     : { sourceUniverseId: universeId, sourceCharacterId: mediaOwner.authorId, sourceType: 'story' as const, sourceContentId: mediaOwner.id };
   const canShowMedia = (!isPostRepost || canOpenPost) && (!isStoryRepost || canShowOriginalStory);
+  const isVideo = mediaOwner.mediaMimeType?.startsWith('video/') ||
+    sourcePost?.media?.some(media => media.url === mediaOwner.image && media.type === 'video');
   const storyImage = resolveMedia(canShowMedia ? mediaOwner.image : "", storyMediaSource);
   const imageIsPrivate = story.image.startsWith('/objects/') || story.image.startsWith('/api/storage/objects/');
   // A private image can take a few seconds to resolve on mobile. Loading is not an error.
@@ -197,6 +202,23 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
   }, [reply, story.id]);
 
   const isPaused = paused || replyFocused || reply.length > 0 || showViewers || showShare || editingMetrics || confirmDelete || (imageIsPrivate && imageUnavailable);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isPaused) video.pause();
+    else void video.play().catch(() => {});
+  }, [isPaused, story.id, storyImage]);
+
+  const storyVideo = (className: string) => (
+    <video key={story.id} ref={videoRef} src={storyImage} muted={mutedVideo} playsInline preload="metadata"
+      className={className} aria-label={story.caption || t('Video')}
+      onLoadedMetadata={event => {
+        const duration = event.currentTarget.duration;
+        if (Number.isFinite(duration) && duration > 0) setVideoDuration({ id: story.id, ms: duration * 1000 });
+      }}
+      onLoadedData={() => setFailedStoryImage(null)} onError={() => setFailedStoryImage(story.id)} />
+  );
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -294,7 +316,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
       </button>
 
       <div className="relative flex h-[100dvh] w-full max-w-[480px] flex-col md:h-[min(92dvh,860px)] md:overflow-hidden md:rounded-[28px]">
-        {storyImage && !isPostRepost && !isStoryRepost && (
+        {storyImage && !isPostRepost && !isStoryRepost && (isVideo ? storyVideo("absolute inset-0 h-full w-full object-contain") : (
           <img
             key={story.id}
             src={storyImage}
@@ -305,10 +327,10 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             draggable={false}
             data-testid={`img-story-${story.id}`}
           />
-        )}
+        ))}
         {isPostRepost && (
           <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col items-center justify-center gap-3 overflow-hidden bg-[#19171d] px-7 pt-20 pb-32">
-            {storyImage && <img src={storyImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-2xl" />}
+            {storyImage && !isVideo && <img src={storyImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-2xl" />}
             {sourcePost && postAuthor && canOpenPost ? (
               <button type="button" onClick={() => { onClose(); navigate(`/p/${encodeURIComponent(sourcePost.id)}`); }} className="pointer-events-auto relative w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/15 bg-[#18151d] text-left text-white shadow-xl focus-visible:ring-2 focus-visible:ring-white" data-testid="button-story-repost-card" aria-label={`Abrir publicación original de @${postAuthor.handle}`}>
                 <div className="flex items-center gap-2.5 px-3 py-2.5">
@@ -316,7 +338,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
                   <span className="min-w-0 truncate text-sm font-semibold">@{postAuthor.handle}</span>
                   <VerifiedBadge account={postAuthor} className="h-3.5 w-3.5" />
                 </div>
-                {storyImage && <img src={storyImage} onLoad={() => setFailedStoryImage(current => current === story.id ? null : current)} onError={() => setFailedStoryImage(story.id)} alt="Publicación compartida" className="max-h-[43dvh] w-full object-contain" />}
+                {storyImage && (isVideo ? storyVideo("max-h-[43dvh] w-full object-contain") : <img src={storyImage} onLoad={() => setFailedStoryImage(current => current === story.id ? null : current)} onError={() => setFailedStoryImage(story.id)} alt="Publicación compartida" className="max-h-[43dvh] w-full object-contain" />)}
                 <div className="px-3 py-2.5 text-xs text-white/75">Ver publicación original ↗</div>
               </button>
             ) : <p className="relative text-center text-sm text-white/80">La publicación original no está disponible.</p>}
@@ -325,14 +347,14 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
         )}
         {isStoryRepost && (
           <div className="pointer-events-none absolute inset-x-0 top-[max(76px,calc(env(safe-area-inset-top)+56px))] bottom-[max(124px,calc(env(safe-area-inset-bottom)+110px))] z-[1] flex flex-col items-center justify-center gap-3 px-7">
-            {storyImage && <img src={storyImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-25 blur-2xl" />}
+            {storyImage && !isVideo && <img src={storyImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-25 blur-2xl" />}
             {canShowOriginalStory && originalStory && originalAuthor ? (
               <div className="pointer-events-auto relative min-h-0 w-full max-w-[350px] overflow-y-auto rounded-2xl border border-white/15 bg-[#18151d] text-white shadow-xl" data-testid="story-repost-source-card">
                 <button type="button" onClick={() => { onClose(); navigate(`/profile/${encodeURIComponent(originalAuthor.id)}`); }} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold" data-testid="story-repost-credit">
                   <CharacterAvatar character={originalAuthor} size={28} />
                   <span className="truncate">@{originalAuthor.handle}</span>
                 </button>
-                {storyImage && <img src={storyImage} onLoad={() => setFailedStoryImage(null)} onError={() => setFailedStoryImage(story.id)} alt="Historia original" className="max-h-[35dvh] w-full object-contain" />}
+                {storyImage && (isVideo ? storyVideo("max-h-[35dvh] w-full object-contain") : <img src={storyImage} onLoad={() => setFailedStoryImage(null)} onError={() => setFailedStoryImage(story.id)} alt="Historia original" className="max-h-[35dvh] w-full object-contain" />)}
                 {originalStory.caption && <p className="whitespace-pre-wrap break-words px-3 py-2.5 text-sm" data-testid="story-repost-original-caption"><SocialText text={originalStory.caption} onNavigate={onClose} /></p>}
               </div>
             ) : <p className="relative text-center text-sm text-white/80">La historia original no está disponible.</p>}
@@ -360,7 +382,7 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
               <div className="relative mx-auto flex max-h-[48dvh] w-full flex-col overflow-y-auto rounded-xl bg-black p-3">
                 <div className="w-full rounded-xl border border-white/20 bg-[#18161c] p-2">
                   <div className="flex items-center gap-2 pb-2 text-xs font-semibold text-white"><CharacterAvatar character={group.author} size={24} />@{group.author.handle}</div>
-                  {storyImage && <img src={storyImage} alt="Historia original" className="max-h-[31dvh] w-full object-contain" />}
+                  {storyImage && (isVideo ? storyVideo("max-h-[31dvh] w-full object-contain") : <img src={storyImage} alt="Historia original" className="max-h-[31dvh] w-full object-contain" />)}
                   {liveStory.caption && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white">{liveStory.caption}</p>}
                 </div>
                 {repostCaption.trim() && <p className="mt-3 break-words text-center text-sm text-white">{repostCaption}</p>}
@@ -405,6 +427,11 @@ function Viewer({ groups, startIndex, onClose }: { groups: StoryGroup[]; startIn
             <span className="text-sm text-foreground/60">{timeAgo(story.createdAt)}</span>
           </button>
           {liveStory.closeFriendsOnly && <span className="ml-auto rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground" data-testid="badge-close-friends-story">★ {t("Mejores amigos")}</span>}
+          {isVideo && <button type="button" onClick={() => setMutedVideo(value => !value)}
+            aria-label={mutedVideo ? 'Activar sonido del video' : 'Silenciar video'}
+            className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full text-foreground">
+            {mutedVideo ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>}
           {isMine && <button type="button" onClick={() => setConfirmDelete(true)} aria-label={t("Eliminar historia")} title={t("Eliminar historia")} className="tap grid h-11 w-11 place-items-center rounded-full text-foreground" data-testid="button-story-delete"><Trash2 className="h-5 w-5" /></button>}
           <button
             onClick={onClose}

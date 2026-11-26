@@ -13,7 +13,7 @@ import { useSocial } from '@/store/social-store';
 import { TopBar, useBack } from '@/components/echo/top-bar';
 import { CharacterAvatar } from '@/components/echo/avatar';
 import { Switch } from '@/components/ui/switch';
-import { compressImage, useMediaResolver, uploadPrivateFile, uploadPrivateImage } from '@/lib/media';
+import { compressImage, useMediaResolver, uploadPrivateFile, uploadPrivateImage, uploadPublicationImage } from '@/lib/media';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { customFetch } from '@workspace/api-client-react';
@@ -111,7 +111,6 @@ export default function CreatePage() {
   const previewLoaded = Boolean(previewUrl && loadedPreviewUrl === previewUrl);
   const firstIsVideo = items[0]?.type === 'video';
   const tooManyForStory = mode === 'story' && items.length > 1;
-  const storyVideo = mode === 'story' && items.some((m) => m.type === 'video');
   const musicPartial = mode === 'story' && !selectedMusicTrack && !!musicTitle.trim() !== !!musicArtist.trim();
   const musicClip = selectedMusicTrack ? { trackId: selectedMusicTrack.id, title: selectedMusicTrack.title, startSeconds: selectedMusicTrack.startSeconds, clipSeconds: selectedMusicTrack.clipSeconds } : undefined;
 
@@ -148,9 +147,10 @@ export default function CreatePage() {
           const mid = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
           let item: PostMedia;
           if (files[i].type.startsWith('video/')) {
-            if (mode === 'story') throw new Error(t('Las historias admiten solo fotos.'));
             const att = await uploadPrivateFile(files[i]);
             item = { id: mid, type: 'video', url: att.url, ...(att.mimeType ? { mimeType: att.mimeType } : {}) };
+          } else if (files[i].type.toLowerCase() === 'image/gif') {
+            item = { id: mid, type: 'image', url: await uploadPublicationImage(files[i]), mimeType: 'image/gif' };
           } else {
             const compressed = await compressImage(files[i], mode === 'story' ? 1280 : 1440);
             item = { id: mid, type: 'image', url: await uploadPrivateImage(compressed) };
@@ -253,16 +253,15 @@ export default function CreatePage() {
     try {
       if (mode === 'story') {
         if (tooManyForStory) {
-          setError(t("Las historias admiten una sola foto. Quitá fotos hasta dejar una."));
+          setError(t("Las historias admiten un solo archivo. Quitá archivos hasta dejar uno."));
           return;
         }
-        if (storyVideo) { setError(t('Las historias admiten solo fotos.')); return; }
         if (musicPartial) { setError(t("Completá título y artista de la música, o dejá ambos vacíos.")); return; }
         if (!musicClip && musicTitle.trim()) {
           setError('La canción figura solo como título y artista. Elegí un fragmento reproducible de ECHO Music antes de publicar la historia.');
           return;
         }
-        actions.createStory({ image, caption, closeFriendsOnly, ...(musicClip ? { musicClip } : {}), ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
+        actions.createStory({ image, caption, closeFriendsOnly, mediaMimeType: items[0]?.mimeType, ...(musicClip ? { musicClip } : {}), ...(mentioned.length ? { mentionedAccountIds: mentioned } : {}),
           ...(musicTitle.trim() ? { music: { title: musicTitle.trim().slice(0, 160), artist: musicArtist.trim().slice(0, 160) } } : {}) });
         toast({ title: t('Historia publicada'), description: `${t('Como')} ${me.name}` });
         navigate('/');
@@ -274,8 +273,8 @@ export default function CreatePage() {
       }
       const poll = pollEnabled ? { question: pollQuestion.trim().slice(0, 200), options: pollOptions.map((text, i) => ({ id: `option_${i}`, text: text.trim().slice(0, 100) })), votes: {} as Record<string, string>, closesAt: new Date(Date.now() + Number(pollDuration) * 60 * 60_000).toISOString() } : undefined;
       const id = actions.createPost({ image, media: items, caption, location, ...(tagged.length ? { taggedAccountIds: tagged } : {}), ...(collaborators.length ? { collaborationInvites: collaborators } : {}), ...(poll ? { poll } : {}), commentsEnabled, ...(musicClip ? { musicClip } : {}) });
-      const cover = items.find((m) => m.type === 'image');
-      if (alsoStory && cover) actions.createStory({ image: cover.url, caption: '' });
+      const cover = items[0];
+      if (alsoStory && cover) actions.createStory({ image: cover.url, mediaMimeType: cover.mimeType, caption: '' });
       toast({ title: t('Publicado'), description: `${t('Como')} ${me.name}` });
       navigate(`/p/${id}`, { replace: true });
     } catch (err) {
@@ -411,7 +410,7 @@ export default function CreatePage() {
             </div>}
           </div>}
         </section>}
-        <input ref={fileRef} type="file" accept={mode === 'post' ? 'image/*,video/mp4,video/webm' : 'image/*'} multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
+        <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm" multiple={mode === 'post'} className="hidden" disabled={busy} onChange={(e) => onFiles(e.target.files)} data-testid="input-file" />
         {mediaSource === 'upload' && (image ? (
           <div className="relative overflow-hidden rounded-[22px] bg-card py-0">
             {!previewLoaded && <div className="absolute inset-0 z-10 flex items-center justify-center bg-card" role="status" aria-label={t("Procesando vista previa")}><span className="text-sm text-muted-foreground">{t('Procesando…')}</span></div>}
@@ -542,7 +541,7 @@ export default function CreatePage() {
             <label className="mt-3 flex items-center justify-between rounded-2xl border border-border px-4 py-3">
               <span>
                 <span className="block text-sm font-medium">{t("Compartir también en tu historia")}</span>
-                <span className="text-xs text-muted-foreground">{t('Aparecerá en el círculo de')} {me.name.split(' ')[0]}{items.length > 1 ? t(' · se usa solo la primera foto') : ''}{items.length && !items.some((m) => m.type === 'image') ? t(' · requiere al menos una foto') : ''}</span>
+                <span className="text-xs text-muted-foreground">{t('Aparecerá en el círculo de')} {me.name.split(' ')[0]}{items.length > 1 ? t(' · se usa solo el primer archivo') : ''}</span>
               </span>
               <Switch checked={alsoStory} onCheckedChange={setAlsoStory} data-testid="switch-also-story" />
             </label>
@@ -559,7 +558,7 @@ export default function CreatePage() {
 
         <button
           type="submit"
-          disabled={mediaSource === 'ai' || !image || busy || galleryLoading || galleryIdentityMismatch || tooManyForStory || storyVideo || musicPartial}
+          disabled={mediaSource === 'ai' || !image || busy || galleryLoading || galleryIdentityMismatch || tooManyForStory || musicPartial}
           className="tap mt-6 h-12 w-full rounded-2xl bg-primary text-[15px] font-semibold text-primary-foreground disabled:opacity-40"
           data-testid="button-publish"
         >
