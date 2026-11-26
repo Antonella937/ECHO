@@ -17,6 +17,8 @@ const entrySchema = z.object({
   keywords: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
   knowledgeScope: z.enum(["everyone", "selected", "nobody"]).default("selected"),
   knownCharacterIds: z.array(z.string().min(1).max(120)).max(100).default([]),
+  photoPaths: z.array(z.string().regex(/^\/objects\/(?:uploads|r2)\/[0-9a-f-]{36}$/i)).max(6)
+    .refine(paths => new Set(paths).size === paths.length).optional(),
   sourceType: z.enum(["manual", "ai_suggestion", "conversation"]).default("manual"),
 }).strict();
 
@@ -49,12 +51,18 @@ function textArray(items: readonly string[]) {
     ? sql`ARRAY[${sql.join(items.map(item => sql`${item}`), sql`,`)}]::text[]`
     : sql`ARRAY[]::text[]`;
 }
+async function ownJournalPhotos(ownerId: string, paths: string[] = []) {
+  if (!paths.length) return true;
+  const result = await db.execute(sql`SELECT DISTINCT object_path FROM echo_media
+    WHERE owner_id=${ownerId} AND object_path = ANY(${textArray(paths)})`);
+  return result.rows.length === paths.length;
+}
 function invalid(req: {params:unknown}) { return params.safeParse(req.params); }
 router.get("/universe/:universeId/journals", async (req,res):Promise<void> => {
   const p=invalid(req); if(!p.success){res.status(400).json({error:"INVALID_UNIVERSE_ID"});return;}
   if(!await ownedWorld(req.userId!,p.data.universeId)){res.status(404).json({error:"UNIVERSE_NOT_FOUND"});return;}
   const r=await db.execute(sql`SELECT id,title,content,category,truth_status,keywords,knowledge_scope,
-    known_character_ids,status,source_type,created_at,updated_at FROM echo_world_journals
+    known_character_ids,status,source_type,photo_paths,created_at,updated_at FROM echo_world_journals
     WHERE owner_id=${req.userId!} AND universe_id=${p.data.universeId}
     ORDER BY created_at DESC LIMIT 500`);
   res.setHeader("Cache-Control","private, no-store");res.json({entries:r.rows});
@@ -69,11 +77,14 @@ router.post("/universe/:universeId/journals", async(req,res):Promise<void>=>{
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
+  if (!await ownJournalPhotos(req.userId!, e.photoPaths)) {
+    res.status(400).json({error:"INVALID_JOURNAL_PHOTOS"});return;
+  }
   const r=await db.execute(sql`INSERT INTO echo_world_journals
-    (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,known_character_ids,source_type,created_by,status)
+    (owner_id,universe_id,title,content,category,truth_status,keywords,knowledge_scope,known_character_ids,photo_paths,source_type,created_by,status)
     VALUES (${req.userId!},${p.data.universeId},${e.title},${e.content},${e.category},
     ${e.truthStatus},${textArray(e.keywords)},
-    ${e.knowledgeScope},${textArray(e.knownCharacterIds)},
+    ${e.knowledgeScope},${textArray(e.knownCharacterIds)},${textArray(e.photoPaths ?? [])},
     ${e.sourceType},${req.userId!},'draft') RETURNING id,status`);
   res.status(201).json(r.rows[0]);
 });
@@ -87,11 +98,15 @@ router.put("/universe/:universeId/journals/:journalId",async(req,res):Promise<vo
     res.status(400).json({error:'INVALID_KNOWLEDGE_SCOPE'});return;
   }
   const e=b.data;
+  if (!await ownJournalPhotos(req.userId!, e.photoPaths)) {
+    res.status(400).json({error:"INVALID_JOURNAL_PHOTOS"});return;
+  }
   const r=await db.execute(sql`UPDATE echo_world_journals SET title=${e.title},content=${e.content},
     category=${e.category},truth_status=${e.truthStatus},
     keywords=${textArray(e.keywords)},
     knowledge_scope=${e.knowledgeScope},
     known_character_ids=${textArray(e.knownCharacterIds)},
+    photo_paths=${e.photoPaths === undefined ? sql`photo_paths` : textArray(e.photoPaths)},
     source_type=${e.sourceType},
     status='draft',approved_by=NULL,approved_at=NULL,updated_at=now()
     WHERE id=${req.params.journalId}::uuid AND owner_id=${req.userId!}
