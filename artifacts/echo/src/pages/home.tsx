@@ -15,7 +15,7 @@ export default function HomePage() {
     <div>
       <header className="sticky top-0 z-30 bg-background pt-[calc(env(safe-area-inset-top,0px)+12px)] lg:pt-0">
         <div className="relative flex h-16 items-center justify-center px-3">
-          <h1 className="wordmark text-[30px] leading-none text-foreground" data-testid="text-wordmark">ECHO</h1>
+          <h1 className="font-[Outfit,ui-rounded,system-ui,sans-serif] text-[33px] font-semibold leading-none tracking-[-0.045em] text-foreground" data-testid="text-wordmark">Echo</h1>
           <Link href="/create" aria-label={t("Crear publicación")} className="tap absolute left-2 grid h-11 w-11 place-items-center rounded-full lg:hidden" data-testid="link-header-create">
             <Plus className="h-7 w-7" strokeWidth={1.7} />
           </Link>
