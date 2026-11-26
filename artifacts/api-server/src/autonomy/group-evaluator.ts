@@ -37,7 +37,7 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
       // It must not depend on unrelated spontaneous feed/DM opt-ins.
       // Preserve explicit character-level autonomy disablement (e.g. the owner's avatar).
       enabled: sceneMode || replyToMessageId ? control?.enabled !== false : control?.enabled === true,
-      dmEnabled: replyToMessageId ? true : sceneMode ? control?.dmEnabled !== false : ownerTurn ? control?.enabled === true : control?.dmEnabled === true,
+      // An explicit group turn is governed by scene and character participation.\n      dmEnabled: sceneMode || Boolean(replyToMessageId) || (ownerTurn ? control?.enabled === true : control?.dmEnabled === true),
       sleeping: !replyToMessageId && /\b(sleep|sleeping|dormir|durmiendo|descansando)\b/i.test(c.configuration?.currentState?.activity ?? ""),
     };
   });
