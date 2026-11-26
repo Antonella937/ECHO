@@ -184,6 +184,12 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     // technical groups are visible through the same post thread, not through
     // another group's private chat history.
     const threadPost = post ?? commentParentPost;
+    const postVisual = input.situation === 'comment' && threadPost
+      ? vision.postSummaries[threadPost.id]?.orderedItems
+          .slice(0, 3)
+          .map(item => `Media ${item.position + 1}: ${item.description.slice(0, 120)}`)
+          .join(' | ')
+      : undefined;
     const musicClip = (story ?? threadPost)?.musicClip;
     const musicContext = musicClip && input.situation === 'comment'
       ? await describeSharedMusic(ownerId, musicClip.trackId, musicClip).catch(() => null) : null;
@@ -200,7 +206,8 @@ export async function previewForOwner(ownerId: string, input: CharacterDecisionI
     const context = [
       `Actor: ${actor?.name ?? input.characterId} (${input.characterId})`,
       analyzedGallery.length ? `Your own analyzed gallery photos (do not claim to post a photo until a gallery ID is selected): ${analyzedGallery.map(item => `${item.id}: ${item.scene}`).join(' | ').slice(0, 550)}` : '',
-      (post ?? commentParentPost) ? `Visible post by ${parsed.data.state.characters.find(c => c.id === (post ?? commentParentPost)!.authorId)?.name ?? (post ?? commentParentPost)!.authorId}: ${((post ?? commentParentPost)!.caption ?? '[image or post without caption; visual content not analyzed]').slice(0,500)}` : '',
+      postVisual ? `Visual observations from the post (reference data): ${JSON.stringify(postVisual)}` : '',
+      threadPost ? `Visible post by ${parsed.data.state.characters.find(c => c.id === threadPost.authorId)?.name ?? threadPost.authorId}: ${(threadPost.caption?.trim() || '[no caption]').slice(0, postVisual ? 240 : 500)}` : '',
       comment ? `Visible comment by ${parsed.data.state.characters.find(c => c.id === comment.authorId)?.name ?? comment.authorId}: ${comment.text.slice(0,300)}` : '',
       story ? `Visible story by ${parsed.data.state.characters.find(c => c.id === story.authorId)?.name ?? story.authorId}: ${(story.caption ?? '[story without caption; visual content not analyzed]').slice(0,400)}` : '',
       musicContext ? `Audio observations from the attached excerpt: ${musicContext}` : '',
