@@ -447,7 +447,8 @@ export class VisionService {
   ): Promise<VisionContext> {
     const relevantPosts = state.posts.filter((post) =>
       post.authorId === input.characterId || post.taggedAccountIds?.includes(input.characterId) || post.id === input.postId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 6);
+      .sort((a, b) => Number(b.id === input.postId) - Number(a.id === input.postId) ||
+        b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 6);
     const relevantStories = state.stories.filter((story) =>
       story.authorId === input.characterId || story.mentionedAccountIds?.includes(input.characterId) || story.id === input.storyId)
       .sort((a, b) => Number(b.id === input.storyId) - Number(a.id === input.storyId)
