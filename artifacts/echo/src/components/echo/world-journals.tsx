@@ -1,22 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
+import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import { customFetch } from '@workspace/api-client-react';
 
 type Entry = {
   id: string; title: string; content: string; category: 'world_knowledge'|'shared_memory'|'secret';
   truth_status: 'confirmed'|'rumor'|'belief'|'unknown'; knowledge_scope: 'everyone'|'selected'|'nobody';
   known_character_ids: string[]; keywords: string[]; status: 'draft'|'published'|'archived';
+  photo_paths?: string[];
   source_type: 'manual'|'ai_suggestion'|'conversation';
 };
 type Draft = {
   title: string; content: string; category: Entry['category']; truthStatus: Entry['truth_status'];
   knowledgeScope: Entry['knowledge_scope']; knownCharacterIds: string[]; keywords: string[];
   sourceType: Entry['source_type'];
+  photoPaths?: string[];
 };
 const empty = (): Draft => ({ title:'',content:'',category:'world_knowledge',truthStatus:'confirmed',
   knowledgeScope:'everyone',knownCharacterIds:[],keywords:[],sourceType:'manual' });
 export function WorldJournals({ universeId, characters }: {
   universeId: string; characters: Array<{id:string;name:string}>;
 }) {
+  const resolveMedia = useMediaResolver();
   const [entries,setEntries]=useState<Entry[]>([]);
   const [entriesUniverse,setEntriesUniverse]=useState(universeId);
   const currentUniverseRef=useRef(universeId);
@@ -97,7 +101,7 @@ export function WorldJournals({ universeId, characters }: {
     setBusy(true);setError('');
     try {
       await customFetch(editing?`${url}/${editing}`:url,{
-        method:editing?'PUT':'POST',body:JSON.stringify({...draft,keywords:keywordInput.split(',').map(x=>x.trim()).filter(Boolean)}),
+        method:editing?'PUT':'POST',body:JSON.stringify({...draft,photoPaths:draft.photoPaths ?? [],keywords:keywordInput.split(',').map(x=>x.trim()).filter(Boolean)}),
         headers:{'Content-Type':'application/json'},responseType:'json'
       });
       if(currentUniverseRef.current===requestedUniverse){
@@ -126,7 +130,31 @@ export function WorldJournals({ universeId, characters }: {
   const edit=(e:Entry)=>{
     setEditing(e.id);setKeywordInput(e.keywords.join(', '));setDraft({title:e.title,content:e.content,category:e.category,
       truthStatus:e.truth_status,knowledgeScope:e.knowledge_scope,
-      knownCharacterIds:e.known_character_ids,keywords:e.keywords,sourceType:e.source_type});
+      knownCharacterIds:e.known_character_ids,keywords:e.keywords,sourceType:e.source_type,photoPaths:e.photo_paths ?? []});
+  };
+  const addPhotos = async (files: File[]) => {
+    if (!files.length || busy) return;
+    if ((draft.photoPaths?.length ?? 0) + files.length > 6) {
+      setError('Podés adjuntar hasta 6 fotos por entrada.'); return;
+    }
+    const requestedUniverse = universeId;
+    setBusy(true); setError('');
+    try {
+      for (const file of files) {
+        if (currentUniverseRef.current !== requestedUniverse) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+          throw new Error('Elegí fotos JPG, PNG o WebP.');
+        }
+        const photo = await uploadPrivateFile(file);
+        if (currentUniverseRef.current !== requestedUniverse) return;
+        setDraft(current => ({ ...current, photoPaths: [...(current.photoPaths ?? []), photo.url] }));
+      }
+    } catch (error) {
+      if (currentUniverseRef.current === requestedUniverse)
+        setError(error instanceof Error ? error.message : 'No se pudo adjuntar la foto.');
+    } finally {
+      if (currentUniverseRef.current === requestedUniverse) setBusy(false);
+    }
   };
   return <section className="mt-5 space-y-3 rounded-2xl border border-border p-3">
     <button type="button" className="flex min-h-11 w-full items-center justify-between text-left font-semibold"
@@ -138,6 +166,9 @@ export function WorldJournals({ universeId, characters }: {
         <div className="text-sm font-semibold">{e.title}</div>
         <p className="text-xs text-muted-foreground">{e.category} · {e.status} · {e.knowledge_scope}</p>
         <p className="line-clamp-3 whitespace-pre-wrap text-xs">{e.content}</p>
+        {!!e.photo_paths?.length && <div className="grid grid-cols-2 gap-2">
+          {e.photo_paths.map((path, index) => <img key={path} src={resolveMedia(path)} alt={`Foto ${index + 1} de ${e.title}`} className="max-h-56 w-full rounded-lg object-contain" loading="lazy" />)}
+        </div>}
         <div className="flex gap-2">
           {e.status!=='archived'&&<button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>edit(e)}>Editar</button>}
           {e.status!=='archived'&&<button type="button" className="min-h-11 rounded-lg bg-secondary px-3 text-xs" disabled={busy} onClick={()=>void archive(e.id)}>Archivar</button>}
@@ -173,6 +204,24 @@ export function WorldJournals({ universeId, characters }: {
           value={draft.title} onChange={e=>setDraft(v=>({...v,title:e.target.value}))}/>
         <textarea aria-label="Contenido del Journal" placeholder="Contenido" className="min-h-32 w-full rounded-xl border border-border bg-background p-3 text-sm"
           value={draft.content} onChange={e=>setDraft(v=>({...v,content:e.target.value}))}/>
+        <div className="space-y-2">
+          <label className="block text-xs">Adjuntar fotos
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || (draft.photoPaths?.length ?? 0) >= 6}
+              className="mt-1 block w-full rounded-xl border border-border p-2"
+              onChange={event => {
+                const files = Array.from(event.currentTarget.files ?? []);
+                event.currentTarget.value = '';
+                void addPhotos(files);
+              }} />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(draft.photoPaths ?? []).map((path, index) => <div key={path}>
+              <img src={resolveMedia(path)} alt={`Foto adjunta ${index + 1}`} className="max-h-36 w-full rounded-lg object-contain" />
+              <button type="button" disabled={busy} className="min-h-10 px-2 text-xs"
+                onClick={() => setDraft(current => ({ ...current, photoPaths: current.photoPaths?.filter(item => item !== path) }))}>Quitar foto {index + 1}</button>
+            </div>)}
+          </div>
+        </div>
         <label className="block text-xs">Tipo
           <select className="mt-1 w-full rounded-xl border border-border bg-background p-3" value={draft.category}
             onChange={e=>setDraft(v=>({...v,category:e.target.value as Draft['category'],
@@ -214,7 +263,7 @@ export function WorldJournals({ universeId, characters }: {
         <div className="flex gap-2">
           <button type="button" className="min-h-11 flex-1 rounded-xl bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
             disabled={busy||!draft.title.trim()||!draft.content.trim()||(draft.knowledgeScope==='selected'&&!draft.knownCharacterIds.length)} onClick={()=>void save()}>Guardar borrador</button>
-          {editing&&<button type="button" className="min-h-11 rounded-xl bg-secondary px-3 text-sm" onClick={()=>{setEditing(null);setDraft(empty());setKeywordInput('');}}>Cancelar</button>}
+          {editing&&<button type="button" disabled={busy} className="min-h-11 rounded-xl bg-secondary px-3 text-sm" onClick={()=>{setEditing(null);setDraft(empty());setKeywordInput('');}}>Cancelar</button>}
         </div>
       </div>
     </>}
