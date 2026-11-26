@@ -917,6 +917,7 @@ export interface Story {
   caption: string;
   createdAt: string;
   repostOfStoryId?: string;
+  mediaMimeType?: string;
   repostOfPostId?: string;
   seenBy: string[];
   origin: string;

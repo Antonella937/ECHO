@@ -1206,6 +1206,7 @@ components:
         caption: { type: string }
         createdAt: { type: string, format: date-time }
         repostOfStoryId: { type: string }
+        mediaMimeType: { type: string }
         repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
@@ -1490,6 +1491,7 @@ components:
         caption: { type: string }
         createdAt: { type: string, format: date-time }
         repostOfStoryId: { type: string }
+        mediaMimeType: { type: string }
         repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
@@ -1590,6 +1592,7 @@ components:
         caption: { type: string }
         createdAt: { type: string, format: date-time }
         repostOfStoryId: { type: string }
+        mediaMimeType: { type: string }
         repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }
@@ -1874,6 +1877,7 @@ components:
         caption: { type: string }
         createdAt: { type: string, format: date-time }
         repostOfStoryId: { type: string }
+        mediaMimeType: { type: string }
         repostOfPostId: { type: string }
         seenBy: { type: array, items: { type: string } }
         origin: { type: string }

@@ -26,6 +26,7 @@
   "dependencies": {
     "@clerk/express": "^2.1.86",
     "@clerk/shared": "^4.43.1",
+    "@ffmpeg-installer/ffmpeg": "1.1.0",
     "@google-cloud/storage": "^8.4.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",

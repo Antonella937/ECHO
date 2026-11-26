@@ -1377,6 +1377,7 @@ export const GetUniverseResponse = zod.object({
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
   "repostOfStoryId": zod.string().optional(),
+  "mediaMimeType": zod.string().optional(),
   "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
@@ -1929,6 +1930,7 @@ export const SaveUniverseBody = zod.object({
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
   "repostOfStoryId": zod.string().optional(),
+  "mediaMimeType": zod.string().optional(),
   "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
@@ -2471,6 +2473,7 @@ export const SaveUniverseResponse = zod.object({
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
   "repostOfStoryId": zod.string().optional(),
+  "mediaMimeType": zod.string().optional(),
   "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
@@ -3061,6 +3064,7 @@ export const VerifyUniverseResponse = zod.object({
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
   "repostOfStoryId": zod.string().optional(),
+  "mediaMimeType": zod.string().optional(),
   "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
@@ -3924,6 +3928,7 @@ export const CreateCreatorUniverseBody = zod.object({
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
   "repostOfStoryId": zod.string().optional(),
+  "mediaMimeType": zod.string().optional(),
   "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()
@@ -4464,6 +4469,7 @@ export const CreateCreatorUniverseResponse = zod.object({
   "caption": zod.string(),
   "createdAt": zod.coerce.date(),
   "repostOfStoryId": zod.string().optional(),
+  "mediaMimeType": zod.string().optional(),
   "repostOfPostId": zod.string().optional(),
   "seenBy": zod.array(zod.string()),
   "origin": zod.string()

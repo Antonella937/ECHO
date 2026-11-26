@@ -59,8 +59,8 @@ router.post("/community-comments/draft", requireAuth, async (req, res) => {
       res.status(403).json({ error: "COMMUNITY_COMMENTS_NOT_ENABLED_OR_NOT_OWNER" }); return;
     }
     let visualContext: string | null = null;
-    const hasImages = Boolean((post as { image?: string; media?: Array<{ type: string }> }).image || (post as { media?: Array<{ type: string }> }).media?.some(m => m.type === "image"));
-    if (hasImages) {
+    const hasMedia = Boolean((post as { image?: string; media?: Array<{ type: string }> }).image || (post as { media?: Array<{ type: string }> }).media?.length);
+    if (hasMedia) {
       try {
         const vision = await new VisionService().analyzePost(ownerId, state as unknown as SocialState, post.id, parsed.data.universeId);
         visualContext = vision.summary.overallDescription.slice(0, 5000);

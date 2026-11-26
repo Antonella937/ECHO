@@ -23,6 +23,7 @@ export interface Story {
   caption: string;
   createdAt: Date;
   repostOfStoryId?: string;
+  mediaMimeType?: string;
   repostOfPostId?: string;
   seenBy: string[];
   origin: string;

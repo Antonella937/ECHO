@@ -4,6 +4,11 @@ packages:
   - lib/integrations/*
   - scripts
 
+allowBuilds:
+  '@clerk/shared': false
+  '@ffmpeg-installer/*': false
+  esbuild: true
+
 autoInstallPeers: false
 
 catalog:

@@ -127,6 +127,7 @@ export interface Comment {
 }
 
 export interface Story {
+  mediaMimeType?: string;
   /** Original story identifier for attributed reposts; permission checks must follow the source. */
   repostOfStoryId?: string;
   /** Original feed post for clickable story shares. */
