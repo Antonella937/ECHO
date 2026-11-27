@@ -47,9 +47,31 @@ export default function ScenesPage() {
   const [error,setError] = useState('');
   const [showCreate,setShowCreate] = useState(false);
   const [showSceneSettings,setShowSceneSettings] = useState(false);
+  const wallpaperKey = user?.id && selected ? `echo:scene-wallpaper:${user.id}:${universeId}:${me.id}:${selected}` : '';
+  const visualPreferenceKey = user?.id && selected ? `echo:scene-visual:${user.id}:${universeId}:${me.id}:${selected}` : '';
+  const [visualSceneKey, setVisualSceneKey] = useState('');
+  const showVisualScene = !!visualPreferenceKey && visualSceneKey === visualPreferenceKey;
+
+  useEffect(() => {
+    try {
+      setVisualSceneKey(visualPreferenceKey && localStorage.getItem(visualPreferenceKey) === '1' ? visualPreferenceKey : '');
+    } catch {
+      setVisualSceneKey('');
+    }
+  }, [visualPreferenceKey]);
+
+  function toggleVisualScene() {
+    if (!visualPreferenceKey) return;
+    setVisualSceneKey(showVisualScene ? '' : visualPreferenceKey);
+    try {
+      if (showVisualScene) localStorage.removeItem(visualPreferenceKey);
+      else localStorage.setItem(visualPreferenceKey, '1');
+    } catch {
+      // The view still works for the current visit when storage is unavailable.
+    }
+  }
   const [sceneWallpaper,setSceneWallpaper] = useState('');
   const resolveMedia = useMediaResolver();
-  const wallpaperKey = user?.id && selected ? `echo:scene-wallpaper:${user.id}:${universeId}:${me.id}:${selected}` : '';
   const [groupBackgroundId,setGroupBackgroundId] = useState('');
   const [matchingGroups,setMatchingGroups] = useState<Array<{id:string;name:string;participantIds:string[]}>>([]);
   useEffect(()=>{const scene=scenes.find(item=>item.sceneId===selected);setMatchingGroups([]);if(!scene||!user?.id)return;let cancelled=false;customFetch<{groups:Array<{id:string;name:string;participantIds:string[]}>}>(`/api/group-dms?${new URLSearchParams({universeId,actorId:me.id})}`,{method:'GET',responseType:'json'}).then(result=>{if(cancelled)return;const sceneMembers=new Set(scene.participantIds);const observedMembers=new Set(scene.participantIds.filter(id=>id!==me.id));setMatchingGroups(result.groups.filter(g=>{const members=new Set(g.participantIds);const expected=members.has(me.id)?sceneMembers:observedMembers;return members.size===expected.size&&[...members].every(id=>expected.has(id));}));}).catch(()=>{if(!cancelled)setMatchingGroups([]);});return()=>{cancelled=true;};},[selected,scenes,user?.id,universeId,me.id]);
@@ -176,6 +198,8 @@ export default function ScenesPage() {
     }catch{setError(es?'No se pudo enviar.':'Could not send.')}finally{setBusy(false)}
   };
   const active=scenes.find(s=>s.sceneId===selected);
+  const latestSpeakerId = events.at(-1)?.actorId;
+  const visualCast = active?.participantIds.filter(id => id !== me.id && (presence[id] ?? 'present') === 'present') ?? [];
   useEffect(()=>{setSceneKindroidGroupId(active?.turnSettings?.kindroidGroupId??'');},[active?.sceneId,active?.turnSettings?.kindroidGroupId]);
   const saveSceneKindroidGroup = async () => {
     if(!active)return;
@@ -304,6 +328,35 @@ export default function ScenesPage() {
         </div>
         <button type="button" aria-expanded={showSceneSettings} onClick={()=>setShowSceneSettings(v=>!v)} aria-label={es?"Opciones":"Options"} className="grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-black/25 text-xl backdrop-blur-md">···</button>
       </div>
+      <div className="relative z-20 flex shrink-0 justify-center">
+        <button type="button" aria-pressed={showVisualScene} onClick={toggleVisualScene}
+          className="rounded-full border border-white/25 bg-black/50 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md aria-pressed:border-white/60">
+          {es ? 'Vista visual' : 'Visual view'}
+        </button>
+      </div>
+      {showVisualScene && visualCast.length > 0 && (
+        <section aria-label={es ? 'Personajes en escena' : 'Characters on stage'}
+          className="relative z-10 flex shrink-0 gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
+          {visualCast.map(id => {
+            const character = state.characters.find(item => item.id === id);
+            const name = character?.name ?? '?';
+            const speaking = latestSpeakerId === id;
+            return (
+              <figure key={id} className={`relative mx-auto h-[min(23dvh,14rem)] min-w-[5rem] max-w-44 flex-1 overflow-hidden rounded-2xl border bg-black/45 text-white transition-[opacity,border-color] motion-reduce:transition-none ${speaking ? 'border-white shadow-lg' : 'border-white/20 opacity-75'}`}>
+                <div className="absolute inset-0 grid place-items-center text-3xl font-semibold" aria-hidden="true">{name.slice(0, 1)}</div>
+                {character?.avatar && <img src={resolveMedia(character.avatar)} alt=""
+                  className="absolute inset-0 h-full w-full object-cover object-top"
+                  onError={event => { event.currentTarget.style.visibility = 'hidden'; }}
+                  key={character.avatar} />}
+                <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-2 pb-2 pt-6 text-center">
+                  <span className="block truncate text-sm font-semibold">{name}</span>
+                  {speaking && <span className="block text-[11px]">{es ? 'Última intervención' : 'Latest turn'}</span>}
+                </figcaption>
+              </figure>
+            );
+          })}
+        </section>
+      )}
       {active.status === 'finished'
         ? <div className="relative z-20 mx-2 rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-xs text-white/80" role="status">{es ? 'Escena terminada · Guardada para releer · Personajes liberados' : 'Scene finished · Saved for reading · Characters released'}</div>
         : <div className="relative z-20 flex justify-end px-2 pb-1"><button type="button" disabled={busy} onClick={()=>void finishScene()} className="rounded-full border border-white/30 bg-black/50 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md disabled:opacity-50" data-testid="finish-scene-button">{es ? 'Terminar escena' : 'Finish scene'}</button></div>}
