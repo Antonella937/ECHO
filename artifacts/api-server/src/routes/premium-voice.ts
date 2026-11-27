@@ -398,9 +398,13 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
  if(!z.string().uuid().safeParse(req.params.id).success){res.status(400).json({error:"INVALID_SAMPLE"});return;}
  try{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
-  const result=await pool.query("SELECT audio_object_path FROM echo_voice_samples WHERE id=$1 AND owner_id=$2 AND status='ready'",[req.params.id,req.userId]);
+  const result=await pool.query(`SELECT s.audio_object_path, s.provider_sample_id,
+    (p.selected_sample_id=s.id) AS selected
+    FROM echo_voice_samples s JOIN echo_voice_projects p ON p.id=s.project_id AND p.owner_id=s.owner_id
+    WHERE s.id=$1 AND s.owner_id=$2 AND s.status='ready'`,[req.params.id,req.userId]);
   if(!result.rowCount){res.status(404).json({error:"SAMPLE_NOT_FOUND"});return;}
-  const path = result.rows[0].audio_object_path;
+  const sample = result.rows[0];
+  const path = sample.audio_object_path;
   if (typeof path === "string" && /^r2\/voice-studio\/previews\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i.test(path)) {
    const r2 = configuredR2();
    if (!r2) throw Error("STORAGE_NOT_CONFIGURED");
@@ -408,20 +412,43 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
    return;
   }
   const base=process.env.SUPABASE_URL?.replace(/\/$/,""),secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!base||!secret)throw Error("STORAGE_NOT_CONFIGURED");
-  const response=await fetch(`${base}/storage/v1/object/sign/echo-media/${path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:120})});
-  if(!response.ok)throw Error("SIGNED_URL_FAILED");
-  const data=await response.json() as {signedURL?:string};
-  const raw=data.signedURL;
-  if(!raw){res.status(502).json({error:"VOICE_SAMPLE_SIGNED_URL_MISSING"});return;}
-  // Supabase commonly returns /object/sign/... relative to /storage/v1/.
-  // Resolving that against the origin directly strips /storage/v1 and breaks playback.
-  const url=new URL(raw.startsWith("http")?raw:raw.startsWith("/storage/v1/")?
-   `${base}${raw}`:`${base}/storage/v1/${raw.replace(/^[/]/,"")}`);
-  if(url.origin!==new URL(base).origin || !url.pathname.startsWith("/storage/v1/object/sign/echo-media/")){
-   res.status(502).json({error:"VOICE_SAMPLE_SIGNED_URL_INVALID"});return;
+  if (base && secret && typeof path === "string") {
+   try {
+    const response=await fetch(`${base}/storage/v1/object/sign/echo-media/${path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:120}),signal:AbortSignal.timeout(5000)});
+    if (response.ok) {
+     const {signedURL}=await response.json() as {signedURL?:string};
+     if (signedURL) {
+      const url=new URL(signedURL.startsWith("http")?signedURL:signedURL.startsWith("/storage/v1/")?
+       `${base}${signedURL}`:`${base}/storage/v1/${signedURL.replace(/^[/]/,"")}`);
+      if (url.origin===new URL(base).origin && url.pathname.startsWith("/storage/v1/object/sign/echo-media/")) {
+       res.json({url:url.toString(),expiresIn:120});
+       return;
+      }
+     }
+    }
+   } catch {
+    // A selected voice can still have a preview at the voice provider.
+   }
   }
-  res.json({url:url.toString(),expiresIn:120});
+  if (sample.selected && typeof sample.provider_sample_id === "string" && /^[a-zA-Z0-9_-]{10,128}$/.test(sample.provider_sample_id) &&
+      elevenLabsVoiceStatus(req.userId!).generationAvailable) {
+   const voiceId = encodeURIComponent(sample.provider_sample_id);
+   const response = await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+    headers: elevenLabsHeaders(), redirect: "error", signal: AbortSignal.timeout(8000),
+   });
+   if (response.ok) {
+    const {preview_url} = await response.json() as {preview_url?:string};
+    if (preview_url) {
+     const url = new URL(preview_url);
+     if (url.protocol === "https:" && !url.username && !url.password &&
+         (url.hostname === "storage.googleapis.com" || url.hostname.endsWith(".elevenlabs.io"))) {
+      res.json({url:url.toString()});
+      return;
+     }
+    }
+   }
+  }
+  res.status(503).json({error:"VOICE_SAMPLE_PLAYBACK_UNAVAILABLE"});
  }catch{res.status(503).json({error:"VOICE_SAMPLE_PLAYBACK_UNAVAILABLE"});}
 });
 /**
