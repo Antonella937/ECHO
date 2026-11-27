@@ -50,7 +50,20 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
   useEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal();
-    return () => dialog?.close();
+    const viewport = window.visualViewport;
+    const fit = () => {
+      if (!viewport || !dialog) return;
+      dialog.style.setProperty('--echo-call-height', `${viewport.height}px`);
+      dialog.style.top = `${viewport.offsetTop}px`;
+    };
+    fit();
+    viewport?.addEventListener('resize', fit);
+    viewport?.addEventListener('scroll', fit);
+    return () => {
+      viewport?.removeEventListener('resize', fit);
+      viewport?.removeEventListener('scroll', fit);
+      dialog?.close();
+    };
   }, []);
 
   useEffect(() => {
@@ -175,24 +188,28 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
   return (
     <dialog ref={dialogRef} aria-label={`Videollamada con ${peer.name}`}
       onCancel={event => { event.preventDefault(); onClose(); }}
-      className="m-auto h-dvh max-h-dvh w-full max-w-lg overflow-hidden bg-neutral-950 p-0 text-white backdrop:bg-black/80 sm:h-[min(54rem,96dvh)] sm:rounded-3xl">
-      <div className="flex h-full min-h-0 flex-col gap-3 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]">
+      className="fixed inset-0 m-0 h-[var(--echo-call-height,100dvh)] max-h-none w-full max-w-none overflow-hidden border-0 bg-neutral-950 p-0 text-white">
+      <div className="relative isolate flex h-full min-h-0 flex-col gap-2 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]">
+        <div className="absolute inset-0 -z-10 bg-neutral-950">
+          {renderParticipant(peer)}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/65" />
+        </div>
         <header className="flex shrink-0 items-center justify-between gap-2 px-1">
           <div className="min-w-0">
             <h2 className="truncate font-semibold">{peer.name}</h2>
             <p className="text-xs text-white/65">Videollamada simulada</p>
           </div>
           <button type="button" aria-expanded={looksOpen} onClick={() => setLooksOpen(open => !open)}
-            className="shrink-0 rounded-lg bg-neutral-800 px-2 py-2 text-xs">Looks</button>
+            className="shrink-0 rounded-lg bg-black/45 px-3 py-2 text-xs backdrop-blur-md">Looks</button>
           {audioAvailable && (
             <>
               <select aria-label="Idioma de las voces" value={language} onChange={event => setLanguage(event.target.value)}
-                className="ml-auto rounded-lg bg-neutral-800 p-2 text-xs">
+                className="rounded-lg bg-black/45 p-2 text-xs backdrop-blur-md">
                 <option value="en">English</option>
                 <option value="es">Español</option>
               </select>
               <button type="button" aria-label={muted ? 'Activar voces' : 'Silenciar voces'} aria-pressed={muted}
-                className="grid size-10 shrink-0 place-items-center rounded-full bg-neutral-800"
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-black/45 backdrop-blur-md"
                 onClick={() => { if (!muted) stopSpeaking(); setMuted(!muted); }}>
                 {muted ? <MicOff size={18} /> : <Volume2 size={18} />}
               </button>
@@ -204,7 +221,7 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
           </button>
         </header>
         {looksOpen && (
-          <section aria-label="Looks de la llamada" className="max-h-[33dvh] shrink-0 overflow-y-auto rounded-xl bg-white/10 p-2 text-xs">
+          <section aria-label="Looks de la llamada" className="max-h-[33dvh] shrink-0 overflow-y-auto rounded-xl bg-black/60 p-3 text-xs backdrop-blur-md">
             <div className="grid grid-cols-2 gap-2">
               {[me, peer].map(person => (
                 <fieldset key={person.id} disabled={!looksReady} className="min-w-0 space-y-2">
@@ -228,19 +245,14 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
           </section>
         )}
         {!looksOpen && lookError && <p role="alert" className="text-xs text-red-300">{lookError}</p>}
-        <div className={`relative min-h-24 flex-1 overflow-hidden rounded-3xl border-2 bg-gradient-to-b from-neutral-700 to-neutral-900 ${speaker === peer.id ? 'border-white/90' : 'border-white/10'}`}>
-          {renderParticipant(peer)}
-          <div className={`absolute bottom-3 right-3 aspect-[3/4] w-1/4 max-w-28 overflow-hidden rounded-2xl border-2 bg-neutral-800 shadow-lg ${speaker === me.id ? 'border-white' : 'border-white/30'}`}>
+        <div className="relative min-h-0 flex-1">
+          <div className={`absolute bottom-1 right-1 aspect-[3/4] w-[24%] max-w-28 max-h-full overflow-hidden rounded-2xl border-2 bg-neutral-800 shadow-lg ${speaker === me.id ? 'border-white' : 'border-white/30'}`}>
             {renderParticipant(me)}
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-xs">{me.name}</span>
           </div>
         </div>
-        <div aria-live="polite" aria-label="Diálogo de la llamada" className="max-h-[22dvh] shrink-0 overflow-y-auto rounded-xl bg-white/10 px-3 py-2 text-sm">
-          {latest ? (
-            <p key={latest.id} className="whitespace-pre-wrap break-words"><strong>{latest.senderId === me.id ? me.name : peer.name}</strong> {latest.text}</p>
-          ) : (
-            <p className="text-white/65">Escribí para empezar la llamada.</p>
-          )}
+        <div aria-live="polite" aria-label="Diálogo de la llamada" className={latest ? 'max-h-[min(16dvh,6rem)] shrink-0 overflow-y-auto rounded-2xl bg-black/45 px-3 py-2 text-sm backdrop-blur-md' : 'sr-only'}>
+          {latest && <p key={latest.id} className="whitespace-pre-wrap break-words"><strong>{latest.senderId === me.id ? me.name : peer.name}</strong> {latest.text}</p>}
         </div>
         {latest && audioAvailable && !muted && (
           <button type="button" disabled={!!speaker} onClick={() => { stopSpeaking(); speak(latest.text, latest.senderId); }}
@@ -250,10 +262,10 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
         )}
         {!audioAvailable && <p className="text-xs text-white/70">Las voces no están disponibles en este navegador.</p>}
         {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-        <form onSubmit={submit} className="flex shrink-0 items-end gap-2">
-          <textarea rows={2} aria-label={`Escribir como ${me.name}`} placeholder={`Escribí como ${me.name}…`}
+        <form onSubmit={submit} className="flex shrink-0 items-end gap-2 rounded-[28px] border border-white/20 bg-black/40 p-1.5 shadow-lg backdrop-blur-md">
+          <textarea rows={1} aria-label={`Escribir como ${me.name}`} placeholder={`Escribí como ${me.name}…`}
             value={dialogue} onChange={event => setDialogue(event.target.value)} maxLength={10000}
-            className="min-w-0 flex-1 resize-none rounded-xl bg-neutral-800 p-3 text-base placeholder:text-white/65" />
+            className="min-h-11 min-w-0 flex-1 resize-none rounded-3xl bg-transparent px-3 py-2.5 text-base leading-6 outline-none placeholder:text-white/75" />
           <button type="submit" aria-label="Enviar diálogo" disabled={!dialogue.trim()}
             className="grid size-11 shrink-0 place-items-center rounded-full bg-white text-black disabled:opacity-40">
             <Send size={18} />
