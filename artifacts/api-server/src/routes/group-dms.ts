@@ -410,8 +410,14 @@ router.post("/group-dms/:groupId/messages", async (req, res) => {
   res.status(201).json({ id: messageId, groupId, senderId: actorId, text, attachments, createdAt: inserted.rows[0].created_at, kindroidDelivery });
   if (kindroidDelivery === "sent") {
     void runGroupAutonomyOnce(req.userId!, universeId, groupId, false, undefined, messageId)
-      .then(result => {
-        if (result.status === "skipped") req.log.info({ groupId, messageId, reason: result.reason }, "Kindroid group reply skipped");
+      .then(async result => {
+        if ("replyId" in result && result.replyId && result.speakerId) {
+          const followUp = await runGroupAutonomyOnce(req.userId!, universeId, groupId, false, undefined, messageId,
+            { id: result.replyId, speakerId: result.speakerId });
+          if (followUp.status === "skipped") req.log.info({ groupId, messageId, reason: followUp.reason }, "Kindroid group follow-up skipped");
+        } else if (result.status === "skipped") {
+          req.log.info({ groupId, messageId, reason: result.reason }, "Kindroid group reply skipped");
+        }
       })
       .catch(() => req.log.warn({ groupId, messageId }, "Kindroid group reply failed"));
   }

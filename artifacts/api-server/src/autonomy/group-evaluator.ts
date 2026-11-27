@@ -4,7 +4,7 @@ import { readOwnerControls } from "./repository";
 import { chooseGroupSpeaker } from "./group-policy";
 
 /** Read-only evaluation. It cannot generate text or mutate a group. */
-export async function evaluateGroupAutonomy(ownerId: string, universeId: string, groupId: string, now = new Date(), sceneMode = false, preferredSpeakerId?: string, replyToMessageId?: string) {
+export async function evaluateGroupAutonomy(ownerId: string, universeId: string, groupId: string, now = new Date(), sceneMode = false, preferredSpeakerId?: string, replyToMessageId?: string, previousReply?: { id: string; speakerId: string }) {
   const controls = await readOwnerControls(ownerId, universeId);
   if (controls.globalKillSwitchEngaged || !controls.liveExecutionEnabled) return { speakerId: null, reason: "OWNER_DISABLED" };
   const [universe] = await db.select({ state: echoUniversesTable.state, archivedAt: echoUniversesTable.archivedAt, deletedAt: echoUniversesTable.deletedAt })
@@ -18,19 +18,21 @@ export async function evaluateGroupAutonomy(ownerId: string, universeId: string,
   if (!group || (!sceneMode && !replyToMessageId && group.autonomy_enabled !== true)) return { speakerId: null, reason: "GROUP_DISABLED" };
   const messages = await db.execute(sql`SELECT id, sender_id, body, created_at FROM echo_group_messages
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
-    ORDER BY created_at DESC LIMIT 1`);
+    ORDER BY created_at DESC, id DESC LIMIT 2`);
   const last = messages.rows[0];
   const participants = Array.isArray(group.participant_ids) ? group.participant_ids.filter((v): v is string => typeof v === "string") : [];
   const primaryId = (state as { primaryCharacterId?: string }).primaryCharacterId;
   const ownerTurn = !sceneMode && !!primaryId && last?.sender_id === primaryId;
-  if (replyToMessageId && (!ownerTurn || last?.id !== replyToMessageId)) {
+  const ownerMessage = previousReply ? messages.rows[1] : last;
+  if (replyToMessageId && (ownerMessage?.sender_id !== primaryId || ownerMessage?.id !== replyToMessageId ||
+    (previousReply && (last?.id !== previousReply.id || last.sender_id !== previousReply.speakerId)))) {
     return { speakerId: null, reason: "GROUP_MESSAGE_SUPERSEDED" };
   }
   const linkedSpeakers = replyToMessageId ? await db.execute(sql`SELECT character_id FROM echo_kindroid_character_links
     WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND enabled = true`) : null;
   const linkedIds = linkedSpeakers && new Set(linkedSpeakers.rows.map(row => row.character_id));
   const candidates = (state.characters ?? []).filter(c =>
-    participants.includes(c.id) && c.id !== primaryId && (!linkedIds || linkedIds.has(c.id))).map(c => {
+    participants.includes(c.id) && c.id !== primaryId && c.id !== previousReply?.speakerId && (!linkedIds || linkedIds.has(c.id))).map(c => {
     const control = controls.characters.get(c.id);
     return {
       id: c.id, archived: c.archived, // An explicitly started spectator scene opts the GROUP into conversation.
