@@ -11,10 +11,10 @@ export interface CallAvatarLook {
   expression: keyof typeof callExpressions;
 }
 
-export function CallAvatar({ look, speaking, reference }: { look: CallAvatarLook; speaking: boolean; reference?: string }) {
+export function CallAvatar({ look, speaking, mouthCue, reference }: { look: CallAvatarLook; speaking: boolean; mouthCue: string; reference?: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const current = useRef({ look, speaking });
-  current.current = { look, speaking };
+  const current = useRef({ look, speaking, mouthCue });
+  current.current = { look, speaking, mouthCue };
 
   useEffect(() => {
     const element = canvas.current;
@@ -136,7 +136,7 @@ export function CallAvatar({ look, speaking, reference }: { look: CallAvatarLook
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     renderer.setAnimationLoop(milliseconds => {
       const time = milliseconds / 1000;
-      const { look, speaking } = current.current;
+      const { look, speaking, mouthCue } = current.current;
       const smile = look.expression === 'smile';
       const surprised = look.expression === 'surprised';
       const blink = !reduceMotion.matches && time % 4.7 > 4.57;
@@ -152,8 +152,11 @@ export function CallAvatar({ look, speaking, reference }: { look: CallAvatarLook
       for (const part of eyes) part.scale.y = blink ? 0.007 : surprised ? 0.072 : 0.045;
       for (const brow of brows) brow.position.y = surprised ? 0.52 : 0.47;
       mouth.position.y = smile ? -0.16 : -0.19;
-      mouth.scale.x = smile ? 0.18 : surprised ? 0.092 : 0.13;
-      mouth.scale.y = speaking ? 0.027 + Math.abs(Math.sin(time * 17)) * 0.072 : surprised ? 0.071 : 0.025;
+      const vowel = mouthCue.match(/[aeiouáéíóú]/i)?.[0]?.toLowerCase();
+      const rounded = vowel && 'ouóú'.includes(vowel);
+      const wide = vowel && 'eiéí'.includes(vowel);
+      mouth.scale.x = speaking ? (rounded ? 0.085 : wide ? 0.16 : 0.13) : smile ? 0.18 : surprised ? 0.092 : 0.13;
+      mouth.scale.y = speaking ? 0.025 + Math.abs(Math.sin(time * 15)) * (wide ? 0.042 : 0.08) : surprised ? 0.071 : 0.025;
       renderer.render(scene, camera);
     });
 

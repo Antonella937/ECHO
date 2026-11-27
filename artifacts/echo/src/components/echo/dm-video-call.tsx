@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { MicOff, PhoneOff, Send, Volume2 } from 'lucide-react';
 import type { Message } from '@/domain/types';
 import { useMediaResolver } from '@/lib/media';
+import { readCallLooks, writeCallLooks } from '@/store/persistence';
 import { CallAvatar, callHair, callClothes, callExpressions, type CallAvatarLook } from './call-avatar';
 
 type Participant = { id: string; name: string; avatar: string };
 
 interface VideoCallProps {
+  storageScope: string;
   me: Participant;
   peer: Participant;
   messages: Message[];
@@ -28,13 +30,15 @@ function CallPortrait({ person, speaking }: { person: Participant; speaking: boo
   );
 }
 
-export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallProps) {
+export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose }: VideoCallProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const seen = useRef(new Set(messages.map(message => message.id)));
   const utterances = useRef(new Set<SpeechSynthesisUtterance>());
   const [latest, setLatest] = useState<Message>();
   const [dialogue, setDialogue] = useState('');
   const [speaker, setSpeaker] = useState<string>();
+  const [mouthCue, setMouthCue] = useState('');
+  const [spokenExpression, setSpokenExpression] = useState<CallAvatarLook['expression']>('neutral');
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
   const [looksOpen, setLooksOpen] = useState(true);
@@ -45,6 +49,8 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
   const [portraitMode, setPortraitMode] = useState<Record<string, boolean>>({});
   const [lookUrls, setLookUrls] = useState<Record<string, string>>({});
   const lookUrlsRef = useRef<Record<string, string>>({});
+  const savedFiles = useRef<Record<string, File>>({});
+  const [looksReady, setLooksReady] = useState(false);
   const [lookError, setLookError] = useState('');
   const [language, setLanguage] = useState('en');
   const audioAvailable = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
@@ -61,6 +67,28 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     const lastTurn = newTurns.at(-1);
     if (lastTurn) setLatest(lastTurn);
   }, [messages]);
+
+  useEffect(() => {
+    let active = true;
+    void readCallLooks<{ avatars: typeof avatarLooks; portraits: typeof portraitMode; files: Record<string, File> }>(storageScope)
+      .then(saved => {
+        if (!active || !saved) return;
+        setAvatarLooks(current => ({ ...current, ...saved.avatars }));
+        setPortraitMode(saved.portraits);
+        savedFiles.current = saved.files;
+        const urls = Object.fromEntries(Object.entries(saved.files).map(([id, file]) => [id, URL.createObjectURL(file)]));
+        lookUrlsRef.current = urls;
+        setLookUrls(urls);
+      })
+      .catch(() => { if (active) setLookError('No se pudieron cargar los looks guardados.'); })
+      .finally(() => { if (active) setLooksReady(true); });
+    return () => { active = false; };
+  }, [storageScope]);
+
+  function saveLooks(avatars = avatarLooks, portraits = portraitMode) {
+    void writeCallLooks(storageScope, { avatars, portraits, files: { ...savedFiles.current } })
+      .catch(() => setLookError('No se pudo guardar el look en este iPhone.'));
+  }
 
   function stopSpeaking() {
     if (utterances.current.size) {
@@ -79,7 +107,19 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     const voices = window.speechSynthesis.getVoices().filter(voice => voice.lang.split('-')[0] === language);
     const voice = voices[senderId === me.id ? Math.min(1, voices.length - 1) : 0];
     if (voice) audio.voice = voice;
-    audio.onstart = () => { if (utterances.current.has(audio)) setSpeaker(senderId); };
+    const action = [...text.matchAll(/\*([^*]+)\*/g)].map(match => match[1]).join(' ');
+    const expression = /\b(smiles?|grins?|laughs?|sonr[ií]e|r[ií]e)\b/i.test(action) ? 'smile'
+      : /\b(gasps?|surprised|sorprendid[oa])\b/i.test(action) ? 'surprised' : 'neutral';
+    audio.onstart = () => {
+      if (!utterances.current.has(audio)) return;
+      setMouthCue(spoken.split(/\s+/)[0] ?? '');
+      setSpokenExpression(expression);
+      setSpeaker(senderId);
+    };
+    audio.onboundary = event => {
+      if (!utterances.current.has(audio)) return;
+      setMouthCue(spoken.slice(event.charIndex).match(/^\S+/)?.[0] ?? '');
+    };
     audio.onend = audio.onerror = () => {
       if (utterances.current.delete(audio)) setSpeaker(undefined);
     };
@@ -105,7 +145,9 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
   }, []);
 
   function updateAvatarLook<K extends keyof CallAvatarLook>(id: string, field: K, value: CallAvatarLook[K]) {
-    setAvatarLooks(current => ({ ...current, [id]: { ...current[id], [field]: value } }));
+    const updated = { ...avatarLooks, [id]: { ...avatarLooks[id], [field]: value } };
+    setAvatarLooks(updated);
+    saveLooks(updated);
   }
 
   function renderParticipant(person: Participant) {
@@ -113,7 +155,9 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     if (portraitMode[person.id]) {
       return <CallPortrait person={{ ...person, avatar: lookUrls[person.id] || person.avatar }} speaking={speaking} />;
     }
-    return <CallAvatar look={avatarLooks[person.id]} speaking={speaking} reference={lookUrls[person.id]} />;
+    const look = avatarLooks[person.id];
+    const expression = speaking && spokenExpression !== 'neutral' ? spokenExpression : look.expression;
+    return <CallAvatar look={{ ...look, expression }} speaking={speaking} mouthCue={speaking ? mouthCue : ''} reference={lookUrls[person.id]} />;
   }
 
   function changeLook(id: string, file?: File) {
@@ -126,7 +170,10 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     const url = file ? URL.createObjectURL(file) : '';
     lookUrlsRef.current = { ...lookUrlsRef.current, [id]: url };
     setLookUrls(lookUrlsRef.current);
+    if (file) savedFiles.current[id] = file;
+    else delete savedFiles.current[id];
     setLookError('');
+    saveLooks();
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -180,10 +227,14 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
               {[me, peer].map(person => {
                 const look = avatarLooks[person.id];
                 return (
-                  <fieldset key={person.id} className="min-w-0 space-y-2">
+                  <fieldset key={person.id} disabled={!looksReady} className="min-w-0 space-y-2">
                     <legend className="mb-1 max-w-full truncate font-semibold">{person.name}</legend>
                     <select aria-label={`Formato del avatar de ${person.name}`} value={portraitMode[person.id] ? 'photo' : 'avatar'}
-                      onChange={event => setPortraitMode({ ...portraitMode, [person.id]: event.target.value === 'photo' })}
+                      onChange={event => {
+                        const updated = { ...portraitMode, [person.id]: event.target.value === 'photo' };
+                        setPortraitMode(updated);
+                        saveLooks(avatarLooks, updated);
+                      }}
                       className="w-full rounded-lg bg-neutral-800 p-2">
                       <option value="avatar">Avatar 3D</option>
                       <option value="photo">Retrato</option>
