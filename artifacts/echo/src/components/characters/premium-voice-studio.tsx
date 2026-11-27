@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { customFetch } from '@workspace/api-client-react';
+import { ApiError, customFetch } from '@workspace/api-client-react';
 import { MediaScopeContext } from '@/lib/media';
 import { AudioLines, FileAudio, RefreshCw, Sparkles, Upload } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
@@ -116,7 +116,12 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
       await customFetch('/api/voices/premium/projects',{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId,mode:'prompt',prompt,language:voiceLanguage,variantCount:count,consentConfirmed:false})});
       await customFetch('/api/voices/premium/generate',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,characterId})});
       await loadProject();
-    }catch{setError(language==='es'?'No se pudieron generar las muestras. Revisá los límites o la configuración de ElevenLabs.':'Could not generate previews. Check limits or ElevenLabs configuration.');}
+    }catch(error){
+      const code = error instanceof ApiError ? (error.data as {error?: string} | null)?.error : undefined;
+      setError(code === 'VOICE_DESIGN_MONTHLY_PREVIEW_LIMIT'
+        ? (language==='es'?'Este personaje ya generó su tanda de muestras de este mes. Podés seguir usando las muestras guardadas.':'This character already used its monthly preview batch. You can still use the saved samples.')
+        : (language==='es'?'No se pudieron generar las muestras. Revisá los límites o la configuración de ElevenLabs.':'Could not generate previews. Check limits or ElevenLabs configuration.'));
+    }
     finally{setGenerating(false);}
   };
   const selectSample=async(id:string)=>{
@@ -141,8 +146,11 @@ export function PremiumVoiceStudio({ characterId }: { characterId?: string }) {
     finally{setCloning(false);}
   };
   const playSample=async(id:string)=>{
+    setError(''); setSampleUrl(null);
     try{const data=await customFetch<{url:string}>(`/api/voices/premium/samples/${id}/play`,{responseType:'json'});setSampleUrl(data.url);}
-    catch{setError(language==='es'?'No se pudo reproducir la muestra.':'Could not play preview.');}
+    catch{setError(id===selectedSampleId && generationAvailable
+      ? (language==='es'?'La muestra guardada no está disponible. Podés usar «Probar voz · 2 créditos» para escuchar la voz seleccionada.':'The saved preview is unavailable. Use “Test voice · 2 credits” to hear the selected voice.')
+      : (language==='es'?'No se pudo reproducir la muestra.':'Could not play preview.'));}
   };
 
   const loadReferences=async()=>{
