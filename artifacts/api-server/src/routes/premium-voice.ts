@@ -9,6 +9,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { readUniverse } from "../lib/universeRepository";
 import { SaveUniverseBody } from "@workspace/api-zod";
 import { resolveEchoPlan } from "../lib/entitlements";
+import { lifetimeAccessForOwner } from "../lib/lifetimeAccess";
 import { elevenLabsVoiceStatus, elevenLabsHeaders, elevenLabsCreationAllowed } from "../lib/elevenLabsVoice";
 
 const router: IRouter = Router();
@@ -334,15 +335,16 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   if(!project || project.mode!=="prompt" || project.prompt.trim().length<20 || project.prompt.length>1000){
    res.status(400).json({error:"VOICE_PROMPT_MUST_BE_20_TO_1000_CHARACTERS",charged:false});return;
   }
-  // Limit costly previews to one batch per project per month. No automatic retries.
+  // Nela can audition multiple batches in the owner account. Keep the in-flight reservation.
+  const unlimitedNelaPreviews = characterId === "nela" && lifetimeAccessForOwner(req.userId!) === "owner_lifetime";
   const month=new Date().toISOString().slice(0,7);
   const client=await pool.connect();
   let reserved=false;
   try {
    await client.query("BEGIN");
    await client.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))",[req.userId,project.id]);
-   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 AND provider='elevenlabs' AND status IN ('pending','ready') AND created_at>=($3 || '-01')::date",[project.id,req.userId,month]);
-   if(Number(previous.rows[0].count)>0){await client.query("ROLLBACK");res.status(429).json({error:"VOICE_DESIGN_MONTHLY_PREVIEW_LIMIT",charged:false});return;}
+   const previous=await client.query("SELECT count(*)::int AS count FROM echo_voice_samples WHERE project_id=$1 AND owner_id=$2 AND provider='elevenlabs' AND created_at>=($3 || '-01')::date AND (status='pending' OR (status='ready' AND NOT $4::boolean))",[project.id,req.userId,month,unlimitedNelaPreviews]);
+   if(Number(previous.rows[0].count)>0){await client.query("ROLLBACK");res.status(429).json({error:unlimitedNelaPreviews?"VOICE_DESIGN_IN_PROGRESS":"VOICE_DESIGN_MONTHLY_PREVIEW_LIMIT",charged:false});return;}
    const reservation=await client.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,status) VALUES($1,$2,'elevenlabs','pending') RETURNING id",[project.id,req.userId]);reservationId=reservation.rows[0].id;
    await client.query("COMMIT");reserved=true;
   }catch(e){await client.query("ROLLBACK");throw e;}finally{client.release();}
