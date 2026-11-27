@@ -22,9 +22,10 @@ const schema = { type: "object", additionalProperties: false, required: ["text"]
 /** Explicit one-group execution, never called from the HTTP read endpoints.
  * Generation is metered; the database claim prevents concurrent duplicate generation.
  */
-export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false, preferredSpeakerId?: string, replyToMessageId?: string) {
+export async function runGroupAutonomyOnce(ownerId: string, universeId: string, groupId: string, sceneMode = false, preferredSpeakerId?: string, replyToMessageId?: string, previousReply?: { id: string; speakerId: string }) {
   const now = new Date();
-  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode, preferredSpeakerId, replyToMessageId);
+  const choice = await evaluateGroupAutonomy(ownerId, universeId, groupId, now, sceneMode, preferredSpeakerId, replyToMessageId, previousReply);
+  const expectedLatestId = previousReply?.id ?? replyToMessageId;
   if (!choice.speakerId) return { status: "skipped", reason: choice.reason };
   const speakerId = choice.speakerId;
   const claimId = randomUUID();
@@ -41,9 +42,9 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     const participantIds = Array.isArray(group.participant_ids) ? group.participant_ids.filter((x): x is string => typeof x === "string") : [];
     const messages = await db.execute(sql`SELECT id, sender_id, body, created_at FROM echo_group_messages
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND group_id = ${groupId}
-      ORDER BY created_at DESC LIMIT 16`);
+      ORDER BY created_at DESC, id DESC LIMIT 16`);
     const latest = messages.rows[0];
-    if (replyToMessageId && latest?.id !== replyToMessageId) {
+    if (replyToMessageId && latest?.id !== expectedLatestId) {
       return { status: "skipped", reason: "GROUP_MESSAGE_SUPERSEDED" };
     }
     if (!sceneMode && !replyToMessageId && (!latest || !String(latest.body ?? "").trim() || new Date(String(latest.created_at)).getTime() > now.getTime() - 120000)) {
@@ -190,7 +191,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
         OR EXISTS (SELECT 1 FROM echo_group_messages WHERE owner_id = ${ownerId}
         AND universe_id = ${universeId} AND group_id = ${groupId}
         GROUP BY group_id HAVING max(created_at) <= ${now.toISOString()}::timestamptz))
-      AND (${!replyToMessageId} OR ${replyToMessageId ?? null} = (
+      AND (${!replyToMessageId} OR ${expectedLatestId ?? null} = (
         SELECT id FROM echo_group_messages WHERE owner_id = ${ownerId} AND universe_id = ${universeId}
           AND group_id = ${groupId} ORDER BY created_at DESC, id DESC LIMIT 1
       ))
@@ -199,7 +200,7 @@ export async function runGroupAutonomyOnce(ownerId: string, universeId: string, 
     void notifyNewGroupMessage({ownerId,universeId,groupId,senderId:speakerId,messageId:String(inserted.rows[0].id)}).catch(()=>{});
     await db.execute(sql`UPDATE echo_group_conversations SET last_autonomy_at = now(), updated_at = now()
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId} AND autonomy_claim_id = ${claimId}`);
-    return { status: "sent", speakerId };
+    return { status: "sent" as const, speakerId, replyId: String(inserted.rows[0].id) };
   } finally {
     await db.execute(sql`UPDATE echo_group_conversations SET autonomy_claim_id = NULL, autonomy_claim_until = NULL
       WHERE owner_id = ${ownerId} AND universe_id = ${universeId} AND id = ${groupId} AND autonomy_claim_id = ${claimId}`);
