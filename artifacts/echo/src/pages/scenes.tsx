@@ -204,7 +204,7 @@ export default function ScenesPage() {
     }catch{setError(es?'No se pudo enviar.':'Could not send.')}finally{setBusy(false)}
   };
   const active=scenes.find(s=>s.sceneId===selected);
-  const visualCast = active?.participantIds.filter(id => id !== me.id && (presence[id] ?? 'present') === 'present') ?? [];
+  const visualCast = active?.participantIds.filter(id => (presence[id] ?? 'present') === 'present') ?? [];
   useEffect(()=>{setSceneKindroidGroupId(active?.turnSettings?.kindroidGroupId??'');},[active?.sceneId,active?.turnSettings?.kindroidGroupId]);
   const saveSceneKindroidGroup = async () => {
     if(!active)return;
