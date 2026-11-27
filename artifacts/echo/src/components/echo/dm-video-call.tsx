@@ -40,7 +40,7 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
   const queue = useRef(Promise.resolve());
   const [mouthOpen, setMouthOpen] = useState(false);
   const [blink, setBlink] = useState(false);
-  const [preparedAudio, setPreparedAudio] = useState(false);
+  const [preparedAudio, setPreparedAudio] = useState<{ text: string; senderId: string }>();
   const [latest, setLatest] = useState<Message>();
   const [replies, setReplies] = useState(() => messages.filter(message => message.senderId === peer.id && message.text.trim()).slice(-1));
   const [copyStatus, setCopyStatus] = useState<{ id: string; copied: boolean }>();
@@ -55,6 +55,20 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
   const [looksReady, setLooksReady] = useState(false);
   const [lookError, setLookError] = useState('');
   const audioAvailable = true;
+  const replayTurn = messages.filter(message => message.text.trim() &&
+    (message.senderId === me.id || message.senderId === peer.id)).at(-1);
+  const latestAudioReady = !!replayTurn && preparedAudio?.senderId === replayTurn.senderId &&
+    preparedAudio.text === replayTurn.text;
+
+  function replayLatestTurn() {
+    if (!replayTurn) return;
+    if (latestAudioReady) {
+      void player.current?.play().catch(() => setError('No se pudo reproducir el audio.'));
+      return;
+    }
+    stopSpeaking();
+    speak(replayTurn.text, replayTurn.senderId);
+  }
 
   useEffect(() => {
     let end: number;
@@ -131,7 +145,7 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
     queue.current = Promise.resolve();
     setSpeaker(undefined);
     setMouthOpen(false);
-    setPreparedAudio(false);
+    setPreparedAudio(undefined);
   }
 
   function speak(text: string, senderId: string) {
@@ -185,7 +199,7 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
             frame = requestAnimationFrame(animate);
           };
           audio.onplaying = () => {
-            setPreparedAudio(false);
+            setPreparedAudio(undefined);
             setSpeaker(senderId);
             cancelAnimationFrame(frame);
             animate();
@@ -193,7 +207,7 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
           audio.onended = finish;
           audio.onerror = () => { setError('No se pudo reproducir la voz de ECHO.'); finish(); };
           signal.addEventListener('abort', finish, { once: true });
-          void audio.play().catch(() => { if (!signal.aborted) setPreparedAudio(true); });
+          void audio.play().catch(() => { if (!signal.aborted) setPreparedAudio({ text, senderId }); });
         });
       } catch (cause) {
         if (!signal.aborted) {
@@ -205,7 +219,7 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
       } finally {
         cancelAnimationFrame(frame);
         if (url) URL.revokeObjectURL(url);
-        if (!signal.aborted) { setSpeaker(undefined); setMouthOpen(false); setPreparedAudio(false); }
+        if (!signal.aborted) { setSpeaker(undefined); setMouthOpen(false); setPreparedAudio(undefined); }
       }
     });
   }
@@ -387,10 +401,10 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
             ))}
           </section>
         )}
-        {(latest || preparedAudio) && !muted && (
-          <button type="button" disabled={!!speaker} onClick={() => { if (preparedAudio) void player.current?.play().catch(() => setError('No se pudo reproducir el audio.')); else if (latest) speak(latest.text, latest.senderId); }}
+        {replayTurn && !muted && (
+          <button type="button" disabled={!!speaker} onClick={replayLatestTurn}
             className="shrink-0 self-start rounded-lg bg-white/10 px-3 py-1 text-xs disabled:opacity-40">
-            {preparedAudio ? 'Reproducir audio listo' : 'Escuchar último mensaje'}
+            Escuchar último mensaje · {replayTurn.senderId === me.id ? me.name : peer.name}
           </button>
         )}
         {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
