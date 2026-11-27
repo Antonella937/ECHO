@@ -422,7 +422,7 @@ export default function ConversationPage() {
         </div>
       </header>
 
-      {videoCallOpen && !other.archived && <DmVideoCall key={appearanceKey} storageScope={appearanceKey} me={me} peer={other} messages={messages}
+      {videoCallOpen && !other.archived && <DmVideoCall key={appearanceKey} storageScope={appearanceKey} universeId={getActiveUniverseId(user?.id ?? '')} me={me} peer={other} messages={messages}
         onSend={dialogue => { actions.sendMessage(other.id, dialogue); }}
         onClose={() => setVideoCallKey(null)} />}
 

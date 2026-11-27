@@ -1,3 +1,4 @@
+import { customFetch } from '@workspace/api-client-react';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { MicOff, PhoneOff, Send, Volume2 } from 'lucide-react';
 import type { Message } from '@/domain/types';
@@ -8,6 +9,7 @@ type Participant = { id: string; name: string; avatar: string };
 
 interface VideoCallProps {
   storageScope: string;
+  universeId: string;
   me: Participant;
   peer: Participant;
   messages: Message[];
@@ -29,15 +31,20 @@ function CallPortrait({ person }: { person: Participant }) {
   );
 }
 
-export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose }: VideoCallProps) {
+export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSend, onClose }: VideoCallProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const seen = useRef(new Set(messages.map(message => message.id)));
-  const utterances = useRef(new Set<SpeechSynthesisUtterance>());
+  const player = useRef<HTMLAudioElement>(null);
+  const voiceRun = useRef(new AbortController());
+  const queue = useRef(Promise.resolve());
+  const [mouthOpen, setMouthOpen] = useState(false);
+  const [blink, setBlink] = useState(false);
+  const [preparedAudio, setPreparedAudio] = useState(false);
   const [latest, setLatest] = useState<Message>();
   const [dialogue, setDialogue] = useState('');
   const [speaker, setSpeaker] = useState<string>();
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [error, setError] = useState('');
   const [looksOpen, setLooksOpen] = useState(false);
   const [lookUrls, setLookUrls] = useState<Record<string, string>>({});
@@ -45,8 +52,16 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
   const savedFiles = useRef<Record<string, File>>({});
   const [looksReady, setLooksReady] = useState(false);
   const [lookError, setLookError] = useState('');
-  const [language, setLanguage] = useState('en');
-  const audioAvailable = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
+  const audioAvailable = true;
+
+  useEffect(() => {
+    let end: number;
+    const timer = window.setInterval(() => {
+      setBlink(true);
+      end = window.setTimeout(() => setBlink(false), 130);
+    }, 4200);
+    return () => { window.clearInterval(timer); window.clearTimeout(end); };
+  }, []);
 
   useLayoutEffect(() => {
     const composer = composerRef.current;
@@ -107,50 +122,117 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
   }
 
   function stopSpeaking() {
-    if (utterances.current.size) {
-      utterances.current.clear();
-      window.speechSynthesis.cancel();
-    }
+    voiceRun.current.abort();
+    voiceRun.current = new AbortController();
+    queue.current = Promise.resolve();
     setSpeaker(undefined);
+    setMouthOpen(false);
+    setPreparedAudio(false);
   }
 
   function speak(text: string, senderId: string) {
-    if (!audioAvailable || muted) return;
+    if (muted) return;
     const spoken = text.replace(/\*{1,3}[^*]+\*{1,3}/g, '').trim();
     if (!spoken) return;
-    const audio = new SpeechSynthesisUtterance(spoken);
-    audio.lang = language;
-    const voices = window.speechSynthesis.getVoices().filter(voice => voice.lang.split('-')[0] === language);
-    const voice = voices[senderId === me.id ? Math.min(1, voices.length - 1) : 0];
-    if (voice) audio.voice = voice;
-    audio.onstart = () => {
-      if (utterances.current.has(audio)) setSpeaker(senderId);
-    };
-    audio.onend = audio.onerror = () => {
-      if (utterances.current.delete(audio)) setSpeaker(undefined);
-    };
-    utterances.current.add(audio);
-    window.speechSynthesis.speak(audio);
+    if (spoken.length > 500) {
+      setError('Este turno supera el límite de 500 caracteres para la voz.');
+      return;
+    }
+    const signal = voiceRun.current.signal;
+    queue.current = queue.current.then(async () => {
+      const audio = player.current;
+      if (!audio || signal.aborted) return;
+      setError('');
+      let url: string | undefined;
+      let frame = 0;
+      try {
+        const blob = await customFetch<Blob>('/api/voices/call/synthesize', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ universeId, characterId: senderId, text: spoken }),
+          responseType: 'blob', signal,
+        });
+        if (signal.aborted) return;
+        let samples: Float32Array | undefined;
+        let rate = 0;
+        try {
+          const context = new OfflineAudioContext(1, 1, 16000);
+          const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+          samples = decoded.getChannelData(0);
+          rate = decoded.sampleRate;
+        } catch { /* Audio playback can still proceed if analysis is unavailable. */ }
+        if (signal.aborted) return;
+        url = URL.createObjectURL(blob);
+        audio.src = url;
+        await new Promise<void>(resolve => {
+          const finish = () => {
+            signal.removeEventListener('abort', finish);
+            audio.onplaying = audio.onended = audio.onerror = null;
+            audio.pause();
+            audio.removeAttribute('src');
+            resolve();
+          };
+          const animate = () => {
+            const cursor = Math.floor(audio.currentTime * rate);
+            let energy = 0;
+            if (samples && !audio.paused) {
+              for (let n = 0; n < 24; n++) energy += (samples[cursor + n * 16] ?? 0) ** 2;
+            }
+            setMouthOpen(energy / 24 > 0.001);
+            frame = requestAnimationFrame(animate);
+          };
+          audio.onplaying = () => {
+            setPreparedAudio(false);
+            setSpeaker(senderId);
+            cancelAnimationFrame(frame);
+            animate();
+          };
+          audio.onended = finish;
+          audio.onerror = () => { setError('No se pudo reproducir la voz de ECHO.'); finish(); };
+          signal.addEventListener('abort', finish, { once: true });
+          void audio.play().catch(() => { if (!signal.aborted) setPreparedAudio(true); });
+        });
+      } catch (cause) {
+        if (!signal.aborted) setError((cause as { status?: number }).status === 409
+          ? 'Asignale una voz a este personaje en su ficha de ECHO.'
+          : 'No se pudo generar la voz de ECHO para este turno.');
+      } finally {
+        cancelAnimationFrame(frame);
+        if (url) URL.revokeObjectURL(url);
+        if (!signal.aborted) { setSpeaker(undefined); setMouthOpen(false); setPreparedAudio(false); }
+      }
+    });
   }
 
   useEffect(() => {
     if (latest?.senderId === peer.id) speak(latest.text, peer.id);
-    // A newly received message triggers speech once. Voice controls apply to subsequent turns.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest?.id]);
 
-  useEffect(() => () => {
-    if (utterances.current.size) {
-      utterances.current.clear();
-      window.speechSynthesis.cancel();
-    }
+  useEffect(() => {
+    voiceRun.current = new AbortController();
+    return () => voiceRun.current.abort();
   }, []);
+
+  useEffect(() => {
+    for (const [key, url] of Object.entries(lookUrls)) {
+      if (!key.includes(':') || !url) continue;
+      const image = new Image();
+      image.src = url;
+    }
+  }, [lookUrls]);
 
   useEffect(() => () => {
     Object.values(lookUrlsRef.current).forEach(url => URL.revokeObjectURL(url));
   }, []);
 
   function renderParticipant(person: Participant) {
+    const idle = lookUrls[person.id + ':idle'];
+    const talking = lookUrls[person.id + ':talk'];
+    if (idle && talking) {
+      const active = speaker === person.id && mouthOpen;
+      const frame = blink ? lookUrls[person.id + (active ? ':talk-blink' : ':blink')] : undefined;
+      return <CallPortrait person={{ ...person, avatar: frame || (active ? talking : idle) }} />;
+    }
     const source = lookUrls[person.id];
     if (source && savedFiles.current[person.id]?.type.startsWith('video/')) {
       return <>
@@ -167,7 +249,7 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
   }
 
   function changeLook(id: string, file?: File) {
-    const isVideo = file && ['video/mp4', 'video/quicktime'].includes(file.type);
+    const isVideo = file && !id.includes(':') && ['video/mp4', 'video/quicktime'].includes(file.type);
     const isPhoto = file && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
     if (file && ((!isVideo && !isPhoto) || file.size > (isVideo ? 50_000_000 : 10_000_000))) {
       setLookError('Elegí una foto JPG, PNG o WebP de hasta 10 MB, o un clip MP4 o MOV de hasta 50 MB.');
@@ -202,6 +284,7 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
     <dialog ref={dialogRef} aria-label={`Videollamada con ${peer.name}`}
       onCancel={event => { event.preventDefault(); onClose(); }}
       className="fixed inset-0 m-0 h-[var(--echo-call-height,100dvh)] max-h-none w-full max-w-none overflow-hidden border-0 bg-neutral-950 p-0 text-white">
+      <audio ref={player} />
       <div className="relative isolate flex h-full min-h-0 flex-col gap-2 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]">
         <div className="absolute inset-0 -z-10 bg-neutral-950">
           {renderParticipant(peer)}
@@ -213,7 +296,7 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
             <button type="button" aria-expanded={looksOpen} onClick={() => setLooksOpen(open => !open)}
               className="min-h-10 rounded-full px-3 text-xs font-medium">Looks</button>
             {audioAvailable && (
-              <button type="button" aria-label={muted ? 'Activar voces' : 'Silenciar voces'} aria-pressed={muted}
+              <button type="button" aria-label={muted ? 'Activar voces de ECHO' : 'Silenciar voces'} title={muted ? 'Activar voces de ECHO (usa créditos)' : 'Silenciar voces'} aria-pressed={muted}
                 className={`grid size-10 place-items-center rounded-full ${muted ? 'bg-white text-black' : 'bg-white/10'}`}
                 onClick={() => { if (!muted) stopSpeaking(); setMuted(!muted); }}>
                 {muted ? <MicOff size={18} /> : <Volume2 size={18} />}
@@ -243,16 +326,24 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
                   </label>
                   {lookUrls[person.id] && <button type="button" className="px-2 py-1 underline"
                     onClick={() => changeLook(person.id)}>Usar foto de perfil</button>}
+                  {([['idle', 'Boca cerrada'], ['talk', 'Boca abierta'], ['blink', 'Cerrada, ojos cerrados'], ['talk-blink', 'Abierta, ojos cerrados']] as const).map(([key, label]) => (
+                    <div key={key} className="flex items-center gap-1">
+                      <label className="min-w-0 flex-1 cursor-pointer rounded-lg border border-white/25 p-2">
+                        {label}{lookUrls[person.id + ':' + key] && ' ✓'}
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => {
+                          const file = event.currentTarget.files?.[0];
+                          if (file) changeLook(person.id + ':' + key, file);
+                          event.currentTarget.value = '';
+                        }} />
+                      </label>
+                      {lookUrls[person.id + ':' + key] && <button type="button" aria-label={`Quitar ${label} de ${person.name}`}
+                        onClick={() => changeLook(person.id + ':' + key)}>×</button>}
+                    </div>
+                  ))}
                 </fieldset>
               ))}
             </div>
-            {audioAvailable && <label className="mt-3 flex items-center justify-between gap-2 border-t border-white/15 pt-2">
-              Idioma de las voces
-              <select value={language} onChange={event => setLanguage(event.target.value)} className="rounded-lg bg-white/10 p-2">
-                <option value="en">English</option>
-                <option value="es">Español</option>
-              </select>
-            </label>}
+            <p className="mt-3 text-white/75">Cargá boca cerrada y abierta y activá el parlante para animar el retrato con la voz de ECHO. Generar voz usa créditos.</p>
             {lookError && <p role="alert" className="mt-2 text-red-300">{lookError}</p>}
           </section>
         )}
@@ -266,13 +357,12 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
         <div aria-live="polite" aria-label="Diálogo de la llamada" className={latest ? 'max-h-[min(16dvh,6rem)] shrink-0 overflow-y-auto rounded-2xl bg-black/45 px-3 py-2 text-sm backdrop-blur-md' : 'sr-only'}>
           {latest && <p key={latest.id} className="whitespace-pre-wrap break-words"><strong>{latest.senderId === me.id ? me.name : peer.name}</strong> {latest.text}</p>}
         </div>
-        {latest && audioAvailable && !muted && (
-          <button type="button" disabled={!!speaker} onClick={() => { stopSpeaking(); speak(latest.text, latest.senderId); }}
+        {(latest || preparedAudio) && !muted && (
+          <button type="button" disabled={!!speaker} onClick={() => { if (preparedAudio) void player.current?.play().catch(() => setError('No se pudo reproducir el audio.')); else if (latest) speak(latest.text, latest.senderId); }}
             className="shrink-0 self-start rounded-lg bg-white/10 px-3 py-1 text-xs disabled:opacity-40">
-            Escuchar último mensaje
+            {preparedAudio ? 'Reproducir audio listo' : 'Escuchar último mensaje'}
           </button>
         )}
-        {!audioAvailable && <p className="text-xs text-white/70">Las voces no están disponibles en este navegador.</p>}
         {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
         <form onSubmit={submit} className="flex shrink-0 items-end gap-2 rounded-[28px] border border-white/25 bg-black/30 p-1.5 shadow-lg backdrop-blur-md focus-within:border-white/45">
           <textarea ref={composerRef} rows={1} aria-label={`Escribir como ${me.name}`} placeholder={`Escribí como ${me.name}…`}

@@ -5,7 +5,7 @@ import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/
 import { ECHO_AUDIO_POLICY } from "../lib/entitlements";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canUseBasicVoices } from "../lib/entitlements";
-import { reserveVoiceNarration, completeVoiceNarration } from "../autonomy/voice-adapter";
+import { reserveVoiceNarration, completeVoiceNarration, narrateSceneTurn } from "../autonomy/voice-adapter";
 import { readUniverse } from "../lib/universeRepository";
 import { db, echoMediaTable, echoUniversesTable } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -89,6 +89,28 @@ router.post("/voices/basic/synthesize", requireAuth, async (req, res) => {
   }
 });
 
+
+router.post("/voices/call/synthesize", requireAuth, async (req, res) => {
+  const { universeId, characterId, text } = req.body ?? {};
+  if ([universeId, characterId].some(value => typeof value !== "string" || !value || value.length > 128) ||
+      typeof text !== "string" || !text.trim() || text.length > 500) {
+    res.status(400).json({ error: "INVALID_VOICE_REQUEST" }); return;
+  }
+  try {
+    const ownerId = req.userId!;
+    if (!await canUseBasicVoices(ownerId)) { res.sendStatus(403); return; }
+    const snapshot = await readUniverse(ownerId, universeId);
+    const parsed = SaveUniverseBody.shape.state.safeParse(snapshot.state);
+    const character = parsed.success ? parsed.data.characters.find(item => item.id === characterId && !item.archived) : undefined;
+    if (!character) { res.sendStatus(404); return; }
+    const audio = await narrateSceneTurn({ ownerId, universeId, characterId,
+      basicVoiceId: character.configuration?.voice?.basicVoiceId, text: text.trim() });
+    if (!audio) { res.status(409).json({ error: "CHARACTER_VOICE_NOT_SELECTED" }); return; }
+    res.set({ "Content-Type": audio.mimeType, "Cache-Control": "private, no-store" }).send(audio.bytes);
+  } catch {
+    res.status(503).json({ error: "CALL_VOICE_UNAVAILABLE" });
+  }
+});
 
 /** On-demand listening: synthesize only the saved character's own DM text. */
 router.post("/voices/basic/listen", requireAuth, async (req, res) => {
