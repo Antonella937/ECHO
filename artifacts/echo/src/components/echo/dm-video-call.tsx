@@ -17,6 +17,22 @@ interface VideoCallProps {
   onClose: () => void;
 }
 
+function splitCallSpeech(text: string): string[] {
+  const chunks: string[] = [];
+  let remaining = text.trim();
+  while (remaining.length > 500) {
+    const window = remaining.slice(0, 500);
+    const sentenceEnd = Array.from(window.matchAll(/[.!?…](?=\s)/g)).at(-1)?.index ?? -1;
+    const wordEnd = window.search(/\s+\S*$/);
+    let end = sentenceEnd >= 250 ? sentenceEnd + 1 : wordEnd > 0 ? wordEnd : 500;
+    if (/[\uD800-\uDBFF]/.test(remaining[end - 1])) end--;
+    chunks.push(remaining.slice(0, end).trim());
+    remaining = remaining.slice(end).trimStart();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
 function CallPortrait({ person }: { person: Participant }) {
   const resolveMedia = useMediaResolver();
   const src = person.avatar.startsWith('blob:') ? person.avatar : person.avatar ? resolveMedia(person.avatar) : '';
@@ -152,74 +168,75 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
     if (muted) return;
     const spoken = text.replace(/\*{1,3}[^*]+\*{1,3}/g, '').trim();
     if (!spoken) return;
-    if (spoken.length > 500) {
-      setError('Este turno supera el límite de 500 caracteres para la voz.');
-      return;
-    }
     const signal = voiceRun.current.signal;
     queue.current = queue.current.then(async () => {
       const audio = player.current;
       if (!audio || signal.aborted) return;
       setError('');
-      let url: string | undefined;
-      let frame = 0;
-      try {
-        const blob = await customFetch<Blob>('/api/voices/call/synthesize', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ universeId, characterId: senderId, text: spoken }),
-          responseType: 'blob', signal,
-        });
+      for (const chunk of splitCallSpeech(spoken)) {
         if (signal.aborted) return;
-        let samples: Float32Array | undefined;
-        let rate = 0;
+        let url: string | undefined;
+        let frame = 0;
         try {
-          const context = new OfflineAudioContext(1, 1, 16000);
-          const decoded = await context.decodeAudioData(await blob.arrayBuffer());
-          samples = decoded.getChannelData(0);
-          rate = decoded.sampleRate;
-        } catch { /* Audio playback can still proceed if analysis is unavailable. */ }
-        if (signal.aborted) return;
-        url = URL.createObjectURL(blob);
-        audio.src = url;
-        await new Promise<void>(resolve => {
-          const finish = () => {
-            signal.removeEventListener('abort', finish);
-            audio.onplaying = audio.onended = audio.onerror = null;
-            audio.pause();
-            audio.removeAttribute('src');
-            resolve();
-          };
-          const animate = () => {
-            const cursor = Math.floor(audio.currentTime * rate);
-            let energy = 0;
-            if (samples && !audio.paused) {
-              for (let n = 0; n < 24; n++) energy += (samples[cursor + n * 16] ?? 0) ** 2;
-            }
-            setMouthOpen(energy / 24 > 0.001);
-            frame = requestAnimationFrame(animate);
-          };
-          audio.onplaying = () => {
-            setPreparedAudio(undefined);
-            setSpeaker(senderId);
-            cancelAnimationFrame(frame);
-            animate();
-          };
-          audio.onended = finish;
-          audio.onerror = () => { setError('No se pudo reproducir la voz de ECHO.'); finish(); };
-          signal.addEventListener('abort', finish, { once: true });
-          void audio.play().catch(() => { if (!signal.aborted) setPreparedAudio({ text, senderId }); });
-        });
-      } catch (cause) {
-        if (!signal.aborted) {
-          const status = (cause as { status?: number }).status;
-          if (status === 409) setError('Asignale una voz a este personaje en su ficha de ECHO.');
-          else if (status === 402) setError('No quedan créditos de voz para este turno.');
-          else setError('No se pudo generar la voz de ECHO para este turno.');
+          const blob = await customFetch<Blob>('/api/voices/call/synthesize', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ universeId, characterId: senderId, text: chunk }),
+            responseType: 'blob', signal,
+          });
+          if (signal.aborted) return;
+          let samples: Float32Array | undefined;
+          let rate = 0;
+          try {
+            const context = new OfflineAudioContext(1, 1, 16000);
+            const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+            samples = decoded.getChannelData(0);
+            rate = decoded.sampleRate;
+          } catch { /* Audio playback can still proceed if analysis is unavailable. */ }
+          if (signal.aborted) return;
+          url = URL.createObjectURL(blob);
+          audio.src = url;
+          const played = await new Promise<boolean>(resolve => {
+            const finish = () => {
+              signal.removeEventListener('abort', finish);
+              audio.onplaying = audio.onended = audio.onerror = null;
+              audio.pause();
+              audio.removeAttribute('src');
+              resolve(false);
+            };
+            const animate = () => {
+              const cursor = Math.floor(audio.currentTime * rate);
+              let energy = 0;
+              if (samples && !audio.paused) {
+                for (let n = 0; n < 24; n++) energy += (samples[cursor + n * 16] ?? 0) ** 2;
+              }
+              setMouthOpen(energy / 24 > 0.001);
+              frame = requestAnimationFrame(animate);
+            };
+            audio.onplaying = () => {
+              setPreparedAudio(undefined);
+              setSpeaker(senderId);
+              cancelAnimationFrame(frame);
+              animate();
+            };
+            audio.onended = () => { resolve(true); finish(); };
+            audio.onerror = () => { setError('No se pudo reproducir la voz de ECHO.'); finish(); };
+            signal.addEventListener('abort', finish, { once: true });
+            void audio.play().catch(() => { if (!signal.aborted) setPreparedAudio({ text, senderId }); });
+          });
+          if (!played) return;
+        } catch (cause) {
+          if (!signal.aborted) {
+            const status = (cause as { status?: number }).status;
+            if (status === 409) setError('Asignale una voz a este personaje en su ficha de ECHO.');
+            else if (status === 402) setError('No quedan créditos de voz para este turno.');
+            else setError('No se pudo generar la voz de ECHO para este turno.');
+          }
+          return;
+        } finally {
+          cancelAnimationFrame(frame);
+          if (url) URL.revokeObjectURL(url);
+          if (!signal.aborted) { setSpeaker(undefined); setMouthOpen(false); setPreparedAudio(undefined); }
         }
-      } finally {
-        cancelAnimationFrame(frame);
-        if (url) URL.revokeObjectURL(url);
-        if (!signal.aborted) { setSpeaker(undefined); setMouthOpen(false); setPreparedAudio(undefined); }
       }
     });
   }
