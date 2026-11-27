@@ -194,31 +194,23 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
           {renderParticipant(peer)}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/65" />
         </div>
-        <header className="flex shrink-0 items-center justify-between gap-2 px-1">
-          <div className="min-w-0">
-            <h2 className="truncate font-semibold">{peer.name}</h2>
-            <p className="text-xs text-white/65">Videollamada simulada</p>
-          </div>
-          <button type="button" aria-expanded={looksOpen} onClick={() => setLooksOpen(open => !open)}
-            className="shrink-0 rounded-lg bg-black/45 px-3 py-2 text-xs backdrop-blur-md">Looks</button>
-          {audioAvailable && (
-            <>
-              <select aria-label="Idioma de las voces" value={language} onChange={event => setLanguage(event.target.value)}
-                className="rounded-lg bg-black/45 p-2 text-xs backdrop-blur-md">
-                <option value="en">English</option>
-                <option value="es">Español</option>
-              </select>
+        <header className="flex shrink-0 items-center justify-between gap-2">
+          <h2 className="min-w-0 truncate rounded-full bg-black/45 px-4 py-2 text-sm font-semibold backdrop-blur-md">{peer.name}</h2>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-black/40 p-1 backdrop-blur-md">
+            <button type="button" aria-expanded={looksOpen} onClick={() => setLooksOpen(open => !open)}
+              className="min-h-10 rounded-full px-3 text-xs font-medium">Looks</button>
+            {audioAvailable && (
               <button type="button" aria-label={muted ? 'Activar voces' : 'Silenciar voces'} aria-pressed={muted}
-                className="grid size-10 shrink-0 place-items-center rounded-full bg-black/45 backdrop-blur-md"
+                className={`grid size-10 place-items-center rounded-full ${muted ? 'bg-white text-black' : 'bg-white/10'}`}
                 onClick={() => { if (!muted) stopSpeaking(); setMuted(!muted); }}>
                 {muted ? <MicOff size={18} /> : <Volume2 size={18} />}
               </button>
-            </>
-          )}
-          <button type="button" aria-label="Colgar" onClick={onClose}
-            className="grid size-11 shrink-0 place-items-center rounded-full bg-red-700">
-            <PhoneOff size={19} />
-          </button>
+            )}
+            <button type="button" aria-label="Colgar" onClick={onClose}
+              className="grid size-11 place-items-center rounded-full bg-red-700">
+              <PhoneOff size={19} />
+            </button>
+          </div>
         </header>
         {looksOpen && (
           <section aria-label="Looks de la llamada" className="max-h-[33dvh] shrink-0 overflow-y-auto rounded-xl bg-black/60 p-3 text-xs backdrop-blur-md">
@@ -241,6 +233,13 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
                 </fieldset>
               ))}
             </div>
+            {audioAvailable && <label className="mt-3 flex items-center justify-between gap-2 border-t border-white/15 pt-2">
+              Idioma de las voces
+              <select value={language} onChange={event => setLanguage(event.target.value)} className="rounded-lg bg-white/10 p-2">
+                <option value="en">English</option>
+                <option value="es">Español</option>
+              </select>
+            </label>}
             {lookError && <p role="alert" className="mt-2 text-red-300">{lookError}</p>}
           </section>
         )}
