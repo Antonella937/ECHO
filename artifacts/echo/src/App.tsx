@@ -5,7 +5,7 @@ import { useOfficialAnnouncementText } from '@/lib/official-announcement-transla
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
-import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import { Link, Redirect, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { esES, enUS, ptBR, frFR, deDE, itIT, koKR, jaJP, zhCN } from '@clerk/localizations';
@@ -359,6 +359,20 @@ function SessionLoadingFallback() {
   );
 }
 
+function SignInLoading() {
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStalled(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return (
+    <div className="mt-6 space-y-4 text-center text-sm text-muted-foreground" role="status">
+      <p>{stalled ? 'El formulario de acceso está tardando en cargar.' : 'Cargando el formulario de acceso…'}</p>
+      {stalled && <button type="button" className="rounded-xl border border-border px-4 py-2 text-foreground" onClick={() => window.location.reload()}>Reintentar conexión</button>}
+    </div>
+  );
+}
+
 function SignInPage() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
@@ -366,8 +380,8 @@ function SignInPage() {
         <div className="mb-4 flex justify-end"><PublicLanguageSelector /></div>
         <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
         <SignIn
-          routing="path"
-          path={`${basePath}/sign-in`}
+          routing="hash"
+          fallback={<SignInLoading />}
           signUpUrl={`${basePath}/sign-up`}
           forceRedirectUrl={basePath || '/'}
         />
@@ -465,7 +479,7 @@ function AuthenticatedExperience() {
     // rather than showing onboarding and suggesting a new universe.
     const installed = window.matchMedia('(display-mode: standalone)').matches
       || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-    return installed ? <SignInPage /> : <LandingPage />;
+    return installed ? <Redirect to="/sign-in" replace /> : <LandingPage />;
   }
   if (universeQuery.isError) {
     const failure = universeQuery.error as { data?: { error?: string }; message?: string } | null;
