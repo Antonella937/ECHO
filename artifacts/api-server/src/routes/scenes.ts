@@ -1,3 +1,4 @@
+import { narrateSceneTurn } from "../autonomy/voice-adapter";
 import { describeGroupAttachment } from "../vision/service";
 import { sceneCanonCandidates } from "../lib/canon-event-candidates";
 import { Router, type IRouter } from "express";
@@ -127,6 +128,42 @@ scenesRouter.get("/scenes/:sceneId/events", async (req, res) => {
     res.json({ events: rows.rows.filter(row => row.visibility === "public" || row.actorId === viewer.data || (Array.isArray(row.audienceIds) ? row.audienceIds.includes(viewer.data) : false) || (row.visibility === "participants" && (!Array.isArray(row.audienceIds) || row.audienceIds.length === 0))) });
   } catch { res.status(503).json({ error: "SCENE_EVENTS_UNAVAILABLE" }); }
 });
+scenesRouter.post("/scenes/:sceneId/events/:eventId/voice", async (req, res) => {
+  const input = scope.extend({ viewerId: id }).strict().safeParse(req.body);
+  const params = z.object({ sceneId: id, eventId: id }).safeParse(req.params);
+  if (!input.success || !params.success) { res.status(400).json({ error: "INVALID_SCENE_VOICE" }); return; }
+  const { universeId, viewerId } = input.data;
+  const { sceneId, eventId } = params.data;
+  const ownerId = req.userId!;
+  try {
+    const [universe] = await db.select({ state: echoUniversesTable.state, archivedAt: echoUniversesTable.archivedAt, deletedAt: echoUniversesTable.deletedAt })
+      .from(echoUniversesTable).where(and(eq(echoUniversesTable.ownerId, ownerId), eq(echoUniversesTable.universeId, universeId))).limit(1);
+    const state = universe?.state as { currentCharacterId?: string; characters?: Array<{ id: string; archived?: boolean; configuration?: { voice?: { basicVoiceId?: string } } }> } | undefined;
+    if (!universe || universe.archivedAt || universe.deletedAt || state?.currentCharacterId !== viewerId) {
+      res.status(403).json({ error: "SCENE_VIEWER_NOT_ALLOWED" }); return;
+    }
+    const result = await db.execute(sql`SELECT e.actor_id AS "actorId", e.text, e.visibility, e.audience_ids AS "audienceIds", s.participant_ids AS "members"
+      FROM echo_scene_events e JOIN echo_scenes s ON s.owner_id=e.owner_id AND s.universe_id=e.universe_id AND s.scene_id=e.scene_id
+      WHERE e.owner_id=${ownerId} AND e.universe_id=${universeId} AND e.scene_id=${sceneId} AND e.event_id=${eventId} LIMIT 1`);
+    const row = result.rows[0];
+    const audience = Array.isArray(row?.audienceIds) ? row.audienceIds : [];
+    if (!row || !Array.isArray(row.members) || !row.members.includes(viewerId) ||
+        !(row.visibility === "public" || row.actorId === viewerId || audience.includes(viewerId) || (row.visibility === "participants" && !audience.length))) {
+      res.status(404).json({ error: "SCENE_EVENT_NOT_FOUND" }); return;
+    }
+    const character = state.characters?.find(item => item.id === row.actorId && !item.archived);
+    if (!character) { res.status(404).json({ error: "CHARACTER_NOT_FOUND" }); return; }
+    const text = typeof row.text === "string" ? row.text.replace(/\*{1,3}[^*]+\*{1,3}/g, "").trim() : "";
+    if (!text || text.length > 500) { res.status(422).json({ error: "SCENE_TURN_NOT_SPEAKABLE" }); return; }
+    const audio = await narrateSceneTurn({ ownerId, universeId, characterId: character.id, basicVoiceId: character.configuration?.voice?.basicVoiceId, text });
+    if (!audio) { res.status(409).json({ error: "CHARACTER_VOICE_NOT_SELECTED" }); return; }
+    res.set({ "Content-Type": audio.mimeType, "Cache-Control": "private, no-store" }).send(audio.bytes);
+  } catch (error) {
+    req.log.warn({ err: error instanceof Error ? error.message : "unknown" }, "Scene voice unavailable");
+    res.status(503).json({ error: "SCENE_VOICE_UNAVAILABLE" });
+  }
+});
+
 // Owner-only review queue; candidates are not written into canon automatically.
 scenesRouter.get("/scenes/:sceneId/canon-candidates", async (req, res) => {
   const parsed = scope.safeParse(req.query);
