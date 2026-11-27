@@ -12,6 +12,7 @@ import { Link } from 'wouter';
 
 const sceneLabels: Record<string, Record<string,string>> = {"en":{"Volver a mensajes":"Back to messages","Crear nueva escena":"Create new scene","Crear escena":"Create scene","Mis escenas":"My scenes","Participantes":"Participants","Turnos y estado":"Turns and status","Autonomía de respuesta":"Reply autonomy","Automático":"Automatic","Manual":"Manual","Por orden":"Ordered","Elegir personaje":"Choose character","Presencia narrativa":"Narrative presence","Presente":"Present","Ausente":"Absent","Se retiró":"Left","Pausar":"Pause","Reanudar":"Resume","Finalizar":"Finish","Eliminar escena definitivamente":"Delete scene permanently","Continuar escena":"Continue scene","Enviar":"Send","Crear":"Create","Título":"Title","Premisa":"Premise","Canon principal":"Main canon","Universo alternativo":"Alternate universe","Elegir próximo turno":"Choose next turn","Escribí en la escena…":"Write in scene…","Estilo de escritura de IA":"AI writing style","Natural / Conversacional":"Natural / Conversational","Cinematográfico":"Cinematic","Literario / Descriptivo":"Literary / Descriptive","Breve / Directo":"Concise / Direct"},"pt":{"Volver a mensajes":"Voltar às mensagens","Crear nueva escena":"Criar nova cena","Crear escena":"Criar cena","Mis escenas":"Minhas cenas","Participantes":"Participantes","Turnos y estado":"Turnos e estado","Autonomía de respuesta":"Respostas automáticas","Automático":"Automático","Manual":"Manual","Por orden":"Em ordem","Elegir personaje":"Escolher personagem","Presencia narrativa":"Presença narrativa","Presente":"Presente","Ausente":"Ausente","Se retiró":"Saiu","Pausar":"Pausar","Reanudar":"Retomar","Finalizar":"Finalizar","Eliminar escena definitivamente":"Excluir cena definitivamente","Continuar escena":"Continuar cena","Enviar":"Enviar","Crear":"Criar","Título":"Título","Premisa":"Premissa","Canon principal":"Cânone principal","Universo alternativo":"Universo alternativo","Elegir próximo turno":"Escolher próximo turno","Escribí en la escena…":"Escreva na cena…","Estilo de escritura de IA":"Estilo de escrita da IA","Natural / Conversacional":"Natural / Conversacional","Cinematográfico":"Cinematográfico","Literario / Descriptivo":"Literário / Descritivo","Breve / Directo":"Breve / Direto"},"fr":{"Volver a mensajes":"Retour aux messages","Crear nueva escena":"Créer une scène","Crear escena":"Créer une scène","Mis escenas":"Mes scènes","Participantes":"Participants","Turnos y estado":"Tours et état","Autonomía de respuesta":"Réponses automatiques","Automático":"Automatique","Manual":"Manuel","Por orden":"Dans l’ordre","Elegir personaje":"Choisir un personnage","Presencia narrativa":"Présence narrative","Presente":"Présent","Ausente":"Absent","Se retiró":"Parti","Pausar":"Pause","Reanudar":"Reprendre","Finalizar":"Terminer","Eliminar escena definitivamente":"Supprimer définitivement la scène","Continuar escena":"Continuer la scène","Enviar":"Envoyer","Crear":"Créer","Título":"Titre","Premisa":"Prémisse","Canon principal":"Canon principal","Universo alternativo":"Univers alternatif","Elegir próximo turno":"Choisir le prochain tour","Escribí en la escena…":"Écrire dans la scène…","Estilo de escritura de IA":"Style d’écriture de l’IA","Natural / Conversacional":"Naturel / Conversationnel","Cinematográfico":"Cinématographique","Literario / Descriptivo":"Littéraire / Descriptif","Breve / Directo":"Bref / Direct"},"de":{"Volver a mensajes":"Zurück zu Nachrichten","Crear nueva escena":"Neue Szene erstellen","Crear escena":"Szene erstellen","Mis escenas":"Meine Szenen","Participantes":"Teilnehmende","Turnos y estado":"Runden und Status","Autonomía de respuesta":"Automatische Antworten","Automático":"Automatisch","Manual":"Manuell","Por orden":"Der Reihe nach","Elegir personaje":"Figur wählen","Presencia narrativa":"Erzählerische Präsenz","Presente":"Anwesend","Ausente":"Abwesend","Se retiró":"Verlassen","Pausar":"Pausieren","Reanudar":"Fortsetzen","Finalizar":"Beenden","Eliminar escena definitivamente":"Szene endgültig löschen","Continuar escena":"Szene fortsetzen","Enviar":"Senden","Crear":"Erstellen","Título":"Titel","Premisa":"Prämisse","Canon principal":"Hauptkanon","Universo alternativo":"Alternatives Universum","Elegir próximo turno":"Nächsten Zug wählen","Escribí en la escena…":"In Szene schreiben…","Estilo de escritura de IA":"KI-Schreibstil","Natural / Conversacional":"Natürlich / Gesprächig","Cinematográfico":"Filmisch","Literario / Descriptivo":"Literarisch / Beschreibend","Breve / Directo":"Kurz / Direkt"},"it":{"Volver a mensajes":"Torna ai messaggi","Crear nueva escena":"Crea una scena","Crear escena":"Crea scena","Mis escenas":"Le mie scene","Participantes":"Partecipanti","Turnos y estado":"Turni e stato","Autonomía de respuesta":"Risposte automatiche","Automático":"Automatico","Manual":"Manuale","Por orden":"In ordine","Elegir personaje":"Scegli personaggio","Presencia narrativa":"Presenza narrativa","Presente":"Presente","Ausente":"Assente","Se retiró":"Uscito","Pausar":"Pausa","Reanudar":"Riprendi","Finalizar":"Termina","Eliminar escena definitivamente":"Elimina definitivamente la scena","Continuar escena":"Continua scena","Enviar":"Invia","Crear":"Crea","Título":"Titolo","Premisa":"Premessa","Canon principal":"Canone principale","Universo alternativo":"Universo alternativo","Elegir próximo turno":"Scegli prossimo turno","Escribí en la escena…":"Scrivi nella scena…","Estilo de escritura de IA":"Stile di scrittura IA","Natural / Conversacional":"Naturale / Conversazionale","Cinematográfico":"Cinematografico","Literario / Descriptivo":"Letterario / Descrittivo","Breve / Directo":"Breve / Diretto"},"ko":{"Volver a mensajes":"메시지로 돌아가기","Crear nueva escena":"새 장면 만들기","Crear escena":"장면 만들기","Mis escenas":"내 장면","Participantes":"참가자","Turnos y estado":"차례와 상태","Autonomía de respuesta":"자동 응답","Automático":"자동","Manual":"수동","Por orden":"순서대로","Elegir personaje":"캐릭터 선택","Presencia narrativa":"장면 참여 상태","Presente":"참석","Ausente":"부재","Se retiró":"퇴장","Pausar":"일시정지","Reanudar":"재개","Finalizar":"종료","Eliminar escena definitivamente":"장면 영구 삭제","Continuar escena":"장면 계속","Enviar":"보내기","Crear":"만들기","Título":"제목","Premisa":"전제","Canon principal":"메인 설정","Universo alternativo":"대체 세계관","Elegir próximo turno":"다음 차례 선택","Escribí en la escena…":"장면에 입력…","Estilo de escritura de IA":"AI 글쓰기 스타일","Natural / Conversacional":"자연스러움 / 대화체","Cinematográfico":"영화적","Literario / Descriptivo":"문학적 / 묘사적","Breve / Directo":"간결 / 직접적"},"ja":{"Volver a mensajes":"メッセージに戻る","Crear nueva escena":"新しいシーンを作成","Crear escena":"シーンを作成","Mis escenas":"マイシーン","Participantes":"参加者","Turnos y estado":"ターンと状態","Autonomía de respuesta":"自動返信","Automático":"自動","Manual":"手動","Por orden":"順番に","Elegir personaje":"キャラクターを選択","Presencia narrativa":"シーン内の参加状況","Presente":"参加中","Ausente":"不在","Se retiró":"退出済み","Pausar":"一時停止","Reanudar":"再開","Finalizar":"終了","Eliminar escena definitivamente":"シーンを完全に削除","Continuar escena":"シーンを続ける","Enviar":"送信","Crear":"作成","Título":"タイトル","Premisa":"前提","Canon principal":"メイン設定","Universo alternativo":"別の世界線","Elegir próximo turno":"次のターンを選択","Escribí en la escena…":"シーンに入力…","Estilo de escritura de IA":"AIの文体","Natural / Conversacional":"自然 / 会話調","Cinematográfico":"映画的","Literario / Descriptivo":"文学的 / 描写的","Breve / Directo":"簡潔 / 直接的"},"zh":{"Volver a mensajes":"返回消息","Crear nueva escena":"创建新场景","Crear escena":"创建场景","Mis escenas":"我的场景","Participantes":"参与者","Turnos y estado":"轮次与状态","Autonomía de respuesta":"自动回复","Automático":"自动","Manual":"手动","Por orden":"按顺序","Elegir personaje":"选择角色","Presencia narrativa":"场景参与状态","Presente":"在场","Ausente":"缺席","Se retiró":"已离开","Pausar":"暂停","Reanudar":"继续","Finalizar":"结束","Eliminar escena definitivamente":"永久删除场景","Continuar escena":"继续场景","Enviar":"发送","Crear":"创建","Título":"标题","Premisa":"前提","Canon principal":"主线设定","Universo alternativo":"平行宇宙","Elegir próximo turno":"选择下一轮","Escribí en la escena…":"在场景中输入…","Estilo de escritura de IA":"AI写作风格","Natural / Conversacional":"自然 / 对话式","Cinematográfico":"电影风格","Literario / Descriptivo":"文学 / 描写式","Breve / Directo":"简洁 / 直接"}};
 type Scene = { sceneId: string; title: string; premise: string; canon: 'main'|'alternate'; participantIds: string[]; status: string; turnSettings?: { mode: 'automatic'|'manual'|'ordered'; order: string[]; nextCharacterId: string|null; cursor: number; style?: 'natural'|'cinematic'|'literary'|'concise'; autoReply?: boolean; kindroidGroupId?: string|null } };
+type SceneView = "text" | "visual";
 type SceneEvent = { eventId: string; actorId: string; text: string; visibility: string; createdAt: string; photoPath?: string | null };
 export default function ScenesPage() {
   const { user } = useUser();
@@ -28,6 +29,7 @@ export default function ScenesPage() {
   const [title,setTitle] = useState('');
   const [premise,setPremise] = useState('');
   const [createMode,setCreateMode] = useState<'automatic'|'manual'>('manual');
+  const [createView, setCreateView] = useState<SceneView>('text');
   const [canon,setCanon] = useState<'main'|'alternate'>('main');
   const [participants,setParticipants] = useState<string[]>([]);
   const [message,setMessage] = useState('');
@@ -48,28 +50,31 @@ export default function ScenesPage() {
   const [showCreate,setShowCreate] = useState(false);
   const [showSceneSettings,setShowSceneSettings] = useState(false);
   const wallpaperKey = user?.id && selected ? `echo:scene-wallpaper:${user.id}:${universeId}:${me.id}:${selected}` : '';
-  const visualPreferenceKey = user?.id && selected ? `echo:scene-visual:${user.id}:${universeId}:${me.id}:${selected}` : '';
-  const [visualSceneKey, setVisualSceneKey] = useState('');
-  const showVisualScene = !!visualPreferenceKey && visualSceneKey === visualPreferenceKey;
-
-  useEffect(() => {
+  const preferenceScope = user?.id ? `echo:scene-visual:${user.id}:${universeId}:${me.id}:` : '';
+  const visualPreferenceKey = preferenceScope && selected ? preferenceScope + selected : '';
+  const [sceneViews, setSceneViews] = useState<Record<string, SceneView>>({});
+  let sceneView: SceneView = sceneViews[visualPreferenceKey] ?? 'text';
+  if (visualPreferenceKey && !sceneViews[visualPreferenceKey]) {
     try {
-      setVisualSceneKey(visualPreferenceKey && localStorage.getItem(visualPreferenceKey) === '1' ? visualPreferenceKey : '');
+      if (localStorage.getItem(visualPreferenceKey) === '1') sceneView = 'visual';
     } catch {
-      setVisualSceneKey('');
-    }
-  }, [visualPreferenceKey]);
-
-  function toggleVisualScene() {
-    if (!visualPreferenceKey) return;
-    setVisualSceneKey(showVisualScene ? '' : visualPreferenceKey);
-    try {
-      if (showVisualScene) localStorage.removeItem(visualPreferenceKey);
-      else localStorage.setItem(visualPreferenceKey, '1');
-    } catch {
-      // The view still works for the current visit when storage is unavailable.
+      // Text is the default when storage is unavailable.
     }
   }
+  const showVisualScene = sceneView === 'visual';
+
+  function saveSceneView(sceneId: string, view: SceneView) {
+    if (!preferenceScope) return;
+    const key = preferenceScope + sceneId;
+    setSceneViews(previous => ({ ...previous, [key]: view }));
+    try {
+      if (view === 'visual') localStorage.setItem(key, '1');
+      else localStorage.removeItem(key);
+    } catch {
+      // Keep the selection available for this visit when storage is unavailable.
+    }
+  }
+
   const [sceneWallpaper,setSceneWallpaper] = useState('');
   const resolveMedia = useMediaResolver();
   const [groupBackgroundId,setGroupBackgroundId] = useState('');
@@ -162,7 +167,7 @@ export default function ScenesPage() {
     finally{setBusy(false)}
   };
   const create = async (e:FormEvent) => {e.preventDefault();if(!participants.length)return;setBusy(true);setError('');
-    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await customFetch(`/api/scenes/${encodeURIComponent(r.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:createMode,order:[me.id,...participants],nextCharacterId:null,autoReply:createMode==='automatic'})});await refresh();setSelected(r.sceneId);setTitle('');setPremise('');setParticipants([]);setSourceMessage(null);setShowCreate(false);}
+    try { const r=await customFetch<{sceneId:string}>('/api/scenes',{method:'POST',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,title,premise,canon,participantIds:[me.id,...participants]})});await customFetch(`/api/scenes/${encodeURIComponent(r.sceneId)}/turns`,{method:'PUT',responseType:'json',headers:{'Content-Type':'application/json'},body:JSON.stringify({universeId,mode:createMode,order:[me.id,...participants],nextCharacterId:null,autoReply:createMode==='automatic'})});saveSceneView(r.sceneId, createView);await refresh();setSelected(r.sceneId);setCreateView('text');setTitle('');setPremise('');setParticipants([]);setSourceMessage(null);setShowCreate(false);}
     catch{setError(es?'No se pudo crear la escena.':'Could not create scene.')}finally{setBusy(false)}
   };
   const pendingPhoto = scenePhoto?.sceneId === selected ? scenePhoto.file : null;
@@ -306,6 +311,14 @@ export default function ScenesPage() {
       <input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} placeholder={st("Título")} className="w-full rounded-xl border border-border bg-background p-3"/>
       <textarea maxLength={4000} value={premise} onChange={e=>setPremise(e.target.value)} placeholder={st("Premisa")} className="w-full rounded-xl border border-border bg-background p-3"/>
       <select value={canon} onChange={e=>setCanon(e.target.value as 'main'|'alternate')} className="w-full rounded-xl border border-border bg-background p-3"><option value="main">{st("Canon principal")}</option><option value="alternate">{st("Universo alternativo")}</option></select>
+      <label className="block space-y-1 text-sm font-medium">
+        <span>{es ? 'Formato de la escena' : 'Scene format'}</span>
+        <select value={createView} onChange={event => setCreateView(event.target.value === 'visual' ? 'visual' : 'text')}
+          className="w-full rounded-xl border border-border bg-background p-3">
+          <option value="text">{es ? 'Texto' : 'Text'}</option>
+          <option value="visual">Visual</option>
+        </select>
+      </label>
       <div className="text-sm font-medium">{st("Participantes")}</div>
       <div className="max-h-40 space-y-2 overflow-y-auto">{characters.map(c=><label key={c.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={participants.includes(c.id)} onChange={e=>setParticipants(old=>e.target.checked?[...old,c.id]:old.filter(x=>x!==c.id))}/>{c.name}</label>)}</div>
       <fieldset className="space-y-2"><legend className="text-sm font-medium">{es?'Modo de turnos':'Turn mode'}</legend>
@@ -329,10 +342,12 @@ export default function ScenesPage() {
         <button type="button" aria-expanded={showSceneSettings} onClick={()=>setShowSceneSettings(v=>!v)} aria-label={es?"Opciones":"Options"} className="grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-black/25 text-xl backdrop-blur-md">···</button>
       </div>
       <div className="relative z-20 flex shrink-0 justify-center">
-        <button type="button" aria-pressed={showVisualScene} onClick={toggleVisualScene}
-          className="rounded-full border border-white/25 bg-black/50 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md aria-pressed:border-white/60">
-          {es ? 'Vista visual' : 'Visual view'}
-        </button>
+        <select aria-label={es ? 'Formato de la escena' : 'Scene format'} value={sceneView}
+          onChange={event => saveSceneView(active.sceneId, event.target.value === 'visual' ? 'visual' : 'text')}
+          className="rounded-full border border-white/25 bg-black/70 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md">
+          <option value="text">{es ? 'Texto' : 'Text'}</option>
+          <option value="visual">Visual</option>
+        </select>
       </div>
       {showVisualScene && visualCast.length > 0 && (
         <section aria-label={es ? 'Personajes en escena' : 'Characters on stage'}
