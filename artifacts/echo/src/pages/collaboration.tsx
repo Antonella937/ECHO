@@ -23,7 +23,7 @@ export default function CollaborationPage() {
     finally{setSaving(false);}
   };
   return <main className="mx-auto min-h-screen max-w-xl space-y-5 px-5 py-12">
-    <Link href="/" className="text-primary">ECHO</Link>
+    <Link href="/" className="echo-interface-wordmark text-primary">Echo</Link>
     <h1 className="text-3xl font-semibold">{t("Mundo colaborativo")}</h1>
     <p className="text-sm text-muted-foreground">{t("Espacio compartido con permisos limitados. Por ahora podés editar el nombre y la descripción del mundo; las conversaciones y memorias privadas permanecen protegidas.")}</p>
     {world && <><label className="block text-sm">{t("Nombre")}<input className="mt-2 w-full rounded-xl border border-border bg-background p-3" maxLength={60} value={name} onChange={e=>setName(e.target.value)}/></label>

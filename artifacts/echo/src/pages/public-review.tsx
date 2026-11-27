@@ -21,7 +21,7 @@ export function PublicReviewHub() {
     <main className="echo-public ep-review-hub">
       <div className="ep-wrap">
         <header className="ep-nav">
-          <span className="ep-brand"><span className="ep-mark" aria-hidden="true"><span>e</span></span><span>ECHO</span></span>
+          <span className="ep-brand"><span className="ep-mark" aria-hidden="true"><span>e</span></span><span className="echo-interface-wordmark">Echo</span></span>
           <span className="ep-review-badge"><Eye size={14} /> Modo revisión</span>
         </header>
         <section className="ep-review-intro">
@@ -56,7 +56,7 @@ export function AuthScreenPreview({ kind }: { kind: AuthPreviewKind }) {
     <main className="echo-public ep-auth-review">
       <div className="ep-auth-review-inner">
         <header className="ep-auth-review-top">
-          <Link href="/creator-preview" className="ep-auth-review-brand">ECHO</Link>
+          <Link href="/creator-preview" className="echo-interface-wordmark ep-auth-review-brand">Echo</Link>
           <span className="ep-review-badge"><Eye size={14} /> Vista previa · sin interacción</span>
         </header>
         <section className="ep-auth-preview-card" aria-label={isSignIn ? 'Vista previa de inicio de sesión' : 'Vista previa de registro'}>

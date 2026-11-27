@@ -7,7 +7,7 @@ export default function NotFound() {
   const [heading, description, home] = copy[language] ?? copy.es;
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center px-8 text-center">
-      <span className="wordmark text-[40px] text-foreground/20">ECHO</span>
+      <span className="echo-interface-wordmark text-foreground/20">Echo</span>
       <p className="mt-6 font-display text-xl font-light">{heading}</p>
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       <Link href="/" className="mt-6 inline-flex h-11 items-center rounded-full bg-secondary px-6 text-sm font-semibold" data-testid="link-404-home">

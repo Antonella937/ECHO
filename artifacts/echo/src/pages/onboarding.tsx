@@ -95,7 +95,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
     return (
       <main className="echo-public ep-onboarding">
         <header className="ep-onboarding-nav">
-          <Link href="/" className="ep-brand" aria-label="ECHO" data-testid="link-onboarding-brand"><span className="ep-mark">e</span><span>ECHO</span></Link>
+          <Link href="/" className="ep-brand" aria-label="ECHO" data-testid="link-onboarding-brand"><span className="ep-mark">e</span><span className="echo-interface-wordmark">Echo</span></Link>
           <span className="ep-eyebrow">{t("Tu espacio está listo")}</span>
         </header>
         <section className="ep-onboarding-main">
@@ -114,7 +114,7 @@ export default function OnboardingPage({ saving, error, onComplete, onEnter }: O
   return (
     <main className="echo-public ep-onboarding">
       <header className="ep-onboarding-nav">
-        <Link href="/" className="ep-brand" aria-label="ECHO, inicio" data-testid="link-onboarding-brand"><span className="ep-mark">e</span><span>ECHO</span></Link>
+        <Link href="/" className="ep-brand" aria-label="ECHO, inicio" data-testid="link-onboarding-brand"><span className="ep-mark">e</span><span className="echo-interface-wordmark">Echo</span></Link>
         <Link href="/faq" className="ep-text-link" data-testid="link-onboarding-help"><CircleHelp size={15} /> {t("Ayuda")}</Link>
       </header>
       <section className="ep-onboarding-main">

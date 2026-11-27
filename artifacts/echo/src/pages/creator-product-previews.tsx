@@ -49,7 +49,7 @@ export function PreviewShell({ children }: { children: React.ReactNode }) {
       <div className="ep-wrap">
         {authenticated ? <header className="epc-private-nav">
           <button type="button" className="epc-private-back" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign("/settings"); }} aria-label="Volver"><ArrowLeft size={19} /><span>Volver</span></button>
-          <Link href="/" className="ep-brand" aria-label="ECHO"><span className="ep-mark" aria-hidden="true"><span>e</span></span><span>ECHO</span></Link>
+          <Link href="/" className="ep-brand" aria-label="ECHO"><span className="ep-mark" aria-hidden="true"><span>e</span></span><span className="echo-interface-wordmark">Echo</span></Link>
           <PublicLanguageSelector />
         </header> : <PublicHeader previewMode />}
         {children}

@@ -181,7 +181,7 @@ textarea.ep-field-control { resize: vertical; min-height: 92px; }
 .ep-auth-review { display: grid; place-items: center; min-height: 100dvh; padding: 28px 16px; background: #0c0c0d; }
 .ep-auth-review-inner { width: min(100%, 440px); }
 .ep-auth-review-top { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.ep-auth-review-brand { color: var(--ep-ink); font-size: 22px; letter-spacing: .38em; text-align: center; }
+.ep-auth-review-brand { color: var(--ep-ink); text-align: center; }
 .ep-auth-preview-card { padding: 34px 38px 29px; border: 1px solid rgba(255,255,255,.055); border-radius: 20px; background: #18181a; text-align: center; }
 .ep-auth-preview-mark { width: 23px; height: 23px; display: grid; place-items: center; margin: 0 auto 27px; border: 1px solid rgba(217,168,189,.6); border-radius: 50%; color: var(--ep-rose); font-size: 13px; }
 .ep-auth-preview-card h1 { margin: 0; font-family: 'DM Sans',sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0; }
