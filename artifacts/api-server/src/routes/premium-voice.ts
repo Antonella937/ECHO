@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import { configuredR2, signR2Request } from "../lib/cloudflareR2";
 import { mp3DurationSeconds } from "../lib/mp3Duration";
 import { reserveCharacterAudioCredit, refundFailedCharacterAudio } from "../lib/audioCredits";
 import { pool } from "@workspace/db";
@@ -317,6 +318,13 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
  if(!parsed.success){res.status(400).json({error:"INVALID_VOICE_PROJECT",charged:false});return;}
  const availability=elevenLabsVoiceStatus(req.userId!);
  if(!availability.generationAvailable){res.status(503).json({error:availability.reason,charged:false});return;}
+ const r2 = configuredR2();
+ const base = process.env.SUPABASE_URL?.replace(/\/$/, "");
+ const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+ if (!r2 && (!base || !secret)) {
+  res.status(503).json({error:"VOICE_STORAGE_NOT_CONFIGURED",charged:false});return;
+ }
+ let reservationId: string | null = null;
  try {
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED",charged:false});return;}
   const {universeId,characterId}=parsed.data;
@@ -329,7 +337,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   // Limit costly previews to one batch per project per month. No automatic retries.
   const month=new Date().toISOString().slice(0,7);
   const client=await pool.connect();
-  let reserved=false; let reservationId:string|null=null;
+  let reserved=false;
   try {
    await client.query("BEGIN");
    await client.query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))",[req.userId,project.id]);
@@ -351,20 +359,25 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   if(!response.ok){await pool.query("UPDATE echo_voice_samples SET status=$2 WHERE id=$1",[reservationId,"failed"]);let providerDetail="unknown";try{const payload=await response.json() as {detail?:{status?:string;message?:string}|string};const detail=payload.detail;providerDetail=typeof detail==="object"&&detail!==null?String(detail.status??"unknown"):typeof detail==="string"?detail.slice(0,100):"unknown";}catch{}console.error("[voice-design] ElevenLabs request rejected",{providerStatus:response.status,providerDetail:providerDetail.replace(/[^a-zA-Z0-9_ -]/g,"").slice(0,100),category:response.status===402?"PAYMENT_REQUIRED":response.status===401||response.status===403?"AUTH_OR_PERMISSION":response.status===429?"RATE_OR_CREDIT_LIMIT":"PROVIDER_REJECTED"});res.status(502).json({error:"ELEVENLABS_VOICE_DESIGN_FAILED",providerStatus:response.status,charged:"unknown"});return;}
   const data=await response.json() as {previews?:{audio_base_64:string;generated_voice_id:string;media_type?:string}[]};
   const previews=(data.previews??[]).slice(0,project.variant_count);
-  const base=process.env.SUPABASE_URL?.replace(/\/$/,"");
-  const secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!base||!secret)throw Error("VOICE_STORAGE_NOT_CONFIGURED");
   const stored:{id:string}[]=[];
   for(const preview of previews){
    if(!preview.generated_voice_id || !preview.audio_base_64)continue;
    const audio=Buffer.from(preview.audio_base_64,"base64");
    if(audio.length<100||audio.length>5*1024*1024)continue;
-   const {randomUUID}=await import("node:crypto");
-   const path=`voice-studio/previews/${project.id}/${randomUUID()}.mp3`;
-   const upload=await fetch(`${base}/storage/v1/object/echo-media/${path}`,{
-    method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"audio/mpeg","x-upsert":"false"},body:audio
-   });
-   if(!upload.ok)continue;
+   const path = `${r2 ? "r2/" : ""}voice-studio/previews/${project.id}/${randomUUID()}.mp3`;
+   const upload = r2
+    ? await fetch(signR2Request(r2, "PUT", path), {
+      method: "PUT", redirect: "error", headers: { "Content-Type": "audio/mpeg" },
+      body: new Uint8Array(audio), signal: AbortSignal.timeout(15000),
+     })
+    : await fetch(`${base}/storage/v1/object/echo-media/${path}`, {
+      method: "POST", headers: { Authorization: `Bearer ${secret}`, apikey: secret!, "Content-Type": "audio/mpeg", "x-upsert": "false" },
+      body: new Uint8Array(audio), signal: AbortSignal.timeout(15000),
+     });
+   if (!upload.ok) {
+    req.log.warn({ status: upload.status, storage: r2 ? "r2" : "supabase" }, "Voice preview upload failed");
+    continue;
+   }
    const inserted=await pool.query("INSERT INTO echo_voice_samples(project_id,owner_id,provider,provider_sample_id,audio_object_path,status) VALUES($1,$2,'elevenlabs',$3,$4,'ready') RETURNING id",[project.id,req.userId,preview.generated_voice_id,path]);
    stored.push({id:inserted.rows[0].id});
   }
@@ -375,6 +388,7 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
   await pool.query("UPDATE echo_voice_projects SET status='ready',updated_at=now() WHERE id=$1 AND owner_id=$2",[project.id,req.userId]);
   res.json({projectId:project.id,samples:stored,generated:stored.length});
  }catch(error){
+  if (reservationId) await pool.query("UPDATE echo_voice_samples SET status='failed' WHERE id=$1 AND owner_id=$2 AND status='pending'", [reservationId, req.userId]).catch(() => undefined);
   req.log.error({message:error instanceof Error?error.message:"UNKNOWN",code:typeof error==="object"&&error!==null&&"code" in error?String(error.code):"UNKNOWN"},"Premium voice design request failed");
   if(!res.headersSent)res.status(503).json({error:"VOICE_GENERATION_UNAVAILABLE",charged:"unknown"});
  }
@@ -385,9 +399,16 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
   if(await resolveEchoPlan(req.userId!)!=="premium"){res.status(403).json({error:"ECHO_PREMIUM_REQUIRED"});return;}
   const result=await pool.query("SELECT audio_object_path FROM echo_voice_samples WHERE id=$1 AND owner_id=$2 AND status='ready'",[req.params.id,req.userId]);
   if(!result.rowCount){res.status(404).json({error:"SAMPLE_NOT_FOUND"});return;}
+  const path = result.rows[0].audio_object_path;
+  if (typeof path === "string" && /^r2\/voice-studio\/previews\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.mp3$/i.test(path)) {
+   const r2 = configuredR2();
+   if (!r2) throw Error("STORAGE_NOT_CONFIGURED");
+   res.json({url:signR2Request(r2, "GET", path, 120),expiresIn:120});
+   return;
+  }
   const base=process.env.SUPABASE_URL?.replace(/\/$/,""),secret=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!base||!secret)throw Error("STORAGE_NOT_CONFIGURED");
-  const response=await fetch(`${base}/storage/v1/object/sign/echo-media/${result.rows[0].audio_object_path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:120})});
+  const response=await fetch(`${base}/storage/v1/object/sign/echo-media/${path}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,apikey:secret,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:120})});
   if(!response.ok)throw Error("SIGNED_URL_FAILED");
   const data=await response.json() as {signedURL?:string};
   const raw=data.signedURL;
