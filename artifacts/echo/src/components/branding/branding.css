@@ -11,7 +11,8 @@
 @keyframes echo-brand-orbit { to { transform: rotate(360deg); } }
 .echo-splash { min-height: 100dvh; display: grid; place-items: center; background: var(--color-background); color: var(--color-foreground); }
 .echo-splash-content { display: flex; flex-direction: column; align-items: center; padding: 32px 16px; }
-.echo-splash-wordmark { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(48px, 10vw, 64px); letter-spacing: .22em; padding-left: .22em; line-height: 1.2; }
+.echo-interface-wordmark { font-family: Outfit, ui-rounded, system-ui, sans-serif; font-size: 33px; font-weight: 600; line-height: 1; letter-spacing: -.045em; }
+.echo-splash-wordmark { font-size: clamp(48px, 10vw, 64px); }
 .echo-splash-rule { height: 1px; width: 72px; margin: 22px 0; background: #95809f; opacity: .65; }
 .echo-splash-tagline { margin: 0 0 28px; font-size: 9px; letter-spacing: .2em; text-align: center; }
 .echo-signature-host { position: relative; }

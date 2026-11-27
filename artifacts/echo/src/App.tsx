@@ -349,7 +349,7 @@ function SessionLoadingFallback() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center text-foreground">
       <div className="max-w-sm space-y-4">
-        <div className="wordmark text-3xl">ECHO</div>
+        <div className="echo-interface-wordmark">Echo</div>
         <p>La sesión está tardando en cargar. Tus universos siguen guardados.</p>
         <button className="rounded-xl border border-border px-5 py-3" onClick={() => window.location.reload()}>
           Reintentar conexión
@@ -378,7 +378,7 @@ function SignInPage() {
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-[440px]">
         <div className="mb-4 flex justify-end"><PublicLanguageSelector /></div>
-        <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
+        <Link href="/" className="echo-interface-wordmark mb-5 block text-center text-foreground">Echo</Link>
         <SignIn
           routing="hash"
           fallback={<SignInLoading />}
@@ -408,7 +408,7 @@ function SignUpPage() {
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <div className="w-full max-w-[440px]">
         <div className="mb-4 flex justify-end"><PublicLanguageSelector /></div>
-        <Link href="/" className="mb-5 block text-center wordmark text-2xl text-foreground">ECHO</Link>
+        <Link href="/" className="echo-interface-wordmark mb-5 block text-center text-foreground">Echo</Link>
         <p className="mb-4 text-center text-sm text-muted-foreground">{betaPrefix}<Link href="/beta-info" className="underline">{betaLink}</Link>.</p>
         <SignUp
           routing="path"

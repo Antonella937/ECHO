@@ -27,7 +27,7 @@ export function EchoSplash() {
   return (
     <div className="echo-splash" role="status" aria-label="Cargando ECHO" aria-busy="true">
       <div className="echo-splash-content">
-        <div className="echo-splash-wordmark" aria-hidden="true">ECHO</div>
+        <div className="echo-interface-wordmark echo-splash-wordmark" aria-hidden="true">Echo</div>
         <div className="echo-splash-rule" aria-hidden="true" />
         <p className="echo-splash-tagline">EVERY WORLD HAS A STORY</p>
         <EchoLoader size={88} decorative />
