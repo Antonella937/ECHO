@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { MicOff, PhoneOff, Send, Volume2 } from 'lucide-react';
 import type { Message } from '@/domain/types';
 import { useMediaResolver } from '@/lib/media';
+import { CallAvatar, callHair, callClothes, callExpressions, type CallAvatarLook } from './call-avatar';
 
 type Participant = { id: string; name: string; avatar: string };
 
@@ -37,6 +38,11 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
   const [looksOpen, setLooksOpen] = useState(true);
+  const [avatarLooks, setAvatarLooks] = useState<Record<string, CallAvatarLook>>(() => ({
+    [me.id]: { hair: 'long', clothes: 'black', expression: 'neutral' },
+    [peer.id]: { hair: 'swept', clothes: 'cream', expression: 'neutral' },
+  }));
+  const [portraitMode, setPortraitMode] = useState<Record<string, boolean>>({});
   const [lookUrls, setLookUrls] = useState<Record<string, string>>({});
   const lookUrlsRef = useRef<Record<string, string>>({});
   const [lookError, setLookError] = useState('');
@@ -98,6 +104,18 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     Object.values(lookUrlsRef.current).forEach(url => URL.revokeObjectURL(url));
   }, []);
 
+  function updateAvatarLook<K extends keyof CallAvatarLook>(id: string, field: K, value: CallAvatarLook[K]) {
+    setAvatarLooks(current => ({ ...current, [id]: { ...current[id], [field]: value } }));
+  }
+
+  function renderParticipant(person: Participant) {
+    const speaking = speaker === person.id;
+    if (portraitMode[person.id]) {
+      return <CallPortrait person={{ ...person, avatar: lookUrls[person.id] || person.avatar }} speaking={speaking} />;
+    }
+    return <CallAvatar look={avatarLooks[person.id]} speaking={speaking} />;
+  }
+
   function changeLook(id: string, file?: File) {
     if (file && (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10_000_000)) {
       setLookError('Elegí un retrato JPG, PNG o WebP de hasta 10 MB.');
@@ -157,32 +175,66 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
           </button>
         </header>
         {looksOpen && (
-          <section aria-label="Looks de la llamada" className="shrink-0 rounded-xl bg-white/10 p-2 text-xs">
-            <p className="mb-2 text-white/75">Elegí un retrato con el peinado y la ropa que quieras para cada uno.</p>
+          <section aria-label="Looks de la llamada" className="max-h-[33dvh] shrink-0 overflow-y-auto rounded-xl bg-white/10 p-2 text-xs">
             <div className="grid grid-cols-2 gap-2">
-              {[me, peer].map(person => (
-                <div key={person.id} className="min-w-0 space-y-1">
-                  <label className="block cursor-pointer truncate rounded-lg border border-white/25 p-2 focus-within:ring-2 focus-within:ring-white">
-                    {lookUrls[person.id] ? 'Cambiar' : 'Elegir'} look de {person.name}
-                    <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
-                      onChange={event => {
-                        const file = event.currentTarget.files?.[0];
-                        if (file) changeLook(person.id, file);
-                        event.currentTarget.value = '';
-                      }} />
-                  </label>
-                  {lookUrls[person.id] && <button type="button" className="px-2 py-1 underline"
-                    aria-label={`Restaurar retrato de ${person.name}`} onClick={() => changeLook(person.id)}>Usar foto de perfil</button>}
-                </div>
-              ))}
+              {[me, peer].map(person => {
+                const look = avatarLooks[person.id];
+                return (
+                  <fieldset key={person.id} className="min-w-0 space-y-2">
+                    <legend className="mb-1 max-w-full truncate font-semibold">{person.name}</legend>
+                    <select aria-label={`Formato del avatar de ${person.name}`} value={portraitMode[person.id] ? 'photo' : 'avatar'}
+                      onChange={event => setPortraitMode({ ...portraitMode, [person.id]: event.target.value === 'photo' })}
+                      className="w-full rounded-lg bg-neutral-800 p-2">
+                      <option value="avatar">Avatar 3D</option>
+                      <option value="photo">Retrato</option>
+                    </select>
+                    {portraitMode[person.id] ? (
+                      <>
+                        <label className="block cursor-pointer rounded-lg border border-white/25 p-2 focus-within:ring-2 focus-within:ring-white">
+                          Elegir retrato
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                            onChange={event => {
+                              const file = event.currentTarget.files?.[0];
+                              if (file) changeLook(person.id, file);
+                              event.currentTarget.value = '';
+                            }} />
+                        </label>
+                        {lookUrls[person.id] && <button type="button" className="px-2 py-1 underline"
+                          onClick={() => changeLook(person.id)}>Usar foto de perfil</button>}
+                      </>
+                    ) : (
+                      <>
+                        <label className="block">Peinado
+                          <select value={look.hair} onChange={event => updateAvatarLook(person.id, 'hair', event.target.value as CallAvatarLook['hair'])}
+                            className="mt-1 w-full rounded-lg bg-neutral-800 p-2">
+                            {Object.entries(callHair).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">Ropa
+                          <select value={look.clothes} onChange={event => updateAvatarLook(person.id, 'clothes', event.target.value as CallAvatarLook['clothes'])}
+                            className="mt-1 w-full rounded-lg bg-neutral-800 p-2">
+                            {Object.entries(callClothes).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">Expresión
+                          <select value={look.expression} onChange={event => updateAvatarLook(person.id, 'expression', event.target.value as CallAvatarLook['expression'])}
+                            className="mt-1 w-full rounded-lg bg-neutral-800 p-2">
+                            {Object.entries(callExpressions).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                          </select>
+                        </label>
+                      </>
+                    )}
+                  </fieldset>
+                );
+              })}
             </div>
             {lookError && <p role="alert" className="mt-2 text-red-300">{lookError}</p>}
           </section>
         )}
-        <div className={`relative min-h-24 flex-1 overflow-hidden rounded-3xl border-2 ${speaker === peer.id ? 'border-white/90' : 'border-white/10'}`}>
-          <CallPortrait person={{ ...peer, avatar: lookUrls[peer.id] || peer.avatar }} speaking={speaker === peer.id} />
-          <div className={`absolute bottom-3 right-3 aspect-[3/4] w-1/4 max-w-28 overflow-hidden rounded-2xl border-2 shadow-lg ${speaker === me.id ? 'border-white' : 'border-white/30'}`}>
-            <CallPortrait person={{ ...me, avatar: lookUrls[me.id] || me.avatar }} speaking={speaker === me.id} />
+        <div className={`relative min-h-24 flex-1 overflow-hidden rounded-3xl border-2 bg-gradient-to-b from-neutral-700 to-neutral-900 ${speaker === peer.id ? 'border-white/90' : 'border-white/10'}`}>
+          {renderParticipant(peer)}
+          <div className={`absolute bottom-3 right-3 aspect-[3/4] w-1/4 max-w-28 overflow-hidden rounded-2xl border-2 bg-neutral-800 shadow-lg ${speaker === me.id ? 'border-white' : 'border-white/30'}`}>
+            {renderParticipant(me)}
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-xs">{me.name}</span>
           </div>
         </div>
