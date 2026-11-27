@@ -15,7 +15,7 @@ interface VideoCallProps {
 
 function CallPortrait({ person, speaking }: { person: Participant; speaking: boolean }) {
   const resolveMedia = useMediaResolver();
-  const src = person.avatar ? resolveMedia(person.avatar) : '';
+  const src = person.avatar.startsWith('blob:') ? person.avatar : person.avatar ? resolveMedia(person.avatar) : '';
   return (
     <div className="absolute inset-0 grid place-items-center overflow-hidden bg-neutral-800 text-3xl text-white/60">
       <span aria-hidden="true">{person.name.slice(0, 1)}</span>
@@ -36,6 +36,10 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
   const [speaker, setSpeaker] = useState<string>();
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
+  const [looksOpen, setLooksOpen] = useState(true);
+  const [lookUrls, setLookUrls] = useState<Record<string, string>>({});
+  const lookUrlsRef = useRef<Record<string, string>>({});
+  const [lookError, setLookError] = useState('');
   const [language, setLanguage] = useState('en');
   const audioAvailable = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
 
@@ -90,6 +94,23 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     }
   }, []);
 
+  useEffect(() => () => {
+    Object.values(lookUrlsRef.current).forEach(url => URL.revokeObjectURL(url));
+  }, []);
+
+  function changeLook(id: string, file?: File) {
+    if (file && (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10_000_000)) {
+      setLookError('Elegí un retrato JPG, PNG o WebP de hasta 10 MB.');
+      return;
+    }
+    const previous = lookUrlsRef.current[id];
+    if (previous) URL.revokeObjectURL(previous);
+    const url = file ? URL.createObjectURL(file) : '';
+    lookUrlsRef.current = { ...lookUrlsRef.current, [id]: url };
+    setLookUrls(lookUrlsRef.current);
+    setLookError('');
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = dialogue.trim();
@@ -114,6 +135,8 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
             <h2 className="truncate font-semibold">{peer.name}</h2>
             <p className="text-xs text-white/65">Videollamada simulada</p>
           </div>
+          <button type="button" aria-expanded={looksOpen} onClick={() => setLooksOpen(open => !open)}
+            className="shrink-0 rounded-lg bg-neutral-800 px-2 py-2 text-xs">Looks</button>
           {audioAvailable && (
             <>
               <select aria-label="Idioma de las voces" value={language} onChange={event => setLanguage(event.target.value)}
@@ -133,10 +156,33 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
             <PhoneOff size={19} />
           </button>
         </header>
+        {looksOpen && (
+          <section aria-label="Looks de la llamada" className="shrink-0 rounded-xl bg-white/10 p-2 text-xs">
+            <p className="mb-2 text-white/75">Elegí un retrato con el peinado y la ropa que quieras para cada uno.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[me, peer].map(person => (
+                <div key={person.id} className="min-w-0 space-y-1">
+                  <label className="block cursor-pointer truncate rounded-lg border border-white/25 p-2 focus-within:ring-2 focus-within:ring-white">
+                    {lookUrls[person.id] ? 'Cambiar' : 'Elegir'} look de {person.name}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                      onChange={event => {
+                        const file = event.currentTarget.files?.[0];
+                        if (file) changeLook(person.id, file);
+                        event.currentTarget.value = '';
+                      }} />
+                  </label>
+                  {lookUrls[person.id] && <button type="button" className="px-2 py-1 underline"
+                    aria-label={`Restaurar retrato de ${person.name}`} onClick={() => changeLook(person.id)}>Usar foto de perfil</button>}
+                </div>
+              ))}
+            </div>
+            {lookError && <p role="alert" className="mt-2 text-red-300">{lookError}</p>}
+          </section>
+        )}
         <div className={`relative min-h-24 flex-1 overflow-hidden rounded-3xl border-2 ${speaker === peer.id ? 'border-white/90' : 'border-white/10'}`}>
-          <CallPortrait person={peer} speaking={speaker === peer.id} />
+          <CallPortrait person={{ ...peer, avatar: lookUrls[peer.id] || peer.avatar }} speaking={speaker === peer.id} />
           <div className={`absolute bottom-3 right-3 aspect-[3/4] w-1/4 max-w-28 overflow-hidden rounded-2xl border-2 shadow-lg ${speaker === me.id ? 'border-white' : 'border-white/30'}`}>
-            <CallPortrait person={me} speaking={speaker === me.id} />
+            <CallPortrait person={{ ...me, avatar: lookUrls[me.id] || me.avatar }} speaking={speaker === me.id} />
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-xs">{me.name}</span>
           </div>
         </div>
