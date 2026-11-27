@@ -760,7 +760,7 @@ function StartupRecovery({ resetError }: { error: Error; resetError: () => void 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-[#111014] px-6 text-center text-[#f2ece8]">
       <section className="w-full max-w-sm space-y-5">
-        <h1 className="text-3xl tracking-[0.4em]">ECHO</h1>
+        <h1 className="echo-interface-wordmark">Echo</h1>
         <p>No pudimos completar el inicio de ECHO. Tu cuenta y tus universos no se borraron.</p>
         <button type="button" className="rounded-xl border border-[#df9fb1] px-5 py-3" onClick={() => { resetError(); window.location.reload(); }}>
           Reintentar conexión
@@ -787,7 +787,7 @@ function App() {
           ) : (
             <main className="flex min-h-[100dvh] items-center justify-center bg-[#111014] px-6 text-center text-[#f2ece8]">
               <section className="max-w-sm space-y-4">
-                <h1 className="text-3xl tracking-[0.4em]">ECHO</h1>
+                <h1 className="echo-interface-wordmark">Echo</h1>
                 <p>La conexión de acceso no está configurada. No borres la aplicación ni crees otra cuenta.</p>
               </section>
             </main>

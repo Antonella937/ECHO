@@ -7,7 +7,7 @@ export default function BetaInformationPage() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <article className="w-full max-w-[680px] space-y-5 text-foreground">
-        <Link href="/" className="wordmark text-2xl">ECHO</Link>
+        <Link href="/" className="echo-interface-wordmark">Echo</Link>
         <p className="text-sm text-muted-foreground">{t("Información preliminar · beta privada")}</p>
         <h1 className="text-3xl font-semibold">{t("Antes de probar ECHO")}</h1>
         <p>{t("ECHO está en desarrollo. La prueba está limitada a un máximo de tres cuentas adultas. Puede haber errores, cambios y pérdida de disponibilidad.")}</p>

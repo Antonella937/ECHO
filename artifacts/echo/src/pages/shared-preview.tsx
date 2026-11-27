@@ -35,7 +35,7 @@ export default function SharedPreviewPage() {
     return () => { active = false; };
   }, [token, t]);
   return <main className="mx-auto min-h-screen max-w-2xl px-5 py-12 text-foreground">
-    <Link href="/" className="text-sm text-primary">ECHO</Link>
+    <Link href="/" className="echo-interface-wordmark text-primary">Echo</Link>
     {error ? <p role="alert" className="mt-8">{error}</p> : !data ? <p className="mt-8">{t("Cargando contenido compartido…")}</p> : <>
       <p className="mt-8 text-xs uppercase tracking-widest text-primary">{data.kind === 'universe' ? t("Universo compartido") : t("Personaje compartido")}</p>
       <h1 className="mt-2 font-display text-4xl">{data.universeName}</h1>

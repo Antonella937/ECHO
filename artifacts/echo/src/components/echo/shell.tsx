@@ -67,8 +67,8 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="grain min-h-[100dvh] bg-background text-foreground lg:grid lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_300px]">
       {/* Desktop rail */}
       <aside className="sticky top-0 hidden h-[100dvh] min-h-0 flex-col overflow-y-auto border-r border-border/70 px-4 py-8 lg:flex">
-        <Link href="/" className="wordmark px-3 text-[26px] text-foreground" data-testid="link-wordmark-rail">
-          ECHO
+        <Link href="/" className="echo-interface-wordmark px-3 text-foreground" data-testid="link-wordmark-rail">
+          Echo
         </Link>
         <nav className="mt-10 flex flex-col gap-1">
           {items.map((it) => {
