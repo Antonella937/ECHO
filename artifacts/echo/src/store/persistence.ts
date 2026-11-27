@@ -33,6 +33,14 @@ function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest):
   );
 }
 
+export function readCallLooks<T>(scope: string): Promise<T | undefined> {
+  return tx('readonly', store => store.get(`call-looks:${scope}`));
+}
+
+export function writeCallLooks<T>(scope: string, value: T): Promise<unknown> {
+  return tx('readwrite', store => store.put(value, `call-looks:${scope}`));
+}
+
 export async function loadLegacyState(): Promise<SocialState | null> {
   // A failed IndexedDB write may leave an older snapshot behind. Once a
   // fallback write succeeds, that localStorage snapshot is authoritative.

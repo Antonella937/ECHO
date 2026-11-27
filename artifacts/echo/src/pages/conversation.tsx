@@ -1,4 +1,5 @@
 import { DmAppearanceSettings, readDmAppearance, dmBackgroundStyle } from '@/components/echo/dm-appearance';
+import { DmVideoCall } from '@/components/echo/dm-video-call';
 import { DmCanonReview } from '@/components/echo/dm-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
@@ -12,7 +13,7 @@ import { useUser } from '@clerk/react';
 import { getActiveUniverseId } from '@/store/persistence';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { Clapperboard, Copy, Check, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Smartphone, Trash2, X } from 'lucide-react';
+import { Clapperboard, Copy, Check, ChevronLeft, CornerUpLeft, Headphones, MoreHorizontal, Bookmark, Pencil, Sparkles, Mic, Plus, Camera, ImagePlus, Music2, Palette, Send, Smile, Square, Smartphone, Trash2, Video, X } from 'lucide-react';
 import { useSocial } from '@/store/social-store';
 import { useStoryViewer } from '@/components/echo/story-viewer';
 import { canViewStory, isStoryActive } from '@/domain/social-features';
@@ -52,6 +53,7 @@ export default function ConversationPage() {
   const [aiPreferencesOpen, setAiPreferencesOpen] = useState(false);
   const { me, character, actions, state } = useSocial();
   const identityId = me.id;
+  const [videoCallKey, setVideoCallKey] = useState<string | null>(null);
   const appearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${identityId}:${id??''}`;
   const legacyAppearanceKey = `echo:dm-appearance:${user?.id??'anonymous'}:${getActiveUniverseId(user?.id??'')}:${id??''}`;
   // Only the universe's original identity inherits legacy wallpapers. Never share them with other personas.
@@ -82,6 +84,7 @@ export default function ConversationPage() {
   },[appearanceKey,legacyAppearanceKey,isOriginalIdentity,user?.id,id,identityId]);
   const other = character(id);
   const messages = useThreadMessages(id);
+  const videoCallOpen = videoCallKey === appearanceKey;
   // Opening a DM should reconcile messages written by server-side autonomy
   // even when this browser has been idle on an older universe revision.
   // The existing sync coordinator merges remote messages with unsaved local edits;
@@ -399,7 +402,7 @@ export default function ConversationPage() {
           <button onClick={back} aria-label={t("Volver")} className="tap z-10 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-background/35 shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-back">
             <ChevronLeft className="h-6 w-6" strokeWidth={1.6} />
           </button>
-          <Link href={`/profile/${other.id}`} className="absolute inset-y-0 left-1/2 flex max-w-[52%] -translate-x-1/2 flex-col items-center justify-center gap-0.5 text-center" data-testid="link-conversation-profile">
+          <Link href={`/profile/${other.id}`} className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-center" data-testid="link-conversation-profile">
             <CharacterAvatar character={other} size={32} />
             <div className="min-w-0 max-w-full leading-tight">
               <div className="flex min-w-0 items-center justify-center gap-1 text-[12px] font-semibold"><span className="truncate">{other.name}</span><VerifiedBadge account={other} className="h-3.5 w-3.5 shrink-0" /></div>
@@ -408,11 +411,20 @@ export default function ConversationPage() {
           </Link>
 
           <div className="z-10 ml-auto flex gap-1">
+            {!other.archived && <button type="button" aria-label="Videollamada" title="Videollamada"
+              className="grid size-10 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl"
+              onClick={() => { playbackRef.current?.pause(); setVideoCallKey(appearanceKey); }}>
+              <Video size={17} />
+            </button>}
             {!other.archived && <Link href={`/phone/${encodeURIComponent(other.id)}`} aria-label={t("Abrir celular")} title={t("Abrir celular")} className="grid size-10 place-items-center rounded-full border border-white/20 bg-background/35 backdrop-blur-xl" data-testid="link-dm-phone"><Smartphone size={17} /></Link>}
           {showAiPreferences && <button type="button" onClick={() => setAiPreferencesOpen(true)} aria-label={t("Configuración de IA")} className="tap flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border border-white/20 bg-background/35 px-2 text-primary shadow-sm backdrop-blur-xl hover:bg-secondary/50" data-testid="button-dm-ai-settings"><Sparkles className="h-3.5 w-3.5" /><span className="hidden text-xs font-semibold sm:inline">IA</span></button>}
           </div>
         </div>
       </header>
+
+      {videoCallOpen && !other.archived && <DmVideoCall key={appearanceKey} storageScope={appearanceKey} me={me} peer={other} messages={messages}
+        onSend={dialogue => { actions.sendMessage(other.id, dialogue); }}
+        onClose={() => setVideoCallKey(null)} />}
 
       {showAiPreferences && <DmAiPreferencesPanel open={aiPreferencesOpen} onClose={() => setAiPreferencesOpen(false)} characterId={other.id} universeId={user?.id ? getActiveUniverseId(user.id) : 'primary'} peers={state.characters.filter(c => !c.archived).map(c => ({ id: c.id, name: c.name }))} />}
 

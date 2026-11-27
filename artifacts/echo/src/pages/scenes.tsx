@@ -1,3 +1,4 @@
+import { SceneStage } from '@/components/echo/scene-stage';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import { SceneCanonReview } from '@/components/echo/scene-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
@@ -203,7 +204,6 @@ export default function ScenesPage() {
     }catch{setError(es?'No se pudo enviar.':'Could not send.')}finally{setBusy(false)}
   };
   const active=scenes.find(s=>s.sceneId===selected);
-  const latestSpeakerId = events.at(-1)?.actorId;
   const visualCast = active?.participantIds.filter(id => id !== me.id && (presence[id] ?? 'present') === 'present') ?? [];
   useEffect(()=>{setSceneKindroidGroupId(active?.turnSettings?.kindroidGroupId??'');},[active?.sceneId,active?.turnSettings?.kindroidGroupId]);
   const saveSceneKindroidGroup = async () => {
@@ -350,27 +350,10 @@ export default function ScenesPage() {
         </select>
       </div>
       {showVisualScene && visualCast.length > 0 && (
-        <section aria-label={es ? 'Personajes en escena' : 'Characters on stage'}
-          className="relative z-10 flex shrink-0 gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
-          {visualCast.map(id => {
-            const character = state.characters.find(item => item.id === id);
-            const name = character?.name ?? '?';
-            const speaking = latestSpeakerId === id;
-            return (
-              <figure key={id} className={`relative mx-auto h-[min(23dvh,14rem)] min-w-[5rem] max-w-44 flex-1 overflow-hidden rounded-2xl border bg-black/45 text-white transition-[opacity,border-color] motion-reduce:transition-none ${speaking ? 'border-white shadow-lg' : 'border-white/20 opacity-75'}`}>
-                <div className="absolute inset-0 grid place-items-center text-3xl font-semibold" aria-hidden="true">{name.slice(0, 1)}</div>
-                {character?.avatar && <img src={resolveMedia(character.avatar)} alt=""
-                  className="absolute inset-0 h-full w-full object-cover object-top"
-                  onError={event => { event.currentTarget.style.visibility = 'hidden'; }}
-                  key={character.avatar} />}
-                <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-2 pb-2 pt-6 text-center">
-                  <span className="block truncate text-sm font-semibold">{name}</span>
-                  {speaking && <span className="block text-[11px]">{es ? 'Última intervención' : 'Latest turn'}</span>}
-                </figcaption>
-              </figure>
-            );
-          })}
-        </section>
+        <SceneStage key={visualPreferenceKey} es={es} turn={events.at(-1)} cast={visualCast.map(id => {
+          const character = state.characters.find(item => item.id === id);
+          return { id, name: character?.name ?? '?', avatar: character?.avatar ? resolveMedia(character.avatar) : '' };
+        })} />
       )}
       {active.status === 'finished'
         ? <div className="relative z-20 mx-2 rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-xs text-white/80" role="status">{es ? 'Escena terminada · Guardada para releer · Personajes liberados' : 'Scene finished · Saved for reading · Characters released'}</div>
