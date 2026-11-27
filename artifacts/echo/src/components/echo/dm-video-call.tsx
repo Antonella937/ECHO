@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { MicOff, PhoneOff, Send, Volume2 } from 'lucide-react';
 import type { Message } from '@/domain/types';
 import { useMediaResolver } from '@/lib/media';
@@ -31,6 +31,7 @@ function CallPortrait({ person }: { person: Participant }) {
 
 export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose }: VideoCallProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const seen = useRef(new Set(messages.map(message => message.id)));
   const utterances = useRef(new Set<SpeechSynthesisUtterance>());
   const [latest, setLatest] = useState<Message>();
@@ -46,6 +47,18 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
   const [lookError, setLookError] = useState('');
   const [language, setLanguage] = useState('en');
   const audioAvailable = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
+
+  useLayoutEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    const resize = () => {
+      composer.style.height = 'auto';
+      if (composer.value) composer.style.height = `${composer.scrollHeight}px`;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, [dialogue]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -261,10 +274,10 @@ export function DmVideoCall({ storageScope, me, peer, messages, onSend, onClose 
         )}
         {!audioAvailable && <p className="text-xs text-white/70">Las voces no están disponibles en este navegador.</p>}
         {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-        <form onSubmit={submit} className="flex shrink-0 items-end gap-2 rounded-[28px] border border-white/20 bg-black/40 p-1.5 shadow-lg backdrop-blur-md">
-          <textarea rows={1} aria-label={`Escribir como ${me.name}`} placeholder={`Escribí como ${me.name}…`}
+        <form onSubmit={submit} className="flex shrink-0 items-end gap-2 rounded-[28px] border border-white/25 bg-black/30 p-1.5 shadow-lg backdrop-blur-md focus-within:border-white/45">
+          <textarea ref={composerRef} rows={1} aria-label={`Escribir como ${me.name}`} placeholder={`Escribí como ${me.name}…`}
             value={dialogue} onChange={event => setDialogue(event.target.value)} maxLength={10000}
-            className="min-h-11 min-w-0 flex-1 resize-none rounded-3xl bg-transparent px-3 py-2.5 text-base leading-6 outline-none placeholder:text-white/75" />
+            className="box-border max-h-[max(44px,min(144px,calc(var(--echo-call-height,100dvh)/4)))] min-h-11 min-w-0 flex-1 resize-none overflow-y-auto overscroll-contain rounded-3xl bg-transparent px-3 py-2.5 text-base leading-6 outline-none placeholder:text-white/75" />
           <button type="submit" aria-label="Enviar diálogo" disabled={!dialogue.trim()}
             className="grid size-11 shrink-0 place-items-center rounded-full bg-white text-black disabled:opacity-40">
             <Send size={18} />
