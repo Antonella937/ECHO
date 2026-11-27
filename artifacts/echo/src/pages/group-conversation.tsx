@@ -1,3 +1,4 @@
+import { useAutosizeComposer } from '@/hooks/use-autosize-composer';
 import { GroupCanonReview } from '@/components/echo/group-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
@@ -48,7 +49,7 @@ export default function GroupConversationPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [text, setText] = useState('');
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useAutosizeComposer(text);
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [toolsOpen,setToolsOpen] = useState(false);
   const [wallpaperOpen,setWallpaperOpen] = useState(false);
@@ -527,7 +528,7 @@ export default function GroupConversationPage() {
     </div>
     {wallpaperOpen&&<div className="relative z-40 mx-3 rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><div className="mb-2 flex justify-between text-sm"><strong>Apariencia del chat</strong><button type="button" onClick={()=>setWallpaperOpen(false)}>✕</button></div><label className="relative block cursor-pointer overflow-hidden rounded-xl border border-white/20 p-3 text-sm">{wallpaperUploading ? "Subiendo fondo..." : "Elegir foto de fondo"}<input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={e=>{void changeWallpaper(e.target.files?.[0]);e.target.value='';}}/></label>{wallpaper&&<button type="button" onClick={()=>void changeWallpaper()} className="mt-2 text-xs">Quitar fondo</button>}</div>}
     {eventsOpen && group && id && group.participantIds.includes(me.id) && <div className="relative z-40 mx-3 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/20 bg-background/90 p-3 backdrop-blur-xl"><button type="button" onClick={()=>setEventsOpen(false)} className="mb-2 text-sm">✕ Cerrar acontecimientos</button><GroupCanonReview key={id} groupId={id} universeId={getActiveUniverseId(user?.id ?? '')} actorId={me.id} /></div>}
-    {canWriteToGroup && <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
+    {canWriteToGroup && <form onSubmit={send} className="relative z-30 flex shrink-0 flex-wrap items-end gap-2 border-0 bg-transparent px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3"><FormattingToolbar inputRef={composerRef} value={text} onChange={setText} maxLength={10000} className="w-full" />
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" multiple className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); try { validateAttachments(files, pendingFiles.length); setPendingFiles(old => [...old, ...files]); setError(''); } catch (err) { setError((err as Error).message); } e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{const files=Array.from(e.target.files??[]);try{validateAttachments(files,pendingFiles.length);setPendingFiles(old=>[...old,...files]);setError('');}catch(err){setError((err as Error).message);}e.target.value='';}} />
       {!!pendingFiles.length && <div className="w-full min-w-0">
@@ -545,7 +546,7 @@ export default function GroupConversationPage() {
         <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-label="Más opciones" aria-expanded={toolsOpen} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-background/40 backdrop-blur-xl"><Plus className={toolsOpen?'h-6 w-6 rotate-45':'h-6 w-6'}/></button>
       </div>
       <button type="button" onClick={() => void recorder.start()} disabled={recorder.status !== 'idle' || sending || pendingFiles.length >= 5} aria-label="Grabar nota de voz" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-50"><Mic className="h-5 w-5" /></button>
-      <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="max-h-36 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-full border border-white/20 bg-background/40 px-4 py-3 outline-none backdrop-blur-xl whitespace-pre-wrap" aria-label="Mensaje al grupo" />
+      <textarea ref={composerRef} value={text} onChange={e => setText(e.target.value)} maxLength={10000} rows={1} placeholder="Mensaje al grupo…" className="box-border max-h-40 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-3xl border border-white/20 bg-background/40 px-4 py-3 outline-none backdrop-blur-xl whitespace-pre-wrap" aria-label="Mensaje al grupo" />
       <button disabled={(!text.trim() && !pendingFiles.length) || sending} aria-label="Enviar mensaje" className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-5 w-5" /></button>
     </form>}
   </div>;

@@ -1,5 +1,6 @@
+import { useAutosizeComposer } from '@/hooks/use-autosize-composer';
 import { customFetch } from '@workspace/api-client-react';
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { MicOff, PhoneOff, Send, Volume2 } from 'lucide-react';
 import type { Message } from '@/domain/types';
 import { useMediaResolver } from '@/lib/media';
@@ -49,7 +50,7 @@ function CallPortrait({ person }: { person: Participant }) {
 
 export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSend, onClose }: VideoCallProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useAutosizeComposer(dialogue);
   const seen = useRef(new Set(messages.map(message => message.id)));
   const player = useRef<HTMLAudioElement>(null);
   const voiceRun = useRef(new AbortController());
@@ -94,18 +95,6 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
     }, 4200);
     return () => { window.clearInterval(timer); window.clearTimeout(end); };
   }, []);
-
-  useLayoutEffect(() => {
-    const composer = composerRef.current;
-    if (!composer) return;
-    const resize = () => {
-      composer.style.height = 'auto';
-      if (composer.value) composer.style.height = `${composer.scrollHeight}px`;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, [dialogue]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
