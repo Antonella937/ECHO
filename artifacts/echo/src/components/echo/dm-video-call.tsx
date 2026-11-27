@@ -42,6 +42,8 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
   const [blink, setBlink] = useState(false);
   const [preparedAudio, setPreparedAudio] = useState(false);
   const [latest, setLatest] = useState<Message>();
+  const [replies, setReplies] = useState(() => messages.filter(message => message.senderId === peer.id && message.text.trim()).slice(-1));
+  const [copyStatus, setCopyStatus] = useState<{ id: string; copied: boolean }>();
   const [dialogue, setDialogue] = useState('');
   const [speaker, setSpeaker] = useState<string>();
   const [muted, setMuted] = useState(true);
@@ -99,7 +101,9 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
     messages.forEach(message => seen.current.add(message.id));
     const lastTurn = newTurns.at(-1);
     if (lastTurn) setLatest(lastTurn);
-  }, [messages]);
+    const incoming = newTurns.filter(message => message.senderId === peer.id);
+    if (incoming.length) setReplies(previous => [...previous, ...incoming]);
+  }, [messages, peer.id]);
 
   useEffect(() => {
     let active = true;
@@ -192,9 +196,12 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
           void audio.play().catch(() => { if (!signal.aborted) setPreparedAudio(true); });
         });
       } catch (cause) {
-        if (!signal.aborted) setError((cause as { status?: number }).status === 409
-          ? 'Asignale una voz a este personaje en su ficha de ECHO.'
-          : 'No se pudo generar la voz de ECHO para este turno.');
+        if (!signal.aborted) {
+          const status = (cause as { status?: number }).status;
+          if (status === 409) setError('Asignale una voz a este personaje en su ficha de ECHO.');
+          else if (status === 402) setError('No quedan créditos de voz para este turno.');
+          else setError('No se pudo generar la voz de ECHO para este turno.');
+        }
       } finally {
         cancelAnimationFrame(frame);
         if (url) URL.revokeObjectURL(url);
@@ -354,9 +361,32 @@ export function DmVideoCall({ storageScope, universeId, me, peer, messages, onSe
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-xs">{me.name}</span>
           </div>
         </div>
-        <div aria-live="polite" aria-label="Diálogo de la llamada" className={latest ? 'max-h-[min(16dvh,6rem)] shrink-0 overflow-y-auto rounded-2xl bg-black/45 px-3 py-2 text-sm backdrop-blur-md' : 'sr-only'}>
-          {latest && <p key={latest.id} className="whitespace-pre-wrap break-words"><strong>{latest.senderId === me.id ? me.name : peer.name}</strong> {latest.text}</p>}
-        </div>
+        {replies.length > 0 && (
+          <section aria-label={`Respuestas de ${peer.name}`} className="max-h-[min(24dvh,10rem)] shrink-0 space-y-3 overflow-y-auto rounded-2xl bg-black/55 px-3 py-2 text-sm backdrop-blur-md">
+            {[...replies].reverse().map(reply => (
+              <article key={reply.id} className="select-text">
+                <div className="flex items-center justify-between gap-2">
+                  <strong>{peer.name}</strong>
+                  <button type="button" className="rounded-lg bg-white/15 px-3 py-2 text-xs"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(reply.text);
+                        setCopyStatus({ id: reply.id, copied: true });
+                      } catch {
+                        setCopyStatus({ id: reply.id, copied: false });
+                      }
+                    }}>
+                    {copyStatus?.id === reply.id && copyStatus.copied ? 'Copiado' : 'Copiar respuesta'}
+                  </button>
+                </div>
+                <p className="whitespace-pre-wrap break-words">{reply.text}</p>
+                {copyStatus?.id === reply.id && !copyStatus.copied && (
+                  <p role="status" className="text-xs text-white/80">Mantené presionado el texto para copiarlo.</p>
+                )}
+              </article>
+            ))}
+          </section>
+        )}
         {(latest || preparedAudio) && !muted && (
           <button type="button" disabled={!!speaker} onClick={() => { if (preparedAudio) void player.current?.play().catch(() => setError('No se pudo reproducir el audio.')); else if (latest) speak(latest.text, latest.senderId); }}
             className="shrink-0 self-start rounded-lg bg-white/10 px-3 py-1 text-xs disabled:opacity-40">
