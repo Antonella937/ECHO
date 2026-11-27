@@ -78,6 +78,48 @@ export async function completeVoiceNarration(ownerId: string, id: string, succee
     .where(and(eq(echoVoiceUsageTable.ownerId, ownerId), eq(echoVoiceUsageTable.messageId, id)));
 }
 
+/** Narrate an explicitly requested turn using the same profile voice and account limits as DMs. */
+export async function narrateSceneTurn(input: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string; text: string }) {
+  const { ownerId, characterId, text } = input;
+  const voiceId = await resolveAutonomousVoiceId(input);
+  if (!voiceId) return null;
+  const custom = voiceId.startsWith("elevenlabs:");
+  if (!custom && !basicVoiceProviderReady()) throw Error("BASIC_VOICE_NOT_AVAILABLE");
+  const reservation = await reserveVoiceNarration(ownerId, characterId, text);
+  if (!reservation) throw Error("VOICE_BUDGET_EXHAUSTED_OR_DISABLED");
+  const requestId = randomUUID();
+  let charged = false;
+  try {
+    const credit = await reserveCharacterAudioCredit({ ownerId, characterId, requestKey: requestId,
+      engine: custom ? "custom" : "kokoro", requestedSeconds: 30 });
+    if (!credit.allowed) throw Error("VOICE_CREDITS_EXHAUSTED");
+    charged = true;
+    let audio: { bytes: Buffer; mimeType: string };
+    if (custom) {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId.slice("elevenlabs:".length))}?output_format=mp3_44100_128`, {
+        method: "POST", headers: { ...elevenLabsHeaders(), Accept: "audio/mpeg" },
+        body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" }), signal: AbortSignal.timeout(45000),
+      });
+      if (!response.ok) throw Error("ELEVENLABS_TTS_FAILED");
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const seconds = mp3DurationSeconds(bytes);
+      if (bytes.length < 100 || bytes.length > 10 * 1024 * 1024 || seconds === null || seconds <= 0 || seconds > 30)
+        throw Error("CUSTOM_VOICE_AUDIO_INVALID");
+      audio = { bytes, mimeType: "audio/mpeg" };
+    } else {
+      const result = await synthesizeBasicVoiceAudio({ text, voice: voices[voiceId], requestId });
+      if (!Number.isFinite(result.seconds) || result.seconds <= 0 || result.seconds > 30) throw Error("VOICE_AUDIO_INVALID");
+      audio = result;
+    }
+    await completeVoiceNarration(ownerId, reservation, true);
+    return audio;
+  } catch (error) {
+    if (charged) await refundFailedCharacterAudio(ownerId, requestId).catch(() => undefined);
+    await completeVoiceNarration(ownerId, reservation, false).catch(() => undefined);
+    throw error;
+  }
+}
+
 /** Voice is attached only after the text DM is committed; TTS failures never roll back the text. */
 export async function dispatchAutonomousVoice(input: { ownerId: string; universeId: string; characterId: string; messageId: string; text: string; spokenText: string; voiceId: string }) {
   const r2 = configuredR2();

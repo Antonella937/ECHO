@@ -1,13 +1,17 @@
+import { customFetch } from '@workspace/api-client-react';
 import { useEffect, useState, useRef } from 'react';
 import { readCallLooks, writeCallLooks } from '@/store/persistence';
 import { Volume2, VolumeX } from 'lucide-react';
 import { CallAvatar, type CallAvatarLook } from './call-avatar';
 
-type CharacterSettings = { photo?: File; voiceURI?: string };
+type CharacterSettings = { photo?: File };
 type StageSettings = Record<string, CharacterSettings>;
 
 interface SceneStageProps {
   storageScope: string;
+  sceneId: string;
+  universeId: string;
+  viewerId: string;
   cast: Array<{ id: string; name: string; avatar: string }>;
   turn?: { eventId: string; actorId: string; text: string };
   es: boolean;
@@ -16,22 +20,21 @@ interface SceneStageProps {
 const hair: CallAvatarLook['hair'][] = ['long', 'swept', 'fringe'];
 const clothes: CallAvatarLook['clothes'][] = ['black', 'cream', 'burgundy'];
 
-export function SceneStage({ cast, turn, es, storageScope }: SceneStageProps) {
+export function SceneStage({ cast, turn, es, storageScope, sceneId, universeId, viewerId }: SceneStageProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [settings, setSettings] = useState<StageSettings>({});
   const [references, setReferences] = useState<Record<string, string>>({});
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [settingsError, setSettingsError] = useState('');
   const [voice, setVoice] = useState(false);
   const [mouthCue, setMouthCue] = useState('');
   const [speaking, setSpeaking] = useState(false);
-  const speech = useRef<SpeechSynthesisUtterance | null>(null);
+  const audio = useRef<HTMLAudioElement>(null);
+  const [voiceError, setVoiceError] = useState('');
+  const [needsPlay, setNeedsPlay] = useState(false);
   const speakerId = turn?.actorId;
-  const voiceURI = speakerId ? settings[speakerId]?.voiceURI : undefined;
   const turnText = turn?.text ?? '';
   const actorOnStage = cast.some(person => person.id === speakerId);
-  const canSpeak = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
   const actions = [...turnText.matchAll(/\*([^*]+)\*/g)].map(match => match[1]).join(' ');
   const expression = /\b(smiles?|grins?|laughs?|sonr[ií]e|r[ií]e)\b/i.test(actions) ? 'smile'
     : /\b(gasps?|surprised|sorprendid[oa])\b/i.test(actions) ? 'surprised' : 'neutral';
@@ -47,15 +50,6 @@ export function SceneStage({ cast, turn, es, storageScope }: SceneStageProps) {
     });
     return () => { active = false; };
   }, [storageScope, es]);
-
-  useEffect(() => {
-    if (!canSpeak) return;
-    const synth = window.speechSynthesis;
-    const update = () => setVoices(synth.getVoices());
-    update();
-    synth.addEventListener('voiceschanged', update);
-    return () => synth.removeEventListener('voiceschanged', update);
-  }, [canSpeak]);
 
   const photos = useRef(new Map<string, { file: File; url: string }>());
   useEffect(() => {
@@ -93,39 +87,58 @@ export function SceneStage({ cast, turn, es, storageScope }: SceneStageProps) {
     changeSettings(id, { photo: file });
   }
 
+  const eventId = turn?.eventId;
   useEffect(() => {
     setSpeaking(false);
-    if (!voice || !canSpeak || !actorOnStage) return;
+    setNeedsPlay(false);
+    setVoiceError('');
+    const player = audio.current;
+    if (!voice || !eventId || !player || !actorOnStage) return;
     const dialogue = turnText.replace(/\*{1,3}[^*]+\*{1,3}/g, '').trim();
     if (!dialogue) return;
-    const line = new SpeechSynthesisUtterance(dialogue);
-    const selectedVoice = window.speechSynthesis.getVoices().find(candidate => candidate.voiceURI === voiceURI);
-    if (selectedVoice) line.voice = selectedVoice;
-    line.lang = selectedVoice?.lang ?? (es ? 'es' : 'en');
-    line.onstart = () => {
-      if (speech.current !== line) return;
-      setMouthCue(dialogue.split(/\s+/)[0] ?? '');
-      setSpeaking(true);
+    if (dialogue.length > 500) {
+      setVoiceError(es ? 'Este turno supera los 500 caracteres de audio.' : 'This turn exceeds the 500-character audio limit.');
+      return;
+    }
+    let active = true;
+    let url: string | undefined;
+    const controller = new AbortController();
+    const words = dialogue.split(/\s+/);
+    player.ontimeupdate = () => {
+      const index = Math.min(words.length - 1, Math.floor((player.currentTime / player.duration) * words.length));
+      setMouthCue(words[index] ?? words[0]);
     };
-    line.onboundary = event => {
-      if (speech.current === line) setMouthCue(dialogue.slice(event.charIndex).match(/^\S+/)?.[0] ?? '');
-    };
-    line.onend = line.onerror = () => {
-      if (speech.current !== line) return;
-      speech.current = null;
-      setSpeaking(false);
-    };
-    speech.current = line;
-    window.speechSynthesis.speak(line);
+    player.onplaying = () => { setNeedsPlay(false); setSpeaking(true); };
+    player.onpause = player.onended = () => setSpeaking(false);
+    void customFetch<Blob>(`/api/scenes/${encodeURIComponent(sceneId)}/events/${encodeURIComponent(eventId)}/voice`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universeId, viewerId }), responseType: 'blob', signal: controller.signal,
+    }).then(blob => {
+      if (!active) return;
+      url = URL.createObjectURL(blob);
+      player.src = url;
+      setMouthCue(words[0]);
+      void player.play().catch(() => { if (active) setNeedsPlay(true); });
+    }).catch(error => {
+      if (!active) return;
+      setVoiceError(error?.status === 409
+        ? (es ? 'Asignale una voz al personaje en su perfil de ECHO.' : 'Assign a voice in the character’s ECHO profile.')
+        : (es ? 'No se pudo generar la voz de ECHO para este turno.' : 'Could not generate the ECHO voice for this turn.'));
+    });
     return () => {
-      if (speech.current !== line) return;
-      speech.current = null;
-      window.speechSynthesis.cancel();
+      active = false;
+      controller.abort();
+      player.pause();
+      player.removeAttribute('src');
+      player.load();
+      player.ontimeupdate = player.onplaying = player.onpause = player.onended = null;
+      if (url) URL.revokeObjectURL(url);
     };
-  }, [voice, canSpeak, actorOnStage, turn?.eventId, turnText, es, voiceURI]);
+  }, [voice, eventId, actorOnStage, turnText, es, sceneId, universeId, viewerId]);
 
   return (
     <section aria-label={es ? 'Personajes en escena' : 'Characters on stage'} className="relative z-10 shrink-0">
+      <audio ref={audio} />
       <div className="flex gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
         {cast.map((person, index) => {
           const active = speakerId === person.id;
@@ -151,16 +164,19 @@ export function SceneStage({ cast, turn, es, storageScope }: SceneStageProps) {
       <div className="mt-1 flex justify-center gap-2">
         <button type="button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(open => !open)}
           className="rounded-full border border-white/25 bg-black/65 px-3 py-1.5 text-xs text-white">
-          {es ? 'Retratos y voces' : 'Portraits and voices'}
+          {es ? 'Retratos' : 'Portraits'}
         </button>
-        {canSpeak && (
-          <button type="button" aria-pressed={voice} onClick={() => setVoice(value => !value)}
+        <button type="button" aria-pressed={voice} onClick={() => setVoice(value => !value)}
             className="flex items-center gap-1.5 rounded-full border border-white/25 bg-black/65 px-3 py-1.5 text-xs text-white">
             {voice ? <Volume2 size={14} /> : <VolumeX size={14} />}
             {es ? 'Voces de la escena' : 'Scene voices'}
           </button>
-        )}
       </div>
+      {needsPlay && <button type="button" className="mx-auto mt-1 block text-xs underline"
+        onClick={() => void audio.current?.play().catch(() => setVoiceError(es ? 'No se pudo reproducir el audio.' : 'Could not play audio.'))}>
+        {es ? 'Reproducir turno' : 'Play turn'}
+      </button>}
+      {voiceError && <p role="status" className="px-2 text-center text-xs text-white/75">{voiceError}</p>}
       {settingsOpen && (
         <div className="mt-2 max-h-[24dvh] space-y-2 overflow-y-auto rounded-xl border border-white/20 bg-neutral-950/95 p-2 text-xs text-white">
           {cast.map(person => (
@@ -181,14 +197,6 @@ export function SceneStage({ cast, turn, es, storageScope }: SceneStageProps) {
                   {es ? 'Quitar foto' : 'Remove photo'}
                 </button>}
               </div>
-              {canSpeak && <label className="flex items-center gap-2">
-                {es ? 'Voz' : 'Voice'}
-                <select value={settings[person.id]?.voiceURI ?? ''} onChange={event => changeSettings(person.id, { voiceURI: event.target.value })}
-                  className="min-w-0 flex-1 rounded-lg bg-neutral-800 p-1.5">
-                  <option value="">{es ? 'Predeterminada de Safari' : 'Browser default'}</option>
-                  {voices.map(option => <option key={option.voiceURI} value={option.voiceURI}>{option.name} · {option.lang}</option>)}
-                </select>
-              </label>}
             </fieldset>
           ))}
           {settingsError && <p role="alert" className="text-red-300">{settingsError}</p>}

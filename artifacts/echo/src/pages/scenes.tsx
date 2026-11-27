@@ -350,7 +350,7 @@ export default function ScenesPage() {
         </select>
       </div>
       {showVisualScene && visualCast.length > 0 && (
-        <SceneStage key={visualPreferenceKey} storageScope={visualPreferenceKey} es={es} turn={events.at(-1)} cast={visualCast.map(id => {
+        <SceneStage key={visualPreferenceKey} storageScope={visualPreferenceKey} sceneId={active.sceneId} universeId={universeId} viewerId={me.id} es={es} turn={events.at(-1)} cast={visualCast.map(id => {
           const character = state.characters.find(item => item.id === id);
           return { id, name: character?.name ?? '?', avatar: character?.avatar ? resolveMedia(character.avatar) : '' };
         })} />
