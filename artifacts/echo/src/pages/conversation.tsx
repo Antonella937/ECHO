@@ -1,3 +1,4 @@
+import { useAutosizeComposer } from '@/hooks/use-autosize-composer';
 import { DmAppearanceSettings, readDmAppearance, dmBackgroundStyle } from '@/components/echo/dm-appearance';
 import { DmVideoCall } from '@/components/echo/dm-video-call';
 import { DmCanonReview } from '@/components/echo/dm-canon-review';
@@ -101,16 +102,7 @@ export default function ConversationPage() {
   const [, navigate] = useLocation();
   const back = () => navigate('/messages');
   const [text, setText] = useState('');
-  const composerRef = useRef<HTMLTextAreaElement>(null);
-  // Expand the DM composer as the user types, including on iOS with the keyboard open.
-  useEffect(() => {
-    const input = composerRef.current;
-    if (!input) return;
-    input.style.height = 'auto';
-    const maxHeight = Math.min(240, Math.max(120, window.innerHeight * 0.32));
-    input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
-    input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [text]);
+  const composerRef = useAutosizeComposer(text);
 
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
   const [attachmentsMenuOpen,setAttachmentsMenuOpen] = useState(false);
@@ -657,7 +649,7 @@ export default function ConversationPage() {
               placeholder={`${t("Escribir como")} ${me.name.split(' ')[0]}…`}
               rows={1}
               maxLength={10000}
-              className="min-h-12 min-w-0 flex-1 resize-none overflow-hidden rounded-full border border-white/20 bg-background/35 px-5 py-3 text-[15px] shadow-sm backdrop-blur-xl placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
+              className="box-border max-h-40 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-3xl border border-white/20 bg-background/35 px-5 py-3 text-[15px] shadow-sm backdrop-blur-xl placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
               aria-label={`${t("Mensaje para")} ${other.name}`}
               data-testid="input-message"
             />

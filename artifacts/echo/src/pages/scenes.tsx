@@ -1,9 +1,10 @@
+import { useAutosizeComposer } from '@/hooks/use-autosize-composer';
 import { SceneStage } from '@/components/echo/scene-stage';
 import { uploadPrivateFile, useMediaResolver } from '@/lib/media';
 import { SceneCanonReview } from '@/components/echo/scene-canon-review';
 import { FormattingToolbar } from '@/components/echo/formatting-toolbar';
 import { SocialText } from '@/components/echo/social-text';
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useUser } from '@clerk/react';
 import { customFetch } from '@workspace/api-client-react';
 import { getActiveUniverseId } from '@/store/persistence';
@@ -35,13 +36,7 @@ export default function ScenesPage() {
   const [participants,setParticipants] = useState<string[]>([]);
   const [message,setMessage] = useState('');
   const [scenePhoto, setScenePhoto] = useState<{ sceneId: string; file: File } | null>(null);
-  const sceneMessageRef = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const field = sceneMessageRef.current;
-    if (!field) return;
-    field.style.height = '';
-    if (message) field.style.height = `${Math.min(field.scrollHeight, 160)}px`;
-  }, [message]);
+  const sceneMessageRef = useAutosizeComposer(message);
   const sceneEventsScrollRef = useRef<HTMLDivElement>(null);
   useEffect(()=>{if(selected && events.length){const container=sceneEventsScrollRef.current;if(container)container.scrollTo({top:container.scrollHeight,behavior:'smooth'});}},[selected,events.length]);
   const [nextSpeaker,setNextSpeaker] = useState('');
@@ -422,7 +417,7 @@ export default function ScenesPage() {
           <span aria-hidden="true">+</span>
           <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||active.status!=='active'} aria-label={es?'Adjuntar foto':'Attach photo'} className="absolute inset-0 cursor-pointer opacity-0" onChange={e=>{const file=e.currentTarget.files?.[0];if(file)setScenePhoto({sceneId:active.sceneId,file});e.currentTarget.value='';}}/>
         </label>
-        <textarea ref={sceneMessageRef} rows={1} value={message} onChange={event => setMessage(event.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="max-h-40 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-full border border-white/25 bg-black/25 px-4 py-3 text-white placeholder:text-white/55 backdrop-blur-md"/><button disabled={busy||active.status!=='active'||(!message.trim()&&!pendingPhoto)} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50" aria-label={st("Enviar")}><span aria-hidden="true" className="text-xl">➤</span></button></form>}</section>}
+        <textarea ref={sceneMessageRef} rows={1} value={message} onChange={event => setMessage(event.target.value)} maxLength={5000} placeholder={st("Escribí en la escena…")} className="box-border max-h-40 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-3xl border border-white/25 bg-black/25 px-4 py-3 text-white placeholder:text-white/55 backdrop-blur-md"/><button disabled={busy||active.status!=='active'||(!message.trim()&&!pendingPhoto)} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50" aria-label={st("Enviar")}><span aria-hidden="true" className="text-xl">➤</span></button></form>}</section>}
     {error&&<p role="alert" className="relative z-20 px-3 text-sm text-destructive">{error}</p>}
   </main>;
 }
