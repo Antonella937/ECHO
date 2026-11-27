@@ -11,7 +11,7 @@ export interface CallAvatarLook {
   expression: keyof typeof callExpressions;
 }
 
-export function CallAvatar({ look, speaking }: { look: CallAvatarLook; speaking: boolean }) {
+export function CallAvatar({ look, speaking, reference }: { look: CallAvatarLook; speaking: boolean; reference?: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const current = useRef({ look, speaking });
   current.current = { look, speaking };
@@ -63,6 +63,58 @@ export function CallAvatar({ look, speaking }: { look: CallAvatarLook; speaking:
     const eyes = [-1, 1].map(side => shape(head, eye, [side * 0.23, 0.34, 0.51], [0.066, 0.045, 0.026]));
     const brows = [-1, 1].map(side => shape(head, hair, [side * 0.23, 0.47, 0.49], [0.105, 0.024, 0.035]));
     const mouth = shape(head, lip, [0, -0.19, 0.483], [0.13, 0.035, 0.03]);
+    const patches = [
+      { parent: head, center: [0, 0.23, 0], radius: [0.65, 0.82, 0.55], sourceY: 0, sourceHeight: 0.69 },
+      { parent: scene, center: [0, -1.16, 0], radius: [0.91, 0.68, 0.45], sourceY: 0.69, sourceHeight: 0.31 },
+    ].map(({ parent, center, radius, sourceY, sourceHeight }) => {
+      const patchGeometry = new THREE.PlaneGeometry(radius[0] * 1.96, radius[1] * 1.96, 24, 24);
+      const positions = patchGeometry.attributes.position;
+      for (let vertex = 0; vertex < positions.count; vertex++) {
+        const x = positions.getX(vertex);
+        const y = positions.getY(vertex);
+        const depth = Math.sqrt(Math.max(0, 1 - (x / radius[0]) ** 2 - (y / radius[1]) ** 2));
+        positions.setXYZ(vertex, x + center[0], y + center[1], depth * radius[2] + center[2] + 0.009);
+      }
+      const surface = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+      const mesh = new THREE.Mesh(patchGeometry, surface);
+      mesh.visible = false;
+      parent.add(mesh);
+      return { mesh, surface, sourceY, sourceHeight };
+    });
+
+    let cancelled = false;
+    if (reference) {
+      const image = new Image();
+      image.onload = () => {
+        if (cancelled) return;
+        for (const { mesh, surface, sourceY, sourceHeight } of patches) {
+          const layer = document.createElement('canvas');
+          layer.width = layer.height = 384;
+          const context = layer.getContext('2d');
+          if (!context) continue;
+          const width = Math.min(image.naturalWidth, image.naturalHeight * 0.78);
+          context.drawImage(image, (image.naturalWidth - width) / 2, image.naturalHeight * sourceY,
+            width, image.naturalHeight * sourceHeight, 0, 0, 384, 384);
+          context.globalCompositeOperation = 'destination-in';
+          context.save();
+          context.translate(192, 192);
+          context.scale(1, 1.04);
+          const mask = context.createRadialGradient(0, 0, 127, 0, 0, 183);
+          mask.addColorStop(0, 'white');
+          mask.addColorStop(1, 'transparent');
+          context.fillStyle = mask;
+          context.fillRect(-192, -192, 384, 384);
+          context.restore();
+          const texture = new THREE.CanvasTexture(layer);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          surface.map = texture;
+          surface.needsUpdate = true;
+          mesh.visible = true;
+        }
+      };
+      image.src = reference;
+    }
+
     const styles = Object.fromEntries(Object.keys(callHair).map(name => [name, new THREE.Group()])) as Record<CallAvatarLook['hair'], THREE.Group>;
     head.add(...Object.values(styles));
     shape(styles.swept, hair, [-0.2, 0.86, 0.27], [0.5, 0.22, 0.36]).rotation.z = 0.25;
@@ -94,6 +146,9 @@ export function CallAvatar({ look, speaking }: { look: CallAvatarLook; speaking:
       collar.visible = look.clothes !== 'black';
       torso.scale.x = hood.visible ? 0.99 : 0.91;
       head.rotation.y = reduceMotion.matches ? 0 : Math.sin(time * 0.85) * 0.085;
+      const referenceLoaded = patches[0].mesh.visible;
+      for (const part of [...eyes, ...brows]) part.visible = !referenceLoaded;
+      mouth.position.z = referenceLoaded ? 0.51 : 0.483;
       for (const part of eyes) part.scale.y = blink ? 0.007 : surprised ? 0.072 : 0.045;
       for (const brow of brows) brow.position.y = surprised ? 0.52 : 0.47;
       mouth.position.y = smile ? -0.16 : -0.19;
@@ -103,13 +158,19 @@ export function CallAvatar({ look, speaking }: { look: CallAvatarLook; speaking:
     });
 
     return () => {
+      cancelled = true;
+      for (const { mesh, surface } of patches) {
+        mesh.geometry.dispose();
+        surface.map?.dispose();
+        surface.dispose();
+      }
       observer.disconnect();
       renderer.setAnimationLoop(null);
       geometry.dispose();
       [skin, hair, fabric, eye, lip].forEach(surface => surface.dispose());
       renderer.dispose();
     };
-  }, []);
+  }, [reference]);
 
   return <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-hidden="true" />;
 }

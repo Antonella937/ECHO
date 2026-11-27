@@ -113,7 +113,7 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
     if (portraitMode[person.id]) {
       return <CallPortrait person={{ ...person, avatar: lookUrls[person.id] || person.avatar }} speaking={speaking} />;
     }
-    return <CallAvatar look={avatarLooks[person.id]} speaking={speaking} />;
+    return <CallAvatar look={avatarLooks[person.id]} speaking={speaking} reference={lookUrls[person.id]} />;
   }
 
   function changeLook(id: string, file?: File) {
@@ -204,6 +204,21 @@ export function DmVideoCall({ me, peer, messages, onSend, onClose }: VideoCallPr
                       </>
                     ) : (
                       <>
+                        <label className="block cursor-pointer rounded-lg border border-white/25 p-2 focus-within:ring-2 focus-within:ring-white">
+                          {lookUrls[person.id] ? 'Cambiar referencia' : 'Importar referencia'}
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                            aria-label={`Importar referencia de ${person.name}`}
+                            onChange={event => {
+                              const file = event.currentTarget.files?.[0];
+                              if (file) changeLook(person.id, file);
+                              event.currentTarget.value = '';
+                            }} />
+                        </label>
+                        {lookUrls[person.id] ? (
+                          <button type="button" className="px-2 py-1 underline" onClick={() => changeLook(person.id)}>Quitar referencia</button>
+                        ) : (
+                          <p className="text-white/65">Usá una foto frontal con la cara centrada y la ropa visible.</p>
+                        )}
                         <label className="block">Peinado
                           <select value={look.hair} onChange={event => updateAvatarLook(person.id, 'hair', event.target.value as CallAvatarLook['hair'])}
                             className="mt-1 w-full rounded-lg bg-neutral-800 p-2">
