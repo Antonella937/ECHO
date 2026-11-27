@@ -364,7 +364,8 @@ router.post("/voices/premium/generate",requireAuth,async(req,res)=>{
    if(!preview.generated_voice_id || !preview.audio_base_64)continue;
    const audio=Buffer.from(preview.audio_base_64,"base64");
    if(audio.length<100||audio.length>5*1024*1024)continue;
-   const path = `${r2 ? "r2/" : ""}voice-studio/previews/${project.id}/${randomUUID()}.mp3`;
+   const previewKey = `voice-studio/previews/${project.id}/${randomUUID()}`;
+   const path = r2 ? `r2/${previewKey}` : `${previewKey}.mp3`;
    const upload = r2
     ? await fetch(signR2Request(r2, "PUT", path), {
       method: "PUT", redirect: "error", headers: { "Content-Type": "audio/mpeg" },
@@ -400,7 +401,7 @@ router.get("/voices/premium/samples/:id/play",requireAuth,async(req,res)=>{
   const result=await pool.query("SELECT audio_object_path FROM echo_voice_samples WHERE id=$1 AND owner_id=$2 AND status='ready'",[req.params.id,req.userId]);
   if(!result.rowCount){res.status(404).json({error:"SAMPLE_NOT_FOUND"});return;}
   const path = result.rows[0].audio_object_path;
-  if (typeof path === "string" && /^r2\/voice-studio\/previews\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.mp3$/i.test(path)) {
+  if (typeof path === "string" && /^r2\/voice-studio\/previews\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i.test(path)) {
    const r2 = configuredR2();
    if (!r2) throw Error("STORAGE_NOT_CONFIGURED");
    res.json({url:signR2Request(r2, "GET", path, 120),expiresIn:120});
