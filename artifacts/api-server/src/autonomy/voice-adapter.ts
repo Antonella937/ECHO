@@ -79,14 +79,14 @@ export async function completeVoiceNarration(ownerId: string, id: string, succee
 }
 
 /** Narrate an explicitly requested turn using the same profile voice and account limits as DMs. */
-export async function narrateSceneTurn(input: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string; text: string }) {
+export async function narrateSceneTurn(input: { ownerId: string; universeId: string; characterId: string; basicVoiceId?: string; text: string; source?: "call" }) {
   const { ownerId, characterId, text } = input;
   const voiceId = await resolveAutonomousVoiceId(input);
   if (!voiceId) return null;
   const custom = voiceId.startsWith("elevenlabs:");
   if (!custom && !basicVoiceProviderReady()) throw Error("BASIC_VOICE_NOT_AVAILABLE");
-  const reservation = await reserveVoiceNarration(ownerId, characterId, text);
-  if (!reservation) throw Error("VOICE_BUDGET_EXHAUSTED_OR_DISABLED");
+  const reservation = input.source === "call" ? null : await reserveVoiceNarration(ownerId, characterId, text);
+  if (input.source !== "call" && !reservation) throw Error("VOICE_BUDGET_EXHAUSTED_OR_DISABLED");
   const requestId = randomUUID();
   let charged = false;
   try {
@@ -111,11 +111,11 @@ export async function narrateSceneTurn(input: { ownerId: string; universeId: str
       if (!Number.isFinite(result.seconds) || result.seconds <= 0 || result.seconds > 30) throw Error("VOICE_AUDIO_INVALID");
       audio = result;
     }
-    await completeVoiceNarration(ownerId, reservation, true);
+    if (reservation) await completeVoiceNarration(ownerId, reservation, true);
     return audio;
   } catch (error) {
     if (charged) await refundFailedCharacterAudio(ownerId, requestId).catch(() => undefined);
-    await completeVoiceNarration(ownerId, reservation, false).catch(() => undefined);
+    if (reservation) await completeVoiceNarration(ownerId, reservation, false).catch(() => undefined);
     throw error;
   }
 }

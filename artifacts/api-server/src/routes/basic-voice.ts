@@ -104,10 +104,13 @@ router.post("/voices/call/synthesize", requireAuth, async (req, res) => {
     const character = parsed.success ? parsed.data.characters.find(item => item.id === characterId && !item.archived) : undefined;
     if (!character) { res.sendStatus(404); return; }
     const audio = await narrateSceneTurn({ ownerId, universeId, characterId,
-      basicVoiceId: character.configuration?.voice?.basicVoiceId, text: text.trim() });
+      basicVoiceId: character.configuration?.voice?.basicVoiceId, text: text.trim(), source: "call" });
     if (!audio) { res.status(409).json({ error: "CHARACTER_VOICE_NOT_SELECTED" }); return; }
     res.set({ "Content-Type": audio.mimeType, "Cache-Control": "private, no-store" }).send(audio.bytes);
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "UNKNOWN";
+    if (reason === "VOICE_CREDITS_EXHAUSTED") { res.status(402).json({ error: reason }); return; }
+    req.log.warn({ reason: /^[A-Z_]+$/.test(reason) ? reason : "UNKNOWN" }, "Call voice generation failed");
     res.status(503).json({ error: "CALL_VOICE_UNAVAILABLE" });
   }
 });
